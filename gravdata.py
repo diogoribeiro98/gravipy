@@ -616,9 +616,9 @@ class GravData():
         
         if write_results:
             txtfile = open(txtfilename, 'w')
-            txtfile.write('# Results of binary fit for %s' % self.name[stname:])
-            txtfile.write('# Lines are: Best chi1, MCMC result, MCMC error 1, MCMC error 1')
-            txtfile.write('# Rowes are: dRA, dDEC, f1, f2, f3, f4, alpha flare, V scale, f BG, alpha BG, PC RA, PC DEC, OPD1, OPD2, OPD3, OPD4')
+            txtfile.write('# Results of binary fit for %s \n' % self.name[stname:])
+            txtfile.write('# Lines are: Best chi1, MCMC result, MCMC error 1, MCMC error 1 \n')
+            txtfile.write('# Rowes are: dRA, dDEC, f1, f2, f3, f4, alpha flare, V scale, f BG, alpha BG, PC RA, PC DEC, OPD1, OPD2, OPD3, OPD4 \n')
         
         if pdf:
             pdf = FPDF(orientation='P', unit='mm', format='A4')
@@ -1035,35 +1035,39 @@ class GravData():
                 if plotres:
                     self.plotFit(theta_result, fitdata, idx, pdf=pdf)
                 if write_results:
-                    txtfile.write("# Polarization %i" % (idx+1))
+                    txtfile.write("# Polarization %i  \n" % (idx+1))
                     txt = ""
                     for t in mostprop:
-                        txt += str(t)
+                        txtfile.write(str(t))
                         if t != mostprop[-1]:
-                            txt += ', '
-                    txtfile.write(txt)
+                            txtfile.write(', ')
+                        else:
+                            txtfile.write('\n')
 
                     percentiles = np.percentile(fl_samples, [16, 50, 84],axis=0).T
                     percentiles[:,0] = percentiles[:,1] - percentiles[:,0] 
                     percentiles[:,2] = percentiles[:,2] - percentiles[:,1] 
                     
                     for t in percentiles[:,1]:
-                        txt += str(t)
+                        txtfile.write(str(t))
                         if t != percentiles[-1,1]:
-                            txt += ', '
-                    txtfile.write(txt)
+                            txtfile.write(', ')
+                        else:
+                            txtfile.write('\n')
 
                     for t in percentiles[:,0]:
-                        txt += str(t)
+                        txtfile.write(str(t))
                         if t != percentiles[-1,0]:
-                            txt += ', '
-                    txtfile.write(txt)
+                            txtfile.write(', ')
+                        else:
+                            txtfile.write('\n')
 
                     for t in percentiles[:,2]:
-                        txt += str(t)
+                        txtfile.write(str(t))
                         if t != percentiles[-1,2]:
-                            txt += ', '
-                    txtfile.write(txt)
+                            txtfile.write(', ')
+                        else:
+                            txtfile.write('\n')
                     
 
 
