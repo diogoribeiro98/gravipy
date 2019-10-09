@@ -587,8 +587,8 @@ class GravData():
     
     def fitBinary(self, nthreads=4, nwalkers=500, nruns=500, bestchi=True,
                   plot=True, fit_for=np.array([0.5,0.5,1.0,0.0]), constant_f=True,
-                  bandpass='tophat', use_coupling=False, use_opds=False, fixedBG=True,
-                  use_visscale=False, write_residuals=False, flagtill=3, flagfrom=13,
+                  use_coupling=False, use_opds=False, fixedBG=True,
+                  use_visscale=False, write_results=True, flagtill=3, flagfrom=13,
                   dRA=0., dDEC=0., plotres=True, pdf=True):
         '''
         Parameter:
@@ -598,10 +598,9 @@ class GravData():
         bestchi:        Gives best chi2 (for True) or mcmc res as output [True]
         plot:           plot MCMC results [True]
         plotres:        plot fit result [True]
-        write_residuals:Write fit residuals in file [False] 
+        write_results:  Write fit results in file [True] 
         fit_for:        weight of VA, V2, T3, VP [[0.5,0.5,1.0,0.0]] 
         constant_f:     Constant coupling [True]
-        bandpass:       Bandpass of spectral pixel ['tophat'] 
         use_coupling:   user theoretical coupling [False] 
         use_opds:       Fit OPDs [False] 
         fixedBG:        Fir for background power law [False]
@@ -610,14 +609,18 @@ class GravData():
         flagfrom:       Flag red channels [13]
         dRA:            Guess for dRA (taken from SOFFX if not 0)
         dDEC:           Guess for dDEC (taken from SOFFY if not 0)
-        
         '''
+        stname = self.name.find('GRAVI')        
+        pdffilename = 'binaryfit_' + self.name[stname:-5] + '.pdf'
+        txtfilename = 'binaryfit_' + self.name[stname:-5] + '.txt'
+        
+        if write_results:
+            txtfile = open(txtfilename, 'w')
+            txtfile.write('# Results of binary fit for %s' % self.name[stname:])
+            txtfile.write('# Lines are: Best chi1, MCMC result, MCMC error 1, MCMC error 1')
+            txtfile.write('# Rowes are: dRA, dDEC, f1, f2, f3, f4, alpha flare, V scale, f BG, alpha BG, PC RA, PC DEC, OPD1, OPD2, OPD3, OPD4')
         
         if pdf:
-            
-            stname = self.name.find('GRAVI')        
-            pdffilename = 'binaryfit_' + self.name[stname:-5] + '.pdf'
-            
             pdf = FPDF(orientation='P', unit='mm', format='A4')
             pdf.add_page()
             pdf.set_font("Helvetica", size=12)
@@ -686,7 +689,6 @@ class GravData():
             print('Fiber on S2, guess for dRA & dDEC should be given with function')
             
         
-        # width spectral bandpass
         if self.polmode == 'COMBINED':
             R = np.zeros((6,nwave))
             if nwave == 11:
@@ -1032,6 +1034,38 @@ class GravData():
                 
                 if plotres:
                     self.plotFit(theta_result, fitdata, idx, pdf=pdf)
+                if writeres:
+                    txt = ""
+                    for t in mostprop:
+                        txt += str(t)
+                        if t != mostprop[-1]:
+                            txt += ', '
+                    txtfile.write(txt)
+
+                    percentiles = np.percentile(fl_samples, [16, 50, 84],axis=0).T
+                    percentiles[:,0] = percentiles[:,1] - percentiles[:,0] 
+                    percentiles[:,2] = percentiles[:,2] - percentiles[:,1] 
+                    
+                    for t in percentiles[:,1]:
+                        txt += str(t)
+                        if t != percentiles[-1,1]:
+                            txt += ', '
+                    txtfile.write(txt)
+
+                    for t in percentiles[:,0]:
+                        txt += str(t)
+                        if t != percentiles[-1,0]:
+                            txt += ', '
+                    txtfile.write(txt)
+
+                    for t in percentiles[:,2]:
+                        txt += str(t)
+                        if t != percentiles[-1,2]:
+                            txt += ', '
+                    txtfile.write(txt)
+                    txtfile.close()
+
+
         
         if pdf:
             pdfimages0 = sorted(glob.glob('temp_pol0*.png'))
@@ -1044,7 +1078,7 @@ class GravData():
                 cover = Image.open(pdfimages0[0])
                 width, height = cover.size
                 ratio = width/height
-                print(ratio)
+
                 if ratio > (160/115):
                     wi = 160
                     he = 0
