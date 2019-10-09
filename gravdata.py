@@ -1034,7 +1034,8 @@ class GravData():
                 
                 if plotres:
                     self.plotFit(theta_result, fitdata, idx, pdf=pdf)
-                if writeres:
+                if write_results:
+                    txtfile.write("# Polarization %i" % (idx+1))
                     txt = ""
                     for t in mostprop:
                         txt += str(t)
@@ -1063,7 +1064,7 @@ class GravData():
                         if t != percentiles[-1,2]:
                             txt += ', '
                     txtfile.write(txt)
-                    txtfile.close()
+                    
 
 
         
@@ -1103,13 +1104,13 @@ class GravData():
                     pdf.image(pdfimages0[pdfcout+pa], w=150)
                     pdf.image(pdfimages1[pdfcout+pa], w=150)
             
-            if pdf:
-                print('Save pdf as %s' % pdffilename)
-                pdf.output(pdffilename)
-                files = glob.glob('temp_pol?_?.png')
+            print('Save pdf as %s' % pdffilename)
+            pdf.output(pdffilename)
+            files = glob.glob('temp_pol?_?.png')
                 for file in files:
                     os.remove(file)
-            
+        if write_results:
+            txtfile.close()
                 
         return 0
 
