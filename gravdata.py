@@ -1107,8 +1107,8 @@ class GravData():
             print('Save pdf as %s' % pdffilename)
             pdf.output(pdffilename)
             files = glob.glob('temp_pol?_?.png')
-                for file in files:
-                    os.remove(file)
+            for file in files:
+                os.remove(file)
         if write_results:
             txtfile.close()
                 
