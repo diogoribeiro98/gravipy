@@ -617,7 +617,7 @@ class GravData():
         if write_results:
             txtfile = open(txtfilename, 'w')
             txtfile.write('# Results of binary fit for %s \n' % self.name[stname:])
-            txtfile.write('# Lines are: Best chi1, MCMC result, MCMC error 1, MCMC error 1 \n')
+            txtfile.write('# Lines are: Best chi2, MCMC result, MCMC error -, MCMC error + \n')
             txtfile.write('# Rowes are: dRA, dDEC, f1, f2, f3, f4, alpha flare, V scale, f BG, alpha BG, PC RA, PC DEC, OPD1, OPD2, OPD3, OPD4 \n')
         
         if pdf:
@@ -1055,15 +1055,21 @@ class GravData():
                         else:
                             txtfile.write('\n')
 
-                    for t in percentiles[:,0]:
-                        txtfile.write(str(t))
+                    for idx, t in enumerate(percentiles[:,0]):
+                        if idx in todel:
+                            txtfile.write(str(t*0.0))
+                        else:
+                            txtfile.write(str(t))
                         if t != percentiles[-1,0]:
                             txtfile.write(', ')
                         else:
                             txtfile.write('\n')
 
-                    for t in percentiles[:,2]:
-                        txtfile.write(str(t))
+                    for idx, t in enumerate(percentiles[:,2]):
+                        if idx in todel:
+                            txtfile.write(str(t*0.0))
+                        else:
+                            txtfile.write(str(t))
                         if t != percentiles[-1,2]:
                             txtfile.write(', ')
                         else:
