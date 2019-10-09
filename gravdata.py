@@ -616,7 +616,7 @@ class GravData():
         if pdf:
             
             stname = self.name.find('GRAVI')        
-            pdfname = 'binaryfit_' + self.name[stname:-5] + '.pdf'
+            pdffilename = 'binaryfit_' + self.name[stname:-5] + '.pdf'
             
             pdf = FPDF(orientation='P', unit='mm', format='A4')
             pdf.add_page()
@@ -1070,8 +1070,8 @@ class GravData():
                     pdf.image(pdfimages1[pdfcout+pa], w=150)
             
             if pdf:
-                print('Save pdf as %s' % pdfname)
-                pdf.output(pdfname)
+                print('Save pdf as %s' % pdffilename)
+                pdf.output(pdffilename)
                 files = glob.glob('temp_pol?_?.png')
                 for file in files:
                     os.remove(file)
