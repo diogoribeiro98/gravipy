@@ -614,11 +614,15 @@ class GravData():
         '''
         
         if pdf:
+            
+            stname = self.name.find('GRAVI')        
+            pdfname = 'binaryfit_' + self.name[stname:-5] + '.pdf'
+            
             pdf = FPDF(orientation='P', unit='mm', format='A4')
             pdf.add_page()
             pdf.set_font("Helvetica", size=12)
             pdf.set_margins(20,20)
-            pdf.cell(0, 10, txt="Fit report for %s" % self.name, ln=2, align="C", border='B')
+            pdf.cell(0, 10, txt="Fit report for %s" % self.name[stname:], ln=2, align="C", border='B')
             pdf.ln()
             pdf.cell(40, 6, txt="Fringe Tracker", ln=0, align="L", border=0)
             pdf.cell(40, 6, txt=self.header["ESO FT ROBJ NAME"], ln=0, align="L", border=0)
@@ -923,8 +927,12 @@ class GravData():
                         plt.close()
                     else:
                         plt.show()
-                    
-                if nruns > 300:
+                
+                if nruns > 500:
+                    show = nruns-150
+                    fl_samples = samples[:, show:, :].reshape((-1, ndim))
+                    fl_clsamples = clsamples[:, show:, :].reshape((-1, cldim))                
+                elif nruns > 300:
                     show = nruns//3*2
                     fl_samples = samples[:, show:, :].reshape((-1, ndim))
                     fl_clsamples = clsamples[:, show:, :].reshape((-1, cldim))
@@ -1062,7 +1070,8 @@ class GravData():
                     pdf.image(pdfimages1[pdfcout+pa], w=150)
             
             if pdf:
-                pdf.output("/home/fewi/Desktop/pdf.pdf")
+                print('Save pdf as %s' % pdfname)
+                pdf.output(pdfname)
                 files = glob.glob('temp_pol?_?.png')
                 for file in files:
                     os.remove(file)
