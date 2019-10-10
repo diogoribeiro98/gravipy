@@ -573,7 +573,7 @@ class GravData():
     
     def fitBinary(self, nthreads=4, nwalkers=500, nruns=500, bestchi=True,
                   plot=True, fit_for=np.array([0.5,0.5,1.0,0.0]), constant_f=True,
-                  use_coupling=False, use_opds=False, fixedBG=True,
+                  use_coupling=False, use_opds=False, fixedBG=True, noS2=True,
                   use_visscale=False, write_results=True, flagtill=3, flagfrom=13,
                   dRA=0., dDEC=0., plotres=True, pdf=True):
         '''
@@ -589,6 +589,7 @@ class GravData():
         constant_f:     Constant coupling [True]
         use_coupling:   user theoretical coupling [False] 
         use_opds:       Fit OPDs [False] 
+        noS2:           Does not do anything if OFFX and OFFY=0
         fixedBG:        Fir for background power law [False]
         use_visscale:   Fit for a scaling in visamp [False] 
         flagtill:       Flag blue channels [3] 
@@ -617,6 +618,9 @@ class GravData():
         if self.fiberOffX != 0 and self.fiberOffY != 0:
             dRA = self.fiberOffX
             dDEC = self.fiberOffY
+        if self.fiberOffX == 0 and self.fiberOffY == 0:
+            if noS2:
+                return 0
         if dRA ==0 and dDEC == 0:
             print('Fiber on S2, guess for dRA & dDEC should be given with function')
             
