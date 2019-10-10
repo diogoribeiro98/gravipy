@@ -613,7 +613,7 @@ class GravData():
         wave = self.wlSC_P1
         self.fiberOffX = -fits.open(self.name)[0].header["HIERARCH ESO INS SOBJ OFFX"] 
         self.fiberOffY = -fits.open(self.name)[0].header["HIERARCH ESO INS SOBJ OFFY"] 
-        print("fiber center: %.2f, %.2f (mas): " % (self.fiberOffX,
+        print("fiber center: %.2f, %.2f (mas)" % (self.fiberOffX,
                                                     self.fiberOffY))
         if self.fiberOffX != 0 and self.fiberOffY != 0:
             dRA = self.fiberOffX
