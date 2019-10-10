@@ -470,7 +470,6 @@ class GravData():
                             [opd3, opd2],
                             [opd3, opd1],
                             [opd2, opd1]])
-
         alpha_S2 = 3
         
         # Flux Ratios
@@ -483,7 +482,6 @@ class GravData():
                 f = np.ones(4)*fluxRatio
             else:
                 f = np.array([fluxRatio1, fluxRatio2, fluxRatio3, fluxRatio4])
-            f = 10.**f 
 
         f_bl = np.array([[f[3],f[2]],
                          [f[3],f[1]],
@@ -686,11 +684,11 @@ class GravData():
         dRA_init = np.array([dRA,dRA-size,dRA+size])
         dDEC_init = np.array([dDEC,dDEC-size,dDEC+size])
 
-        fr_start = np.log10(2.0)
-        flux_ratio_1_init = np.array([fr_start,np.log10(0.01),np.log10(100.)])
-        flux_ratio_2_init = np.array([fr_start,np.log10(0.01),np.log10(100.)])
-        flux_ratio_3_init = np.array([fr_start,np.log10(0.01),np.log10(100.)])
-        flux_ratio_4_init = np.array([fr_start,np.log10(0.01),np.log10(100.)])
+        fr_start = 2.0
+        flux_ratio_1_init = np.array([fr_start, 0.005,100.])
+        flux_ratio_2_init = np.array([fr_start, 0.005,100.])
+        flux_ratio_3_init = np.array([fr_start, 0.005,100.])
+        flux_ratio_4_init = np.array([fr_start, 0.005,100.])
 
         alpha_SgrA_init = np.array([-1.,-5.,5.])
 
