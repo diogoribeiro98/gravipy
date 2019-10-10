@@ -620,9 +620,10 @@ class GravData():
             dDEC = self.fiberOffY
         if self.fiberOffX == 0 and self.fiberOffY == 0:
             if noS2:
+                print('No Fiber offset, if you want to fit this file use noS2=False')
                 return 0
-        if dRA ==0 and dDEC == 0:
-            print('Fiber on S2, guess for dRA & dDEC should be given with function')
+        if dRA == 0 and dDEC == 0:
+            print('Fiber offset is zero, guess for dRA & dDEC should be given with function')
             
         stname = self.name.find('GRAVI')        
         txtfilename = 'binaryfit_' + self.name[stname:-5] + '.txt'
