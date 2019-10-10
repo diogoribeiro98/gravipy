@@ -596,16 +596,6 @@ class GravData():
         dRA:            Guess for dRA (taken from SOFFX if not 0)
         dDEC:           Guess for dDEC (taken from SOFFY if not 0)
         '''
-        stname = self.name.find('GRAVI')        
-        txtfilename = 'binaryfit_' + self.name[stname:-5] + '.txt'
-        
-        if write_results:
-            txtfile = open(txtfilename, 'w')
-            txtfile.write('# Results of binary fit for %s \n' % self.name[stname:])
-            txtfile.write('# Lines are: Best chi2, MCMC result, MCMC error -, MCMC error + \n')
-            txtfile.write('# Rowes are: dRA, dDEC, f1, f2, f3, f4, alpha flare, V scale, f BG, alpha BG, PC RA, PC DEC, OPD1, OPD2, OPD3, OPD4 \n')
-            txtfile.write('# Parameter which are not fitted have 0.0 as error \n\n')
-        
         self.fit_for = fit_for
         self.use_coupling = use_coupling
         self.constant_f = constant_f
@@ -630,6 +620,15 @@ class GravData():
         if dRA ==0 and dDEC == 0:
             print('Fiber on S2, guess for dRA & dDEC should be given with function')
             
+        stname = self.name.find('GRAVI')        
+        txtfilename = 'binaryfit_' + self.name[stname:-5] + '.txt'
+        if write_results:
+            txtfile = open(txtfilename, 'w')
+            txtfile.write('# Results of binary fit for %s \n' % self.name[stname:])
+            txtfile.write('# Lines are: Best chi2, MCMC result, MCMC error -, MCMC error + \n')
+            txtfile.write('# Rowes are: dRA, dDEC, f1, f2, f3, f4, alpha flare, V scale, f BG, alpha BG, PC RA, PC DEC, OPD1, OPD2, OPD3, OPD4 \n')
+            txtfile.write('# Parameter which are not fitted have 0.0 as error \n')
+            txtfile.write('# MJD: %f \n\n' % MJD)
         
         if self.polmode == 'COMBINED':
             R = np.zeros((6,nwave))
