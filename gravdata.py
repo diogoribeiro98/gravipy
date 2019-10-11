@@ -773,7 +773,9 @@ class GravData():
             txtfile.write('# Lines are: Best chi2, MCMC result, MCMC error -, MCMC error + \n')
             txtfile.write('# Rowes are: dRA, dDEC, f1, f2, f3, f4, alpha flare, V scale, f BG, alpha BG, PC RA, PC DEC, OPD1, OPD2, OPD3, OPD4 \n')
             txtfile.write('# Parameter which are not fitted have 0.0 as error \n')
-            txtfile.write('# MJD: %f \n\n' % MJD)
+            txtfile.write('# MJD: %f \n' % MJD)
+            txtfile.write('# OFFX: %f \n' % self.fiberOffX)
+            txtfile.write('# OFFY: %f \n\n' % self.fiberOffY)
         
         if self.polmode == 'COMBINED':
             R = np.zeros((6,nwave))
@@ -800,7 +802,6 @@ class GravData():
                 R[3,:] = [24.6,16.4,15.5,17.2,18.2,16.9,19.5,22.2,22.6,23.0,22.5]
                 R[4,:] = [26.4,17.5,16.2,17.2,17.9,16.3,18.8,21.4,21.6,21.8,22.1]
                 R[5,:] = [27.4,18.8,17.5,17.6,17.4,15.2,16.8,19.2,19.8,20.0,21.1]
-
             elif nwave == 14:
                 R[0,:] = [28.9,16.5,15.6,16.8,17.6,16.4,15.7,17.5,18.8,20.1,20.2,20.5,22.0,28.3]
                 R[1,:] = [27.2,15.8,14.9,16.0,16.7,15.7,15.1,16.4,18.2,19.6,20.0,20.3,21.7,25.3]
@@ -808,7 +809,6 @@ class GravData():
                 R[3,:] = [29.1,17.0,15.9,16.6,17.1,16.6,15.8,16.9,18.8,20.5,21.0,21.3,22.0,24.4]
                 R[4,:] = [28.8,16.8,16.1,16.7,17.4,16.7,16.1,17.2,19.0,20.5,21.2,21.6,22.2,25.2]
                 R[5,:] = [28.0,16.0,15.0,16.2,16.6,15.7,15.3,16.4,17.8,19.3,19.8,20.0,20.8,24.4]
-            
             
         dlambda = np.zeros((6,nwave))
         for i in range(0,6):
@@ -820,7 +820,6 @@ class GravData():
                 dlambda[i,:] = 0.03817
         self.dlambda = dlambda 
 
-                
         # Initial guesses
         size = 4
         dRA_init = np.array([dRA,dRA-size,dRA+size])
@@ -918,6 +917,10 @@ class GravData():
                 if write_results and ndit > 1:
                     txtfile.write('# DIT %i \n' % dit)
                 if pdf:
+                    savetime = str(datetime.now()).replace('-', '')
+                    savetime = savetime.replace(' ', '-')
+                    savetime = savetime.replace(':', '')
+                    self.savetime = savetime
                     if ndit == 1:
                         pdffilename = 'binaryfit_' + self.name[stname:-5] + '.pdf'
                     else:
@@ -1074,7 +1077,7 @@ class GravData():
                         axes[-1].set_xlabel("step number")
                         
                         if pdf:
-                            pdfname = 'temp_pol%i_1.png' % idx
+                            pdfname = '%s_pol%i_1.png' % (savetime, idx)
                             plt.savefig(pdfname)
                             plt.close()
                         else:
@@ -1098,7 +1101,7 @@ class GravData():
                         fig = corner.corner(fl_clsamples, quantiles=[0.16, 0.5, 0.84],
                                             truths=clmostprop, labels=cllabels)
                         if pdf:
-                            pdfname = 'temp_pol%i_2.png' % idx
+                            pdfname = '%s_pol%i_2.png' % (savetime, idx)
                             plt.savefig(pdfname)
                             plt.close()
                         else:
@@ -1185,9 +1188,9 @@ class GravData():
                     if write_results:
                         txtfile.write("# Polarization %i  \n" % (idx+1))
                         txt = ""
-                        for t in mostprop:
+                        for tdx, t in enumerate(mostprop):
                             txtfile.write(str(t))
-                            if t != mostprop[-1]:
+                            if tdx != (len(mostprop)-1):
                                 txtfile.write(', ')
                             else:
                                 txtfile.write('\n')
@@ -1196,36 +1199,36 @@ class GravData():
                         percentiles[:,0] = percentiles[:,1] - percentiles[:,0] 
                         percentiles[:,2] = percentiles[:,2] - percentiles[:,1] 
                         
-                        for t in percentiles[:,1]:
+                        for tdx, t in enumerate(percentiles[:,1]):
                             txtfile.write(str(t))
-                            if t != percentiles[-1,1]:
+                            if tdx != (len(percentiles[:,1])-1):
                                 txtfile.write(', ')
                             else:
                                 txtfile.write('\n')
 
-                        for idx, t in enumerate(percentiles[:,0]):
-                            if idx in todel:
+                        for tdx, t in enumerate(percentiles[:,0]):
+                            if tdx in todel:
                                 txtfile.write(str(t*0.0))
                             else:
                                 txtfile.write(str(t))
-                            if t != percentiles[-1,0]:
+                            if tdx != (len(percentiles[:,1])-1):
                                 txtfile.write(', ')
                             else:
                                 txtfile.write('\n')
 
-                        for idx, t in enumerate(percentiles[:,2]):
-                            if idx in todel:
+                        for tdx, t in enumerate(percentiles[:,2]):
+                            if tdx in todel:
                                 txtfile.write(str(t*0.0))
                             else:
                                 txtfile.write(str(t))
-                            if t != percentiles[-1,2]:
+                            if tdx != (len(percentiles[:,1])-1):
                                 txtfile.write(', ')
                             else:
                                 txtfile.write('\n')
-                
+
                 if pdf:
-                    pdfimages0 = sorted(glob.glob('temp_pol0*.png'))
-                    pdfimages1 = sorted(glob.glob('temp_pol1*.png'))
+                    pdfimages0 = sorted(glob.glob(savetime + '_pol0*.png'))
+                    pdfimages1 = sorted(glob.glob(savetime + '_pol1*.png'))
                     pdfcout = 0
                     if plot:
                         pdf.add_page()
@@ -1261,7 +1264,7 @@ class GravData():
                     
                     print('Save pdf as %s' % pdffilename)
                     pdf.output(pdffilename)
-                    files = glob.glob('temp_pol?_?.png')
+                    files = glob.glob(savetime + '_pol?_?.png')
                     for file in files:
                         os.remove(file)
             if write_results:
@@ -1323,8 +1326,9 @@ class GravData():
         plt.ylim(-0.1,1.1)
         plt.xlabel('spatial frequency (1/arcsec)')
         if pdf:
+            savetime = self.savetime
             plt.title('Polarization %i' % (idx + 1))
-            pdfname = 'temp_pol%i_3.png' % idx
+            pdfname = '%s_pol%i_3.png' % (savetime, idx)
             plt.savefig(pdfname)
             plt.close()
         else:
@@ -1344,7 +1348,7 @@ class GravData():
         plt.ylim(-0.1,1.1)
         if pdf:
             plt.title('Polarization %i' % (idx + 1))
-            pdfname = 'temp_pol%i_4.png' % idx
+            pdfname = '%s_pol%i_4.png' % (savetime, idx)
             plt.savefig(pdfname)
             plt.close()
         else:
@@ -1370,7 +1374,7 @@ class GravData():
         plt.ylabel('closure phase (deg)')
         if pdf:
             plt.title('Polarization %i' % (idx + 1))
-            pdfname = 'temp_pol%i_5.png' % idx
+            pdfname = '%s_pol%i_5.png' % (savetime, idx)
             plt.savefig(pdfname)
             plt.close()
         else:
@@ -1389,7 +1393,7 @@ class GravData():
         plt.xlabel('spatial frequency (1/arcsec)')
         if pdf:
             plt.title('Polarization %i' % (idx + 1))
-            pdfname = 'temp_pol%i_6.png' % idx
+            pdfname = '%s_pol%i_6.png' % (savetime, idx)
             plt.savefig(pdfname)
             plt.close()
         else:
@@ -1397,7 +1401,7 @@ class GravData():
         
         
         
-
+        
 
 
             
