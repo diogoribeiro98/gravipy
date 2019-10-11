@@ -508,8 +508,6 @@ class GravData():
             (model_visamp_full, model_visphi_full, 
             model_closure_full)  = self.calc_vis(theta, u, v, wave_model, dlambda_model)
             model_vis2_full = model_visamp_full**2.
-            print(model_vis2_full.shape)
-
 
             magu = np.sqrt(u**2.+v**2.)
             u_as = np.zeros((len(u),len(wave)))
@@ -638,14 +636,14 @@ class GravData():
         vis = np.zeros((6,len(wave))) + 0j
         for i in range(0,6):
             # s = bl*(sky position) + opd1 - opd2  in mum
-            s_SgrA = ((fiberOffX-dRA)*u[i]+(fiberOffY-dDEC)*v[i]) * mas2rad * 1e6
-            s_S2 = (fiberOffX*u[i]+fiberOffY*v[i]) * mas2rad * 1e6
+            s_SgrA = ((fiberOffX-dRA)*u[i] + (fiberOffY-dDEC)*v[i]) * mas2rad * 1e6
+            s_S2 = (fiberOffX*u[i] + fiberOffY*v[i]) * mas2rad * 1e6
             if use_opds:
                 s_S2 = s_S2 + opd_bl[i,0] - opd_bl[i,1]
     
             # u,v in 1/mas
-            u_mas = u[i]/(wave*1e-6) / rad2mas
-            v_mas = v[i]/(wave*1e-6) / rad2mas
+            u_mas = u[i] / (wave*1e-6) / rad2mas
+            v_mas = v[i] / (wave*1e-6) / rad2mas
             
             # interferometric intensities of all components
             intSgrA = self.vis_intensity(s_SgrA, alpha_SgrA, wave, dlambda[i,:])
@@ -824,22 +822,19 @@ class GravData():
 
                 
         # Initial guesses
-        size = 2
+        size = 4
         dRA_init = np.array([dRA,dRA-size,dRA+size])
         dDEC_init = np.array([dDEC,dDEC-size,dDEC+size])
 
-        fr_start = 2.0
-        flux_ratio_1_init = np.array([fr_start, 0.005,100.])
-        flux_ratio_2_init = np.array([fr_start, 0.005,100.])
-        flux_ratio_3_init = np.array([fr_start, 0.005,100.])
-        flux_ratio_4_init = np.array([fr_start, 0.005,100.])
+        fr_start = 0.1
+        flux_ratio_1_init = np.array([fr_start, 0.0, 10.])
+        flux_ratio_2_init = np.array([fr_start, 0.0, 10.])
+        flux_ratio_3_init = np.array([fr_start, 0.0, 10.])
+        flux_ratio_4_init = np.array([fr_start, 0.0, 10.])
 
         alpha_SgrA_init = np.array([-1.,-5.,5.])
-
         vis_scale_init = np.array([0.8,0.1,1.2])
-
         flux_ratio_bg_init = np.array([0.1,0.,20.])
-
         color_bg_init = np.array([3.,-5.,5.])
 
         size = 5
@@ -882,6 +877,21 @@ class GravData():
                 1*use_visscale + 1*np.invert(fixedBG))
 
         ndim = len(theta)
+        todel = []
+        if constant_f:
+            todel.append(3)
+            todel.append(4)
+            todel.append(5)
+        if not use_visscale:
+            todel.append(7)
+        if fixedBG:
+            todel.append(9)
+        if not use_opds:
+            todel.append(12)
+            todel.append(13)
+            todel.append(14)
+            todel.append(15)
+
                 
         # Get data
         if self.polmode == 'SPLIT':
@@ -1009,7 +1019,10 @@ class GravData():
                     width = 1e-1
                     pos = np.ones((nwalkers,ndim))
                     for par in range(ndim):
-                        pos[:,par] = theta[par] + width*np.random.randn(nwalkers)
+                        if par in todel:
+                            pos[:,par] = theta[par]
+                        else:
+                            pos[:,par] = theta[par] + width*np.random.randn(nwalkers)
 
                     print('Run MCMC for Pol %i' % (idx+1))
                     fitdata = [visamp, visamp_error, visamp_flag,
@@ -1044,21 +1057,6 @@ class GravData():
                     samples = sampler.chain
                     mostprop = sampler.flatchain[np.argmax(sampler.flatlnprobability)]
                     
-                    todel = []
-                    if constant_f:
-                        todel.append(3)
-                        todel.append(4)
-                        todel.append(5)
-                    if not use_visscale:
-                        todel.append(7)
-                    if fixedBG:
-                        todel.append(9)
-                    if not use_opds:
-                        todel.append(12)
-                        todel.append(13)
-                        todel.append(14)
-                        todel.append(15)
-                        
                     clsamples = np.delete(samples, todel, 2)
                     cllabels = np.delete(theta_names, todel)
                     cllabels_raw = np.delete(theta_names_raw, todel)
