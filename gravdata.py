@@ -427,6 +427,150 @@ class GravData():
         """
         return (lambda0/2.2)**(-1-alpha)*2*dlambda*np.sinc(s*2*dlambda/lambda0**2.)*np.exp(-2.j*np.pi*s/lambda0)
     
+    def plot_vis(self, theta, constant_f=True, use_opds=False, fixedBG=True, use_visscale=False, fiberOff=None, plot=True):
+        """
+        theta should be a list of:
+        dRA, dDEC, f1, (f2), (f3), (f4), alpha flare, (V scale), f BG, (alpha BG), 
+        PC RA, PC DEC, (OPD1), (OPD2), (OPD3), (OPD4)
+        
+        Values in bracket are by default not used, can be activated by options:
+        constant_f:     Constant coupling [True]
+        use_opds:       Fit OPDs [False] 
+        fixedBG:        Keep background power law [True]
+        use_visscale:   Fit for a scaling in visamp [False] 
+        dRA:            Guess for dRA (taken from SOFFX if not 0)
+        dDEC:           Guess for dDEC (taken from SOFFY if not 0)
+        
+        """
+        theta_names_raw = np.array(["dRA", "dDEC", "f1", "f2", "f3", "f4" , "alpha flare", "V scale", "f BG",
+                                    "alpha BG", "PC RA", "PC DEC", "OPD1", "OPD2", "OPD3", "OPD4"])
+        try:
+            if len(theta) != 16:
+                print('Thetha has to include the following 16 parameter:')
+                print(theta_names_raw)
+                raise ValueError('Wrong number of input parameter given (should be 16)')
+        except(TypeError):
+            print('Thetha has to include the following 16 parameter:')
+            print(theta_names_raw)
+            raise ValueError('Wrong number of input parameter given (should be 16)')            
+        
+        self.use_coupling = False
+        self.constant_f = constant_f
+        self.fixedBG = fixedBG
+        self.use_opds = use_opds
+        self.use_visscale = use_visscale
+        
+        if fiberOff is None:
+            self.fiberOffX = -fits.open(self.name)[0].header["HIERARCH ESO INS SOBJ OFFX"] 
+            self.fiberOffY = -fits.open(self.name)[0].header["HIERARCH ESO INS SOBJ OFFY"] 
+        else:
+            self.fiberOffX = fiberOff[0]
+            self.fiberOffY = fiberOff[1]
+        print("fiber center: %.2f, %.2f (mas)" % (self.fiberOffX, self.fiberOffY))
+
+        nwave = self.channel
+        if nwave != 14:
+            raise ValueError('Only usable for 14 channels')
+        self.getIntdata(plot=False, flag=False)
+        u = self.u
+        v = self.v
+        wave = self.wlSC_P1
+        R = np.zeros((6,nwave))
+        R[0,:] = [28.9,16.5,15.6,16.8,17.6,16.4,15.7,17.5,18.8,20.1,20.2,20.5,22.0,28.3]
+        R[1,:] = [27.2,15.8,14.9,16.0,16.7,15.7,15.1,16.4,18.2,19.6,20.0,20.3,21.7,25.3]
+        R[2,:] = [28.3,16.2,15.3,16.7,17.3,16.3,15.7,17.4,18.8,20.2,20.7,21.1,22.4,27.5]
+        R[3,:] = [29.1,17.0,15.9,16.6,17.1,16.6,15.8,16.9,18.8,20.5,21.0,21.3,22.0,24.4]
+        R[4,:] = [28.8,16.8,16.1,16.7,17.4,16.7,16.1,17.2,19.0,20.5,21.2,21.6,22.2,25.2]
+        R[5,:] = [28.0,16.0,15.0,16.2,16.6,15.7,15.3,16.4,17.8,19.3,19.8,20.0,20.8,24.4]
+        dlambda = np.zeros((6,nwave))
+        for i in range(0,6):
+            if (nwave==11) or (nwave==14):
+                dlambda[i,:] = wave/R[i,:]/2
+            elif nwave==210:
+                dlambda[i,:] = wave/500/2
+            else:
+                dlambda[i,:] = 0.03817
+        
+        visamp, visphi, closure = self.calc_vis(theta, u, v, wave, dlambda)
+        vis2 = visamp**2
+        
+        if plot:
+            colors_baseline = np.array(["magenta","crimson","cyan","green","blue","orange"])
+            colors_closure = np.array(["blue","crimson","cyan","green"])
+            baseline_labels = np.array(["UT4-3","UT4-2","UT4-1","UT3-2","UT3-1","UT2-1"])
+            closure_labels = np.array(["UT4-3-2","UT4-3-1","UT4-2-1","UT3-2-1"])
+            rad2as = 180 / np.pi * 3600
+
+            wave_model = np.linspace(wave[0],wave[len(wave)-1],1000)
+            dlambda_model = np.zeros((6,len(wave_model)))
+            for i in range(0,6):
+                dlambda_model[i,:] = np.interp(wave_model, wave, dlambda[i,:])
+            (model_visamp_full, model_visphi_full, 
+            model_closure_full)  = self.calc_vis(theta, u, v, wave_model, dlambda_model)
+            model_vis2_full = model_visamp_full**2.
+            print(model_vis2_full.shape)
+
+
+            magu = np.sqrt(u**2.+v**2.)
+            u_as = np.zeros((len(u),len(wave)))
+            v_as = np.zeros((len(v),len(wave)))
+            for i in range(0,len(u)):
+                u_as[i,:] = u[i]/(wave*1.e-6) / rad2as
+                v_as[i,:] = v[i]/(wave*1.e-6) / rad2as
+            magu_as = np.sqrt(u_as**2.+v_as**2.)
+
+            u_as_model = np.zeros((len(u),len(wave_model)))
+            v_as_model = np.zeros((len(v),len(wave_model)))
+            for i in range(0,len(u)):
+                u_as_model[i,:] = u[i]/(wave_model*1.e-6) / rad2as
+                v_as_model[i,:] = v[i]/(wave_model*1.e-6) / rad2as
+            magu_as_model = np.sqrt(u_as_model**2.+v_as_model**2.)
+
+            # Visamp 
+            for i in range(0,6):
+                plt.plot(magu_as[i,:], visamp[i,:], color=colors_baseline[i], ls='', marker='o')
+                plt.plot(magu_as_model[i,:], model_visamp_full[i,:], color=colors_baseline[i])
+            plt.ylabel('visibility modulus')
+            plt.ylim(-0.1,1.1)
+            plt.xlabel('spatial frequency (1/arcsec)')
+            plt.show()
+            
+            # Vis2
+            for i in range(0,6):
+                plt.errorbar(magu_as[i,:], vis2[i,:], color=colors_baseline[i], ls='', marker='o')
+                plt.plot(magu_as_model[i,:], model_vis2_full[i,:],
+                        color=colors_baseline[i], alpha=1.0)
+            plt.xlabel('spatial frequency (1/arcsec)')
+            plt.ylabel('visibility squared')
+            plt.ylim(-0.1,1.1)
+            plt.show()
+            
+            # T3
+            max_u = np.zeros((4))
+            max_u[0] = np.max(np.array([magu[0],magu[3],magu[1]]))
+            max_u[1] = np.max(np.array([magu[0],magu[4],magu[2]]))
+            max_u[2] = np.max(np.array([magu[1],magu[5],magu[2]]))
+            max_u[3] = np.max(np.array([magu[3],magu[5],magu[4]]))
+            for i in range(0,4):
+                max_u_as = max_u[i]/(wave*1.e-6) / rad2as
+                max_u_as_model = max_u[i]/(wave_model*1.e-6) / rad2as
+                plt.errorbar(max_u_as, closure[i,:], color=colors_closure[i],ls='', marker='o')
+                plt.plot(max_u_as_model, model_closure_full[i,:], color=colors_closure[i])
+            plt.xlabel('spatial frequency of largest baseline in triangle (1/arcsec)')
+            plt.ylabel('closure phase (deg)')
+            plt.show()
+            
+            # VisPhi
+            for i in range(0,6):
+                plt.errorbar(magu_as[i,:], visphi[i,:], color=colors_baseline[i], ls='', marker='o')
+                plt.plot(magu_as_model[i,:], model_visphi_full[i,:], color=colors_baseline[i],alpha=1.0)
+            plt.ylabel('visibility phase')
+            plt.xlabel('spatial frequency (1/arcsec)')
+            plt.show()
+
+        return visamp, vis2, visphi, closure
+
+    
     def calc_vis(self, theta, u, v, wave, dlambda):
         mas2rad = 1e-3 / 3600 / 180 * np.pi
         rad2mas = 180 / np.pi * 3600 * 1e3
@@ -712,22 +856,27 @@ class GravData():
         opd_4_init = [0.1,-opd_max,opd_max]
 
         # initial fit parameters 
-        theta = np.array([dRA_init[0],dDEC_init[0],flux_ratio_1_init[0],flux_ratio_2_init[0],flux_ratio_3_init[0],flux_ratio_4_init[0],alpha_SgrA_init[0],vis_scale_init[0],flux_ratio_bg_init[0],color_bg_init[0],phase_center_RA_init[0],phase_center_DEC_init[0],opd_1_init[0],opd_2_init[0],opd_3_init[0],opd_4_init[0]])
+        theta = np.array([dRA_init[0],dDEC_init[0],flux_ratio_1_init[0],flux_ratio_2_init[0],
+                          flux_ratio_3_init[0],flux_ratio_4_init[0],alpha_SgrA_init[0],vis_scale_init[0],
+                          flux_ratio_bg_init[0],color_bg_init[0],phase_center_RA_init[0],
+                          phase_center_DEC_init[0],opd_1_init[0],opd_2_init[0],opd_3_init[0],opd_4_init[0]])
 
         # lower limit on fit parameters 
-        theta_lower = np.array([dRA_init[1],dDEC_init[1],flux_ratio_1_init[1],flux_ratio_2_init[1],flux_ratio_3_init[1],flux_ratio_4_init[1],alpha_SgrA_init[1],vis_scale_init[1],flux_ratio_bg_init[1],color_bg_init[1],phase_center_RA_init[1],phase_center_DEC_init[1],opd_1_init[1],opd_2_init[1],opd_3_init[1],opd_4_init[1]])
+        theta_lower = np.array([dRA_init[1],dDEC_init[1],flux_ratio_1_init[1],flux_ratio_2_init[1],
+                                flux_ratio_3_init[1],flux_ratio_4_init[1],alpha_SgrA_init[1],vis_scale_init[1],
+                                flux_ratio_bg_init[1],color_bg_init[1],phase_center_RA_init[1],
+                                phase_center_DEC_init[1],opd_1_init[1],opd_2_init[1],opd_3_init[1],opd_4_init[1]])
 
         # upper limit on fit parameters 
-        theta_upper = np.array([dRA_init[2],dDEC_init[2],flux_ratio_1_init[2],flux_ratio_2_init[2],flux_ratio_3_init[2],flux_ratio_4_init[2],alpha_SgrA_init[2],vis_scale_init[2],flux_ratio_bg_init[2],color_bg_init[2],phase_center_RA_init[2],phase_center_DEC_init[2],opd_1_init[2],opd_2_init[2],opd_3_init[2],opd_4_init[2]])
+        theta_upper = np.array([dRA_init[2],dDEC_init[2],flux_ratio_1_init[2],flux_ratio_2_init[2],
+                                flux_ratio_3_init[2],flux_ratio_4_init[2],alpha_SgrA_init[2],
+                                vis_scale_init[2],flux_ratio_bg_init[2],color_bg_init[2],phase_center_RA_init[2],
+                                phase_center_DEC_init[2],opd_1_init[2],opd_2_init[2],opd_3_init[2],opd_4_init[2]])
 
-        theta_names = np.array(["dRA", "dDEC", "f1", "f2", "f3", "f4" ,
-                                r"$\alpha_{flare}$", r"|V| sc", r"$f_{bg}$",
-                                r"$\alpha_{bg}$", r"$RA_{PC}$", r"$DEC_{PC}$",
-                                "OPD1", "OPD2", "OPD3", "OPD4"])
-        theta_names_raw = np.array(["dRA", "dDEC", "f1", "f2", "f3", "f4" ,
-                                    "alpha flare", "V scale", "f BG",
-                                    "alpha BG", "PC RA", "PC DEC",
-                                    "OPD1", "OPD2", "OPD3", "OPD4"])
+        theta_names = np.array(["dRA", "dDEC", "f1", "f2", "f3", "f4" , r"$\alpha_{flare}$", r"|V| sc", r"$f_{bg}$",
+                                r"$\alpha_{bg}$", r"$RA_{PC}$", r"$DEC_{PC}$", "OPD1", "OPD2", "OPD3", "OPD4"])
+        theta_names_raw = np.array(["dRA", "dDEC", "f1", "f2", "f3", "f4" , "alpha flare", "V scale", "f BG",
+                                    "alpha BG", "PC RA", "PC DEC", "OPD1", "OPD2", "OPD3", "OPD4"])
 
         ndof = (5 + 3*np.invert(constant_f) + np.sum(fit_for != 0)*2 + 4*use_opds +
                 1*use_visscale + 1*np.invert(fixedBG))
@@ -965,7 +1114,6 @@ class GravData():
                     else:
                         theta_result = theta_fit
                     
-                    
                     magu = np.sqrt(u**2.+v**2.) # projected baseline length in meters
                     pa = np.arctan2(v,u)
                     for i in range(0,len(pa)):
@@ -1033,7 +1181,6 @@ class GravData():
                                     (percentiles[i,1], percentiles[i,2], percentiles[i,0]),
                                     ln=1, align="C", border="L")
                         pdf.ln()
-
                     
                     if plotres:
                         self.plotFit(theta_result, fitdata, idx, pdf=pdf)
@@ -1077,9 +1224,6 @@ class GravData():
                                 txtfile.write(', ')
                             else:
                                 txtfile.write('\n')
-                        
-
-
                 
                 if pdf:
                     pdfimages0 = sorted(glob.glob('temp_pol0*.png'))
@@ -1124,7 +1268,6 @@ class GravData():
                         os.remove(file)
             if write_results:
                 txtfile.close()
-                
         return 0
 
 
@@ -1133,7 +1276,6 @@ class GravData():
         colors_closure = np.array(["blue","crimson","cyan","green"])
         baseline_labels = np.array(["UT4-3","UT4-2","UT4-1","UT3-2","UT3-1","UT2-1"])
         closure_labels = np.array(["UT4-3-2","UT4-3-1","UT4-2-1","UT3-2-1"])
-
 
         rad2as = 180 / np.pi * 3600
         
@@ -1236,7 +1378,6 @@ class GravData():
         else:
             plt.show()
         
-
         # VisPhi
         for i in range(0,6):
             plt.errorbar(magu_as[i,:], visphi[i,:]*(1-visphi_flag)[i], 
