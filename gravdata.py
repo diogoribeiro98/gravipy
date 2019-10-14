@@ -579,9 +579,14 @@ class GravData():
         use_visscale = self.use_visscale
         fiberOffX = self.fiberOffX
         fiberOffY = self.fiberOffY
+        fixpos = self.fixpos
         
-        dRA = theta[0]
-        dDEC = theta[1]
+        if fixpos:
+            dRA = self.fiberOffX
+            dDEC = self.fiberOffY
+        else:
+            dRA = theta[0]
+            dDEC = theta[1]
         if constant_f:
             fluxRatio = theta[2]
         else:
@@ -715,7 +720,8 @@ class GravData():
                   plot=True, fit_for=np.array([0.5,0.5,1.0,0.0]), constant_f=True,
                   use_coupling=False, use_opds=False, fixedBG=True, noS2=True,
                   use_visscale=False, write_results=True, flagtill=3, flagfrom=13,
-                  dRA=0., dDEC=0., plotres=True, pdf=True, bequiet=False):
+                  dRA=0., dDEC=0., plotres=True, pdf=True, bequiet=False,
+                  fixpos=False):
         '''
         Parameter:
         nthreads:       number of cores [4] 
@@ -744,6 +750,7 @@ class GravData():
         self.use_opds = use_opds
         self.fixedBG = fixedBG
         self.use_visscale = use_visscale
+        self.fixpos = fixpos
         
         # Get data from file
         nwave = self.channel
@@ -835,7 +842,7 @@ class GravData():
         flux_ratio_3_init = np.array([fr_start, 0.0, 10.])
         flux_ratio_4_init = np.array([fr_start, 0.0, 10.])
 
-        alpha_SgrA_init = np.array([-1.,-5.,5.])
+        alpha_SgrA_init = np.array([-1.,-5.,7.])
         vis_scale_init = np.array([0.8,0.1,1.2])
         flux_ratio_bg_init = np.array([0.1,0.,20.])
         color_bg_init = np.array([3.,-5.,5.])
@@ -881,6 +888,9 @@ class GravData():
 
         ndim = len(theta)
         todel = []
+        if fixpos:
+            todel.append(0)
+            todel.append(1)
         if constant_f:
             todel.append(3)
             todel.append(4)
@@ -970,6 +980,8 @@ class GravData():
                     pdf.cell(40, 6, txt=str(bestchi), ln=0, align="L", border=0)
                     pdf.cell(40, 6, txt="Fit OPDs", ln=0, align="L", border=0)
                     pdf.cell(40, 6, txt=str(use_opds), ln=1, align="L", border=0)
+                    pdf.cell(40, 6, txt="Fixpos", ln=0, align="L", border=0)
+                    pdf.cell(40, 6, txt=str(fixpos), ln=1, align="L", border=0)
                     pdf.ln()
                 
                 if not bequiet:
