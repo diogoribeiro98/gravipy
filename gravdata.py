@@ -715,7 +715,7 @@ class GravData():
                   plot=True, fit_for=np.array([0.5,0.5,1.0,0.0]), constant_f=True,
                   use_coupling=False, use_opds=False, fixedBG=True, noS2=True,
                   use_visscale=False, write_results=True, flagtill=3, flagfrom=13,
-                  dRA=0., dDEC=0., plotres=True, pdf=True):
+                  dRA=0., dDEC=0., plotres=True, pdf=True, bequiet=False):
         '''
         Parameter:
         nthreads:       number of cores [4] 
@@ -736,6 +736,7 @@ class GravData():
         flagfrom:       Flag red channels [13]
         dRA:            Guess for dRA (taken from SOFFX if not 0)
         dDEC:           Guess for dDEC (taken from SOFFY if not 0)
+        bequiet         Suppresses ALL outputs
         '''
         self.fit_for = fit_for
         self.use_coupling = use_coupling
@@ -753,17 +754,20 @@ class GravData():
         wave = self.wlSC_P1
         self.fiberOffX = -fits.open(self.name)[0].header["HIERARCH ESO INS SOBJ OFFX"] 
         self.fiberOffY = -fits.open(self.name)[0].header["HIERARCH ESO INS SOBJ OFFY"] 
-        print("fiber center: %.2f, %.2f (mas)" % (self.fiberOffX,
+        if not bequiet:
+            print("fiber center: %.2f, %.2f (mas)" % (self.fiberOffX,
                                                     self.fiberOffY))
         if self.fiberOffX != 0 and self.fiberOffY != 0:
             dRA = self.fiberOffX
             dDEC = self.fiberOffY
         if self.fiberOffX == 0 and self.fiberOffY == 0:
             if noS2:
-                print('No Fiber offset, if you want to fit this file use noS2=False')
+                if not bequiet:
+                    print('No Fiber offset, if you want to fit this file use noS2=False')
                 return 0
         if dRA == 0 and dDEC == 0:
-            print('Fiber offset is zero, guess for dRA & dDEC should be given with function')
+            if not bequiet:
+                print('Fiber offset is zero, guess for dRA & dDEC should be given with function')
             
         stname = self.name.find('GRAVI')        
         txtfilename = 'binaryfit_' + self.name[stname:-5] + '.txt'
@@ -911,7 +915,8 @@ class GravData():
             visphi_flag_P = [self.visampflagSC_P1, self.visampflagSC_P2]
             
             ndit = np.shape(self.visampSC_P1)[0]//6
-            print('NDIT = %i' % ndit)
+            if not bequiet:
+                print('NDIT = %i' % ndit)
             
             for dit in range(ndit):
                 if write_results and ndit > 1:
@@ -967,7 +972,8 @@ class GravData():
                     pdf.cell(40, 6, txt=str(use_opds), ln=1, align="L", border=0)
                     pdf.ln()
                 
-                print('Run MCMC for DIT %i' % (dit+1))
+                if not bequiet:
+                    print('Run MCMC for DIT %i' % (dit+1))
                 ditstart = dit*6
                 ditstop = ditstart + 6
                 t3ditstart = dit*4
@@ -1008,7 +1014,8 @@ class GravData():
                         p = flagtill
                         t = flagfrom
                         if idx == 0 and dit == 0:
-                            print('using channels from #%i to #%i' % (p, t))
+                            if not bequiet:
+                                print('using channels from #%i to #%i' % (p, t))
                         visamp_flag[:,0:p] = True
                         vis2_flag[:,0:p] = True
                         visphi_flag[:,0:p] = True
@@ -1026,8 +1033,8 @@ class GravData():
                             pos[:,par] = theta[par]
                         else:
                             pos[:,par] = theta[par] + width*np.random.randn(nwalkers)
-
-                    print('Run MCMC for Pol %i' % (idx+1))
+                    if not bequiet:
+                        print('Run MCMC for Pol %i' % (idx+1))
                     fitdata = [visamp, visamp_error, visamp_flag,
                             vis2, vis2_error, vis2_flag,
                             closure, closure_error, closure_flag,
@@ -1038,7 +1045,10 @@ class GravData():
                                                             args=(fitdata, u, v, wave,
                                                                 dlambda, theta_lower,
                                                                 theta_upper))
-                        sampler.run_mcmc(pos, nruns, progress=True)
+                        if bequiet:
+                            sampler.run_mcmc(pos, nruns, progress=False)
+                        else:
+                            sampler.run_mcmc(pos, nruns, progress=True)
                     else:
                         with Pool(processes=nthreads) as pool:
                             sampler = emcee.EnsembleSampler(nwalkers, ndim, self.lnprob, 
@@ -1046,11 +1056,15 @@ class GravData():
                                                                 dlambda, theta_lower,
                                                                 theta_upper),
                                                             pool=pool)
-                            sampler.run_mcmc(pos, nruns, progress=True)     
+                            if bequiet:
+                                sampler.run_mcmc(pos, nruns, progress=False) 
+                            else:
+                                sampler.run_mcmc(pos, nruns, progress=True)     
                             
-                    print("---------------------------------------")
-                    print("Mean acceptance fraction: %.2f"  % np.mean(sampler.acceptance_fraction))
-                    print("---------------------------------------")
+                    if not bequiet:
+                        print("---------------------------------------")
+                        print("Mean acceptance fraction: %.2f"  % np.mean(sampler.acceptance_fraction))
+                        print("---------------------------------------")
                     if pdf:
                         pdf.cell(0, 10, txt="Polarization  %i" % (idx+1), ln=2, align="C", border='B')
                         pdf.cell(0, 10, txt="Mean acceptance fraction: %.2f"  %
@@ -1140,34 +1154,36 @@ class GravData():
                     redchi_closure = np.sum(res_closure**2./closure_error**2.*(1-closure_flag))/(closure.size-np.sum(closure_flag)-ndof)
                     redchi_visphi = np.sum(res_visphi**2./visphi_error**2.*(1-visphi_flag))/(visphi.size-np.sum(visphi_flag)-ndof)
 
-                    print("redchi for visamp: %.2f" % redchi_visamp)
-                    print("redchi for vis2: %.2f" % redchi_vis2)
-                    print("redchi for closure: %.2f" % redchi_closure)
-                    print("redchi for visphi: %.2f" % redchi_visphi)
-                    print("average visamp error: %.2f" % 
-                        np.mean(visamp_error*(1-visamp_flag)))
-                    print("average vis2 error: %.2f" % 
-                        np.mean(vis2_error*(1-vis2_flag)))
-                    print("average closure error (deg): %.2f" % 
-                        np.mean(closure_error*(1-closure_flag)))
-                    print("average visphi error (deg): %.2f" % 
-                        np.mean(visphi_error*(1-visphi_flag)))
+                    if not bequiet:
+                        print("redchi for visamp: %.2f" % redchi_visamp)
+                        print("redchi for vis2: %.2f" % redchi_vis2)
+                        print("redchi for closure: %.2f" % redchi_closure)
+                        print("redchi for visphi: %.2f" % redchi_visphi)
+                        print("average visamp error: %.2f" % 
+                            np.mean(visamp_error*(1-visamp_flag)))
+                        print("average vis2 error: %.2f" % 
+                            np.mean(vis2_error*(1-vis2_flag)))
+                        print("average closure error (deg): %.2f" % 
+                            np.mean(closure_error*(1-closure_flag)))
+                        print("average visphi error (deg): %.2f" % 
+                            np.mean(visphi_error*(1-visphi_flag)))
 
                     percentiles = np.percentile(fl_clsamples, [16, 50, 84],axis=0).T
                     percentiles[:,0] = percentiles[:,1] - percentiles[:,0] 
                     percentiles[:,2] = percentiles[:,2] - percentiles[:,1] 
                     
-                    print("-----------------------------------")
-                    print("Best chi2 result:")
-                    for i in range(0, cldim):
-                        print("%s = %.3f" % (cllabels_raw[i], clmostprop[i]))
-                    print("\n")
-                    print("MCMC Result:")
-                    for i in range(0, cldim):
-                        print("%s = %.3f + %.3f - %.3f" % (cllabels_raw[i], percentiles[i,1], 
-                                                        percentiles[i,2], 
-                                                        percentiles[i,0]))
-                    print("-----------------------------------")
+                    if not bequiet:
+                        print("-----------------------------------")
+                        print("Best chi2 result:")
+                        for i in range(0, cldim):
+                            print("%s = %.3f" % (cllabels_raw[i], clmostprop[i]))
+                        print("\n")
+                        print("MCMC Result:")
+                        for i in range(0, cldim):
+                            print("%s = %.3f + %.3f - %.3f" % (cllabels_raw[i], percentiles[i,1], 
+                                                            percentiles[i,2], 
+                                                            percentiles[i,0]))
+                        print("-----------------------------------")
                     
                     if pdf:
                         pdf.cell(40, 8, txt="", ln=0, align="L", border="B")
@@ -1262,7 +1278,8 @@ class GravData():
                             pdf.image(pdfimages0[pdfcout+pa], w=150)
                             pdf.image(pdfimages1[pdfcout+pa], w=150)
                     
-                    print('Save pdf as %s' % pdffilename)
+                    if not bequiet:
+                        print('Save pdf as %s' % pdffilename)
                     pdf.output(pdffilename)
                     files = glob.glob(savetime + '_pol?_?.png')
                     for file in files:
