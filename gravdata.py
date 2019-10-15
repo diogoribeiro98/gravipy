@@ -1132,7 +1132,7 @@ class GravData():
 
                     
                     if plot:
-                        ranges = np.percentile(fl_clsamples, [1, 99], axis=0).T
+                        ranges = np.percentile(fl_clsamples, [3, 97], axis=0).T
                         fig = corner.corner(fl_clsamples, quantiles=[0.16, 0.5, 0.84],
                                             truths=clmostprop, labels=cllabels)
                         if pdf:
