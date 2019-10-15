@@ -580,6 +580,7 @@ class GravData():
         fiberOffX = self.fiberOffX
         fiberOffY = self.fiberOffY
         fixpos = self.fixpos
+        fixedBH = self.fixedBH
         
         if fixpos:
             dRA = self.fiberOffX
@@ -594,7 +595,10 @@ class GravData():
             fluxRatio2 = theta[3]
             fluxRatio3 = theta[4]
             fluxRatio4 = theta[5]
-        alpha_SgrA = theta[6]
+        if fixedBH:
+            alpha_SgrA = -0.5
+        else:
+            alpha_SgrA = theta[6]
         if use_visscale:
             vis_scale = theta[7]
         else:
@@ -721,7 +725,7 @@ class GravData():
                   use_coupling=False, use_opds=False, fixedBG=True, noS2=True,
                   use_visscale=False, write_results=True, flagtill=3, flagfrom=13,
                   dRA=0., dDEC=0., plotres=True, pdf=True, bequiet=False,
-                  fixpos=False):
+                  fixpos=False, fixedBH=False):
         '''
         Parameter:
         nthreads:       number of cores [4] 
@@ -751,6 +755,7 @@ class GravData():
         self.fixedBG = fixedBG
         self.use_visscale = use_visscale
         self.fixpos = fixpos
+        self.fixedBH = fixedBH
         
         # Get data from file
         nwave = self.channel
@@ -895,6 +900,8 @@ class GravData():
             todel.append(3)
             todel.append(4)
             todel.append(5)
+        if fixedBH:
+            todel.append(6)
         if not use_visscale:
             todel.append(7)
         if fixedBG:
@@ -981,7 +988,9 @@ class GravData():
                     pdf.cell(40, 6, txt="Fit OPDs", ln=0, align="L", border=0)
                     pdf.cell(40, 6, txt=str(use_opds), ln=1, align="L", border=0)
                     pdf.cell(40, 6, txt="Fixpos", ln=0, align="L", border=0)
-                    pdf.cell(40, 6, txt=str(fixpos), ln=1, align="L", border=0)
+                    pdf.cell(40, 6, txt=str(fixpos), ln=0, align="L", border=0)
+                    pdf.cell(40, 6, txt="Fixed BH", ln=0, align="L", border=0)
+                    pdf.cell(40, 6, txt=str(fixedBH), ln=1, align="L", border=0)
                     pdf.ln()
                 
                 if not bequiet:
