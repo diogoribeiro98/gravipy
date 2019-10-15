@@ -633,7 +633,7 @@ class GravData():
                 f = np.ones(4)*fluxRatio
             else:
                 f = np.array([fluxRatio1, fluxRatio2, fluxRatio3, fluxRatio4])
-
+        f = 10.**f
         f_bl = np.array([[f[3],f[2]],
                          [f[3],f[1]],
                          [f[3],f[0]],
@@ -841,11 +841,11 @@ class GravData():
         dRA_init = np.array([dRA,dRA-size,dRA+size])
         dDEC_init = np.array([dDEC,dDEC-size,dDEC+size])
 
-        fr_start = 0.1
-        flux_ratio_1_init = np.array([fr_start, 0.0, 10.])
-        flux_ratio_2_init = np.array([fr_start, 0.0, 10.])
-        flux_ratio_3_init = np.array([fr_start, 0.0, 10.])
-        flux_ratio_4_init = np.array([fr_start, 0.0, 10.])
+        fr_start = np.log10(0.1)
+        flux_ratio_1_init = np.array([fr_start, np.log10(0.001), np.log10(10.)])
+        flux_ratio_2_init = np.array([fr_start, np.log10(0.001), np.log10(10.)])
+        flux_ratio_3_init = np.array([fr_start, np.log10(0.001), np.log10(10.)])
+        flux_ratio_4_init = np.array([fr_start, np.log10(0.001), np.log10(10.)])
 
         alpha_SgrA_init = np.array([-1.,-5.,7.])
         vis_scale_init = np.array([0.8,0.1,1.2])
