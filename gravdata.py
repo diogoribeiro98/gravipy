@@ -852,7 +852,7 @@ class GravData():
         flux_ratio_bg_init = np.array([0.1,0.,20.])
         color_bg_init = np.array([3.,-5.,5.])
 
-        size = 5
+        size = 2
         phase_center_RA = 0.1
         phase_center_DEC = 0.1
 
