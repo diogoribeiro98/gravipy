@@ -1174,6 +1174,7 @@ class GravData():
                     redchi_vis2 = np.sum(res_vis2**2./vis2_error**2.*(1-vis2_flag))/(vis2.size-np.sum(vis2_flag)-ndof)
                     redchi_closure = np.sum(res_closure**2./closure_error**2.*(1-closure_flag))/(closure.size-np.sum(closure_flag)-ndof)
                     redchi_visphi = np.sum(res_visphi**2./visphi_error**2.*(1-visphi_flag))/(visphi.size-np.sum(visphi_flag)-ndof)
+                    redchi = [redchi_visamp, redchi_vis2, redchi_closure, redchi_visphi]
                     if idx == 0:
                         redchi0 = [redchi_visamp, redchi_vis2, redchi_closure, redchi_visphi]
                     elif idx == 1:
@@ -1229,10 +1230,12 @@ class GravData():
                         self.plotFit(theta_result, fitdata, idx, pdf=pdf)
                     if write_results:
                         txtfile.write("# Polarization %i  \n" % (idx+1))
-                        txt = ""
                         for tdx, t in enumerate(mostprop):
                             txtfile.write(str(t))
-                            if tdx != (len(mostprop)-1):
+                            txtfile.write(', ')
+                        for tdx, t in enumerate(redchi):
+                            txtfile.write(str(t))
+                            if tdx != (len(redchi)-1):
                                 txtfile.write(', ')
                             else:
                                 txtfile.write('\n')
@@ -1243,7 +1246,10 @@ class GravData():
                         
                         for tdx, t in enumerate(percentiles[:,1]):
                             txtfile.write(str(t))
-                            if tdx != (len(percentiles[:,1])-1):
+                            txtfile.write(', ')
+                        for tdx, t in enumerate(redchi):
+                            txtfile.write(str(t))
+                            if tdx != (len(redchi)-1):
                                 txtfile.write(', ')
                             else:
                                 txtfile.write('\n')
@@ -1256,7 +1262,7 @@ class GravData():
                             if tdx != (len(percentiles[:,1])-1):
                                 txtfile.write(', ')
                             else:
-                                txtfile.write('\n')
+                                txtfile.write(', 0, 0, 0, 0 \n')
 
                         for tdx, t in enumerate(percentiles[:,2]):
                             if tdx in todel:
@@ -1266,7 +1272,7 @@ class GravData():
                             if tdx != (len(percentiles[:,1])-1):
                                 txtfile.write(', ')
                             else:
-                                txtfile.write('\n')
+                                txtfile.write(', 0, 0, 0, 0 \n')
 
                 if pdf:
                     pdfimages0 = sorted(glob.glob(savetime + '_pol0*.png'))
