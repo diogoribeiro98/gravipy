@@ -1174,7 +1174,11 @@ class GravData():
                     redchi_vis2 = np.sum(res_vis2**2./vis2_error**2.*(1-vis2_flag))/(vis2.size-np.sum(vis2_flag)-ndof)
                     redchi_closure = np.sum(res_closure**2./closure_error**2.*(1-closure_flag))/(closure.size-np.sum(closure_flag)-ndof)
                     redchi_visphi = np.sum(res_visphi**2./visphi_error**2.*(1-visphi_flag))/(visphi.size-np.sum(visphi_flag)-ndof)
-
+                    if idx == 0:
+                        redchi0 = [redchi_visamp, redchi_vis2, redchi_closure, redchi_visphi]
+                    elif idx == 1:
+                        redchi1 = [redchi_visamp, redchi_vis2, redchi_closure, redchi_visphi]
+                        
                     if not bequiet:
                         print("redchi for visamp: %.2f" % redchi_visamp)
                         print("redchi for vis2: %.2f" % redchi_vis2)
@@ -1188,6 +1192,7 @@ class GravData():
                             np.mean(closure_error*(1-closure_flag)))
                         print("average visphi error (deg): %.2f" % 
                             np.mean(visphi_error*(1-visphi_flag)))
+                    
 
                     percentiles = np.percentile(fl_clsamples, [16, 50, 84],axis=0).T
                     percentiles[:,0] = percentiles[:,1] - percentiles[:,0] 
@@ -1294,7 +1299,8 @@ class GravData():
                         titles = ['Vis Amp', 'Vis 2', 'Closure Phase', 'Visibility Phase']
                         for pa in range(4):
                             pdf.add_page()
-                            pdf.cell(0, 10, txt=titles[pa], ln=1, align="C", border='B')
+                            text = '%s, redchi: %.2f (P1), %.2f (P2)' % (titles[pa], redchi0[pa], redchi1[pa])
+                            pdf.cell(0, 10, txt=text, ln=1, align="C", border='B')
                             pdf.ln()
                             pdf.image(pdfimages0[pdfcout+pa], w=150)
                             pdf.image(pdfimages1[pdfcout+pa], w=150)
