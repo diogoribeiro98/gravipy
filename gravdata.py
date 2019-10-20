@@ -1585,6 +1585,8 @@ class GravData():
                         os.remove(file)
             if write_results:
                 txtfile.close()
+                if second_iteration:
+                    txtfile_cor.close()
         return 0
 
 
