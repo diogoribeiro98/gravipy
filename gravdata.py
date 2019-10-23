@@ -758,7 +758,7 @@ class GravData():
                   use_coupling=False, use_opds=False, fixedBG=True, noS2=True,
                   use_visscale=False, write_results=True, flagtill=3, flagfrom=13,
                   dRA=0., dDEC=0., plotres=True, pdf=True, bequiet=False,
-                  fixpos=False, fixedBH=False, second_iteration=False):
+                  fixpos=False, fixedBH=False, second_iteration=False, specialfix=False):
         '''
         Parameter:
         nthreads:       number of cores [4] 
@@ -1091,6 +1091,12 @@ class GravData():
                         vis2_flag[:,t] = True
                         visphi_flag[:,t] = True
                         closure_flag[:,t] = True
+                        
+                    if specialfix:
+                        # ATTENTION First baseline flagged!
+                        visamp_flag[0] = True
+                        vis2_flag[0] = True
+                        visphi_flag[0] = True
                         
                     width = 1e-1
                     pos = np.ones((nwalkers,ndim))
