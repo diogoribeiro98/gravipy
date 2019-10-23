@@ -450,7 +450,6 @@ class GravData():
             print(theta_names_raw)
             raise ValueError('Wrong number of input parameter given (should be 16)')            
         
-        self.use_coupling = False
         self.constant_f = constant_f
         self.fixedBG = fixedBG
         self.use_opds = use_opds
@@ -568,7 +567,6 @@ class GravData():
     def calc_vis(self, theta, u, v, wave, dlambda):
         mas2rad = 1e-3 / 3600 / 180 * np.pi
         rad2mas = 180 / np.pi * 3600 * 1e3
-        use_coupling = self.use_coupling 
         constant_f = self.constant_f
         fixedBG = self.fixedBG
         use_opds = self.use_opds
@@ -620,15 +618,10 @@ class GravData():
         alpha_S2 = 3
         
         # Flux Ratios
-        if use_coupling:
-            # TODO can I remove this? Commented in Idels file
-            raise ValueError('Coupling ratios not available!')
-            f = 10.**fluxRatio1*np.array([coupling_1, coupling_2, coupling_3, coupling_4])
+        if constant_f:
+            f = np.ones(4)*fluxRatio
         else:
-            if constant_f:
-                f = np.ones(4)*fluxRatio
-            else:
-                f = np.array([fluxRatio1, fluxRatio2, fluxRatio3, fluxRatio4])
+            f = np.array([fluxRatio1, fluxRatio2, fluxRatio3, fluxRatio4])
         f = 10.**f
         f_bl = np.array([[f[3],f[2]],
                          [f[3],f[1]],
@@ -755,7 +748,7 @@ class GravData():
     
     def fitBinary(self, nthreads=4, nwalkers=500, nruns=500, bestchi=True,
                   plot=True, fit_for=np.array([0.5,0.5,1.0,0.0]), constant_f=True,
-                  use_coupling=False, use_opds=False, fixedBG=True, noS2=True,
+                  use_opds=False, fixedBG=True, noS2=True,
                   use_visscale=False, write_results=True, flagtill=3, flagfrom=13,
                   dRA=0., dDEC=0., plotres=True, pdf=True, bequiet=False,
                   fixpos=False, fixedBH=False, second_iteration=False, specialfix=False):
@@ -770,7 +763,6 @@ class GravData():
         write_results:  Write fit results in file [True] 
         fit_for:        weight of VA, V2, T3, VP [[0.5,0.5,1.0,0.0]] 
         constant_f:     Constant coupling [True]
-        use_coupling:   user theoretical coupling [False] 
         use_opds:       Fit OPDs [False] 
         noS2:           Does not do anything if OFFX and OFFY=0
         fixedBG:        Fir for background power law [False]
@@ -782,7 +774,6 @@ class GravData():
         bequiet         Suppresses ALL outputs
         '''
         self.fit_for = fit_for
-        self.use_coupling = use_coupling
         self.constant_f = constant_f
         self.use_opds = use_opds
         self.fixedBG = fixedBG
