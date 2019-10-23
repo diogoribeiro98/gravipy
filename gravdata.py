@@ -2351,7 +2351,7 @@ class GravData():
                             if tdx != (len(percentiles[:,1])-1):
                                 txtfile.write(', ')
                             else:
-                                txtfile.write(', 0, 0, 0, 0 \n')
+                                txtfile.write(', 0 \n')
 
                         for tdx, t in enumerate(percentiles[:,2]):
                             if tdx in todel:
@@ -2361,7 +2361,7 @@ class GravData():
                             if tdx != (len(percentiles[:,1])-1):
                                 txtfile.write(', ')
                             else:
-                                txtfile.write(', 0, 0, 0, 0 \n')
+                                txtfile.write(', 0 \n')
 
                 if pdf:
                     pdfimages0 = sorted(glob.glob(savetime + '_pol0*.png'))
