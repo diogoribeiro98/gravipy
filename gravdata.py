@@ -1932,7 +1932,7 @@ class GravData():
     def fitUnary(self, nthreads=4, nwalkers=500, nruns=500, bestchi=True,
                 plot=True, fixedBG=False, fixedBH=False, write_results=True, 
                 flagtill=1, flagfrom=13, plotres=True, pdf=True, bequiet=False,
-                noS2=False, onlyphases=True):
+                noS2=False, onlyphases=True, fitforS2=False):
         """
         """
         self.fixedBG = fixedBG
@@ -2016,8 +2016,12 @@ class GravData():
 
         # Initial guesses
         size = 5
-        phase_center_RA = 0.1
-        phase_center_DEC = 0.1
+        if fitforS2:
+            phase_center_RA = self.fiberOffX
+            phase_center_DEC = self.fiberOffY
+        else:
+            phase_center_RA = 0.1
+            phase_center_DEC = 0.1
         phase_center_RA_init = np.array([phase_center_RA,
                                          phase_center_RA - size,
                                          phase_center_RA + size])
