@@ -232,6 +232,8 @@ class GravData():
                 self.vis2flagSC_P2 = fitsdata['OI_VIS2', 12].data.field('FLAG')
                 self.t3flagSC_P1 = fitsdata['OI_T3', 11].data.field('FLAG')
                 self.t3flagSC_P2 = fitsdata['OI_T3', 12].data.field('FLAG')
+                self.visphiflagSC_P1 = fitsdata['OI_VIS', 11].data.field('FLAG')
+                self.visphiflagSC_P2 = fitsdata['OI_VIS', 12].data.field('FLAG')
                 
                 if flag:
                     self.visampSC_P1[self.visampflagSC_P1] = np.nan
@@ -248,6 +250,12 @@ class GravData():
                     self.t3errSC_P1[self.t3flagSC_P1] = np.nan
                     self.t3SC_P2[self.t3flagSC_P2] = np.nan
                     self.t3errSC_P2[self.t3flagSC_P2] = np.nan
+
+                    self.visphiSC_P1[self.visphiflagSC_P1] = np.nan
+                    self.visphierrSC_P1[self.visphiflagSC_P1] = np.nan
+                    self.visphiSC_P2[self.visphiflagSC_P2] = np.nan
+                    self.visphierrSC_P2[self.visphiflagSC_P2] = np.nan
+
                     
                 
                 if plot:
@@ -1928,7 +1936,54 @@ class GravData():
         if np.any(theta < lower) or np.any(theta > upper):
             return -np.inf
         return self.lnlike_unary(theta, fitdata, u, v, wave, dlambda)
-
+    
+    def plot_unary(self, theta, giveuv=False, uu=None, vv=None, plot=False):
+        theta_names_raw = np.array(["PC RA", "PC DEC"])
+        rad2as = 180 / np.pi * 3600
+        try:
+            if len(theta) != 2:
+                print('Theta has to include the following 2 parameter:')
+                print(theta_names_raw)
+                raise ValueError('Wrong number of input parameter given (should be 2)')
+        except(TypeError):
+            print('Thetha has to include the following 2 parameter:')
+            print(theta_names_raw)
+            raise ValueError('Wrong number of input parameter given (should be 2)')
+        self.fixedBG = False
+        self.fixedBH = False
+        self.onlyphases = True
+        nwave = self.channel
+        if giveuv:
+            if uu is None or vv is None:
+                raise ValueError("if giveuv=True values for u and v have to be given to the function (as uu, vv)")
+            else:
+                u = uu
+                v = vv
+        else:
+            u = self.u
+            v = self.v
+        wave = self.wlSC_P1
+        R = np.zeros((6,nwave))
+        R[0,:] = [28.9,16.5,15.6,16.8,17.6,16.4,15.7,17.5,18.8,20.1,20.2,20.5,22.0,28.3]
+        R[1,:] = [27.2,15.8,14.9,16.0,16.7,15.7,15.1,16.4,18.2,19.6,20.0,20.3,21.7,25.3]
+        R[2,:] = [28.3,16.2,15.3,16.7,17.3,16.3,15.7,17.4,18.8,20.2,20.7,21.1,22.4,27.5]
+        R[3,:] = [29.1,17.0,15.9,16.6,17.1,16.6,15.8,16.9,18.8,20.5,21.0,21.3,22.0,24.4]
+        R[4,:] = [28.8,16.8,16.1,16.7,17.4,16.7,16.1,17.2,19.0,20.5,21.2,21.6,22.2,25.2]
+        R[5,:] = [28.0,16.0,15.0,16.2,16.6,15.7,15.3,16.4,17.8,19.3,19.8,20.0,20.8,24.4]
+        dlambda = np.zeros((6,nwave))
+        for i in range(0,6):
+            if (nwave==11) or (nwave==14):
+                dlambda[i,:] = wave/R[i,:]/2
+            elif nwave==210:
+                dlambda[i,:] = wave/500/2
+            else:
+                dlambda[i,:] = 0.03817
+        visphi = self.calc_vis_unary(theta, u, v, wave, dlambda)
+        return visphi
+        
+    
+    
+    
     def fitUnary(self, nthreads=4, nwalkers=500, nruns=500, bestchi=True,
                 plot=True, fixedBG=False, fixedBH=False, write_results=True, 
                 flagtill=1, flagfrom=13, plotres=True, pdf=True, bequiet=False,
@@ -2061,18 +2116,6 @@ class GravData():
 
         # Get data
         if self.polmode == 'SPLIT':
-            visamp_P = [self.visampSC_P1, self.visampSC_P2]
-            visamp_error_P = [self.visamperrSC_P1, self.visamperrSC_P2]
-            visamp_flag_P = [self.visampflagSC_P1, self.visampflagSC_P2]
-            
-            vis2_P = [self.vis2SC_P1, self.vis2SC_P2]
-            vis2_error_P = [self.vis2errSC_P1, self.vis2errSC_P2]
-            vis2_flag_P = [self.vis2flagSC_P1, self.vis2flagSC_P2]
-
-            closure_P = [self.t3SC_P1, self.t3SC_P2]
-            closure_error_P = [self.t3errSC_P1, self.t3errSC_P2]
-            closure_flag_P = [self.t3flagSC_P1, self.t3flagSC_P2]
-            
             visphi_P = [self.visphiSC_P1, self.visphiSC_P2]
             visphi_error_P = [self.visphierrSC_P1, self.visphierrSC_P2]
             visphi_flag_P = [self.visampflagSC_P1, self.visampflagSC_P2]
@@ -2131,39 +2174,11 @@ class GravData():
                     print('Run MCMC for DIT %i' % (dit+1))
                 ditstart = dit*6
                 ditstop = ditstart + 6
-                t3ditstart = dit*4
-                t3ditstop = t3ditstart + 4
 
                 for idx in range(2):
-                    visamp = visamp_P[idx][ditstart:ditstop]
-                    visamp_error = visamp_error_P[idx][ditstart:ditstop]
-                    visamp_flag = visamp_flag_P[idx][ditstart:ditstop]
-                    vis2 = vis2_P[idx][ditstart:ditstop]
-                    vis2_error = vis2_error_P[idx][ditstart:ditstop]
-                    vis2_flag = vis2_flag_P[idx][ditstart:ditstop]
-                    closure = closure_P[idx][t3ditstart:t3ditstop]
-                    closure_error = closure_error_P[idx][t3ditstart:t3ditstop]
-                    closure_flag = closure_flag_P[idx][t3ditstart:t3ditstop]
                     visphi = visphi_P[idx][ditstart:ditstop]
                     visphi_error = visphi_error_P[idx][ditstart:ditstop]
                     visphi_flag = visphi_flag_P[idx][ditstart:ditstop]
-
-                    # further flag if visamp/vis2 if >1 or NaN, and replace NaN with 0 
-                    with np.errstate(invalid='ignore'):
-                        visamp_flag1 = (visamp > 1) | (visamp < 1.e-5)
-                    visamp_flag2 = np.isnan(visamp)
-                    visamp_flag_final = ((visamp_flag) | (visamp_flag1) | (visamp_flag2))
-                    visamp_flag = visamp_flag_final
-                    visamp = np.nan_to_num(visamp)
-                    visamp_error[visamp_flag] = 1.
-                
-                    with np.errstate(invalid='ignore'):
-                        vis2_flag1 = (vis2 > 1) | (vis2 < 1.e-5) 
-                    vis2_flag2 = np.isnan(vis2)
-                    vis2_flag_final = ((vis2_flag) | (vis2_flag1) | (vis2_flag2))
-                    vis2_flag = vis2_flag_final
-                    vis2 = np.nan_to_num(vis2)
-                    vis2_error[vis2_flag] = 1.
 
                     if ((flagtill > 0) and (flagfrom > 0)):
                         p = flagtill
@@ -2171,15 +2186,8 @@ class GravData():
                         if idx == 0 and dit == 0:
                             if not bequiet:
                                 print('using channels from #%i to #%i' % (p, t))
-                        visamp_flag[:,0:p] = True
-                        vis2_flag[:,0:p] = True
                         visphi_flag[:,0:p] = True
-                        closure_flag[:,0:p] = True
-
-                        visamp_flag[:,t] = True
-                        vis2_flag[:,t] = True
                         visphi_flag[:,t] = True
-                        closure_flag[:,t] = True
                         
                     width = 1e-1
                     pos = np.ones((nwalkers,ndim))
@@ -2190,10 +2198,6 @@ class GravData():
                             pos[:,par] = theta[par] + width*np.random.randn(nwalkers)
                     if not bequiet:
                         print('Run MCMC for Pol %i' % (idx+1))
-                    fitdata_all = [visamp, visamp_error, visamp_flag,
-                                   vis2, vis2_error, vis2_flag,
-                                   closure, closure_error, closure_flag,
-                                   visphi, visphi_error, visphi_flag]
                     fitdata = [visphi, visphi_error, visphi_flag]
                     if nthreads == 1:
                         sampler = emcee.EnsembleSampler(nwalkers, ndim, self.lnprob_unary,
