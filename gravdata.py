@@ -2405,6 +2405,8 @@ class GravData():
                         else:
                             txtfile.write('nan, nan, nan, nan, nan, nan \n')
                             txtfile.write('nan, nan, nan, nan, nan, nan \n')
+                            txtfile.write('nan, nan, nan, nan, nan, nan \n')
+                            txtfile.write('nan, nan, nan, nan, nan, nan \n')
                     
                 if createpdf:
                     if (bothdofit == True).all():
