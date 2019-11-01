@@ -2127,9 +2127,10 @@ class GravData():
             if not bequiet:
                 print('NDIT = %i' % ndit)
             for dit in range(ndit):
-                
-                
-                
+                savetime = str(datetime.now()).replace('-', '')
+                savetime = savetime.replace(' ', '-')
+                savetime = savetime.replace(':', '')
+                self.savetime = savetime
                 if write_results and ndit > 1:
                     txtfile.write('# DIT %i \n' % dit)
                 if createpdf:
@@ -2186,7 +2187,7 @@ class GravData():
                     visphi_error = visphi_error_P[idx][ditstart:ditstop]
                     visphi_flag = visphi_flag_P[idx][ditstart:ditstop]
                     u = fullu[ditstart:ditstop]
-                    v = fullu[ditstart:ditstop]
+                    v = fullv[ditstart:ditstop]
                     
                     if ((flagtill > 0) and (flagfrom > 0)):
                         p = flagtill
