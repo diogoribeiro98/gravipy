@@ -2320,7 +2320,9 @@ class GravData():
                         check = np.abs(res_visphi_1) < np.abs(res_visphi_2) 
                         res_visphi = res_visphi_1*check + res_visphi_2*(1-check)
 
-                        redchi_visphi = np.sum(res_visphi**2./visphi_error**2.*(1-visphi_flag))/(visphi.size-np.sum(visphi_flag)-ndof)
+                        #redchi_visphi = np.sum(res_visphi**2./visphi_error**2.*(1-visphi_flag))/(visphi.size-np.sum(visphi_flag)-ndof)
+                        redchi_visphi = np.sum(res_visphi**2.*(1-visphi_flag))/(visphi.size-np.sum(visphi_flag)-ndof)
+                        
                         if idx == 0:
                             redchi0 = redchi_visphi
                         elif idx == 1:
