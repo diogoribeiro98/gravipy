@@ -9,8 +9,11 @@ from fpdf import FPDF
 from PIL import Image
 from scipy import optimize
 
-from generalFunctions import *
-set_style('show')
+try:
+    from generalFunctions import *
+    set_style('show')
+except NameError:
+    pass
 
 import sys
 import os 
@@ -432,7 +435,8 @@ class GravData():
     
     def plot_vis(self, theta, constant_f=True, use_opds=False, fixedBG=True, fiberOff=None, plot=True):
         """
-        theta should be a list of:
+        Test function to see how a given theta would look like
+        Theta should be a list of:
         dRA, dDEC, f1, (f2), (f3), (f4), alpha flare, (V scale), f BG, (alpha BG), 
         PC RA, PC DEC, (OPD1), (OPD2), (OPD3), (OPD4)
         
@@ -758,8 +762,8 @@ class GravData():
                   plot=True, fit_for=np.array([0.5,0.5,1.0,0.0]), constant_f=True,
                   use_opds=False, fixedBG=True, noS2=True,
                   use_visscale=False, write_results=True, flagtill=3, flagfrom=13,
-                  dRA=0., dDEC=0., plotres=True, pdf=True, bequiet=False,
-                  fixpos=False, fixedBH=False, second_iteration=False, specialfix=False):
+                  dRA=0., dDEC=0., plotres=True, createpdf=True, bequiet=False,
+                  fixpos=False, fixedBH=False, second_iteration=False):
         '''
         Parameter:
         nthreads:       number of cores [4] 
@@ -779,7 +783,11 @@ class GravData():
         flagfrom:       Flag red channels [13]
         dRA:            Guess for dRA (taken from SOFFX if not 0)
         dDEC:           Guess for dDEC (taken from SOFFY if not 0)
-        bequiet         Suppresses ALL outputs
+        bequiet:        Suppresses ALL outputs
+        createpdf:      Creates a pdf with fit results and all plots [True] 
+        fixpos:         Does nto fit the distance between the sources [False]
+        fixedBH:        Fit for black hole power law [False]
+        second_iteration: Does a second iteration with corrected error bars [False]
         '''
         self.fit_for = fit_for
         self.constant_f = constant_f
@@ -982,7 +990,7 @@ class GravData():
                     txtfile.write('# DIT %i \n' % dit)
                     if second_iteration:
                         txtfile_cor.write('# DIT %i \n' % dit)
-                if pdf:
+                if createpdf:
                     savetime = str(datetime.now()).replace('-', '')
                     savetime = savetime.replace(' ', '-')
                     savetime = savetime.replace(':', '')
@@ -1090,13 +1098,7 @@ class GravData():
                         vis2_flag[:,t] = True
                         visphi_flag[:,t] = True
                         closure_flag[:,t] = True
-                        
-                    if specialfix:
-                        # ATTENTION First baseline flagged!
-                        visamp_flag[0] = True
-                        vis2_flag[0] = True
-                        visphi_flag[0] = True
-                        
+                    
                     width = 1e-1
                     pos = np.ones((nwalkers,ndim))
                     for par in range(ndim):
@@ -1136,7 +1138,7 @@ class GravData():
                         print("---------------------------------------")
                         print("Mean acceptance fraction: %.2f"  % np.mean(sampler.acceptance_fraction))
                         print("---------------------------------------")
-                    if pdf:
+                    if createpdf:
                         pdf.cell(0, 10, txt="Polarization  %i" % (idx+1), ln=2, align="C", border='B')
                         pdf.cell(0, 10, txt="Mean acceptance fraction: %.2f"  %
                                 np.mean(sampler.acceptance_fraction), 
@@ -1164,7 +1166,7 @@ class GravData():
                             ax.yaxis.set_label_coords(-0.1, 0.5)
                         axes[-1].set_xlabel("step number")
                         
-                        if pdf:
+                        if createpdf:
                             pdfname = '%s_pol%i_1.png' % (savetime, idx)
                             plt.savefig(pdfname)
                             plt.close()
@@ -1182,7 +1184,7 @@ class GravData():
                         ranges = np.percentile(fl_clsamples, [3, 97], axis=0).T
                         fig = corner.corner(fl_clsamples, quantiles=[0.16, 0.5, 0.84],
                                             truths=clmostprop, labels=cllabels)
-                        if pdf:
+                        if createpdf:
                             pdfname = '%s_pol%i_2.png' % (savetime, idx)
                             plt.savefig(pdfname)
                             plt.close()
@@ -1253,7 +1255,7 @@ class GravData():
                                                                percentiles[i,0]))
                         print("-----------------------------------")
                     
-                    if pdf:
+                    if createpdf:
                         pdf.cell(40, 8, txt="", ln=0, align="L", border="B")
                         pdf.cell(40, 8, txt="Best chi2 result", ln=0, align="L", border="LB")
                         pdf.cell(60, 8, txt="MCMC result", ln=1, align="L", border="LB")
@@ -1268,7 +1270,7 @@ class GravData():
                         pdf.ln()
                     
                     if plotres and not second_iteration:
-                        self.plotFit(theta_result, fitdata, idx, pdf=pdf)
+                        self.plotFit(theta_result, fitdata, idx, createpdf=createpdf)
                     if write_results:
                         txtfile.write("# Polarization %i  \n" % (idx+1))
                         for tdx, t in enumerate(mostprop):
@@ -1383,7 +1385,7 @@ class GravData():
                                 ax.yaxis.set_label_coords(-0.1, 0.5)
                             axes[-1].set_xlabel("step number")
                             
-                            if pdf:
+                            if createpdf:
                                 pdfname = '%s_pol%i_3.png' % (savetime, idx)
                                 plt.savefig(pdfname)
                                 plt.close()
@@ -1401,7 +1403,7 @@ class GravData():
                             ranges = np.percentile(fl_clsamples, [3, 97], axis=0).T
                             fig = corner.corner(fl_clsamples, quantiles=[0.16, 0.5, 0.84],
                                                 truths=clmostprop, labels=cllabels)
-                            if pdf:
+                            if createpdf:
                                 pdfname = '%s_pol%i_4.png' % (savetime, idx)
                                 plt.savefig(pdfname)
                                 plt.close()
@@ -1471,7 +1473,7 @@ class GravData():
                                                                 percentiles[i,0]))
                             print("-----------------------------------")
                         if plotres:
-                            self.plotFitCor(theta_result, theta_result_cor, fitdata, fitdata_cor, idx, pdf=pdf)
+                            self.plotFitCor(theta_result, theta_result_cor, fitdata, fitdata_cor, idx, createpdf=createpdf)
                         if write_results:
                             txtfile_cor.write("# Polarization %i  \n" % (idx+1))
                             for tdx, t in enumerate(mostprop):
@@ -1521,7 +1523,7 @@ class GravData():
                 
                         
 
-                if pdf:
+                if createpdf:
                     pdfimages0 = sorted(glob.glob(savetime + '_pol0*.png'))
                     pdfimages1 = sorted(glob.glob(savetime + '_pol1*.png'))
                     pdfcout = 0
@@ -1595,7 +1597,12 @@ class GravData():
         return 0
 
 
-    def plotFit(self, theta, fitdata, idx=0, pdf=False):
+    def plotFit(self, theta, fitdata, idx=0, createpdf=False):
+        """
+        Calculates the theoretical interferometric data for the given parameters in theta
+        and plots them together with the data in fitdata.
+        Mainly used in fitBinary as result plots.
+        """
         colors_baseline = np.array(["magenta","crimson","cyan","green","blue","orange"])
         colors_closure = np.array(["blue","crimson","cyan","green"])
         baseline_labels = np.array(["UT4-3","UT4-2","UT4-1","UT3-2","UT3-1","UT2-1"])
@@ -1647,7 +1654,7 @@ class GravData():
         plt.ylabel('visibility modulus')
         plt.ylim(-0.1,1.1)
         plt.xlabel('spatial frequency (1/arcsec)')
-        if pdf:
+        if createpdf:
             savetime = self.savetime
             plt.title('Polarization %i' % (idx + 1))
             pdfname = '%s_pol%i_5.png' % (savetime, idx)
@@ -1668,7 +1675,7 @@ class GravData():
         plt.xlabel('spatial frequency (1/arcsec)')
         plt.ylabel('visibility squared')
         plt.ylim(-0.1,1.1)
-        if pdf:
+        if createpdf:
             plt.title('Polarization %i' % (idx + 1))
             pdfname = '%s_pol%i_6.png' % (savetime, idx)
             plt.savefig(pdfname)
@@ -1694,7 +1701,7 @@ class GravData():
                      color=colors_closure[i])
         plt.xlabel('spatial frequency of largest baseline in triangle (1/arcsec)')
         plt.ylabel('closure phase (deg)')
-        if pdf:
+        if createpdf:
             plt.title('Polarization %i' % (idx + 1))
             pdfname = '%s_pol%i_7.png' % (savetime, idx)
             plt.savefig(pdfname)
@@ -1713,7 +1720,7 @@ class GravData():
                     color=colors_baseline[i],alpha=1.0)
         plt.ylabel('visibility phase')
         plt.xlabel('spatial frequency (1/arcsec)')
-        if pdf:
+        if createpdf:
             plt.title('Polarization %i' % (idx + 1))
             pdfname = '%s_pol%i_8.png' % (savetime, idx)
             plt.savefig(pdfname)
@@ -1722,7 +1729,13 @@ class GravData():
             plt.show()
         
         
-    def plotFitCor(self, theta, theta_cor, fitdata, fitdata_cor, idx=0, pdf=False):
+    def plotFitCor(self, theta, theta_cor, fitdata, fitdata_cor, idx=0, createpdf=False):
+        """
+        Calculates the theoretical interferometric data for the given parameters in theta
+        and in theta cor, to compare two fits.
+        Plots them together with the data in fitdata.
+        Mainly used in fitBinary as result plots.
+        """
         colors_baseline = np.array(["magenta","crimson","cyan","green","blue","orange"])
         colors_closure = np.array(["blue","crimson","cyan","green"])
         baseline_labels = np.array(["UT4-3","UT4-2","UT4-1","UT3-2","UT3-1","UT2-1"])
@@ -1788,7 +1801,7 @@ class GravData():
         plt.ylabel('visibility modulus')
         plt.ylim(-0.1,1.1)
         plt.xlabel('spatial frequency (1/arcsec)')
-        if pdf:
+        if createpdf:
             savetime = self.savetime
             plt.title('Polarization %i' % (idx + 1))
             pdfname = '%s_pol%i_5.png' % (savetime, idx)
@@ -1815,7 +1828,7 @@ class GravData():
         plt.xlabel('spatial frequency (1/arcsec)')
         plt.ylabel('visibility squared')
         plt.ylim(-0.1,1.1)
-        if pdf:
+        if createpdf:
             plt.title('Polarization %i' % (idx + 1))
             pdfname = '%s_pol%i_6.png' % (savetime, idx)
             plt.savefig(pdfname)
@@ -1847,7 +1860,7 @@ class GravData():
                      color=colors_closure[i], ls='--')
         plt.xlabel('spatial frequency of largest baseline in triangle (1/arcsec)')
         plt.ylabel('closure phase (deg)')
-        if pdf:
+        if createpdf:
             plt.title('Polarization %i' % (idx + 1))
             pdfname = '%s_pol%i_7.png' % (savetime, idx)
             plt.savefig(pdfname)
@@ -1872,7 +1885,7 @@ class GravData():
                     color=colors_baseline[i], ls='--')
         plt.ylabel('visibility phase')
         plt.xlabel('spatial frequency (1/arcsec)')
-        if pdf:
+        if createpdf:
             plt.title('Polarization %i' % (idx + 1))
             pdfname = '%s_pol%i_8.png' % (savetime, idx)
             plt.savefig(pdfname)
@@ -1880,7 +1893,7 @@ class GravData():
         else:
             plt.show()
         
-        
+    ############################################
     # Unary model
     def calc_vis_unary(self, theta, u, v, wave, dlambda):
         mas2rad = 1e-3 / 3600 / 180 * np.pi
@@ -1906,9 +1919,7 @@ class GravData():
             else:
                 alpha_bg = theta[4]
         
-        # Calculate complex visibilities
         vis = np.zeros((6,len(wave))) + 0j
-        
         if len(u) != 6 or len(v) != 6:
             raise ValueError('u or v have wrong length, something went wrong')
         for i in range(0,6):
@@ -1919,7 +1930,6 @@ class GravData():
             # interferometric intensities of all components
             intSgrA = self.vis_intensity(0, alpha_SgrA, wave, dlambda[i,:])
             intBG = self.vis_intensity(0, alpha_bg, wave, dlambda[i,:])
-            
             vis[i,:] = (intSgrA/(intSgrA + fluxRatioBG * intBG) *
                          np.exp(-2j*np.pi*(u_mas * phaseCenterRA 
                                            + v_mas * phaseCenterDEC)))
@@ -1941,6 +1951,12 @@ class GravData():
         return self.lnlike_unary(theta, fitdata, u, v, wave, dlambda)
     
     def plot_unary(self, theta, giveuv=False, uu=None, vv=None, plot=False):
+        """
+        Test function to see how a given theta would look like in phases.
+        Input:  theta = [dRa, dDec]
+                giveuv has to be set to True if you wnat to change the uv data
+                otherwie it will take them from the class
+        """
         theta_names_raw = np.array(["PC RA", "PC DEC"])
         rad2as = 180 / np.pi * 3600
         try:
@@ -1992,6 +2008,25 @@ class GravData():
                 flagtill=1, flagfrom=13, plotres=True, createpdf=True, bequiet=False,
                 noS2=False, onlyphases=True, fitforS2=False, mindatapoints=3):
         """
+        Does a MCMC unary fit on the phases of the data.
+        Parameter:
+        nthreads:       number of cores [4] 
+        nwalkers:       number of walkers [500] 
+        nruns:          number of MCMC runs [500] 
+        bestchi:        Gives best chi2 (for True) or mcmc res as output [True]
+        plot:           plot MCMC results [True]
+        fixedBG:        Fit for background power law [False]
+        fixedBH:        Fit for black hole power law [False]
+        write_results:  Write fit results in file [True] 
+        flagtill:       Flag blue channels [1] 
+        flagfrom:       Flag red channels [13]
+        plotres:        plot fit result [True]
+        createpdf:      Creates a pdf with fit results and all plots [True] 
+        bequiet:        Suppresses ALL outputs [False]
+        noS2:           If True ignores files where fiber offset is 0 [False]
+        onlyphases:     Fits only the phases [True]
+        fitforS2:       If True sets the inital value at the position of S2 [False] 
+        mindatapoints:  if less valid datapoints in one baselin, file is rejected [3]
         """
         self.fixedBG = fixedBG
         self.fixedBH = fixedBH
