@@ -763,7 +763,8 @@ class GravData():
                   use_opds=False, fixedBG=True, noS2=True,
                   use_visscale=False, write_results=True, flagtill=3, flagfrom=13,
                   dRA=0., dDEC=0., plotres=True, createpdf=True, bequiet=False,
-                  fixpos=False, fixedBH=False, second_iteration=False):
+                  fixpos=False, fixedBH=False, second_iteration=False,
+                  dphRA=0.1, dphDec=0.1):
         '''
         Parameter:
         nthreads:       number of cores [4] 
@@ -904,8 +905,8 @@ class GravData():
         color_bg_init = np.array([3.,-5.,5.])
 
         size = 5
-        phase_center_RA = 0.1
-        phase_center_DEC = 0.1
+        phase_center_RA = dphRA
+        phase_center_DEC = dphDec
 
         phase_center_RA_init = np.array([phase_center_RA,phase_center_RA-size,phase_center_RA+size])
         phase_center_DEC_init = np.array([phase_center_DEC,phase_center_DEC-size,phase_center_DEC+size])
@@ -1982,6 +1983,8 @@ class GravData():
             u = self.u
             v = self.v
         wave = self.wlSC_P1
+        
+        
         R = np.zeros((6,nwave))
         R[0,:] = [28.9,16.5,15.6,16.8,17.6,16.4,15.7,17.5,18.8,20.1,20.2,20.5,22.0,28.3]
         R[1,:] = [27.2,15.8,14.9,16.0,16.7,15.7,15.1,16.4,18.2,19.6,20.0,20.3,21.7,25.3]
@@ -2062,7 +2065,7 @@ class GravData():
             txtfile.write('# MJD: %f \n' % MJD)
             txtfile.write('# OFFX: %f \n' % self.fiberOffX)
             txtfile.write('# OFFY: %f \n\n' % self.fiberOffY)
-        
+
         if self.polmode == 'COMBINED':
             R = np.zeros((6,nwave))
             if nwave == 11:
@@ -2100,7 +2103,7 @@ class GravData():
         for i in range(0,6):
             if (nwave==11) or (nwave==14):
                 dlambda[i,:] = wave/R[i,:]/2
-            elif nwave==210:
+            elif nwave==233:
                 dlambda[i,:] = wave/500/2
             else:
                 dlambda[i,:] = 0.03817
