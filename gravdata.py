@@ -2009,7 +2009,8 @@ class GravData():
     def fitUnary(self, nthreads=4, nwalkers=500, nruns=500, bestchi=True,
                 plot=True, fixedBG=False, fixedBH=False, write_results=True, 
                 flagtill=1, flagfrom=13, plotres=True, createpdf=True, bequiet=False,
-                noS2=False, onlyphases=True, fitforS2=False, mindatapoints=3):
+                noS2=False, onlyphases=True, fitforS2=False, mindatapoints=3,
+                dontfit=None):
         """
         Does a MCMC unary fit on the phases of the data.
         Parameter:
@@ -2030,6 +2031,7 @@ class GravData():
         onlyphases:     Fits only the phases [True]
         fitforS2:       If True sets the inital value at the position of S2 [False] 
         mindatapoints:  if less valid datapoints in one baselin, file is rejected [3]
+        dontfit:        List of telescopes to flag
         """
         self.fixedBG = fixedBG
         self.fixedBH = fixedBH
@@ -2256,6 +2258,18 @@ class GravData():
                                 print('Baseline %i is has to few non flagged values' % bl)
                             dofit = False
                     bothdofit[idx] = dofit
+                    
+                    if dontfit is not None:
+                        if not bequiet:
+                            print('Will not fit Telescope %i' % dontfit)
+                        if dontfit not in [1,2,3,4]:
+                            raise ValueError('Dontfit has to be one of the UTs: 1,2,3,4')
+                        telescopes = [[4, 3],[4, 2],[4, 1],[3, 2],[3, 1],[2, 1]]
+                        for bl in range(6):
+                            if dontfit in telescopes[bl]:
+                                visphi_flag[bl,:] = True
+                            
+                        
                             
                             
                     if dofit == True:
