@@ -654,7 +654,7 @@ class GravData():
                 s_SgrA = ((-phaseCenterRA)*u[i] + (-phaseCenterDEC)*v[i]) * mas2rad * 1e6
                 s_S2 = ((dRA-phaseCenterRA)*u[i] + (dDEC-phaseCenterDEC)*v[i]) * mas2rad * 1e6
             else:
-                s = bl*(sky position) + opd1 - opd2  in mum
+                #s = bl*(sky position) + opd1 - opd2  in mum
                 s_SgrA = ((fiberOffX-dRA)*u[i] + (fiberOffY-dDEC)*v[i]) * mas2rad * 1e6
                 s_S2 = (fiberOffX*u[i] + fiberOffY*v[i]) * mas2rad * 1e6
             
