@@ -565,6 +565,7 @@ class GravData():
                 plt.plot(max_u_as_model, model_closure_full[i,:], color=colors_closure[i])
             plt.xlabel('spatial frequency of largest baseline in triangle (1/arcsec)')
             plt.ylabel('closure phase (deg)')
+            plt.ylim(-180, 180)
             plt.show()
             
             # VisPhi
@@ -573,6 +574,7 @@ class GravData():
                 plt.plot(magu_as_model[i,:], model_visphi_full[i,:], color=colors_baseline[i],alpha=1.0)
             plt.ylabel('visibility phase')
             plt.xlabel('spatial frequency (1/arcsec)')
+            plt.ylim(-180, 180)
             plt.show()
 
         return visamp, vis2, visphi, closure
@@ -956,6 +958,9 @@ class GravData():
             todel.append(7)
         if fixedBG:
             todel.append(9)
+        if fit_for[3] == 0:
+            todel.append(10)
+            todel.append(11)
         if not use_opds:
             todel.append(12)
             todel.append(13)
