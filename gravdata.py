@@ -591,6 +591,7 @@ class GravData():
         fiberOffY = self.fiberOffY
         fixpos = self.fixpos
         fixedBH = self.fixedBH
+        stefanstyle = self.stefanstyle
         
         if fixpos:
             dRA = self.fiberOffX
@@ -649,9 +650,16 @@ class GravData():
         # Calculate complex visibilities
         vis = np.zeros((6,len(wave))) + 0j
         for i in range(0,6):
-            # s = bl*(sky position) + opd1 - opd2  in mum
-            s_SgrA = ((fiberOffX-dRA)*u[i] + (fiberOffY-dDEC)*v[i]) * mas2rad * 1e6
-            s_S2 = (fiberOffX*u[i] + fiberOffY*v[i]) * mas2rad * 1e6
+            if stefanstyle:
+                s_SgrA = ((-phaseCenterRA)*u[i] + (-phaseCenterDEC)*v[i]) * mas2rad * 1e6
+                s_S2 = ((dRA-phaseCenterRA)*u[i] + (dDEC-phaseCenterDEC)*v[i]) * mas2rad * 1e6
+            else:
+                s = bl*(sky position) + opd1 - opd2  in mum
+                s_SgrA = ((fiberOffX-dRA)*u[i] + (fiberOffY-dDEC)*v[i]) * mas2rad * 1e6
+                s_S2 = (fiberOffX*u[i] + fiberOffY*v[i]) * mas2rad * 1e6
+            
+
+            
             if use_opds:
                 s_S2 = s_S2 + opd_bl[i,0] - opd_bl[i,1]
     
@@ -666,14 +674,24 @@ class GravData():
             intS2_center = self.vis_intensity(0, alpha_S2, wave, dlambda[i,:])
             intBG = self.vis_intensity(0, alpha_bg, wave, dlambda[i,:])
             
-            vis[i,:] = ((intSgrA + 
-                         np.sqrt(f_bl[i,0] * f_bl[i,1]) * intS2)/
-                        (np.sqrt(intSgrA_center + f_bl[i,0] * intS2_center 
-                                 + fluxRatioBG * intBG) *
-                         np.sqrt(intSgrA_center + f_bl[i,1] * intS2_center 
-                                 + fluxRatioBG * intBG)) *
-                         np.exp(-2j*np.pi*(u_mas * phaseCenterRA 
-                                           + v_mas * phaseCenterDEC)))
+            if stefanstyle:
+                vis[i,:] = ((intSgrA + 
+                            np.sqrt(f_bl[i,0] * f_bl[i,1]) * intS2)/
+                            (np.sqrt(intSgrA_center + f_bl[i,0] * intS2_center 
+                                    + fluxRatioBG * intBG) *
+                            np.sqrt(intSgrA_center + f_bl[i,1] * intS2_center 
+                                    + fluxRatioBG * intBG)))
+            else:
+                vis[i,:] = ((intSgrA + 
+                            np.sqrt(f_bl[i,0] * f_bl[i,1]) * intS2)/
+                            (np.sqrt(intSgrA_center + f_bl[i,0] * intS2_center 
+                                    + fluxRatioBG * intBG) *
+                            np.sqrt(intSgrA_center + f_bl[i,1] * intS2_center 
+                                    + fluxRatioBG * intBG)) *
+                            np.exp(-2j*np.pi*(u_mas * phaseCenterRA 
+                                            + v_mas * phaseCenterDEC)))
+            
+
         
         visamp = np.abs(vis)*vis_scale
         visphi = np.angle(vis, deg=True)
@@ -766,7 +784,7 @@ class GravData():
                   use_visscale=False, write_results=True, flagtill=3, flagfrom=13,
                   dRA=0., dDEC=0., plotres=True, createpdf=True, bequiet=False,
                   fixpos=False, fixedBH=False, second_iteration=False,
-                  dphRA=0.1, dphDec=0.1):
+                  dphRA=0.1, dphDec=0.1, stefanstyle=True):
         '''
         Parameter:
         nthreads:       number of cores [4] 
@@ -799,6 +817,7 @@ class GravData():
         self.use_visscale = use_visscale
         self.fixpos = fixpos
         self.fixedBH = fixedBH
+        self.stefanstyle = stefanstyle
         rad2as = 180 / np.pi * 3600
 
         # Get data from file
@@ -888,7 +907,8 @@ class GravData():
                 dlambda[i,:] = wave/500/2
             else:
                 dlambda[i,:] = 0.03817
-        self.dlambda = dlambda 
+        self.dlambda = dlambda
+        self.wave = wave
 
         # Initial guesses
         size = 4
