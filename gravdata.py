@@ -651,8 +651,11 @@ class GravData():
         vis = np.zeros((6,len(wave))) + 0j
         for i in range(0,6):
             if stefanstyle:
-                s_SgrA = ((-phaseCenterRA)*u[i] + (-phaseCenterDEC)*v[i]) * mas2rad * 1e6
-                s_S2 = ((dRA-phaseCenterRA)*u[i] + (dDEC-phaseCenterDEC)*v[i]) * mas2rad * 1e6
+                if self.fit_for[3] == 0:
+                    phaseCenterRA = 0
+                    phaseCenterDEC = 0
+                s_SgrA = ((phaseCenterRA)*u[i] + (phaseCenterDEC)*v[i]) * mas2rad * 1e6
+                s_S2 = ((dRA+phaseCenterRA)*u[i] + (dDEC+phaseCenterDEC)*v[i]) * mas2rad * 1e6
             else:
                 #s = bl*(sky position) + opd1 - opd2  in mum
                 s_SgrA = ((fiberOffX-dRA)*u[i] + (fiberOffY-dDEC)*v[i]) * mas2rad * 1e6
