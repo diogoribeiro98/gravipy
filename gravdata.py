@@ -1742,7 +1742,7 @@ class GravData():
         for i in range(0,6):
             plt.errorbar(magu_as[i,:], visphi[i,:]*(1-visphi_flag)[i], 
                         visphi_error[i,:]*(1-visphi_flag)[i],
-                        color=colors_baseline[i], ls='', ls=1, alpha=0.5, capsize=0)
+                        color=colors_baseline[i], ls='', lw=1, alpha=0.5, capsize=0)
             plt.scatter(magu_as[i,:], visphi[i,:]*(1-visphi_flag)[i],
                         color=colors_baseline[i], alpha=0.5)
             plt.plot(magu_as_model[i,:], model_visphi_full[i,:],
