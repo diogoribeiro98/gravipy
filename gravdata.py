@@ -1675,11 +1675,11 @@ class GravData():
         for i in range(0,6):
             plt.errorbar(magu_as[i,:], visamp[i,:]*(1-visamp_flag)[i],
                          visamp_error[i,:]*(1-visamp_flag)[i],
-                         color=colors_baseline[i],ls='', alpha=0.5, capsize=0)
+                         color=colors_baseline[i],ls='', lw=1, alpha=0.5, capsize=0)
             plt.scatter(magu_as[i,:], visamp[i,:]*(1-visamp_flag)[i],
                         color=colors_baseline[i], alpha=0.5)
             plt.plot(magu_as_model[i,:], model_visamp_full[i,:],
-                     color=colors_baseline[i], alpha=1.0)
+                     color='k', zorder=100)
         plt.ylabel('visibility modulus')
         plt.ylim(-0.1,1.1)
         plt.xlabel('spatial frequency (1/arcsec)')
@@ -1696,11 +1696,11 @@ class GravData():
         for i in range(0,6):
             plt.errorbar(magu_as[i,:], vis2[i,:]*(1-vis2_flag)[i], 
                          vis2_error[i,:]*(1-vis2_flag)[i], 
-                         color=colors_baseline[i],ls='', alpha=0.5, capsize=0)
+                         color=colors_baseline[i],ls='', lw=1, alpha=0.5, capsize=0)
             plt.scatter(magu_as[i,:], vis2[i,:]*(1-vis2_flag)[i],
                         color=colors_baseline[i],alpha=0.5)
             plt.plot(magu_as_model[i,:], model_vis2_full[i,:],
-                     color=colors_baseline[i], alpha=1.0)
+                     color='k', zorder=100)
         plt.xlabel('spatial frequency (1/arcsec)')
         plt.ylabel('visibility squared')
         plt.ylim(-0.1,1.1)
@@ -1723,11 +1723,11 @@ class GravData():
             max_u_as_model = max_u[i]/(wave_model*1.e-6) / rad2as
             plt.errorbar(max_u_as, closure[i,:]*(1-closure_flag)[i],
                          closure_error[i,:]*(1-closure_flag)[i],
-                         color=colors_closure[i],ls='', alpha=0.5, capsize=0)
+                         color=colors_closure[i],ls='', lw=1, alpha=0.5, capsize=0)
             plt.scatter(max_u_as, closure[i,:]*(1-closure_flag)[i],
                         color=colors_closure[i], alpha=0.5)
             plt.plot(max_u_as_model, model_closure_full[i,:], 
-                     color=colors_closure[i])
+                     color='k', zorder=100)
         plt.xlabel('spatial frequency of largest baseline in triangle (1/arcsec)')
         plt.ylabel('closure phase (deg)')
         if createpdf:
@@ -1742,11 +1742,11 @@ class GravData():
         for i in range(0,6):
             plt.errorbar(magu_as[i,:], visphi[i,:]*(1-visphi_flag)[i], 
                         visphi_error[i,:]*(1-visphi_flag)[i],
-                        color=colors_baseline[i], ls='', alpha=0.5, capsize=0)
+                        color=colors_baseline[i], ls='', ls=1, alpha=0.5, capsize=0)
             plt.scatter(magu_as[i,:], visphi[i,:]*(1-visphi_flag)[i],
                         color=colors_baseline[i], alpha=0.5)
             plt.plot(magu_as_model[i,:], model_visphi_full[i,:],
-                    color=colors_baseline[i],alpha=1.0)
+                    color='k', zorder=100)
         plt.ylabel('visibility phase')
         plt.xlabel('spatial frequency (1/arcsec)')
         if createpdf:
