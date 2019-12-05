@@ -1963,6 +1963,86 @@ class GravData():
         
     ############################################
     # Unary model
+    
+    def simulateUnaryphases(self, dRa, dDec, plot=False):
+        """
+        Test function to se how a given phasecenter shift would look like
+        """
+        self.fixedBG = True
+        self.fixedBH = True
+        self.onlyphases = True
+        rad2as = 180 / np.pi * 3600
+        
+        nwave = self.channel
+        if nwave != 14:
+            raise ValueError('Only usable for 14 channels')
+        self.getIntdata(plot=False, flag=False)
+        u = self.u
+        v = self.v
+        wave = self.wlSC_P1
+        R = np.zeros((6,nwave))
+        R[0,:] = [28.9,16.5,15.6,16.8,17.6,16.4,15.7,17.5,18.8,20.1,20.2,20.5,22.0,28.3]
+        R[1,:] = [27.2,15.8,14.9,16.0,16.7,15.7,15.1,16.4,18.2,19.6,20.0,20.3,21.7,25.3]
+        R[2,:] = [28.3,16.2,15.3,16.7,17.3,16.3,15.7,17.4,18.8,20.2,20.7,21.1,22.4,27.5]
+        R[3,:] = [29.1,17.0,15.9,16.6,17.1,16.6,15.8,16.9,18.8,20.5,21.0,21.3,22.0,24.4]
+        R[4,:] = [28.8,16.8,16.1,16.7,17.4,16.7,16.1,17.2,19.0,20.5,21.2,21.6,22.2,25.2]
+        R[5,:] = [28.0,16.0,15.0,16.2,16.6,15.7,15.3,16.4,17.8,19.3,19.8,20.0,20.8,24.4]
+        dlambda = np.zeros((6,nwave))
+        for i in range(0,6):
+            if (nwave==11) or (nwave==14):
+                dlambda[i,:] = wave/R[i,:]/2
+            elif nwave==210:
+                dlambda[i,:] = wave/500/2
+            else:
+                dlambda[i,:] = 0.03817
+                
+        theta = [dRa, dDec, 0, 0, 0]
+        visphi = self.calc_vis_unary(theta, u, v, wave, dlambda)
+        
+        if plot:
+            wave_model = np.linspace(wave[0],wave[len(wave)-1],1000)
+            dlambda_model = np.zeros((6,len(wave_model)))
+            for i in range(0,6):
+                dlambda_model[i,:] = np.interp(wave_model, wave, dlambda[i,:])
+            model_visphi_full  = self.calc_vis_unary(theta, u, v, wave_model, dlambda_model)
+            magu = np.sqrt(u**2.+v**2.)
+            u_as = np.zeros((len(u),len(wave)))
+            v_as = np.zeros((len(v),len(wave)))
+            for i in range(0,len(u)):
+                u_as[i,:] = u[i]/(wave*1.e-6) / rad2as
+                v_as[i,:] = v[i]/(wave*1.e-6) / rad2as
+            magu_as = np.sqrt(u_as**2.+v_as**2.)
+
+            u_as_model = np.zeros((len(u),len(wave_model)))
+            v_as_model = np.zeros((len(v),len(wave_model)))
+            for i in range(0,len(u)):
+                u_as_model[i,:] = u[i]/(wave_model*1.e-6) / rad2as
+                v_as_model[i,:] = v[i]/(wave_model*1.e-6) / rad2as
+            magu_as_model = np.sqrt(u_as_model**2.+v_as_model**2.)
+            for i in range(0,6):
+                plt.errorbar(magu_as[i,:], visphi[i,:], color=self.colors_baseline[i], ls='', marker='o')
+                plt.plot(magu_as_model[i,:], model_visphi_full[i,:], color=self.colors_baseline[i],alpha=1.0)
+            plt.ylabel('VisPhi')
+            plt.xlabel('spatial frequency (1/arcsec)')
+            plt.axhline(0, ls='--', lw=0.5)
+            maxval = np.max(np.abs(model_visphi_full))
+            if maxval < 45:
+                maxplot=50
+            elif maxval < 95:
+                maxplot=100
+            else:
+                maxplot=180
+            plt.ylim(-maxplot, maxplot)
+            plt.suptitle('dRa=%.1f, dDec=%.1f' % (theta[0], theta[1]), fontsize=12)
+            plt.show()
+        return visphi
+        
+    
+    
+    
+    
+    
+    
     def calc_vis_unary(self, theta, u, v, wave, dlambda):
         mas2rad = 1e-3 / 3600 / 180 * np.pi
         rad2mas = 180 / np.pi * 3600 * 1e3
@@ -2522,6 +2602,9 @@ class GravData():
                         
                         if plotres:
                             self.plotFitUnary(theta_result, fitdata, u, v, idx, createpdf=createpdf)
+                    else:
+                        fitdiff = 0
+                        redchi_visphi = 0
                     if write_results:
                         if writefitdiff:
                             fitqual = fitdiff
