@@ -2077,7 +2077,7 @@ class GravData():
                 plot=True, fixedBG=False, fixedBH=False, write_results=True, 
                 flagtill=1, flagfrom=13, plotres=True, createpdf=True, bequiet=False,
                 noS2=False, onlyphases=True, fitforS2=False, mindatapoints=3,
-                dontfit=None, dontfitbl=None):
+                dontfit=None, dontfitbl=None, writefitdiff=False):
         """
         Does a MCMC unary fit on the phases of the data.
         Parameter:
@@ -2099,7 +2099,8 @@ class GravData():
         fitforS2:       If True sets the inital value at the position of S2 [False] 
         mindatapoints:  if less valid datapoints in one baselin, file is rejected [3]
         dontfit:        Number of telescope to flag
-        dontfitbl:        Number of baseline to flag
+        dontfitbl:      Number of baseline to flag
+        writefitdiff:   Writes the difference of the mean fit vs data instead of redchi2
         """
         self.fixedBG = fixedBG
         self.fixedBH = fixedBH
@@ -2425,6 +2426,9 @@ class GravData():
                         if nruns > 300:
                             fl_samples = samples[:, -200:, :].reshape((-1, ndim))
                             fl_clsamples = clsamples[:, -200:, :].reshape((-1, cldim))                
+                        elif nruns > 200:
+                            fl_samples = samples[:, -100:, :].reshape((-1, ndim))
+                            fl_clsamples = clsamples[:, -100:, :].reshape((-1, cldim))                
                         else:
                             fl_samples = samples.reshape((-1, ndim))
                             fl_clsamples = clsamples.reshape((-1, cldim))
@@ -2457,6 +2461,16 @@ class GravData():
                         redchi_visphi = np.sum(res_visphi**2./visphi_error**2.*(1-visphi_flag))/(visphi.size-np.sum(visphi_flag)-ndof)
                         #redchi_visphi = np.sum(res_visphi**2.*(1-visphi_flag))/(visphi.size-np.sum(visphi_flag)-ndof)
                         
+                        fitdiff = []
+                        for bl in range(6):
+                            data = visphi[bl]
+                            data[np.where(visphi_flag[bl] == True)] = np.nan
+                            fit = fit_visphi[bl]
+                            fit[np.where(visphi_flag[bl] == True)] = np.nan
+                            fitdiff.append(np.abs(np.nanmedian(data)-np.nanmedian(fit)))
+                        fitdiff = np.sum(fitdiff)
+                        
+                        
                         if idx == 0:
                             redchi0 = redchi_visphi
                         elif idx == 1:
@@ -2465,6 +2479,7 @@ class GravData():
                         if not bequiet:
                             print('ndof: %i' % (visphi.size-np.sum(visphi_flag)-ndof))
                             print("redchi for visphi: %.2f" % redchi_visphi)
+                            print("mean fit difference: %.2f" % fitdiff)
                             print("average visphi error (deg): %.2f" % 
                                 np.mean(visphi_error*(1-visphi_flag)))
                         
@@ -2503,12 +2518,16 @@ class GravData():
                         if plotres:
                             self.plotFitUnary(theta_result, fitdata, u, v, idx, createpdf=createpdf)
                     if write_results:
+                        if writefitdiff:
+                            fitqual = fitdiff
+                        else:
+                            fitqual = redchi_visphi
                         txtfile.write("# Polarization %i  \n" % (idx+1))
                         if dofit == True:
                             for tdx, t in enumerate(mostprop):
                                 txtfile.write(str(t))
                                 txtfile.write(', ')
-                            txtfile.write(str(redchi_visphi))
+                            txtfile.write(str(fitqual))
                             txtfile.write('\n')
                                     
                             percentiles = np.percentile(fl_samples, [16, 50, 84],axis=0).T
@@ -2518,7 +2537,7 @@ class GravData():
                             for tdx, t in enumerate(percentiles[:,1]):
                                 txtfile.write(str(t))
                                 txtfile.write(', ')
-                            txtfile.write(str(redchi_visphi))
+                            txtfile.write(str(fitqual))
                             txtfile.write('\n')
 
                             for tdx, t in enumerate(percentiles[:,0]):
@@ -2631,7 +2650,7 @@ class GravData():
         # VisPhi
         for i in range(0,6):
             plt.errorbar(magu_as[i,:], visphi[i,:]*(1-visphi_flag)[i], 
-                        visphi_error[i,:]*(1-visphi_flag)[i],
+                        visphi_error[i,:]*(1-visphi_flag)[i], label=self.baseline_labels[i],
                         color=self.colors_baseline[i], ls='', lw=1, alpha=0.5, capsize=0)
             plt.scatter(magu_as[i,:], visphi[i,:]*(1-visphi_flag)[i],
                         color=self.colors_baseline[i], alpha=0.5)
@@ -2639,6 +2658,7 @@ class GravData():
                     color='k', zorder=100)
         plt.ylabel('visibility phase')
         plt.xlabel('spatial frequency (1/arcsec)')
+        plt.legend()
         if createpdf:
             plt.title('Polarization %i' % (idx + 1))
             pdfname = '%s_pol%i_8.png' % (savetime, idx)
