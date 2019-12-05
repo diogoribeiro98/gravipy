@@ -2468,8 +2468,9 @@ class GravData():
                             fit = fit_visphi[bl]
                             fit[np.where(visphi_flag[bl] == True)] = np.nan
                             err = visphi_error[bl]
-                            err[np.where(visphi_flag[bl] == True)] = np.nan                            
-                            fitdiff.append(np.abs(np.nanmedian(data)-np.nanmedian(fit))/np.nanmean(err))
+                            err[np.where(visphi_flag[bl] == True)] = np.nan              
+                            fitdiff.append(np.abs(np.nanmedian(data)-np.nanmedian(fit)))
+                            #fitdiff.append(np.abs(np.nanmedian(data)-np.nanmedian(fit))/np.nanmean(err))
                         fitdiff = np.sum(fitdiff)
                         
                         
