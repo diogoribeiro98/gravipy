@@ -7,7 +7,8 @@ import corner
 from multiprocessing import Pool
 from fpdf import FPDF
 from PIL import Image
-from scipy import optimize
+from scipy import optimize 
+from matplotlib import gridspec
 
 try:
     from generalFunctions import *
@@ -18,7 +19,10 @@ except NameError:
 import sys
 import os 
 
-
+color1 = '#C02F1D'
+color2 = '#348ABD'
+color3 = '#F26D21'
+color4 = '#7A68A6'
 
 from astropy.time import Time
 from datetime import timedelta, datetime
@@ -37,6 +41,12 @@ class GravData():
     def __init__(self, data, verbose=True):
         self.name = data
         self.verbose = verbose
+        self.colors_baseline = np.array(['k', 'darkblue', color4, 
+                                         color2, 'darkred', color1])
+        self.colors_closure = np.array([color1, 'darkred', 'k', color2])
+        self.baseline_labels = np.array(["UT4-3","UT4-2","UT4-1",
+                                         "UT3-2","UT3-1","UT2-1"])
+        self.closure_labels = np.array(["UT4-3-2","UT4-3-1","UT4-2-1","UT3-2-1"])
         
         poscatg = ['VIS_DUAL_SCI_RAW', 'VIS_SINGLE_SCI_RAW', 'VIS_SINGLE_CAL_RAW', 
            'VIS_DUAL_CAL_RAW', 'VIS_SINGLE_CALIBRATED', 'VIS_DUAL_CALIBRATED',
@@ -185,9 +195,6 @@ class GravData():
             raise ValueError('Input is a RAW file, not usable for this function')
         
         fitsdata = fits.open(self.name)
-        
-        self.colors_baseline = np.array(["magenta","crimson","cyan","green","blue","orange"])
-        self.colors_closure = np.array(["blue","crimson","cyan","green"])
         if self.polmode == 'SPLIT':
             if mode =='SC':
                 self.u = fitsdata['OI_VIS', 11].data.field('UCOORD')
@@ -262,24 +269,36 @@ class GravData():
                     
                 
                 if plot:
+                    gs = gridspec.GridSpec(2,2)
+                    plt.figure(figsize=(25,25))
+                    axis = plt.subplot(gs[0,0])
+                    for idx in range(len(self.vis2SC_P1)):
+                        plt.errorbar(self.spFrequAS[idx,:], self.visampSC_P1[idx,:], self.visamperrSC_P1[idx,:], ls='', marker='o',color=self.colors_baseline[idx%6])
+                    for idx in range(len(self.vis2SC_P2)):
+                        plt.errorbar(self.spFrequAS[idx,:], self.visampSC_P2[idx,:], self.visamperrSC_P2[idx,:], ls='', marker='p',color=self.colors_baseline[idx%6])
+                    plt.axhline(1, ls='--', lw=0.5)
+                    plt.ylim(-0.0,1.1)
+                    plt.ylabel('visibility amplitude')
+
+                    axis = plt.subplot(gs[0,1])
                     for idx in range(len(self.vis2SC_P1)):
                         plt.errorbar(self.spFrequAS[idx,:], self.vis2SC_P1[idx,:], self.vis2errSC_P1[idx,:], ls='', marker='o',color=self.colors_baseline[idx%6])
                     for idx in range(len(self.vis2SC_P2)):
                         plt.errorbar(self.spFrequAS[idx,:], self.vis2SC_P2[idx,:], self.vis2errSC_P2[idx,:], ls='', marker='p',color=self.colors_baseline[idx%6])
-                    plt.ylim(-0.1,1.4)
-                    plt.xlabel('spatial frequency (1/arcsec)')
+                    plt.axhline(1, ls='--', lw=0.5)
+                    plt.ylim(-0.0,1.1)
                     plt.ylabel('visibility squared')
-                    plt.show()
 
+                    axis = plt.subplot(gs[1,1])
                     for idx in range(len(self.vis2SC_P1)):
                         plt.errorbar(self.spFrequAS[idx,:], self.visphiSC_P1[idx,:],self.visphierrSC_P1[idx,:], ls='', marker='o',color=self.colors_baseline[idx%6])
                     for idx in range(len(self.vis2SC_P2)):
                         plt.errorbar(self.spFrequAS[idx,:], self.visphiSC_P2[idx,:],self.visphierrSC_P2[idx,:], ls='', marker='p',color=self.colors_baseline[idx%6])
-                    #plt.ylim(-0.1,1.4)
+                    plt.axhline(0, ls='--', lw=0.5)
                     plt.xlabel('spatial frequency (1/arcsec)')
                     plt.ylabel('visibility phase')
-                    plt.show()
                     
+                    axis = plt.subplot(gs[1,0])
                     max_u = np.zeros((4))
                     max_u[0] = np.max(np.array([spFrequ[0],spFrequ[3],spFrequ[1]]))
                     max_u[1] = np.max(np.array([spFrequ[0],spFrequ[4],spFrequ[2]]))
@@ -292,7 +311,8 @@ class GravData():
                     for idx in range(len(self.t3SC_P2)):
                         max_u_as = max_u[idx%4]/(wave*1.e-6) * np.pi / 180. / 3600.
                         plt.errorbar(max_u_as, self.t3SC_P1[idx,:], self.t3errSC_P1[idx,:], marker='p',color=self.colors_closure[idx%4],linestyle='')
-                    plt.xlabel('spatial frequency of largest baseline in triangle (1/arcsec)')
+                    plt.axhline(0, ls='--', lw=0.5)
+                    plt.xlabel('spatial frequency (1/arcsec)')
                     plt.ylabel('closure phase (deg)')
                     plt.show()
         fitsdata.close()
@@ -433,7 +453,7 @@ class GravData():
         """
         return (lambda0/2.2)**(-1-alpha)*2*dlambda*np.sinc(s*2*dlambda/lambda0**2.)*np.exp(-2.j*np.pi*s/lambda0)
     
-    def plot_vis(self, theta, constant_f=True, use_opds=False, fixedBG=True, fiberOff=None, plot=True):
+    def simulateVisdata(self, theta, constant_f=True, use_opds=False, fixedBG=True, fiberOff=None, plot=True, stefanstyle=True):
         """
         Test function to see how a given theta would look like
         Theta should be a list of:
@@ -468,6 +488,7 @@ class GravData():
         self.use_visscale = False
         self.fixpos = False
         self.fixedBH = False
+        self.stefanstyle = stefanstyle
         
         if fiberOff is None:
             self.fiberOffX = -fits.open(self.name)[0].header["HIERARCH ESO INS SOBJ OFFX"] 
@@ -504,12 +525,9 @@ class GravData():
         vis2 = visamp**2
         
         if plot:
-            colors_baseline = np.array(["magenta","crimson","cyan","green","blue","orange"])
-            colors_closure = np.array(["blue","crimson","cyan","green"])
-            baseline_labels = np.array(["UT4-3","UT4-2","UT4-1","UT3-2","UT3-1","UT2-1"])
-            closure_labels = np.array(["UT4-3-2","UT4-3-1","UT4-2-1","UT3-2-1"])
+            gs = gridspec.GridSpec(2,2)
+            plt.figure(figsize=(25,25))
             
-
             wave_model = np.linspace(wave[0],wave[len(wave)-1],1000)
             dlambda_model = np.zeros((6,len(wave_model)))
             for i in range(0,6):
@@ -534,47 +552,70 @@ class GravData():
             magu_as_model = np.sqrt(u_as_model**2.+v_as_model**2.)
 
             # Visamp 
+            axis = plt.subplot(gs[0,0])
             for i in range(0,6):
-                plt.plot(magu_as[i,:], visamp[i,:], color=colors_baseline[i], ls='', marker='o')
-                plt.plot(magu_as_model[i,:], model_visamp_full[i,:], color=colors_baseline[i])
-            plt.ylabel('visibility modulus')
-            plt.ylim(-0.1,1.1)
-            plt.xlabel('spatial frequency (1/arcsec)')
-            plt.show()
+                plt.plot(magu_as[i,:], visamp[i,:], color=self.colors_baseline[i], ls='', marker='o')
+                plt.plot(magu_as_model[i,:], model_visamp_full[i,:], color=self.colors_baseline[i])
+            plt.ylabel('VisAmp')
+            plt.axhline(1, ls='--', lw=0.5)
+            plt.ylim(-0.0,1.1)
+            #plt.xlabel('spatial frequency (1/arcsec)')
             
             # Vis2
+            axis = plt.subplot(gs[0,1])
             for i in range(0,6):
-                plt.errorbar(magu_as[i,:], vis2[i,:], color=colors_baseline[i], ls='', marker='o')
+                plt.errorbar(magu_as[i,:], vis2[i,:], color=self.colors_baseline[i], ls='', marker='o')
                 plt.plot(magu_as_model[i,:], model_vis2_full[i,:],
-                        color=colors_baseline[i], alpha=1.0)
-            plt.xlabel('spatial frequency (1/arcsec)')
-            plt.ylabel('visibility squared')
-            plt.ylim(-0.1,1.1)
-            plt.show()
+                        color=self.colors_baseline[i], alpha=1.0)
+            #plt.xlabel('spatial frequency (1/arcsec)')
+            plt.ylabel('V2')
+            plt.axhline(1, ls='--', lw=0.5)
+            plt.ylim(-0.0,1.1)
             
             # T3
+            axis = plt.subplot(gs[1,0])
             max_u = np.zeros((4))
             max_u[0] = np.max(np.array([magu[0],magu[3],magu[1]]))
             max_u[1] = np.max(np.array([magu[0],magu[4],magu[2]]))
             max_u[2] = np.max(np.array([magu[1],magu[5],magu[2]]))
             max_u[3] = np.max(np.array([magu[3],magu[5],magu[4]]))
+            maxval = []
             for i in range(0,4):
                 max_u_as = max_u[i]/(wave*1.e-6) / rad2as
                 max_u_as_model = max_u[i]/(wave_model*1.e-6) / rad2as
-                plt.errorbar(max_u_as, closure[i,:], color=colors_closure[i],ls='', marker='o')
-                plt.plot(max_u_as_model, model_closure_full[i,:], color=colors_closure[i])
-            plt.xlabel('spatial frequency of largest baseline in triangle (1/arcsec)')
-            plt.ylabel('closure phase (deg)')
-            plt.ylim(-180, 180)
-            plt.show()
+                plt.errorbar(max_u_as, closure[i,:], color=self.colors_closure[i],ls='', marker='o')
+                plt.plot(max_u_as_model, model_closure_full[i,:], color=self.colors_closure[i])
+            plt.axhline(0, ls='--', lw=0.5)
+            plt.xlabel('spatial frequency (1/arcsec)')
+            plt.ylabel('T3Phi (deg)')
+            maxval = np.max(np.abs(model_closure_full))
+            if maxval < 15:
+                maxplot=20
+            elif maxval < 75:
+                maxplot=80
+            else:
+                maxplot=180
+            plt.ylim(-maxplot, maxplot)
             
             # VisPhi
+            axis = plt.subplot(gs[1,1])
             for i in range(0,6):
-                plt.errorbar(magu_as[i,:], visphi[i,:], color=colors_baseline[i], ls='', marker='o')
-                plt.plot(magu_as_model[i,:], model_visphi_full[i,:], color=colors_baseline[i],alpha=1.0)
-            plt.ylabel('visibility phase')
+                plt.errorbar(magu_as[i,:], visphi[i,:], color=self.colors_baseline[i], ls='', marker='o')
+                plt.plot(magu_as_model[i,:], model_visphi_full[i,:], color=self.colors_baseline[i],alpha=1.0)
+            plt.ylabel('VisPhi')
             plt.xlabel('spatial frequency (1/arcsec)')
-            plt.ylim(-180, 180)
+            plt.axhline(0, ls='--', lw=0.5)
+            maxval = np.max(np.abs(model_visphi_full))
+            if maxval < 45:
+                maxplot=50
+            elif maxval < 95:
+                maxplot=100
+            else:
+                maxplot=180
+            plt.ylim(-maxplot, maxplot)
+            
+            plt.suptitle('dRa=%.1f, dDec=%.1f, fratio=%.1f, a=%.1f, fBG=%.1f, PCRa=%.1f, PCDec=%.1f' 
+                         % (theta[0], theta[1], theta[2], theta[6], theta[8], theta[10], theta[11]), fontsize=12)
             plt.show()
 
         return visamp, vis2, visphi, closure
@@ -651,9 +692,12 @@ class GravData():
         vis = np.zeros((6,len(wave))) + 0j
         for i in range(0,6):
             if stefanstyle:
-                if self.fit_for[3] == 0:
-                    phaseCenterRA = 0
-                    phaseCenterDEC = 0
+                try:
+                    if self.fit_for[3] == 0:
+                        phaseCenterRA = 0
+                        phaseCenterDEC = 0
+                except AttributeError:
+                    pass
                 s_SgrA = ((phaseCenterRA)*u[i] + (phaseCenterDEC)*v[i]) * mas2rad * 1e6
                 s_S2 = ((dRA+phaseCenterRA)*u[i] + (dDEC+phaseCenterDEC)*v[i]) * mas2rad * 1e6
             else:
@@ -835,18 +879,21 @@ class GravData():
         if not bequiet:
             print("fiber center: %.2f, %.2f (mas)" % (self.fiberOffX,
                                                     self.fiberOffY))
-        if self.fiberOffX != 0 and self.fiberOffY != 0:
-            dRA = self.fiberOffX
-            dDEC = self.fiberOffY
-        if self.fiberOffX == 0 and self.fiberOffY == 0:
-            if noS2:
-                if not bequiet:
-                    print('No Fiber offset, if you want to fit this file use noS2=False')
-                return 0
         if dRA == 0 and dDEC == 0:
-            if not bequiet:
-                print('Fiber offset is zero, guess for dRA & dDEC should be given with function')
-            
+            if self.fiberOffX != 0 and self.fiberOffY != 0:
+                dRA = self.fiberOffX
+                dDEC = self.fiberOffY
+            if self.fiberOffX == 0 and self.fiberOffY == 0:
+                if noS2:
+                    if not bequiet:
+                        print('No Fiber offset, if you want to fit this file use noS2=False')
+                    return 0
+            if dRA == 0 and dDEC == 0:
+                if not bequiet:
+                    print('Fiber offset is zero, guess for dRA & dDEC should be given with function')
+        else:
+            print('Guess for RA & DEC from function as: %.2f, %.2f' % (dRA, dDEC))
+        
         stname = self.name.find('GRAVI')        
         txtfilename = 'binaryfit_' + self.name[stname:-5] + '.txt'
         if write_results:
@@ -919,15 +966,15 @@ class GravData():
         dDEC_init = np.array([dDEC,dDEC-size,dDEC+size])
 
         fr_start = np.log10(0.1)
-        flux_ratio_1_init = np.array([fr_start, np.log10(0.001), np.log10(10.)])
+        flux_ratio_1_init = np.array([fr_start, np.log10(0.01), np.log10(10.)])
         flux_ratio_2_init = np.array([fr_start, np.log10(0.001), np.log10(10.)])
         flux_ratio_3_init = np.array([fr_start, np.log10(0.001), np.log10(10.)])
         flux_ratio_4_init = np.array([fr_start, np.log10(0.001), np.log10(10.)])
-
-        alpha_SgrA_init = np.array([-1.,-5.,7.])
+        print('la')
+        alpha_SgrA_init = np.array([-1.,-10.,10.])
         vis_scale_init = np.array([0.8,0.1,1.2])
         flux_ratio_bg_init = np.array([0.1,0.,20.])
-        color_bg_init = np.array([3.,-5.,5.])
+        color_bg_init = np.array([3.,-10.,10.])
 
         size = 5
         phase_center_RA = dphRA
@@ -990,6 +1037,7 @@ class GravData():
             todel.append(14)
             todel.append(15)
         ndof = 16 - len(todel)
+        
 
                 
         # Get data
@@ -1252,6 +1300,7 @@ class GravData():
                         redchi1 = [redchi_visamp, redchi_vis2, redchi_closure, redchi_visphi]
                         
                     if not bequiet:
+                        print('ndof: %i' % (vis2.size-np.sum(vis2_flag)-ndof))
                         print("redchi for visamp: %.2f" % redchi_visamp)
                         print("redchi for vis2: %.2f" % redchi_vis2)
                         print("redchi for closure: %.2f" % redchi_closure)
@@ -1632,11 +1681,6 @@ class GravData():
         and plots them together with the data in fitdata.
         Mainly used in fitBinary as result plots.
         """
-        colors_baseline = np.array(["magenta","crimson","cyan","green","blue","orange"])
-        colors_closure = np.array(["blue","crimson","cyan","green"])
-        baseline_labels = np.array(["UT4-3","UT4-2","UT4-1","UT3-2","UT3-1","UT2-1"])
-        closure_labels = np.array(["UT4-3-2","UT4-3-1","UT4-2-1","UT3-2-1"])
-
         rad2as = 180 / np.pi * 3600
         
         (visamp, visamp_error, visamp_flag, vis2, 
@@ -1675,9 +1719,9 @@ class GravData():
         for i in range(0,6):
             plt.errorbar(magu_as[i,:], visamp[i,:]*(1-visamp_flag)[i],
                          visamp_error[i,:]*(1-visamp_flag)[i],
-                         color=colors_baseline[i],ls='', lw=1, alpha=0.5, capsize=0)
+                         color=self.colors_baseline[i],ls='', lw=1, alpha=0.5, capsize=0)
             plt.scatter(magu_as[i,:], visamp[i,:]*(1-visamp_flag)[i],
-                        color=colors_baseline[i], alpha=0.5)
+                        color=self.colors_baseline[i], alpha=0.5)
             plt.plot(magu_as_model[i,:], model_visamp_full[i,:],
                      color='k', zorder=100)
         plt.ylabel('visibility modulus')
@@ -1696,9 +1740,9 @@ class GravData():
         for i in range(0,6):
             plt.errorbar(magu_as[i,:], vis2[i,:]*(1-vis2_flag)[i], 
                          vis2_error[i,:]*(1-vis2_flag)[i], 
-                         color=colors_baseline[i],ls='', lw=1, alpha=0.5, capsize=0)
+                         color=self.colors_baseline[i],ls='', lw=1, alpha=0.5, capsize=0)
             plt.scatter(magu_as[i,:], vis2[i,:]*(1-vis2_flag)[i],
-                        color=colors_baseline[i],alpha=0.5)
+                        color=self.colors_baseline[i],alpha=0.5)
             plt.plot(magu_as_model[i,:], model_vis2_full[i,:],
                      color='k', zorder=100)
         plt.xlabel('spatial frequency (1/arcsec)')
@@ -1723,9 +1767,9 @@ class GravData():
             max_u_as_model = max_u[i]/(wave_model*1.e-6) / rad2as
             plt.errorbar(max_u_as, closure[i,:]*(1-closure_flag)[i],
                          closure_error[i,:]*(1-closure_flag)[i],
-                         color=colors_closure[i],ls='', lw=1, alpha=0.5, capsize=0)
+                         color=self.colors_closure[i],ls='', lw=1, alpha=0.5, capsize=0)
             plt.scatter(max_u_as, closure[i,:]*(1-closure_flag)[i],
-                        color=colors_closure[i], alpha=0.5)
+                        color=self.colors_closure[i], alpha=0.5)
             plt.plot(max_u_as_model, model_closure_full[i,:], 
                      color='k', zorder=100)
         plt.xlabel('spatial frequency of largest baseline in triangle (1/arcsec)')
@@ -1742,9 +1786,9 @@ class GravData():
         for i in range(0,6):
             plt.errorbar(magu_as[i,:], visphi[i,:]*(1-visphi_flag)[i], 
                         visphi_error[i,:]*(1-visphi_flag)[i],
-                        color=colors_baseline[i], ls='', lw=1, alpha=0.5, capsize=0)
+                        color=self.colors_baseline[i], ls='', lw=1, alpha=0.5, capsize=0)
             plt.scatter(magu_as[i,:], visphi[i,:]*(1-visphi_flag)[i],
-                        color=colors_baseline[i], alpha=0.5)
+                        color=self.colors_baseline[i], alpha=0.5)
             plt.plot(magu_as_model[i,:], model_visphi_full[i,:],
                     color='k', zorder=100)
         plt.ylabel('visibility phase')
@@ -1765,11 +1809,6 @@ class GravData():
         Plots them together with the data in fitdata.
         Mainly used in fitBinary as result plots.
         """
-        colors_baseline = np.array(["magenta","crimson","cyan","green","blue","orange"])
-        colors_closure = np.array(["blue","crimson","cyan","green"])
-        baseline_labels = np.array(["UT4-3","UT4-2","UT4-1","UT3-2","UT3-1","UT2-1"])
-        closure_labels = np.array(["UT4-3-2","UT4-3-1","UT4-2-1","UT3-2-1"])
-
         rad2as = 180 / np.pi * 3600
         
         (visamp, visamp_error, visamp_flag, vis2, 
@@ -1816,17 +1855,17 @@ class GravData():
         for i in range(0,6):
             plt.errorbar(magu_as[i,:], visamp[i,:]*(1-visamp_flag)[i],
                          visamp_error[i,:]*(1-visamp_flag)[i],
-                         color=colors_baseline[i],ls='', lw=2, alpha=0.5, capsize=0)
+                         color=self.colors_baseline[i],ls='', lw=2, alpha=0.5, capsize=0)
             plt.scatter(magu_as[i,:], visamp[i,:]*(1-visamp_flag)[i],
-                        color=colors_baseline[i], alpha=0.5)
+                        color=self.colors_baseline[i], alpha=0.5)
             plt.plot(magu_as_model[i,:], model_visamp_full[i,:],
-                     color=colors_baseline[i], alpha=1.0)
+                     color=self.colors_baseline[i], alpha=1.0)
             plt.errorbar(magu_as[i,:], visamp[i,:]*(1-visamp_flag)[i],
                          visamp_error_cor[i,:]*(1-visamp_flag)[i],
-                         color=colors_baseline[i],ls='', lw=0.5, marker='', 
+                         color=self.colors_baseline[i],ls='', lw=0.5, marker='', 
                          alpha=1, capsize=0)
             plt.plot(magu_as_model[i,:], model_visamp_cor[i,:],
-                     color=colors_baseline[i], alpha=1.0, ls='--')
+                     color=self.colors_baseline[i], alpha=1.0, ls='--')
         plt.ylabel('visibility modulus')
         plt.ylim(-0.1,1.1)
         plt.xlabel('spatial frequency (1/arcsec)')
@@ -1843,17 +1882,17 @@ class GravData():
         for i in range(0,6):
             plt.errorbar(magu_as[i,:], vis2[i,:]*(1-vis2_flag)[i], 
                          vis2_error[i,:]*(1-vis2_flag)[i], 
-                         color=colors_baseline[i],ls='', lw=2, alpha=0.5, capsize=0)
+                         color=self.colors_baseline[i],ls='', lw=2, alpha=0.5, capsize=0)
             plt.scatter(magu_as[i,:], vis2[i,:]*(1-vis2_flag)[i],
-                        color=colors_baseline[i],alpha=0.5)
+                        color=self.colors_baseline[i],alpha=0.5)
             plt.plot(magu_as_model[i,:], model_vis2_full[i,:],
-                     color=colors_baseline[i], alpha=1.0)
+                     color=self.colors_baseline[i], alpha=1.0)
             plt.errorbar(magu_as[i,:], vis2[i,:]*(1-vis2_flag)[i],
                          vis2_error_cor[i,:]*(1-vis2_flag)[i],
-                         color=colors_baseline[i], ls='', marker='', lw=0.5, 
+                         color=self.colors_baseline[i], ls='', marker='', lw=0.5, 
                          alpha=1, capsize=0)
             plt.plot(magu_as_model[i,:], model_vis2_cor[i,:],
-                     color=colors_baseline[i], alpha=1.0, ls='--')
+                     color=self.colors_baseline[i], alpha=1.0, ls='--')
         plt.xlabel('spatial frequency (1/arcsec)')
         plt.ylabel('visibility squared')
         plt.ylim(-0.1,1.1)
@@ -1876,17 +1915,17 @@ class GravData():
             max_u_as_model = max_u[i]/(wave_model*1.e-6) / rad2as
             plt.errorbar(max_u_as, closure[i,:]*(1-closure_flag)[i],
                          closure_error[i,:]*(1-closure_flag)[i],
-                         color=colors_closure[i], ls='', lw=2, alpha=0.5, capsize=0)
+                         color=self.colors_closure[i], ls='', lw=2, alpha=0.5, capsize=0)
             plt.scatter(max_u_as, closure[i,:]*(1-closure_flag)[i],
-                        color=colors_closure[i], alpha=0.5)
+                        color=self.colors_closure[i], alpha=0.5)
             plt.plot(max_u_as_model, model_closure_full[i,:], 
-                     color=colors_closure[i])
+                     color=self.colors_closure[i])
             plt.errorbar(max_u_as, closure[i,:]*(1-closure_flag)[i],
                          closure_error_cor[i,:]*(1-closure_flag)[i],
-                         color=colors_closure[i],ls='', lw=0.5, marker='',
+                         color=self.colors_closure[i],ls='', lw=0.5, marker='',
                          alpha=1, capsize=0)
             plt.plot(max_u_as_model, model_closure_cor[i,:], 
-                     color=colors_closure[i], ls='--')
+                     color=self.colors_closure[i], ls='--')
         plt.xlabel('spatial frequency of largest baseline in triangle (1/arcsec)')
         plt.ylabel('closure phase (deg)')
         if createpdf:
@@ -1901,17 +1940,17 @@ class GravData():
         for i in range(0,6):
             plt.errorbar(magu_as[i,:], visphi[i,:]*(1-visphi_flag)[i], 
                         visphi_error[i,:]*(1-visphi_flag)[i],
-                        color=colors_baseline[i], ls='', lw=2, alpha=0.5, capsize=0)
+                        color=self.colors_baseline[i], ls='', lw=2, alpha=0.5, capsize=0)
             plt.scatter(magu_as[i,:], visphi[i,:]*(1-visphi_flag)[i],
-                        color=colors_baseline[i], alpha=0.5)
+                        color=self.colors_baseline[i], alpha=0.5)
             plt.plot(magu_as_model[i,:], model_visphi_full[i,:],
-                    color=colors_baseline[i])
+                    color=self.colors_baseline[i])
             plt.errorbar(magu_as[i,:], visphi[i,:]*(1-visphi_flag)[i], 
                         visphi_error_cor[i,:]*(1-visphi_flag)[i],
-                        color=colors_baseline[i], ls='', lw=0.5, marker='',
+                        color=self.colors_baseline[i], ls='', lw=0.5, marker='',
                         alpha=1, capsize=0)
             plt.plot(magu_as_model[i,:], model_visphi_cor[i,:],
-                    color=colors_baseline[i], ls='--')
+                    color=self.colors_baseline[i], ls='--')
         plt.ylabel('visibility phase')
         plt.xlabel('spatial frequency (1/arcsec)')
         if createpdf:
@@ -2038,7 +2077,7 @@ class GravData():
                 plot=True, fixedBG=False, fixedBH=False, write_results=True, 
                 flagtill=1, flagfrom=13, plotres=True, createpdf=True, bequiet=False,
                 noS2=False, onlyphases=True, fitforS2=False, mindatapoints=3,
-                dontfit=None):
+                dontfit=None, dontfitbl=None):
         """
         Does a MCMC unary fit on the phases of the data.
         Parameter:
@@ -2059,7 +2098,8 @@ class GravData():
         onlyphases:     Fits only the phases [True]
         fitforS2:       If True sets the inital value at the position of S2 [False] 
         mindatapoints:  if less valid datapoints in one baselin, file is rejected [3]
-        dontfit:        List of telescopes to flag
+        dontfit:        Number of telescope to flag
+        dontfitbl:        Number of baseline to flag
         """
         self.fixedBG = fixedBG
         self.fixedBH = fixedBH
@@ -2084,8 +2124,14 @@ class GravData():
                     print('No Fiber offset, if you want to fit this file use noS2=False')
                 return 0
             
-        stname = self.name.find('GRAVI')        
-        txtfilename = 'unaryfit_' + self.name[stname:-5] + '.txt'
+        stname = self.name.find('GRAVI')     
+        if dontfit is not None:
+            savefilename = 'unaryfit_woUT' + str(dontfit) + '_' + self.name[stname:-5]
+        elif dontfitbl is not None:
+            savefilename = 'unaryfit_woBL' + str(dontfitbl) + '_' + self.name[stname:-5]
+        else:
+            savefilename = 'unaryfit_' + self.name[stname:-5]
+        txtfilename = savefilename + '.txt'
         if write_results:
             txtfile = open(txtfilename, 'w')
             txtfile.write('# Results of Unary fit for %s \n' % self.name[stname:])
@@ -2207,9 +2253,9 @@ class GravData():
                     savetime = savetime.replace(':', '')
                     self.savetime = savetime
                     if ndit == 1:
-                        pdffilename = 'unaryfit_' + self.name[stname:-5] + '.pdf'
+                        pdffilename = savefilename + '.pdf'
                     else:
-                        pdffilename = 'unaryfit_' + self.name[stname:-5] + '_DIT' + str(dit) + '.pdf'
+                        pdffilename = savefilename + '_DIT' + str(dit) + '.pdf'
 
                     pdf = FPDF(orientation='P', unit='mm', format='A4')
                     pdf.add_page()
@@ -2296,6 +2342,14 @@ class GravData():
                         for bl in range(6):
                             if dontfit in telescopes[bl]:
                                 visphi_flag[bl,:] = True
+                    if dontfitbl is not None:
+                        if not bequiet:
+                            print('Will not fit baseline %i' % dontfitbl)
+                        if dontfitbl not in [1,2,3,4,5,6]:
+                            raise ValueError('Dontfit has to be one of the UTs: 1,2,3,4,5,6')
+                        if dontfit is not None:
+                            raise ValueError('Use either dontfit or dontfitbl, not both')
+                        visphi_flag[dontfitbl-1,:] = True
                             
                         
                             
@@ -2400,8 +2454,8 @@ class GravData():
                         check = np.abs(res_visphi_1) < np.abs(res_visphi_2) 
                         res_visphi = res_visphi_1*check + res_visphi_2*(1-check)
 
-                        #redchi_visphi = np.sum(res_visphi**2./visphi_error**2.*(1-visphi_flag))/(visphi.size-np.sum(visphi_flag)-ndof)
-                        redchi_visphi = np.sum(res_visphi**2.*(1-visphi_flag))/(visphi.size-np.sum(visphi_flag)-ndof)
+                        redchi_visphi = np.sum(res_visphi**2./visphi_error**2.*(1-visphi_flag))/(visphi.size-np.sum(visphi_flag)-ndof)
+                        #redchi_visphi = np.sum(res_visphi**2.*(1-visphi_flag))/(visphi.size-np.sum(visphi_flag)-ndof)
                         
                         if idx == 0:
                             redchi0 = redchi_visphi
@@ -2409,6 +2463,7 @@ class GravData():
                             redchi1 = redchi_visphi
                             
                         if not bequiet:
+                            print('ndof: %i' % (visphi.size-np.sum(visphi_flag)-ndof))
                             print("redchi for visphi: %.2f" % redchi_visphi)
                             print("average visphi error (deg): %.2f" % 
                                 np.mean(visphi_error*(1-visphi_flag)))
@@ -2545,10 +2600,7 @@ class GravData():
         return 0
             
     def plotFitUnary(self, theta,  fitdata, u, v, idx=0, createpdf=False):
-        colors_baseline = np.array(["magenta","crimson","cyan","green","blue","orange"])
-
         rad2as = 180 / np.pi * 3600
-        
         (visphi, visphi_error, visphi_flag) = fitdata
         wave = self.wlSC_P1
         dlambda = self.dlambda
@@ -2580,9 +2632,9 @@ class GravData():
         for i in range(0,6):
             plt.errorbar(magu_as[i,:], visphi[i,:]*(1-visphi_flag)[i], 
                         visphi_error[i,:]*(1-visphi_flag)[i],
-                        color=colors_baseline[i], ls='', lw=1, alpha=0.5, capsize=0)
+                        color=self.colors_baseline[i], ls='', lw=1, alpha=0.5, capsize=0)
             plt.scatter(magu_as[i,:], visphi[i,:]*(1-visphi_flag)[i],
-                        color=colors_baseline[i], alpha=0.5)
+                        color=self.colors_baseline[i], alpha=0.5)
             plt.plot(magu_as_model[i,:], model_visphi_full[i,:],
                     color='k', zorder=100)
         plt.ylabel('visibility phase')
