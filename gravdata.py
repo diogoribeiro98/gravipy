@@ -451,7 +451,8 @@ class GravData():
         s = B*skypos-opd1-opd2
         alphs = power law
         """
-        return (lambda0/2.2)**(-1-alpha)*2*dlambda*np.sinc(s*2*dlambda/lambda0**2.)*np.exp(-2.j*np.pi*s/lambda0)
+        return (lambda0/2.2)**(-1-alpha)*2*dlambda*np.sinc(2*s*dlambda/lambda0**2.)*np.exp(-2.j*np.pi*s/lambda0)
+    
     
     def simulateVisdata(self, theta, constant_f=True, use_opds=False, fixedBG=True, fiberOff=None, plot=True, stefanstyle=True):
         """
@@ -2911,11 +2912,11 @@ class GravData():
         alpha_SgrA_init = np.array([-1.,-5.,7.])
         flux_ratio_bg_init = np.array([0.1,0.,20.])
         alpha_bg_init = np.array([3.,-5.,5.])
-        opd_max = 1.5 # maximum opd in microns (lambda/4)
-        opd_1_init = [0.1,-opd_max,opd_max]
-        opd_2_init = [0.1,-opd_max,opd_max]
-        opd_3_init = [0.1,-opd_max,opd_max]
-        opd_4_init = [0.1,-opd_max,opd_max]
+        opd_max = 1.5 # maximum opd in microns
+        opd_1_init = [0.0,-opd_max,opd_max]
+        opd_2_init = [0.0,-opd_max,opd_max]
+        opd_3_init = [0.0,-opd_max,opd_max]
+        opd_4_init = [0.0,-opd_max,opd_max]
 
         # initial fit parameters 
         theta = np.array([phase_center_RA_init[0], phase_center_DEC_init[0],
