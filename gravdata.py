@@ -3243,6 +3243,7 @@ class GravData():
                         except ValueError:
                             fitdiff = 0
                             redchi_visphi = 0
+                            dofit = False
                             if not bequiet:
                                 print('Fit failed')
                     else:
