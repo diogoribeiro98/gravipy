@@ -3286,10 +3286,10 @@ class GravData():
                                 else:
                                     txtfile.write(', 0 \n')
                         else:
-                            txtfile.write('nan, nan, nan, nan, nan, nan \n')
-                            txtfile.write('nan, nan, nan, nan, nan, nan \n')
-                            txtfile.write('nan, nan, nan, nan, nan, nan \n')
-                            txtfile.write('nan, nan, nan, nan, nan, nan \n')
+                            txtfile.write('nan, nan, nan, nan, nan, nan, nan, nan, nan, nan \n')
+                            txtfile.write('nan, nan, nan, nan, nan, nan, nan, nan, nan, nan \n')
+                            txtfile.write('nan, nan, nan, nan, nan, nan, nan, nan, nan, nan \n')
+                            txtfile.write('nan, nan, nan, nan, nan, nan, nan, nan, nan, nan \n')
                     
                 if createpdf:
                     if (bothdofit == True).all():
