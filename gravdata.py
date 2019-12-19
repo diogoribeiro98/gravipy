@@ -2842,7 +2842,12 @@ class GravData():
         if dontfit is not None:
             savefilename = 'punaryfit_woUT' + str(dontfit) + '_' + self.name[stname:-5]
         elif dontfitbl is not None:
-            savefilename = 'punaryfit_woBL' + str(dontfitbl) + '_' + self.name[stname:-5]
+            if isinstance(dontfitbl, list):
+                blname = "".join(str(i) for i in dontfitbl)
+                savefilename = 'punaryfit_woBL' + str(blname) + '_' + self.name[stname:-5]
+            elif isinstance(dontfitbl, int):
+                savefilename = 'punaryfit_woBL' + str(dontfitbl) + '_' + self.name[stname:-5]
+                
         else:
             savefilename = 'punaryfit_' + self.name[stname:-5]
         txtfilename = savefilename + '.txt'
@@ -3063,13 +3068,24 @@ class GravData():
                             if dontfit in telescopes[bl]:
                                 visphi_flag[bl,:] = True
                     if dontfitbl is not None:
-                        if not bequiet:
-                            print('Will not fit baseline %i' % dontfitbl)
-                        if dontfitbl not in [1,2,3,4,5,6]:
-                            raise ValueError('Dontfit has to be one of the UTs: 1,2,3,4,5,6')
-                        if dontfit is not None:
-                            raise ValueError('Use either dontfit or dontfitbl, not both')
-                        visphi_flag[dontfitbl-1,:] = True
+                        if isinstance(dontfitbl, int):
+                            if not bequiet:
+                                print('Will not fit baseline %i' % dontfitbl)
+                            if dontfitbl not in [1,2,3,4,5,6]:
+                                raise ValueError('Dontfit has to be one of the UTs: 1,2,3,4,5,6')
+                            if dontfit is not None:
+                                raise ValueError('Use either dontfit or dontfitbl, not both')
+                            visphi_flag[dontfitbl-1,:] = True
+                        elif isinstance(dontfitbl, list):
+                            for bl in dontfitbl:
+                                if not bequiet:
+                                    print('Will not fit baseline %i' % bl)
+                                if bl not in [1,2,3,4,5,6]:
+                                    raise ValueError('Dontfit has to be one of the UTs: 1,2,3,4,5,6')
+                                if dontfit is not None:
+                                    raise ValueError('Use either dontfit or dontfitbl, not both')
+                                visphi_flag[bl-1,:] = True
+                                
                             
                         
                             
@@ -3178,7 +3194,7 @@ class GravData():
                         check = np.abs(res_visphi_1) < np.abs(res_visphi_2) 
                         res_visphi = res_visphi_1*check + res_visphi_2*(1-check)
 
-                        redchi_visphi = np.sum(res_visphi**2./visphi_error**2.*(1-visphi_flag))/(visphi.size-np.sum(visphi_flag)-ndof)
+                        redchi_visphi = np.sum((res_visphi**2./visphi_error**2.)*(1-visphi_flag))/(visphi.size-np.sum(visphi_flag)-ndof)
                         #redchi_visphi = np.sum(res_visphi**2.*(1-visphi_flag))/(visphi.size-np.sum(visphi_flag)-ndof)
                             
                         fitdiff = []
