@@ -2779,7 +2779,7 @@ class GravData():
     
     
     def fitUnary_proper(self, nthreads=4, nwalkers=500, nruns=500, bestchi=True,
-                        plot=True, fixedBG=False, fixedBH=False, noBG=False,
+                        plot=True, fixedBG=True, fixedBH=True, noBG=True,
                         fitopds=np.array([0,0,0,0]), write_results=True, 
                         flagtill=2, flagfrom=12, plotres=True, createpdf=True, 
                         bequiet=False, noS2=False, mindatapoints=3,
@@ -2803,7 +2803,6 @@ class GravData():
         createpdf:      Creates a pdf with fit results and all plots [True] 
         bequiet:        Suppresses ALL outputs [False]
         noS2:           If True ignores files where fiber offset is 0 [False]
-        onlyphases:     Fits only the phases [True]
         mindatapoints:  if less valid datapoints in one baselin, file is rejected [3]
         dontfit:        Number of telescope to flag
         dontfitbl:      Number of baseline to flag
@@ -2943,7 +2942,7 @@ class GravData():
             todel.append(2)
         if noBG:
             todel.append(3)
-        if fixedBH:
+        if fixedBG:
             todel.append(4)
         for tel in range(4):
             if fitopds[tel] != 1:
