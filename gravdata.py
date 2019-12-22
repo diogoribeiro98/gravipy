@@ -2090,6 +2090,7 @@ class GravData():
         fixedBH = self.fixedBH
         noBG = self.noBG
         use_opds = self.use_opds
+        specialfit = self.specialfit
         
         phaseCenterRA = theta[0]
         phaseCenterDEC = theta[1]
@@ -2116,6 +2117,14 @@ class GravData():
                                [opd3, opd2],
                                [opd3, opd1],
                                [opd2, opd1]])
+        if specialfit:
+            special_par = theta[9] 
+            sp_bl  = np.array([0,
+                               special_par,
+                               special_par,
+                               special_par,
+                               special_par,
+                               0])
 
         vis = np.zeros((6,len(wave))) + 0j
         if len(u) != 6 or len(v) != 6:
@@ -2128,6 +2137,8 @@ class GravData():
             
             if use_opds:
                 s_SgrA = s_SgrA + opd_bl[i,0] - opd_bl[i,1]
+            if specialfit:
+                s_SgrA = s_SgrA + sp_bl[i]
 
             # u,v in 1/mas
             u_mas = u[i] / (wave*1e-6) / rad2mas
@@ -2785,7 +2796,8 @@ class GravData():
                         fitopds=np.array([0,0,0,0]), write_results=True, 
                         flagtill=2, flagfrom=12, plotres=True, createpdf=True, 
                         bequiet=False, noS2=False, mindatapoints=3,
-                        dontfit=None, dontfitbl=None, writefitdiff=False):
+                        dontfit=None, dontfitbl=None, writefitdiff=False,
+                        specialfit=False):
         """
         Does a MCMC unary fit on the phases of the data.
         Parameter:
@@ -2809,6 +2821,8 @@ class GravData():
         dontfit:        Number of telescope to flag
         dontfitbl:      Number of baseline to flag
         writefitdiff:   Writes the difference of the mean fit vs data instead of redchi2
+        specialfit:     Special version of fit, changing implementaion 
+                        (dummy to allow an additional fit parameter)
         """
         self.fixedBG = fixedBG
         self.fixedBH = fixedBH
@@ -2818,6 +2832,7 @@ class GravData():
             use_opds = True
         else:
             self.use_opds = False
+        self.specialfit = specialfit
         rad2as = 180 / np.pi * 3600
 
         # Get data from file
@@ -2923,25 +2938,27 @@ class GravData():
         opd_2_init = [0.0,-opd_max,opd_max]
         opd_3_init = [0.0,-opd_max,opd_max]
         opd_4_init = [0.0,-opd_max,opd_max]
+        special_par = [0, -2, 2]
 
         # initial fit parameters 
         theta = np.array([phase_center_RA_init[0], phase_center_DEC_init[0],
                           alpha_SgrA_init[0], flux_ratio_bg_init[0], alpha_bg_init[0],
-                          opd_1_init[0],opd_2_init[0],opd_3_init[0],opd_4_init[0]])
+                          opd_1_init[0],opd_2_init[0],opd_3_init[0],opd_4_init[0],
+                          special_par[0]])
         theta_lower = np.array([phase_center_RA_init[1], phase_center_DEC_init[1],
                                 alpha_SgrA_init[1], flux_ratio_bg_init[1],
                                 alpha_bg_init[1],opd_1_init[1],opd_2_init[1],
-                                opd_3_init[1],opd_4_init[1]])
+                                opd_3_init[1],opd_4_init[1], special_par[1]])
         theta_upper = np.array([phase_center_RA_init[2], phase_center_DEC_init[2],
                                 alpha_SgrA_init[2], flux_ratio_bg_init[2],
                                 alpha_bg_init[2],opd_1_init[2],opd_2_init[2],
-                                opd_3_init[2],opd_4_init[2]])
+                                opd_3_init[2],opd_4_init[2], special_par[2]])
 
         theta_names = np.array([r"$RA_{PC}$", r"$DEC_{PC}$", r"$\alpha_{SgrA}$", 
                                 r"$f_{bg}$",r"$\alpha_{bg}$", "OPD1", "OPD2", 
-                                "OPD3", "OPD4"])
+                                "OPD3", "OPD4", "special"])
         theta_names_raw = np.array(["PC RA", "PC DEC", "alpha SgrA", "f BG", "alpha BG", 
-                                    "OPD1", "OPD2", "OPD3", "OPD4"])
+                                    "OPD1", "OPD2", "OPD3", "OPD4", "special"])
 
         ndim = len(theta)
         todel = []
@@ -2954,6 +2971,8 @@ class GravData():
         for tel in range(4):
             if fitopds[tel] != 1:
                 todel.append(5+tel)
+        if not specialfit:
+            todel.append(9)
         ndof = ndim - len(todel)
 
         # Get data
@@ -3302,10 +3321,11 @@ class GravData():
                                 else:
                                     txtfile.write(', 0 \n')
                         else:
-                            txtfile.write('nan, nan, nan, nan, nan, nan, nan, nan, nan, nan \n')
-                            txtfile.write('nan, nan, nan, nan, nan, nan, nan, nan, nan, nan \n')
-                            txtfile.write('nan, nan, nan, nan, nan, nan, nan, nan, nan, nan \n')
-                            txtfile.write('nan, nan, nan, nan, nan, nan, nan, nan, nan, nan \n')
+                            nantxt = 'nan, '
+                            txtfile.write(nantxt*(ndim-1) + 'nan \n')
+                            txtfile.write(nantxt*(ndim-1) + 'nan \n')
+                            txtfile.write(nantxt*(ndim-1) + 'nan \n')
+                            txtfile.write(nantxt*(ndim-1) + 'nan \n')
                     
                 if createpdf:
                     if (bothdofit == True).all():
