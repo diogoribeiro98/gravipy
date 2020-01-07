@@ -2119,12 +2119,8 @@ class GravData():
                                [opd2, opd1]])
         if specialfit:
             special_par = theta[9] 
-            sp_bl  = np.array([0,
-                               special_par,
-                               special_par,
-                               special_par,
-                               special_par,
-                               0])
+            sp_bl = np.ones(6)*special_par
+            sp_bl *= self.specialfit_bl
 
         vis = np.zeros((6,len(wave))) + 0j
         if len(u) != 6 or len(v) != 6:
@@ -2797,7 +2793,7 @@ class GravData():
                         flagtill=2, flagfrom=12, plotres=True, createpdf=True, 
                         bequiet=False, noS2=False, mindatapoints=3,
                         dontfit=None, dontfitbl=None, writefitdiff=False,
-                        specialfit=False):
+                        specialpar=np.array([0,0,0,0,0,0])):
         """
         Does a MCMC unary fit on the phases of the data.
         Parameter:
@@ -2824,6 +2820,7 @@ class GravData():
         specialfit:     Special version of fit, changing implementaion 
                         (dummy to allow an additional fit parameter)
         """
+        rad2as = 180 / np.pi * 3600
         self.fixedBG = fixedBG
         self.fixedBH = fixedBH
         self.noBG = noBG
@@ -2832,9 +2829,21 @@ class GravData():
             use_opds = True
         else:
             self.use_opds = False
-        self.specialfit = specialfit
-        rad2as = 180 / np.pi * 3600
-
+        
+        if np.any(specialpar):
+            self.specialfit = True
+            #self.specialfit_bl = np.array([0,1,1,1,1,0])
+            #self.specialfit_bl = np.array([1,0,0,0,0,1])
+            #self.specialfit_bl = np.array([1,1,0,0,-1,-1])
+            self.specialfit_bl = specialpar
+            if not bequiet:
+                print('Specialfit parameter applied to BLs:')
+                nonzero = np.nonzero(self.specialfit_bl)[0]
+                print(*list(nonzero*self.specialfit_bl[nonzero]))
+                print('\n')
+        else:
+            self.specialfit = False
+        specialfit = self.specialfit
         # Get data from file
         nwave = self.channel
         self.getIntdata(plot=False, flag=False)
@@ -2938,7 +2947,7 @@ class GravData():
         opd_2_init = [0.0,-opd_max,opd_max]
         opd_3_init = [0.0,-opd_max,opd_max]
         opd_4_init = [0.0,-opd_max,opd_max]
-        special_par = [0, -2, 2]
+        special_par = [-0.15, -2, 2]
 
         # initial fit parameters 
         theta = np.array([phase_center_RA_init[0], phase_center_DEC_init[0],
@@ -3322,10 +3331,10 @@ class GravData():
                                     txtfile.write(', 0 \n')
                         else:
                             nantxt = 'nan, '
-                            txtfile.write(nantxt*(ndim-1) + 'nan \n')
-                            txtfile.write(nantxt*(ndim-1) + 'nan \n')
-                            txtfile.write(nantxt*(ndim-1) + 'nan \n')
-                            txtfile.write(nantxt*(ndim-1) + 'nan \n')
+                            txtfile.write(nantxt*(ndim) + 'nan \n')
+                            txtfile.write(nantxt*(ndim) + 'nan \n')
+                            txtfile.write(nantxt*(ndim) + 'nan \n')
+                            txtfile.write(nantxt*(ndim) + 'nan \n')
                     
                 if createpdf:
                     if (bothdofit == True).all():
