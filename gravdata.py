@@ -454,7 +454,7 @@ class GravData():
         return (lambda0/2.2)**(-1-alpha)*2*dlambda*np.sinc(2*s*dlambda/lambda0**2.)*np.exp(-2.j*np.pi*s/lambda0)
     
     
-    def simulateVisdata(self, theta, constant_f=True, use_opds=False, fixedBG=True, fiberOff=None, plot=True, stefanstyle=True):
+    def simulateVisdata(self, theta, constant_f=True, use_opds=False, fixedBG=True, fiberOff=None, plot=True):
         """
         Test function to see how a given theta would look like
         Theta should be a list of:
@@ -489,7 +489,6 @@ class GravData():
         self.use_visscale = False
         self.fixpos = False
         self.fixedBH = False
-        self.stefanstyle = stefanstyle
         
         if fiberOff is None:
             self.fiberOffX = -fits.open(self.name)[0].header["HIERARCH ESO INS SOBJ OFFX"] 
@@ -633,7 +632,7 @@ class GravData():
         fiberOffY = self.fiberOffY
         fixpos = self.fixpos
         fixedBH = self.fixedBH
-        stefanstyle = self.stefanstyle
+        specialfit = self.specialfit
         
         if fixpos:
             dRA = self.fiberOffX
@@ -674,6 +673,10 @@ class GravData():
                                [opd3, opd2],
                                [opd3, opd1],
                                [opd2, opd1]])
+        if specialfit:
+            special_par = theta[16] 
+            sp_bl = np.ones(6)*special_par
+            sp_bl *= self.specialfit_bl
         alpha_S2 = 3
         
         # Flux Ratios
@@ -692,24 +695,21 @@ class GravData():
         # Calculate complex visibilities
         vis = np.zeros((6,len(wave))) + 0j
         for i in range(0,6):
-            if stefanstyle:
-                try:
-                    if self.fit_for[3] == 0:
-                        phaseCenterRA = 0
-                        phaseCenterDEC = 0
-                except AttributeError:
-                    pass
-                s_SgrA = ((phaseCenterRA)*u[i] + (phaseCenterDEC)*v[i]) * mas2rad * 1e6
-                s_S2 = ((dRA+phaseCenterRA)*u[i] + (dDEC+phaseCenterDEC)*v[i]) * mas2rad * 1e6
-            else:
-                #s = bl*(sky position) + opd1 - opd2  in mum
-                s_SgrA = ((fiberOffX-dRA)*u[i] + (fiberOffY-dDEC)*v[i]) * mas2rad * 1e6
-                s_S2 = (fiberOffX*u[i] + fiberOffY*v[i]) * mas2rad * 1e6
-            
+            try:
+                if self.fit_for[3] == 0:
+                    phaseCenterRA = 0
+                    phaseCenterDEC = 0
+            except AttributeError:
+                pass
+            s_SgrA = ((phaseCenterRA)*u[i] + (phaseCenterDEC)*v[i]) * mas2rad * 1e6
+            s_S2 = ((dRA+phaseCenterRA)*u[i] + (dDEC+phaseCenterDEC)*v[i]) * mas2rad * 1e6
 
             
             if use_opds:
                 s_S2 = s_S2 + opd_bl[i,0] - opd_bl[i,1]
+            if specialfit:
+                s_SgrA += sp_bl[i]
+                s_S2 += sp_bl[i]
     
             # u,v in 1/mas
             u_mas = u[i] / (wave*1e-6) / rad2mas
@@ -722,23 +722,12 @@ class GravData():
             intS2_center = self.vis_intensity(0, alpha_S2, wave, dlambda[i,:])
             intBG = self.vis_intensity(0, alpha_bg, wave, dlambda[i,:])
             
-            if stefanstyle:
-                vis[i,:] = ((intSgrA + 
-                            np.sqrt(f_bl[i,0] * f_bl[i,1]) * intS2)/
-                            (np.sqrt(intSgrA_center + f_bl[i,0] * intS2_center 
-                                    + fluxRatioBG * intBG) *
-                            np.sqrt(intSgrA_center + f_bl[i,1] * intS2_center 
-                                    + fluxRatioBG * intBG)))
-            else:
-                vis[i,:] = ((intSgrA + 
-                            np.sqrt(f_bl[i,0] * f_bl[i,1]) * intS2)/
-                            (np.sqrt(intSgrA_center + f_bl[i,0] * intS2_center 
-                                    + fluxRatioBG * intBG) *
-                            np.sqrt(intSgrA_center + f_bl[i,1] * intS2_center 
-                                    + fluxRatioBG * intBG)) *
-                            np.exp(-2j*np.pi*(u_mas * phaseCenterRA 
-                                            + v_mas * phaseCenterDEC)))
-            
+            vis[i,:] = ((intSgrA + 
+                        np.sqrt(f_bl[i,0] * f_bl[i,1]) * intS2)/
+                        (np.sqrt(intSgrA_center + f_bl[i,0] * intS2_center 
+                                + fluxRatioBG * intBG) *
+                        np.sqrt(intSgrA_center + f_bl[i,1] * intS2_center 
+                                + fluxRatioBG * intBG)))
 
         
         visamp = np.abs(vis)*vis_scale
@@ -832,8 +821,8 @@ class GravData():
                   use_visscale=False, write_results=True, flagtill=3, flagfrom=13,
                   dRA=0., dDEC=0., plotres=True, createpdf=True, bequiet=False,
                   fixpos=False, fixedBH=False, second_iteration=False,
-                  dphRA=0.1, dphDec=0.1, stefanstyle=True):
-        '''
+                  dphRA=0.1, dphDec=0.1, specialpar=np.array([0,0,0,0,0,0])):
+        '''s_S2
         Parameter:
         nthreads:       number of cores [4] 
         nwalkers:       number of walkers [500] 
@@ -865,8 +854,22 @@ class GravData():
         self.use_visscale = use_visscale
         self.fixpos = fixpos
         self.fixedBH = fixedBH
-        self.stefanstyle = stefanstyle
         rad2as = 180 / np.pi * 3600
+        if np.any(specialpar):
+            self.specialfit = True
+            #self.specialfit_bl = np.array([0,1,1,1,1,0])
+            #self.specialfit_bl = np.array([1,0,0,0,0,1])
+            #self.specialfit_bl = np.array([1,1,0,0,-1,-1])
+            self.specialfit_bl = specialpar
+            if not bequiet:
+                print('Specialfit parameter applied to BLs:')
+                nonzero = np.nonzero(self.specialfit_bl)[0]
+                print(*list(nonzero*self.specialfit_bl[nonzero]))
+                print('\n')
+        else:
+            self.specialfit = False
+        specialfit = self.specialfit
+
 
         # Get data from file
         nwave = self.channel
@@ -989,29 +992,30 @@ class GravData():
         opd_2_init = [0.1,-opd_max,opd_max]
         opd_3_init = [0.1,-opd_max,opd_max]
         opd_4_init = [0.1,-opd_max,opd_max]
+        special_par = [-0.15, -2, 2]
 
         # initial fit parameters 
         theta = np.array([dRA_init[0],dDEC_init[0],flux_ratio_1_init[0],flux_ratio_2_init[0],
                           flux_ratio_3_init[0],flux_ratio_4_init[0],alpha_SgrA_init[0],vis_scale_init[0],
                           flux_ratio_bg_init[0],color_bg_init[0],phase_center_RA_init[0],
-                          phase_center_DEC_init[0],opd_1_init[0],opd_2_init[0],opd_3_init[0],opd_4_init[0]])
+                          phase_center_DEC_init[0],opd_1_init[0],opd_2_init[0],opd_3_init[0],opd_4_init[0],special_par[0]])
 
         # lower limit on fit parameters 
         theta_lower = np.array([dRA_init[1],dDEC_init[1],flux_ratio_1_init[1],flux_ratio_2_init[1],
                                 flux_ratio_3_init[1],flux_ratio_4_init[1],alpha_SgrA_init[1],vis_scale_init[1],
                                 flux_ratio_bg_init[1],color_bg_init[1],phase_center_RA_init[1],
-                                phase_center_DEC_init[1],opd_1_init[1],opd_2_init[1],opd_3_init[1],opd_4_init[1]])
+                                phase_center_DEC_init[1],opd_1_init[1],opd_2_init[1],opd_3_init[1],opd_4_init[1], special_par[1]])
 
         # upper limit on fit parameters 
         theta_upper = np.array([dRA_init[2],dDEC_init[2],flux_ratio_1_init[2],flux_ratio_2_init[2],
                                 flux_ratio_3_init[2],flux_ratio_4_init[2],alpha_SgrA_init[2],
                                 vis_scale_init[2],flux_ratio_bg_init[2],color_bg_init[2],phase_center_RA_init[2],
-                                phase_center_DEC_init[2],opd_1_init[2],opd_2_init[2],opd_3_init[2],opd_4_init[2]])
+                                phase_center_DEC_init[2],opd_1_init[2],opd_2_init[2],opd_3_init[2],opd_4_init[2], special_par[2]])
 
         theta_names = np.array(["dRA", "dDEC", "f1", "f2", "f3", "f4" , r"$\alpha_{flare}$", r"|V| sc", r"$f_{bg}$",
-                                r"$\alpha_{bg}$", r"$RA_{PC}$", r"$DEC_{PC}$", "OPD1", "OPD2", "OPD3", "OPD4"])
+                                r"$\alpha_{bg}$", r"$RA_{PC}$", r"$DEC_{PC}$", "OPD1", "OPD2", "OPD3", "OPD4", "special"])
         theta_names_raw = np.array(["dRA", "dDEC", "f1", "f2", "f3", "f4" , "alpha flare", "V scale", "f BG",
-                                    "alpha BG", "PC RA", "PC DEC", "OPD1", "OPD2", "OPD3", "OPD4"])
+                                    "alpha BG", "PC RA", "PC DEC", "OPD1", "OPD2", "OPD3", "OPD4", "special"])
 
 
         ndim = len(theta)
@@ -1037,6 +1041,8 @@ class GravData():
             todel.append(13)
             todel.append(14)
             todel.append(15)
+        if not specialfit:
+            todel.append(16)
         ndof = 16 - len(todel)
         
 
