@@ -2622,7 +2622,7 @@ class GravData():
                         else:
                             theta_result = theta_fit
                             
-                        fit_visphi = self.calc_vis_unary_proper(theta_result, u, v, wave, dlambda)
+                        fit_visphi = self.calc_vis_unary(theta_result, u, v, wave, dlambda)
                                     
                         res_visphi_1 = fit_visphi-visphi
                         res_visphi_2 = 360-(fit_visphi-visphi)
@@ -2690,7 +2690,7 @@ class GravData():
                             
                         if plotres:
                             self.plotFitUnary(theta_result, fitdata, u, v, idx, 
-                                            createpdf=createpdf, proper=True)
+                                            createpdf=createpdf)
                     else:
                         fitdiff = 0
                         redchi_visphi = 0
