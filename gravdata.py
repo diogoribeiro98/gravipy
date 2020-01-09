@@ -2061,6 +2061,7 @@ class GravData():
         noBG = self.noBG
         use_opds = self.use_opds
         specialfit = self.specialfit
+        michistyle = self.michistyle
         
         phaseCenterRA = theta[0]
         phaseCenterDEC = theta[1]
@@ -2099,6 +2100,9 @@ class GravData():
                 
         vis = np.zeros((6,len(wave))) + 0j
         for i in range(0,6):
+            # pc in mas -> mas2rad -> pc in rad
+            # uv in m -> *1e6 -> uv in mum
+            # s in mum
             s_SgrA = ((phaseCenterRA)*u[i] + (phaseCenterDEC)*v[i]) * mas2rad * 1e6
             
             if use_opds:
@@ -2106,10 +2110,6 @@ class GravData():
             if specialfit:
                 s_SgrA = s_SgrA + sp_bl[i]
 
-            # u,v in 1/mas
-            u_mas = u[i] / (wave*1e-6) / rad2mas
-            v_mas = v[i] / (wave*1e-6) / rad2mas
-    
             # interferometric intensities of all components
             intSgrA = self.vis_intensity(s_SgrA, alpha_SgrA, wave, dlambda[i,:])
             intSgrA_center = self.vis_intensity(0, alpha_SgrA, wave, dlambda[i,:])
@@ -2117,6 +2117,10 @@ class GravData():
     
             vis[i,:] = (intSgrA/
                         (intSgrA_center + fluxRatioBG * intBG))
+            
+            if michistyle:
+                s_sgra_ul = s_SgrA / wave
+                vis[i,:] = np.exp(-2j*np.pi*s_sgra_ul)
             
         visphi = np.angle(vis, deg=True)
         visphi = visphi + 360.*(visphi<-180.) - 360.*(visphi>180.)
@@ -2200,7 +2204,7 @@ class GravData():
                         flagtill=2, flagfrom=12, plotres=True, createpdf=True, 
                         bequiet=False, noS2=False, mindatapoints=3,
                         dontfit=None, dontfitbl=None, writefitdiff=False,
-                        specialpar=np.array([0,0,0,0,0,0])):
+                        specialpar=np.array([0,0,0,0,0,0]), michistyle=False):
         """
         Does a MCMC unary fit on the phases of the data.
         Parameter:
@@ -2231,6 +2235,7 @@ class GravData():
         self.fixedBG = fixedBG
         self.fixedBH = fixedBH
         self.noBG = noBG
+        self.michistyle = michistyle
         if np.any(fitopds):
             self.use_opds = True
             use_opds = True
