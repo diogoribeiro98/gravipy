@@ -9,6 +9,7 @@ from fpdf import FPDF
 from PIL import Image
 from scipy import optimize 
 from matplotlib import gridspec
+from pkg_resources import resource_filename
 
 try:
     from generalFunctions import *
@@ -450,6 +451,114 @@ class GravData():
     
     ############################################    
     ############################################
+    ################ Phase Maps ################
+    ############################################
+    ############################################
+    
+    def loadPhasemaps(self):
+        # load in phasmaps
+        phasemapsfile = resource_filename('gravipy', 'GRAVITY_SC_MAP_DEFAULT.fits')
+        phasemaps = fits.open(phasemapsfile)
+        self.pm_amp = phasemaps['SC_AMP'].data
+        self.pm_pha = phasemaps['SC_PHASE'].data
+        phasemaps.close()
+
+
+    def rotation(self, ang):
+        return np.array([[np.cos(ang), np.sin(ang)],
+                         [-np.sin(ang), np.cos(ang)]])
+    
+    
+    def readPhasemaps(self, ra, dec, fromFits=True, 
+                      northangle=None, dra=None, ddec=None):
+        """
+        Calculates coupling amplitude / phase for given 
+        
+        ra,dec: RA, DEC position on sky relative to nominal field center = SOBJ [mas]
+        dra,ddec: ESO QC MET SOBJ DRA / DDEC: 
+            location of science object (= desired science fiber position, = field center) given by INS.SOBJ relative to *actual* fiber position measured by the laser metrology [mas]
+            mis-pointing = actual - desired fiber position = -(DRA,DDEC)
+        north_angle: north direction on acqcam in degree
+        if fromFits is true, northangle & dra,ddec are taken from fits file
+        """
+        try:
+           self.pm_amp
+        except AttributeError:
+            self.loadPhasemaps()
+        if fromFits:
+            # should not do that in here for mcmc
+            header = fits.open(self.name)[0].header
+            northangle1 = header['ESO QC ACQ FIELD1 NORTH_ANGLE']/180*math.pi
+            northangle2 = header['ESO QC ACQ FIELD2 NORTH_ANGLE']/180*math.pi
+            northangle3 = header['ESO QC ACQ FIELD3 NORTH_ANGLE']/180*math.pi
+            northangle4 = header['ESO QC ACQ FIELD4 NORTH_ANGLE']/180*math.pi
+            northangle = [northangle1, northangle2, northangle3, northangle4]
+
+            ddec1 = header['ESO QC MET SOBJ DDEC1']
+            ddec2 = header['ESO QC MET SOBJ DDEC2']
+            ddec3 = header['ESO QC MET SOBJ DDEC3']
+            ddec4 = header['ESO QC MET SOBJ DDEC4']
+            ddec = [ddec1, ddec2, ddec3, ddec4]
+
+            dra1 = header['ESO QC MET SOBJ DRA1']
+            dra2 = header['ESO QC MET SOBJ DRA2']
+            dra3 = header['ESO QC MET SOBJ DRA3']
+            dra4 = header['ESO QC MET SOBJ DRA4']
+            dra = [dra1, dra2, dra3, dra4]
+            
+        lambda0 = 2.2
+        cor_amp = np.zeros((4, len(self.wave)))
+        cor_pha = np.zeros((4, len(self.wave)))
+        for tel in range(4):
+            pos = np.array([ra + dra[tel], dec + ddec[tel]])
+            pos_rot = np.dot(self.rotation(northangle[tel]), pos)
+            for channel in range(len(self.wave)):
+                pos_scaled = pos_rot*lambda0/self.wave[channel] + 101
+                pos_int = (np.round(pos_scaled)).astype(int)
+                
+                cor_amp[tel, channel] = self.pm_amp[tel, pos_int[0], pos_int[1]]
+                cor_pha[tel, channel] = self.pm_pha[tel, pos_int[0], pos_int[1]]
+            
+        return cor_amp, cor_pha
+    
+    
+    
+    def readPhasemapsSingle(self, ra, dec, northangle, dra, ddec, tel, lam):
+        """
+        Calculates coupling amplitude / phase for given 
+        
+        ra,dec: RA, DEC position on sky relative to nominal field center = SOBJ [mas]
+        dra,ddec: ESO QC MET SOBJ DRA / DDEC: 
+            location of science object (= desired science fiber position, = field center) given by INS.SOBJ relative to *actual* fiber position measured by the laser metrology [mas]
+            mis-pointing = actual - desired fiber position = -(DRA,DDEC)
+        north_angle: north direction on acqcam in degree
+        if fromFits is true, northangle & dra,ddec are taken from fits file
+        """
+        try:
+           self.pm_amp
+        except AttributeError:
+            self.loadPhasemaps()
+            
+        lambda0 = 2.2
+        pos = np.array([ra + dra, dec + ddec])
+        pos_rot = np.dot(self.rotation(northangle), pos)
+        pos_scaled = pos_rot*lambda0/lam + 100
+        pos_int = (np.round(pos_scaled)).astype(int)
+        
+        cor_amp = self.pm_amp[tel, pos_int[1], pos_int[0]]
+        cor_pha = self.pm_pha[tel, pos_int[1], pos_int[0]]
+            
+        return cor_amp, cor_pha
+        
+            
+            
+    
+    
+    
+    
+    
+    ############################################    
+    ############################################
     ############### Binary model ###############
     ############################################
     ############################################
@@ -460,47 +569,128 @@ class GravData():
         s = B*skypos-opd1-opd2
         alphs = power law
         """
-        return (lambda0/2.2)**(-1-alpha)*2*dlambda*np.sinc(2*s*dlambda/lambda0**2.)*np.exp(-2.j*np.pi*s/lambda0)
+        x = 2*s*dlambda/lambda0**2.
+        
+        ## this should be the right solution, but x can be an array
+        #if x == 0:
+            #sinc = 1
+        #else:
+            #sinc = np.sin(x)/x
+            
+        # np.sinc = sin(pi*x)/(pi*x)
+        sinc = np.sinc(x/np.pi)
+        return (lambda0/2.2)**(-1-alpha)*2*dlambda*sinc*np.exp(-2.j*np.pi*s/lambda0)
     
     
-    def simulateVisdata_single(self, theta, lam, dlam, u, v, constant_f=True, fixedBG=True):
+    def simulateVisdata_single(self, theta, wave, dlambda, u, v, 
+                               fixedBG=True, fixedBH=True, 
+                               phasemaps=False, phasemapsstuff=None):
         '''
         Test function to generate a single datapoint for a given u, v, lambda, dlamba & theta
         
         Theta should be a list of:
-        dRA, dDEC, f1, (f2), (f3), (f4), alpha flare, f BG, (alpha BG), 
-        PC RA, PC DEC, (OPD1), (OPD2), (OPD3), (OPD4)
+        dRA, dDEC, f, alpha flare, f BG, (alpha BG), PC RA, PC DEC
         
         Values in bracket are by default not used, can be activated by options:
-        constant_f:     Constant coupling [True]
-        use_opds:       Use OPDs [False] 
-        fixedBG:        Keep background power law [True]        
+        fixedBH:        Keep primary power law [False]        
+        fixedBG:        Keep background power law [True]  
+        
+        if phasemaps=True, phasemapsstuff must be a list of:
+            [tel1, dra1, ddec1, north_angle1, tel2, dra2, ddec2, north_angle2]
         '''
-        theta_names_raw = np.array(["dRA", "dDEC", "f1", "f2", "f3", "f4" , "alpha flare", "f BG",
-                                    "alpha BG", "PC RA", "PC DEC", "OPD1", "OPD2", "OPD3", "OPD4"])
+        theta_names_raw = np.array(["dRA", "dDEC", "f", "alpha flare", "f BG", 
+                                    "alpha BG", "PC RA", "PC DEC"])
         rad2as = 180 / np.pi * 3600
-        self.constant_f = constant_f
-        self.fixedBG = fixedBG
-        self.use_opds = False
-        self.fixpos = False
-        self.fixedBH = False
-        self.specialfit = False
-        self.fiberOffX = 0
-        self.fiberOffY = 0
         # check Theta
         try:
-            if len(theta) != 15:
-                print('Theta has to include the following 16 parameter:')
+            if len(theta) != 8:
+                print('Theta has to include the following 8 parameter:')
                 print(theta_names_raw)
-                raise ValueError('Wrong number of input parameter given (should be 16)')
+                raise ValueError('Wrong number of input parameter given (should be 8)')
         except(TypeError):
-            print('Thetha has to include the following 16 parameter:')
+            print('Thetha has to include the following 8 parameter:')
             print(theta_names_raw)
-            raise ValueError('Wrong number of input parameter given (should be 16)') 
+            raise ValueError('Wrong number of input parameter given (should be 8)') 
         
-        vis = self.calc_vis(theta, u, v, lam, dlam, 
-                                                singlevalue=True)
-        
+        mas2rad = 1e-3 / 3600 / 180 * np.pi
+        dRA = theta[0]
+        dDEC = theta[1]
+        f = theta[2]
+        if fixedBH:
+            alpha_SgrA = -0.5
+        else:
+            alpha_SgrA = theta[3]
+        fluxRatioBG = theta[4]
+        if fixedBG:
+            alpha_bg = 3.
+        else:
+            alpha_bg = theta[5]
+        phaseCenterRA = theta[6]
+        phaseCenterDEC = theta[7]
+        alpha_S2 = 3
+        f = 10.**f
+
+        s_SgrA = ((phaseCenterRA)*u + (phaseCenterDEC)*v) * mas2rad * 1e6
+        s_S2 = ((dRA+phaseCenterRA)*u + (dDEC+phaseCenterDEC)*v) * mas2rad * 1e6
+                
+        if phasemaps:
+            (tel1, dra1, ddec1, north_angle1, 
+             tel2, dra2, ddec2, north_angle2) = phasemapsstuff
+            
+            cor_amp_sgr1, cor_pha_sgr1 = self.readPhasemapsSingle(phaseCenterRA,
+                                                                  phaseCenterDEC,
+                                                                  north_angle1, 
+                                                                  dra1, ddec1,
+                                                                  tel1, wave)
+            cor_amp_sgr2, cor_pha_sgr2 = self.readPhasemapsSingle(phaseCenterRA,
+                                                                  phaseCenterDEC,
+                                                                  north_angle2, 
+                                                                  dra2, ddec2,
+                                                                  tel2, wave)
+            cor_amp_s21, cor_pha_s21 = self.readPhasemapsSingle(dRA+phaseCenterRA, 
+                                                               dDEC+phaseCenterDEC,
+                                                               north_angle1, 
+                                                               dra1, ddec1,
+                                                               tel1, wave)
+            cor_amp_s22, cor_pha_s22 = self.readPhasemapsSingle(dRA+phaseCenterRA, 
+                                                               dDEC+phaseCenterDEC,
+                                                               north_angle2, 
+                                                               dra2, ddec2,
+                                                               tel2, wave)
+            
+            # differential opd
+            opd_sgr = (cor_pha_sgr1-cor_pha_sgr2)/360*wave
+            s_SgrA -= opd_sgr
+            opd_s2 = (cor_pha_s21-cor_pha_s22)/360*wave
+            s_S2 -= opd_s2
+            
+            # different coupling
+            cr1 = (cor_amp_s21 / cor_amp_sgr1)
+            cr2 = (cor_amp_s22 / cor_amp_sgr2)
+            
+            
+            # interferometric intensities of all components
+            intSgrA = self.vis_intensity(s_SgrA, alpha_SgrA, wave, dlambda)
+            intS2 = self.vis_intensity(s_S2, alpha_S2, wave, dlambda)
+            intSgrA_center = self.vis_intensity(0, alpha_SgrA, wave, dlambda)
+            intS2_center = self.vis_intensity(0, alpha_S2, wave, dlambda)
+            intBG = self.vis_intensity(0, alpha_bg, wave, dlambda)
+
+            vis = ((intSgrA + f*np.sqrt(cr1*cr2)*intS2)/
+                   (np.sqrt(intSgrA_center + f*cr1*intS2_center + fluxRatioBG * intBG)*
+                    np.sqrt(intSgrA_center + f*cr2*intS2_center + fluxRatioBG * intBG)))
+            
+        else:
+            # interferometric intensities of all components
+            intSgrA = self.vis_intensity(s_SgrA, alpha_SgrA, wave, dlambda)
+            intS2 = self.vis_intensity(s_S2, alpha_S2, wave, dlambda)
+            intSgrA_center = self.vis_intensity(0, alpha_SgrA, wave, dlambda)
+            intS2_center = self.vis_intensity(0, alpha_S2, wave, dlambda)
+            intBG = self.vis_intensity(0, alpha_bg, wave, dlambda)
+            
+            vis = ((intSgrA + f * intS2)/
+                    (intSgrA_center + f * intS2_center + fluxRatioBG * intBG))
+            
         return vis
     
     
@@ -681,6 +871,12 @@ class GravData():
         fixedBH = self.fixedBH
         specialfit = self.specialfit
         
+        phasemaps = self.phasemaps
+        if phasemaps:
+            northangle = self.northangle
+            ddec = self.ddec
+            dra = self.dra
+        
         if fixpos:
             dRA = self.fiberOffX
             dDEC = self.fiberOffY
@@ -734,67 +930,87 @@ class GravData():
                          [f[2],f[1]],
                          [f[2],f[0]],
                          [f[1],f[0]]])
-
-        if singlevalue:
-            s_SgrA = ((phaseCenterRA)*u + (phaseCenterDEC)*v) * mas2rad * 1e6
-            s_S2 = ((dRA+phaseCenterRA)*u + (dDEC+phaseCenterDEC)*v) * mas2rad * 1e6
+        
+        if phasemaps:
+            cor_amp_sgr, cor_pha_sgr = self.readPhasemaps(phaseCenterRA,
+                                                            phaseCenterDEC,
+                                                            fromFits=False, 
+                                                            northangle=northangle,
+                                                            dra=dra, ddec=ddec)
+            cor_amp_s2, cor_pha_s2 = self.readPhasemaps(dRA+phaseCenterRA, 
+                                                        dDEC+phaseCenterDEC,
+                                                        fromFits=False, 
+                                                        northangle=northangle,
+                                                        dra=dra, ddec=ddec)
+            pm_amp_sgr = np.array([[cor_amp_sgr[0], cor_amp_sgr[1]],
+                                    [cor_amp_sgr[0], cor_amp_sgr[2]],
+                                    [cor_amp_sgr[0], cor_amp_sgr[3]],
+                                    [cor_amp_sgr[1], cor_amp_sgr[2]],
+                                    [cor_amp_sgr[1], cor_amp_sgr[3]],
+                                    [cor_amp_sgr[2], cor_amp_sgr[3]]])
+            pm_pha_sgr = np.array([[cor_pha_sgr[0], cor_pha_sgr[1]],
+                                    [cor_pha_sgr[0], cor_pha_sgr[2]],
+                                    [cor_pha_sgr[0], cor_pha_sgr[3]],
+                                    [cor_pha_sgr[1], cor_pha_sgr[2]],
+                                    [cor_pha_sgr[1], cor_pha_sgr[3]],
+                                    [cor_pha_sgr[2], cor_pha_sgr[3]]])
+            pm_amp_s2 = np.array([[cor_amp_s2[0], cor_amp_s2[1]],
+                                    [cor_amp_s2[0], cor_amp_s2[2]],
+                                    [cor_amp_s2[0], cor_amp_s2[3]],
+                                    [cor_amp_s2[1], cor_amp_s2[2]],
+                                    [cor_amp_s2[1], cor_amp_s2[3]],
+                                    [cor_amp_s2[2], cor_amp_s2[3]]])
+            pm_pha_s2 = np.array([[cor_pha_s2[0], cor_pha_s2[1]],
+                                    [cor_pha_s2[0], cor_pha_s2[2]],
+                                    [cor_pha_s2[0], cor_pha_s2[3]],
+                                    [cor_pha_s2[1], cor_pha_s2[2]],
+                                    [cor_pha_s2[1], cor_pha_s2[3]],
+                                    [cor_pha_s2[2], cor_pha_s2[3]]])       
             
+        # TODO actually implement this to visibilities
+        # Calculate complex visibilities
+        vis = np.zeros((6,len(wave))) + 0j
+        for i in range(0,6):
+            try:
+                if self.fit_for[3] == 0:
+                    phaseCenterRA = 0
+                    phaseCenterDEC = 0
+            except AttributeError:
+                pass
+            s_SgrA = ((phaseCenterRA)*u[i] + (phaseCenterDEC)*v[i]) * mas2rad * 1e6
+            s_S2 = ((dRA+phaseCenterRA)*u[i] + (dDEC+phaseCenterDEC)*v[i]) * mas2rad * 1e6
+
+            if use_opds:
+                s_S2 = s_S2 + opd_bl[i,0] - opd_bl[i,1]
+            if specialfit:
+                s_SgrA += sp_bl[i]
+                s_S2 += sp_bl[i]
+        
             # interferometric intensities of all components
-            intSgrA = self.vis_intensity(s_SgrA, alpha_SgrA, wave, dlambda)
-            intS2 = self.vis_intensity(s_S2, alpha_S2, wave, dlambda)
-            intSgrA_center = self.vis_intensity(0, alpha_SgrA, wave, dlambda)
-            intS2_center = self.vis_intensity(0, alpha_S2, wave, dlambda)
-            intBG = self.vis_intensity(0, alpha_bg, wave, dlambda)
-
-            vis = ((intSgrA + f[0] * intS2)/
-                   (intSgrA_center + f[0] * intS2_center + fluxRatioBG * intBG))
-            return vis
-        
-        else:
-            # Calculate complex visibilities
-            vis = np.zeros((6,len(wave))) + 0j
-            for i in range(0,6):
-                try:
-                    if self.fit_for[3] == 0:
-                        phaseCenterRA = 0
-                        phaseCenterDEC = 0
-                except AttributeError:
-                    pass
-                s_SgrA = ((phaseCenterRA)*u[i] + (phaseCenterDEC)*v[i]) * mas2rad * 1e6
-                s_S2 = ((dRA+phaseCenterRA)*u[i] + (dDEC+phaseCenterDEC)*v[i]) * mas2rad * 1e6
-
+            intSgrA = self.vis_intensity(s_SgrA, alpha_SgrA, wave, dlambda[i,:])
+            intS2 = self.vis_intensity(s_S2, alpha_S2, wave, dlambda[i,:])
+            intSgrA_center = self.vis_intensity(0, alpha_SgrA, wave, dlambda[i,:])
+            intS2_center = self.vis_intensity(0, alpha_S2, wave, dlambda[i,:])
+            intBG = self.vis_intensity(0, alpha_bg, wave, dlambda[i,:])
                 
-                if use_opds:
-                    s_S2 = s_S2 + opd_bl[i,0] - opd_bl[i,1]
-                if specialfit:
-                    s_SgrA += sp_bl[i]
-                    s_S2 += sp_bl[i]
-        
-                # interferometric intensities of all components
-                intSgrA = self.vis_intensity(s_SgrA, alpha_SgrA, wave, dlambda[i,:])
-                intS2 = self.vis_intensity(s_S2, alpha_S2, wave, dlambda[i,:])
-                intSgrA_center = self.vis_intensity(0, alpha_SgrA, wave, dlambda[i,:])
-                intS2_center = self.vis_intensity(0, alpha_S2, wave, dlambda[i,:])
-                intBG = self.vis_intensity(0, alpha_bg, wave, dlambda[i,:])
-                
-                vis[i,:] = ((intSgrA + 
-                            np.sqrt(f_bl[i,0] * f_bl[i,1]) * intS2)/
-                            (np.sqrt(intSgrA_center + f_bl[i,0] * intS2_center 
-                                    + fluxRatioBG * intBG) *
-                            np.sqrt(intSgrA_center + f_bl[i,1] * intS2_center 
-                                    + fluxRatioBG * intBG)))
+            vis[i,:] = ((intSgrA + 
+                        np.sqrt(f_bl[i,0] * f_bl[i,1]) * intS2)/
+                        (np.sqrt(intSgrA_center + f_bl[i,0] * intS2_center 
+                                + fluxRatioBG * intBG) *
+                        np.sqrt(intSgrA_center + f_bl[i,1] * intS2_center 
+                                + fluxRatioBG * intBG)))
 
-            visamp = np.abs(vis)
-            visphi = np.angle(vis, deg=True)
-            closure = np.zeros((4, len(wave)))
-            closure[0,:] = visphi[0,:] + visphi[3,:] - visphi[1,:]
-            closure[1,:] = visphi[0,:] + visphi[4,:] - visphi[2,:]
-            closure[2,:] = visphi[1,:] + visphi[5,:] - visphi[2,:]
-            closure[3,:] = visphi[3,:] + visphi[5,:] - visphi[4,:]
+        visamp = np.abs(vis)
+        visphi = np.angle(vis, deg=True)
+        closure = np.zeros((4, len(wave)))
+        closure[0,:] = visphi[0,:] + visphi[3,:] - visphi[1,:]
+        closure[1,:] = visphi[0,:] + visphi[4,:] - visphi[2,:]
+        closure[2,:] = visphi[1,:] + visphi[5,:] - visphi[2,:]
+        closure[3,:] = visphi[3,:] + visphi[5,:] - visphi[4,:]
 
-            visphi = visphi + 360.*(visphi<-180.) - 360.*(visphi>180.)
-            closure = closure + 360.*(closure<-180.) - 360.*(closure>180.)
-            return visamp, visphi, closure 
+        visphi = visphi + 360.*(visphi<-180.) - 360.*(visphi>180.)
+        closure = closure + 360.*(closure<-180.) - 360.*(closure>180.)
+        return visamp, visphi, closure 
     
     
     def lnprob(self, theta, fitdata, u, v, wave, dlambda, lower, upper):
@@ -875,7 +1091,7 @@ class GravData():
                   write_results=True, flagtill=3, flagfrom=13,
                   dRA=0., dDEC=0., plotres=True, createpdf=True, bequiet=False,
                   fixpos=False, fixedBH=False, dphRA=0.1, dphDec=0.1,
-                  specialpar=np.array([0,0,0,0,0,0])):
+                  specialpar=np.array([0,0,0,0,0,0]), phasemaps=False):
         '''
         Parameter:
         nthreads:       number of cores [4] 
@@ -936,6 +1152,29 @@ class GravData():
         else:
             self.specialfit = False
         specialfit = self.specialfit
+        
+        self.phasemaps = phasemaps
+        if phasemaps:
+            self.loadPhasemaps()
+            
+            header = fits.open(self.name)[0].header
+            northangle1 = header['ESO QC ACQ FIELD1 NORTH_ANGLE']/180*math.pi
+            northangle2 = header['ESO QC ACQ FIELD2 NORTH_ANGLE']/180*math.pi
+            northangle3 = header['ESO QC ACQ FIELD3 NORTH_ANGLE']/180*math.pi
+            northangle4 = header['ESO QC ACQ FIELD4 NORTH_ANGLE']/180*math.pi
+            self.northangle = [northangle1, northangle2, northangle3, northangle4]
+
+            ddec1 = header['ESO QC MET SOBJ DDEC1']
+            ddec2 = header['ESO QC MET SOBJ DDEC2']
+            ddec3 = header['ESO QC MET SOBJ DDEC3']
+            ddec4 = header['ESO QC MET SOBJ DDEC4']
+            self.ddec = [ddec1, ddec2, ddec3, ddec4]
+
+            dra1 = header['ESO QC MET SOBJ DRA1']
+            dra2 = header['ESO QC MET SOBJ DRA2']
+            dra3 = header['ESO QC MET SOBJ DRA3']
+            dra4 = header['ESO QC MET SOBJ DRA4']
+            self.dra = [dra1, dra2, dra3, dra4]
 
 
         # Get data from file
@@ -1799,7 +2038,7 @@ class GravData():
     ############################################
     ############################################    
     
-    def simulateUnaryphases(self, dRa, dDec, plot=False):
+    def simulateUnaryphases(self, dRa, dDec, specialfit=False, specialpar=None, plot=False, compare=True, uvind=False):
         """
         Test function to se how a given phasecenter shift would look like
         """
@@ -1807,7 +2046,9 @@ class GravData():
         self.fixedBH = True
         self.noBG = True
         self.use_opds = False
-        self.specialfit = False
+        self.specialfit = specialfit
+        self.specialfit_bl = np.array([1,1,0,0,-1,-1])
+        self.michistyle = False
         
         rad2as = 180 / np.pi * 3600
         
@@ -1833,46 +2074,68 @@ class GravData():
                 dlambda[i,:] = wave/500/2
             else:
                 dlambda[i,:] = 0.03817
+        self.dlambda = dlambda
                 
-        theta = [dRa, dDec, 0, 0, 0]
-        visphi = self.calc_vis_unary(theta, u, v, wave, dlambda)
+        theta = [dRa, dDec, 0, 0, 0, 0, 0, 0, 0, specialpar]
+        fit_visphi = self.calc_vis_unary(theta, u, v, wave, dlambda)
         
-        if plot:
-            wave_model = np.linspace(wave[0],wave[len(wave)-1],1000)
-            dlambda_model = np.zeros((6,len(wave_model)))
-            for i in range(0,6):
-                dlambda_model[i,:] = np.interp(wave_model, wave, dlambda[i,:])
-            model_visphi_full  = self.calc_vis_unary(theta, u, v, wave_model, dlambda_model)
-            magu = np.sqrt(u**2.+v**2.)
-            u_as = np.zeros((len(u),len(wave)))
-            v_as = np.zeros((len(v),len(wave)))
-            for i in range(0,len(u)):
-                u_as[i,:] = u[i]/(wave*1.e-6) / rad2as
-                v_as[i,:] = v[i]/(wave*1.e-6) / rad2as
-            magu_as = np.sqrt(u_as**2.+v_as**2.)
+        if compare:
+            visphi = self.visphiSC_P1[:6]
+            visphi_error = self.visphierrSC_P1[:6]
+            visphi_flag = self.visampflagSC_P1[:6]
+            visphi_flag[:,0:2] = True
+            visphi_flag[:,12:] = True
+            fitdata = [visphi, visphi_error, visphi_flag]
+            self.plotFitUnary(theta, fitdata, u, v, 1,
+                              createpdf=False, uvind=uvind)
+            
+            
+            
+            res_visphi_1 = fit_visphi-visphi
+            #res_visphi_2 = 360-(fit_visphi-visphi)
+            #check = np.abs(res_visphi_1) < np.abs(res_visphi_2) 
+            #res_visphi = res_visphi_1*check + res_visphi_2*(1-check)
+            chi2 = np.sum(res_visphi_1**2./visphi_error**2.*(1-visphi_flag))
+            print(chi2)
+            return visphi
+            
+        else:
+            if plot:
+                wave_model = np.linspace(wave[0],wave[len(wave)-1],1000)
+                dlambda_model = np.zeros((6,len(wave_model)))
+                for i in range(0,6):
+                    dlambda_model[i,:] = np.interp(wave_model, wave, dlambda[i,:])
+                model_visphi_full  = self.calc_vis_unary(theta, u, v, wave_model, dlambda_model)
+                magu = np.sqrt(u**2.+v**2.)
+                u_as = np.zeros((len(u),len(wave)))
+                v_as = np.zeros((len(v),len(wave)))
+                for i in range(0,len(u)):
+                    u_as[i,:] = u[i]/(wave*1.e-6) / rad2as
+                    v_as[i,:] = v[i]/(wave*1.e-6) / rad2as
+                magu_as = np.sqrt(u_as**2.+v_as**2.)
 
-            u_as_model = np.zeros((len(u),len(wave_model)))
-            v_as_model = np.zeros((len(v),len(wave_model)))
-            for i in range(0,len(u)):
-                u_as_model[i,:] = u[i]/(wave_model*1.e-6) / rad2as
-                v_as_model[i,:] = v[i]/(wave_model*1.e-6) / rad2as
-            magu_as_model = np.sqrt(u_as_model**2.+v_as_model**2.)
-            for i in range(0,6):
-                plt.errorbar(magu_as[i,:], visphi[i,:], color=self.colors_baseline[i], ls='', marker='o')
-                plt.plot(magu_as_model[i,:], model_visphi_full[i,:], color=self.colors_baseline[i],alpha=1.0)
-            plt.ylabel('VisPhi')
-            plt.xlabel('spatial frequency (1/arcsec)')
-            plt.axhline(0, ls='--', lw=0.5)
-            maxval = np.max(np.abs(model_visphi_full))
-            if maxval < 45:
-                maxplot=50
-            elif maxval < 95:
-                maxplot=100
-            else:
-                maxplot=180
-            plt.ylim(-maxplot, maxplot)
-            plt.suptitle('dRa=%.1f, dDec=%.1f' % (theta[0], theta[1]), fontsize=12)
-            plt.show()
+                u_as_model = np.zeros((len(u),len(wave_model)))
+                v_as_model = np.zeros((len(v),len(wave_model)))
+                for i in range(0,len(u)):
+                    u_as_model[i,:] = u[i]/(wave_model*1.e-6) / rad2as
+                    v_as_model[i,:] = v[i]/(wave_model*1.e-6) / rad2as
+                magu_as_model = np.sqrt(u_as_model**2.+v_as_model**2.)
+                for i in range(0,6):
+                    plt.errorbar(magu_as[i,:], visphi[i,:], color=self.colors_baseline[i], ls='', marker='o')
+                    plt.plot(magu_as_model[i,:], model_visphi_full[i,:], color=self.colors_baseline[i],alpha=1.0)
+                plt.ylabel('VisPhi')
+                plt.xlabel('spatial frequency (1/arcsec)')
+                plt.axhline(0, ls='--', lw=0.5)
+                maxval = np.max(np.abs(model_visphi_full))
+                if maxval < 45:
+                    maxplot=50
+                elif maxval < 95:
+                    maxplot=100
+                else:
+                    maxplot=180
+                plt.ylim(-maxplot, maxplot)
+                plt.suptitle('dRa=%.1f, dDec=%.1f' % (theta[0], theta[1]), fontsize=12)
+                plt.show()
         return visphi
         
     
@@ -1920,8 +2183,6 @@ class GravData():
         if len(u) != 6 or len(v) != 6:
             raise ValueError('u or v have wrong length, something went wrong')                
                 
-                
-        vis = np.zeros((6,len(wave))) + 0j
         for i in range(0,6):
             # pc in mas -> mas2rad -> pc in rad
             # uv in m -> *1e6 -> uv in mum
@@ -2628,13 +2889,14 @@ class GravData():
     
     
             
-    def plotFitUnary(self, theta,  fitdata, u, v, idx=0, createpdf=False):
+    def plotFitUnary(self, theta,  fitdata, u, v, idx=0, createpdf=False, uvind=False):
         rad2as = 180 / np.pi * 3600
         (visphi, visphi_error, visphi_flag) = fitdata
         visphi[np.isnan(visphi)] = 0
         wave = self.wlSC_P1
         dlambda = self.dlambda
-        savetime = self.savetime
+        if createpdf:
+            savetime = self.savetime
         wave_model = np.linspace(wave[0],wave[len(wave)-1],1000)
         dlambda_model = np.zeros((6,len(wave_model)))
         for i in range(0,6):
@@ -2657,24 +2919,51 @@ class GravData():
             u_as_model[i,:] = u[i]/(wave_model*1.e-6) / rad2as
             v_as_model[i,:] = v[i]/(wave_model*1.e-6) / rad2as
         magu_as_model = np.sqrt(u_as_model**2.+v_as_model**2.)
+        
+        
+        if uvind:
+            gs = gridspec.GridSpec(1,2)
+            axis = plt.subplot(gs[0,0])
+            for i in range(0,6):
+                plt.errorbar(u_as[i,:], visphi[i,:]*(1-visphi_flag[i]), 
+                            visphi_error[i,:]*(1-visphi_flag[i]), label=self.baseline_labels[i],
+                            color=self.colors_baseline[i], ls='', lw=1, alpha=0.5, capsize=0)
+                plt.scatter(u_as[i,:], visphi[i,:]*(1-visphi_flag[i]),
+                            color=self.colors_baseline[i], alpha=0.5)
+                plt.plot(u_as_model[i,:], model_visphi_full[i,:],
+                        color='k', zorder=100)
+            plt.ylabel('visibility phase')
+            plt.xlabel('U (1/arcsec)')     
 
-        # VisPhi
-        for i in range(0,6):
-            plt.errorbar(magu_as[i,:], visphi[i,:]*(1-visphi_flag[i]), 
-                        visphi_error[i,:]*(1-visphi_flag[i]), label=self.baseline_labels[i],
-                        color=self.colors_baseline[i], ls='', lw=1, alpha=0.5, capsize=0)
-            plt.scatter(magu_as[i,:], visphi[i,:]*(1-visphi_flag[i]),
-                        color=self.colors_baseline[i], alpha=0.5)
-            plt.plot(magu_as_model[i,:], model_visphi_full[i,:],
-                    color='k', zorder=100)
-        plt.ylabel('visibility phase')
-        plt.xlabel('spatial frequency (1/arcsec)')
-        plt.legend()
-        if createpdf:
-            plt.title('Polarization %i' % (idx + 1))
-            pdfname = '%s_pol%i_8.png' % (savetime, idx)
-            plt.savefig(pdfname)
-            plt.close()
-        else:
+            axis = plt.subplot(gs[0,1])
+            for i in range(0,6):
+                plt.errorbar(v_as[i,:], visphi[i,:]*(1-visphi_flag[i]), 
+                            visphi_error[i,:]*(1-visphi_flag[i]), label=self.baseline_labels[i],
+                            color=self.colors_baseline[i], ls='', lw=1, alpha=0.5, capsize=0)
+                plt.scatter(v_as[i,:], visphi[i,:]*(1-visphi_flag[i]),
+                            color=self.colors_baseline[i], alpha=0.5)
+                plt.plot(v_as_model[i,:], model_visphi_full[i,:],
+                        color='k', zorder=100)
+            plt.xlabel('V (1/arcsec)')     
             plt.show()
+        
+        else:
+            for i in range(0,6):
+                plt.errorbar(magu_as[i,:], visphi[i,:]*(1-visphi_flag[i]), 
+                            visphi_error[i,:]*(1-visphi_flag[i]), label=self.baseline_labels[i],
+                            color=self.colors_baseline[i], ls='', lw=1, alpha=0.5, capsize=0)
+                plt.scatter(magu_as[i,:], visphi[i,:]*(1-visphi_flag[i]),
+                            color=self.colors_baseline[i], alpha=0.5)
+                plt.plot(magu_as_model[i,:], model_visphi_full[i,:],
+                        color='k', zorder=100)
+            plt.ylabel('visibility phase')
+            plt.xlabel('spatial frequency (1/arcsec)')
+            plt.legend()
+            if createpdf:
+                plt.title('Polarization %i' % (idx + 1))
+                pdfname = '%s_pol%i_8.png' % (savetime, idx)
+                plt.savefig(pdfname)
+                plt.close()
+            else:
+                plt.show()
             
