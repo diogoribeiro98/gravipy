@@ -705,8 +705,6 @@ class GravData():
         constant_f:     Constant coupling [True]
         use_opds:       Fit OPDs [False] 
         fixedBG:        Keep background power law [True]
-        dRA:            Guess for dRA (taken from SOFFX if not 0)
-        dDEC:           Guess for dDEC (taken from SOFFY if not 0)
         
         """
         theta_names_raw = np.array(["dRA", "dDEC", "f1", "f2", "f3", "f4" , "alpha flare", "f BG",
@@ -727,6 +725,8 @@ class GravData():
         self.use_opds = use_opds
         self.fixpos = False
         self.fixedBH = False
+        self.specialfit = False
+        self.phasemaps = False
         
         if fiberOff is None:
             self.fiberOffX = -fits.open(self.name)[0].header["HIERARCH ESO INS SOBJ OFFX"] 
@@ -2537,6 +2537,11 @@ class GravData():
                             ln=0, align="L", border=0)
                     pdf.cell(40, 6, txt="Result: Best Chi2", ln=0, align="L", border=0)
                     pdf.cell(40, 6, txt=str(bestchi), ln=1, align="L", border=0)
+                    
+                    pdf.cell(40, 6, txt="Specialfit", ln=0, align="L", border=0)
+                    pdf.cell(40, 6, txt=str(specialfit), ln=0, align="L", border=0)
+                    pdf.cell(40, 6, txt="Specialfit BL", ln=0, align="L", border=0)
+                    pdf.cell(40, 6, txt=str(specialpar), ln=1, align="L", border=0)
                     pdf.ln()
 
                 if not bequiet:
