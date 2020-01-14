@@ -504,7 +504,7 @@ class GravData():
     
     def loadPhasemaps(self):
         # load in phasmaps
-        phasemapsfile = resource_filename('gravipy', 'GRAVITY_SC_MAP_DEFAULT.fits')
+        phasemapsfile = resource_filename('gravipy', 'GRAVITY_SC_MAP_20200114.fits')
         phasemaps = fits.open(phasemapsfile)
         self.pm_amp = phasemaps['SC_AMP'].data
         self.pm_pha = phasemaps['SC_PHASE'].data
@@ -528,9 +528,14 @@ class GravData():
         north_angle: north direction on acqcam in degree
         if fromFits is true, northangle & dra,ddec are taken from fits file
         """
+        if self.tel == 'UT':
+            scale = 1
+        elif self.tel == 'AT':
+            scale = 4.4
+                
         try:
            self.pm_amp
-        except AttributeError:
+        except AttributeErrfor:
             self.loadPhasemaps()
         if fromFits:
             # should not do that in here for mcmc
@@ -560,7 +565,7 @@ class GravData():
             pos = np.array([ra + dra[tel], dec + ddec[tel]])
             pos_rot = np.dot(self.rotation(northangle[tel]), pos)
             for channel in range(len(self.wave)):
-                pos_scaled = pos_rot*lambda0/self.wave[channel] + 100
+                pos_scaled = pos_rot*lambda0/self.wave[channel]*scale + 100
                 pos_int = (np.round(pos_scaled)).astype(int)
                 cor_amp[tel, channel] = self.pm_amp[tel, pos_int[1], pos_int[0]]
                 cor_pha[tel, channel] = self.pm_pha[tel, pos_int[1], pos_int[0]]
@@ -584,11 +589,16 @@ class GravData():
            self.pm_amp
         except AttributeError:
             self.loadPhasemaps()
-            
+
+        if self.tel == 'UT':
+            scale = 1
+        elif self.tel == 'AT':
+            scale = 4.4
+
         lambda0 = 2.2
         pos = np.array([ra + dra, dec + ddec])
         pos_rot = np.dot(self.rotation(northangle), pos)
-        pos_scaled = pos_rot*lambda0/lam + 100
+        pos_scaled = pos_rot*lambda0/lam*scale + 100
         pos_int = (np.round(pos_scaled)).astype(int)
         
         cor_amp = self.pm_amp[tel, pos_int[1], pos_int[0]]
@@ -1259,6 +1269,14 @@ class GravData():
 
 
         # Get data from file
+        tel = fits.open(self.name)[0].header["TELESCOP"]
+        if tel == 'ESO-VLTI-U1234':
+            self.tel = 'UT'
+        elif tel == 'ESO-VLTI-A1234':
+            self.tel = 'AT'
+        else:
+            raise ValueError('Telescope not AT or UT, seomtehign wrong with input data')
+
         nwave = self.channel
         self.getIntdata(plot=False, flag=False)
         MJD = fits.open(self.name)[0].header["MJD-OBS"]
