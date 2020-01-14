@@ -14,7 +14,7 @@ from pkg_resources import resource_filename
 try:
     from generalFunctions import *
     set_style('show')
-except NameError:
+except (NameError, ModuleNotFoundError):
     pass
 
 import sys
@@ -445,7 +445,54 @@ class GravData():
     
     
     
+    def getDlambda(self):
+        nwave = self.channel
+        wave = self.wlSC_P1
+        self.wave = wave
+        if nwave in [11, 14]:
+            if self.polmode == 'COMBINED':
+                R = np.zeros((6,nwave))
+                if nwave == 11:
+                    R[0,:] = [32.9,20.6,20.3,19.3,19.2,16.1,18.3,20.8,21.2,21.7,23.4]
+                    R[1,:] = [31.8,18.6,17.5,18.5,19.8,16.8,19.8,22.7,22.6,22.8,22.7]
+                    R[2,:] = [31.8,19.1,19.0,18.7,18.9,16.3,19.1,21.6,22.2,22.5,23.6]
+                    R[3,:] = [29.9,18.3,18.6,20.6,23.5,19.5,22.7,25.8,25.4,26.8,26.2]
+                    R[4,:] = [30.8,18.0,17.6,19.3,22.3,19.4,23.3,26.5,26.3,27.7,24.9]
+                    R[5,:] = [29.7,18.1,18.1,18.1,18.6,16.5,19.6,22.4,22.8,22.8,22.3]
+                elif nwave == 14:
+                    R[0,:] = [28.9,16.5,15.6,16.8,17.6,16.4,15.7,17.5,18.8,20.1,20.2,20.5,22.0,28.3]
+                    R[1,:] = [27.2,15.8,14.9,16.0,16.7,15.7,15.1,16.4,18.2,19.6,20.0,20.3,21.7,25.3]
+                    R[2,:] = [28.3,16.2,15.3,16.7,17.3,16.3,15.7,17.4,18.8,20.2,20.7,21.1,22.4,27.5]
+                    R[3,:] = [29.1,17.0,15.9,16.6,17.1,16.6,15.8,16.9,18.8,20.5,21.0,21.3,22.0,24.4]
+                    R[4,:] = [28.8,16.8,16.1,16.7,17.4,16.7,16.1,17.2,19.0,20.5,21.2,21.6,22.2,25.2]
+                    R[5,:] = [28.0,16.0,15.0,16.2,16.6,15.7,15.3,16.4,17.8,19.3,19.8,20.0,20.8,24.4]
+            else:
+                R = np.zeros((6,nwave))
+                if nwave == 11:
+                    R[0,:] = [25.0,18.3,20.1,20.7,20.0,16.7,17.9,20.1,20.5,21.3,23.9]
+                    R[1,:] = [24.0,16.5,15.9,17.2,17.6,15.3,17.3,19.7,20.2,20.8,22.4]
+                    R[2,:] = [26.2,19.5,19.8,19.3,18.9,16.1,17.6,19.9,20.7,21.3,23.4]
+                    R[3,:] = [24.6,16.4,15.5,17.2,18.2,16.9,19.5,22.2,22.6,23.0,22.5]
+                    R[4,:] = [26.4,17.5,16.2,17.2,17.9,16.3,18.8,21.4,21.6,21.8,22.1]
+                    R[5,:] = [27.4,18.8,17.5,17.6,17.4,15.2,16.8,19.2,19.8,20.0,21.1]
+                elif nwave == 14:
+                    R[0,:] = [28.9,16.5,15.6,16.8,17.6,16.4,15.7,17.5,18.8,20.1,20.2,20.5,22.0,28.3]
+                    R[1,:] = [27.2,15.8,14.9,16.0,16.7,15.7,15.1,16.4,18.2,19.6,20.0,20.3,21.7,25.3]
+                    R[2,:] = [28.3,16.2,15.3,16.7,17.3,16.3,15.7,17.4,18.8,20.2,20.7,21.1,22.4,27.5]
+                    R[3,:] = [29.1,17.0,15.9,16.6,17.1,16.6,15.8,16.9,18.8,20.5,21.0,21.3,22.0,24.4]
+                    R[4,:] = [28.8,16.8,16.1,16.7,17.4,16.7,16.1,17.2,19.0,20.5,21.2,21.6,22.2,25.2]
+                    R[5,:] = [28.0,16.0,15.0,16.2,16.6,15.7,15.3,16.4,17.8,19.3,19.8,20.0,20.8,24.4]
+        dlambda = np.zeros((6,nwave))
+        for i in range(0,6):
+            if (nwave==11) or (nwave==14):
+                dlambda[i,:] = wave/R[i,:]/2
+            elif nwave==233:
+                dlambda[i,:] = wave/500/2
+            else:
+                dlambda[i,:] = 0.03817
+        self.dlambda = dlambda 
     
+       
     
     
     
@@ -513,11 +560,10 @@ class GravData():
             pos = np.array([ra + dra[tel], dec + ddec[tel]])
             pos_rot = np.dot(self.rotation(northangle[tel]), pos)
             for channel in range(len(self.wave)):
-                pos_scaled = pos_rot*lambda0/self.wave[channel] + 101
+                pos_scaled = pos_rot*lambda0/self.wave[channel] + 100
                 pos_int = (np.round(pos_scaled)).astype(int)
-                
-                cor_amp[tel, channel] = self.pm_amp[tel, pos_int[0], pos_int[1]]
-                cor_pha[tel, channel] = self.pm_pha[tel, pos_int[0], pos_int[1]]
+                cor_amp[tel, channel] = self.pm_amp[tel, pos_int[1], pos_int[0]]
+                cor_pha[tel, channel] = self.pm_pha[tel, pos_int[1], pos_int[0]]
             
         return cor_amp, cor_pha
     
@@ -550,12 +596,9 @@ class GravData():
             
         return cor_amp, cor_pha
         
-            
-            
     
     
-    
-    
+ 
     
     ############################################    
     ############################################
@@ -657,7 +700,6 @@ class GravData():
                                                                north_angle2, 
                                                                dra2, ddec2,
                                                                tel2, wave)
-            
             # differential opd
             opd_sgr = (cor_pha_sgr1-cor_pha_sgr2)/360*wave
             s_SgrA -= opd_sgr
@@ -667,7 +709,6 @@ class GravData():
             # different coupling
             cr1 = (cor_amp_s21 / cor_amp_sgr1)
             cr2 = (cor_amp_s22 / cor_amp_sgr2)
-            
             
             # interferometric intensities of all components
             intSgrA = self.vis_intensity(s_SgrA, alpha_SgrA, wave, dlambda)
@@ -694,7 +735,7 @@ class GravData():
         return vis
     
     
-    def simulateVisdata(self, theta, constant_f=True, use_opds=False, fixedBG=True, fiberOff=None, plot=True):
+    def simulateVisdata(self, theta, constant_f=True, use_opds=False, fixedBG=True, fixedBH=True, fiberOff=None, plot=True, phasemaps=False, phasemapsstuff=None):
         """
         Test function to see how a given theta would look like
         Theta should be a list of:
@@ -705,10 +746,14 @@ class GravData():
         constant_f:     Constant coupling [True]
         use_opds:       Fit OPDs [False] 
         fixedBG:        Keep background power law [True]
+
+        if phasemaps=True, phasemapsstuff must be a list of:
+            [dra, ddec, north_angle]
         
         """
-        theta_names_raw = np.array(["dRA", "dDEC", "f1", "f2", "f3", "f4" , "alpha flare", "f BG",
-                                    "alpha BG", "PC RA", "PC DEC", "OPD1", "OPD2", "OPD3", "OPD4"])
+        theta_names_raw = np.array(["dRA", "dDEC", "f1", "f2", "f3", "f4" , "alpha flare",
+                                    "f BG", "alpha BG", "PC RA", "PC DEC", "OPD1", "OPD2",
+                                    "OPD3", "OPD4"])
         rad2as = 180 / np.pi * 3600
         try:
             if len(theta) != 15:
@@ -723,10 +768,9 @@ class GravData():
         self.constant_f = constant_f
         self.fixedBG = fixedBG
         self.use_opds = use_opds
+        self.fixedBH = fixedBH
         self.fixpos = False
-        self.fixedBH = False
         self.specialfit = False
-        self.phasemaps = False
         
         if fiberOff is None:
             self.fiberOffX = -fits.open(self.name)[0].header["HIERARCH ESO INS SOBJ OFFX"] 
@@ -735,6 +779,14 @@ class GravData():
             self.fiberOffX = fiberOff[0]
             self.fiberOffY = fiberOff[1]
         print("fiber center: %.2f, %.2f (mas)" % (self.fiberOffX, self.fiberOffY))
+        
+        if phasemaps:
+            self.dra = phasemapsstuff[0]*np.ones(4)
+            self.ddec = phasemapsstuff[1]*np.ones(4)
+            self.northangle = phasemapsstuff[2]*np.ones(4)
+            self.phasemaps = True
+        else:
+            self.phasemaps = False
 
         nwave = self.channel
         if nwave != 14:
@@ -743,22 +795,10 @@ class GravData():
         u = self.u
         v = self.v
         wave = self.wlSC_P1
-        R = np.zeros((6,nwave))
-        R[0,:] = [28.9,16.5,15.6,16.8,17.6,16.4,15.7,17.5,18.8,20.1,20.2,20.5,22.0,28.3]
-        R[1,:] = [27.2,15.8,14.9,16.0,16.7,15.7,15.1,16.4,18.2,19.6,20.0,20.3,21.7,25.3]
-        R[2,:] = [28.3,16.2,15.3,16.7,17.3,16.3,15.7,17.4,18.8,20.2,20.7,21.1,22.4,27.5]
-        R[3,:] = [29.1,17.0,15.9,16.6,17.1,16.6,15.8,16.9,18.8,20.5,21.0,21.3,22.0,24.4]
-        R[4,:] = [28.8,16.8,16.1,16.7,17.4,16.7,16.1,17.2,19.0,20.5,21.2,21.6,22.2,25.2]
-        R[5,:] = [28.0,16.0,15.0,16.2,16.6,15.7,15.3,16.4,17.8,19.3,19.8,20.0,20.8,24.4]
-        dlambda = np.zeros((6,nwave))
-        for i in range(0,6):
-            if (nwave==11) or (nwave==14):
-                dlambda[i,:] = wave/R[i,:]/2
-            elif nwave==210:
-                dlambda[i,:] = wave/500/2
-            else:
-                dlambda[i,:] = 0.03817
-        self.dlambda = dlambda
+        
+        self.getDlambda()
+        dlambda = self.dlambda
+
         visamp, visphi, closure = self.calc_vis(theta, u, v, wave, dlambda)
         vis2 = visamp**2
         
@@ -859,7 +899,7 @@ class GravData():
         return visamp, vis2, visphi, closure
 
 
-    def calc_vis(self, theta, u, v, wave, dlambda, singlevalue=False):
+    def calc_vis(self, theta, u, v, wave, dlambda):
         mas2rad = 1e-3 / 3600 / 180 * np.pi
         rad2mas = 180 / np.pi * 3600 * 1e3
         constant_f = self.constant_f
@@ -870,7 +910,7 @@ class GravData():
         fixpos = self.fixpos
         fixedBH = self.fixedBH
         specialfit = self.specialfit
-        
+
         phasemaps = self.phasemaps
         if phasemaps:
             northangle = self.northangle
@@ -932,11 +972,13 @@ class GravData():
                          [f[1],f[0]]])
         
         if phasemaps:
+            # read in amplitude & phasemaps
+            # result has tuple of shape 4,14
             cor_amp_sgr, cor_pha_sgr = self.readPhasemaps(phaseCenterRA,
-                                                            phaseCenterDEC,
-                                                            fromFits=False, 
-                                                            northangle=northangle,
-                                                            dra=dra, ddec=ddec)
+                                                          phaseCenterDEC,
+                                                          fromFits=False, 
+                                                          northangle=northangle,
+                                                          dra=dra, ddec=ddec)
             cor_amp_s2, cor_pha_s2 = self.readPhasemaps(dRA+phaseCenterRA, 
                                                         dDEC+phaseCenterDEC,
                                                         fromFits=False, 
@@ -965,40 +1007,79 @@ class GravData():
                                     [cor_pha_s2[0], cor_pha_s2[3]],
                                     [cor_pha_s2[1], cor_pha_s2[2]],
                                     [cor_pha_s2[1], cor_pha_s2[3]],
-                                    [cor_pha_s2[2], cor_pha_s2[3]]])       
-            
-        # TODO actually implement this to visibilities
-        # Calculate complex visibilities
-        vis = np.zeros((6,len(wave))) + 0j
-        for i in range(0,6):
-            try:
-                if self.fit_for[3] == 0:
-                    phaseCenterRA = 0
-                    phaseCenterDEC = 0
-            except AttributeError:
-                pass
-            s_SgrA = ((phaseCenterRA)*u[i] + (phaseCenterDEC)*v[i]) * mas2rad * 1e6
-            s_S2 = ((dRA+phaseCenterRA)*u[i] + (dDEC+phaseCenterDEC)*v[i]) * mas2rad * 1e6
+                                    [cor_pha_s2[2], cor_pha_s2[3]]])    
+            print(pm_pha_sgr.shape)
 
-            if use_opds:
-                s_S2 = s_S2 + opd_bl[i,0] - opd_bl[i,1]
-            if specialfit:
-                s_SgrA += sp_bl[i]
-                s_S2 += sp_bl[i]
-        
-            # interferometric intensities of all components
-            intSgrA = self.vis_intensity(s_SgrA, alpha_SgrA, wave, dlambda[i,:])
-            intS2 = self.vis_intensity(s_S2, alpha_S2, wave, dlambda[i,:])
-            intSgrA_center = self.vis_intensity(0, alpha_SgrA, wave, dlambda[i,:])
-            intS2_center = self.vis_intensity(0, alpha_S2, wave, dlambda[i,:])
-            intBG = self.vis_intensity(0, alpha_bg, wave, dlambda[i,:])
+            vis = np.zeros((6,len(wave))) + 0j
+            for i in range(0,6):
+                try:
+                    if self.fit_for[3] == 0:
+                        phaseCenterRA = 0
+                        phaseCenterDEC = 0
+                except AttributeError:
+                    pass
+                s_SgrA = ((phaseCenterRA)*u[i] + (phaseCenterDEC)*v[i]) * mas2rad * 1e6
+                s_S2 = ((dRA+phaseCenterRA)*u[i] + (dDEC+phaseCenterDEC)*v[i]) * mas2rad * 1e6
+
+                if use_opds:
+                    s_S2 = s_S2 + opd_bl[i,0] - opd_bl[i,1]
+                if specialfit:
+                    s_SgrA += sp_bl[i]
+                    s_S2 += sp_bl[i]
                 
-            vis[i,:] = ((intSgrA + 
-                        np.sqrt(f_bl[i,0] * f_bl[i,1]) * intS2)/
-                        (np.sqrt(intSgrA_center + f_bl[i,0] * intS2_center 
-                                + fluxRatioBG * intBG) *
-                        np.sqrt(intSgrA_center + f_bl[i,1] * intS2_center 
-                                + fluxRatioBG * intBG)))
+                opd_sgr = (pm_pha_sgr[i,0] - pm_pha_sgr[i,1])/360*wave
+                opd_s2 = (pm_pha_s2[i,0] - pm_pha_s2[i,1])/360*wave
+                s_SgrA -= opd_sgr
+                s_S2 -= opd_s2
+                
+                cr1 = (pm_amp_s2[i,0] / pm_amp_sgr[i,0])
+                cr2 = (pm_amp_s2[i,1] / pm_amp_sgr[i,1])
+                
+                # interferometric intensities of all components
+                intSgrA = self.vis_intensity(s_SgrA, alpha_SgrA, wave, dlambda[i,:])
+                intS2 = self.vis_intensity(s_S2, alpha_S2, wave, dlambda[i,:])
+                intSgrA_center = self.vis_intensity(0, alpha_SgrA, wave, dlambda[i,:])
+                intS2_center = self.vis_intensity(0, alpha_S2, wave, dlambda[i,:])
+                intBG = self.vis_intensity(0, alpha_bg, wave, dlambda[i,:])
+
+                vis[i,:] = ((intSgrA + 
+                            np.sqrt(f_bl[i,0] * f_bl[i,1] * cr1 * cr2) * intS2)/
+                            (np.sqrt(intSgrA_center + f_bl[i,0] * cr1 * intS2_center 
+                                    + fluxRatioBG * intBG) *
+                             np.sqrt(intSgrA_center + f_bl[i,1] * cr2 * intS2_center 
+                                    + fluxRatioBG * intBG)))  
+
+        else:
+            vis = np.zeros((6,len(wave))) + 0j
+            for i in range(0,6):
+                try:
+                    if self.fit_for[3] == 0:
+                        phaseCenterRA = 0
+                        phaseCenterDEC = 0
+                except AttributeError:
+                    pass
+                s_SgrA = ((phaseCenterRA)*u[i] + (phaseCenterDEC)*v[i]) * mas2rad * 1e6
+                s_S2 = ((dRA+phaseCenterRA)*u[i] + (dDEC+phaseCenterDEC)*v[i]) * mas2rad * 1e6
+
+                if use_opds:
+                    s_S2 = s_S2 + opd_bl[i,0] - opd_bl[i,1]
+                if specialfit:
+                    s_SgrA += sp_bl[i]
+                    s_S2 += sp_bl[i]
+            
+                # interferometric intensities of all components
+                intSgrA = self.vis_intensity(s_SgrA, alpha_SgrA, wave, dlambda[i,:])
+                intS2 = self.vis_intensity(s_S2, alpha_S2, wave, dlambda[i,:])
+                intSgrA_center = self.vis_intensity(0, alpha_SgrA, wave, dlambda[i,:])
+                intS2_center = self.vis_intensity(0, alpha_S2, wave, dlambda[i,:])
+                intBG = self.vis_intensity(0, alpha_bg, wave, dlambda[i,:])
+                    
+                vis[i,:] = ((intSgrA + 
+                            np.sqrt(f_bl[i,0] * f_bl[i,1]) * intS2)/
+                            (np.sqrt(intSgrA_center + f_bl[i,0] * intS2_center 
+                                    + fluxRatioBG * intBG) *
+                            np.sqrt(intSgrA_center + f_bl[i,1] * intS2_center 
+                                    + fluxRatioBG * intBG)))
 
         visamp = np.abs(vis)
         visphi = np.angle(vis, deg=True)
@@ -1215,50 +1296,10 @@ class GravData():
             txtfile.write('# MJD: %f \n' % MJD)
             txtfile.write('# OFFX: %f \n' % self.fiberOffX)
             txtfile.write('# OFFY: %f \n\n' % self.fiberOffY)
-        
-        if self.polmode == 'COMBINED':
-            R = np.zeros((6,nwave))
-            if nwave == 11:
-                R[0,:] = [32.9,20.6,20.3,19.3,19.2,16.1,18.3,20.8,21.2,21.7,23.4]
-                R[1,:] = [31.8,18.6,17.5,18.5,19.8,16.8,19.8,22.7,22.6,22.8,22.7]
-                R[2,:] = [31.8,19.1,19.0,18.7,18.9,16.3,19.1,21.6,22.2,22.5,23.6]
-                R[3,:] = [29.9,18.3,18.6,20.6,23.5,19.5,22.7,25.8,25.4,26.8,26.2]
-                R[4,:] = [30.8,18.0,17.6,19.3,22.3,19.4,23.3,26.5,26.3,27.7,24.9]
-                R[5,:] = [29.7,18.1,18.1,18.1,18.6,16.5,19.6,22.4,22.8,22.8,22.3]
-            elif nwave == 14:
-                R[0,:] = [28.9,16.5,15.6,16.8,17.6,16.4,15.7,17.5,18.8,20.1,20.2,20.5,22.0,28.3]
-                R[1,:] = [27.2,15.8,14.9,16.0,16.7,15.7,15.1,16.4,18.2,19.6,20.0,20.3,21.7,25.3]
-                R[2,:] = [28.3,16.2,15.3,16.7,17.3,16.3,15.7,17.4,18.8,20.2,20.7,21.1,22.4,27.5]
-                R[3,:] = [29.1,17.0,15.9,16.6,17.1,16.6,15.8,16.9,18.8,20.5,21.0,21.3,22.0,24.4]
-                R[4,:] = [28.8,16.8,16.1,16.7,17.4,16.7,16.1,17.2,19.0,20.5,21.2,21.6,22.2,25.2]
-                R[5,:] = [28.0,16.0,15.0,16.2,16.6,15.7,15.3,16.4,17.8,19.3,19.8,20.0,20.8,24.4]
-        else:
-            R = np.zeros((6,nwave))
-            if nwave == 11:
-                R[0,:] = [25.0,18.3,20.1,20.7,20.0,16.7,17.9,20.1,20.5,21.3,23.9]
-                R[1,:] = [24.0,16.5,15.9,17.2,17.6,15.3,17.3,19.7,20.2,20.8,22.4]
-                R[2,:] = [26.2,19.5,19.8,19.3,18.9,16.1,17.6,19.9,20.7,21.3,23.4]
-                R[3,:] = [24.6,16.4,15.5,17.2,18.2,16.9,19.5,22.2,22.6,23.0,22.5]
-                R[4,:] = [26.4,17.5,16.2,17.2,17.9,16.3,18.8,21.4,21.6,21.8,22.1]
-                R[5,:] = [27.4,18.8,17.5,17.6,17.4,15.2,16.8,19.2,19.8,20.0,21.1]
-            elif nwave == 14:
-                R[0,:] = [28.9,16.5,15.6,16.8,17.6,16.4,15.7,17.5,18.8,20.1,20.2,20.5,22.0,28.3]
-                R[1,:] = [27.2,15.8,14.9,16.0,16.7,15.7,15.1,16.4,18.2,19.6,20.0,20.3,21.7,25.3]
-                R[2,:] = [28.3,16.2,15.3,16.7,17.3,16.3,15.7,17.4,18.8,20.2,20.7,21.1,22.4,27.5]
-                R[3,:] = [29.1,17.0,15.9,16.6,17.1,16.6,15.8,16.9,18.8,20.5,21.0,21.3,22.0,24.4]
-                R[4,:] = [28.8,16.8,16.1,16.7,17.4,16.7,16.1,17.2,19.0,20.5,21.2,21.6,22.2,25.2]
-                R[5,:] = [28.0,16.0,15.0,16.2,16.6,15.7,15.3,16.4,17.8,19.3,19.8,20.0,20.8,24.4]
-            
-        dlambda = np.zeros((6,nwave))
-        for i in range(0,6):
-            if (nwave==11) or (nwave==14):
-                dlambda[i,:] = wave/R[i,:]/2
-            elif nwave==210:
-                dlambda[i,:] = wave/500/2
-            else:
-                dlambda[i,:] = 0.03817
-        self.dlambda = dlambda
+
         self.wave = wave
+        self.getDlambda()
+        dlambda = self.dlambda
 
         # Initial guesses
         size = 4
@@ -2059,22 +2100,8 @@ class GravData():
         u = self.u
         v = self.v
         wave = self.wlSC_P1
-        R = np.zeros((6,nwave))
-        R[0,:] = [28.9,16.5,15.6,16.8,17.6,16.4,15.7,17.5,18.8,20.1,20.2,20.5,22.0,28.3]
-        R[1,:] = [27.2,15.8,14.9,16.0,16.7,15.7,15.1,16.4,18.2,19.6,20.0,20.3,21.7,25.3]
-        R[2,:] = [28.3,16.2,15.3,16.7,17.3,16.3,15.7,17.4,18.8,20.2,20.7,21.1,22.4,27.5]
-        R[3,:] = [29.1,17.0,15.9,16.6,17.1,16.6,15.8,16.9,18.8,20.5,21.0,21.3,22.0,24.4]
-        R[4,:] = [28.8,16.8,16.1,16.7,17.4,16.7,16.1,17.2,19.0,20.5,21.2,21.6,22.2,25.2]
-        R[5,:] = [28.0,16.0,15.0,16.2,16.6,15.7,15.3,16.4,17.8,19.3,19.8,20.0,20.8,24.4]
-        dlambda = np.zeros((6,nwave))
-        for i in range(0,6):
-            if (nwave==11) or (nwave==14):
-                dlambda[i,:] = wave/R[i,:]/2
-            elif nwave==210:
-                dlambda[i,:] = wave/500/2
-            else:
-                dlambda[i,:] = 0.03817
-        self.dlambda = dlambda
+        self.getDlambda()
+        dlambda = self.dlambda
                 
         theta = [dRa, dDec, 0, 0, 0, 0, 0, 0, 0, specialpar]
         fit_visphi = self.calc_vis_unary(theta, u, v, wave, dlambda)
@@ -2262,22 +2289,9 @@ class GravData():
             v = self.v
         wave = self.wlSC_P1
         
-        
-        R = np.zeros((6,nwave))
-        R[0,:] = [28.9,16.5,15.6,16.8,17.6,16.4,15.7,17.5,18.8,20.1,20.2,20.5,22.0,28.3]
-        R[1,:] = [27.2,15.8,14.9,16.0,16.7,15.7,15.1,16.4,18.2,19.6,20.0,20.3,21.7,25.3]
-        R[2,:] = [28.3,16.2,15.3,16.7,17.3,16.3,15.7,17.4,18.8,20.2,20.7,21.1,22.4,27.5]
-        R[3,:] = [29.1,17.0,15.9,16.6,17.1,16.6,15.8,16.9,18.8,20.5,21.0,21.3,22.0,24.4]
-        R[4,:] = [28.8,16.8,16.1,16.7,17.4,16.7,16.1,17.2,19.0,20.5,21.2,21.6,22.2,25.2]
-        R[5,:] = [28.0,16.0,15.0,16.2,16.6,15.7,15.3,16.4,17.8,19.3,19.8,20.0,20.8,24.4]
-        dlambda = np.zeros((6,nwave))
-        for i in range(0,6):
-            if (nwave==11) or (nwave==14):
-                dlambda[i,:] = wave/R[i,:]/2
-            elif nwave==210:
-                dlambda[i,:] = wave/500/2
-            else:
-                dlambda[i,:] = 0.03817
+        self.getDlambda()
+        dlambda = self.dlambda
+
         visphi = self.calc_vis_unary(theta, u, v, wave, dlambda)
         return visphi
         
@@ -2381,49 +2395,8 @@ class GravData():
             txtfile.write('# OFFX: %f \n' % self.fiberOffX)
             txtfile.write('# OFFY: %f \n\n' % self.fiberOffY)
 
-        if self.polmode == 'COMBINED':
-            R = np.zeros((6,nwave))
-            if nwave == 11:
-                R[0,:] = [32.9,20.6,20.3,19.3,19.2,16.1,18.3,20.8,21.2,21.7,23.4]
-                R[1,:] = [31.8,18.6,17.5,18.5,19.8,16.8,19.8,22.7,22.6,22.8,22.7]
-                R[2,:] = [31.8,19.1,19.0,18.7,18.9,16.3,19.1,21.6,22.2,22.5,23.6]
-                R[3,:] = [29.9,18.3,18.6,20.6,23.5,19.5,22.7,25.8,25.4,26.8,26.2]
-                R[4,:] = [30.8,18.0,17.6,19.3,22.3,19.4,23.3,26.5,26.3,27.7,24.9]
-                R[5,:] = [29.7,18.1,18.1,18.1,18.6,16.5,19.6,22.4,22.8,22.8,22.3]
-            elif nwave == 14:
-                R[0,:] = [28.9,16.5,15.6,16.8,17.6,16.4,15.7,17.5,18.8,20.1,20.2,20.5,22.0,28.3]
-                R[1,:] = [27.2,15.8,14.9,16.0,16.7,15.7,15.1,16.4,18.2,19.6,20.0,20.3,21.7,25.3]
-                R[2,:] = [28.3,16.2,15.3,16.7,17.3,16.3,15.7,17.4,18.8,20.2,20.7,21.1,22.4,27.5]
-                R[3,:] = [29.1,17.0,15.9,16.6,17.1,16.6,15.8,16.9,18.8,20.5,21.0,21.3,22.0,24.4]
-                R[4,:] = [28.8,16.8,16.1,16.7,17.4,16.7,16.1,17.2,19.0,20.5,21.2,21.6,22.2,25.2]
-                R[5,:] = [28.0,16.0,15.0,16.2,16.6,15.7,15.3,16.4,17.8,19.3,19.8,20.0,20.8,24.4]
-        else:
-            R = np.zeros((6,nwave))
-            if nwave == 11:
-                R[0,:] = [25.0,18.3,20.1,20.7,20.0,16.7,17.9,20.1,20.5,21.3,23.9]
-                R[1,:] = [24.0,16.5,15.9,17.2,17.6,15.3,17.3,19.7,20.2,20.8,22.4]
-                R[2,:] = [26.2,19.5,19.8,19.3,18.9,16.1,17.6,19.9,20.7,21.3,23.4]
-                R[3,:] = [24.6,16.4,15.5,17.2,18.2,16.9,19.5,22.2,22.6,23.0,22.5]
-                R[4,:] = [26.4,17.5,16.2,17.2,17.9,16.3,18.8,21.4,21.6,21.8,22.1]
-                R[5,:] = [27.4,18.8,17.5,17.6,17.4,15.2,16.8,19.2,19.8,20.0,21.1]
-            elif nwave == 14:
-                R[0,:] = [28.9,16.5,15.6,16.8,17.6,16.4,15.7,17.5,18.8,20.1,20.2,20.5,22.0,28.3]
-                R[1,:] = [27.2,15.8,14.9,16.0,16.7,15.7,15.1,16.4,18.2,19.6,20.0,20.3,21.7,25.3]
-                R[2,:] = [28.3,16.2,15.3,16.7,17.3,16.3,15.7,17.4,18.8,20.2,20.7,21.1,22.4,27.5]
-                R[3,:] = [29.1,17.0,15.9,16.6,17.1,16.6,15.8,16.9,18.8,20.5,21.0,21.3,22.0,24.4]
-                R[4,:] = [28.8,16.8,16.1,16.7,17.4,16.7,16.1,17.2,19.0,20.5,21.2,21.6,22.2,25.2]
-                R[5,:] = [28.0,16.0,15.0,16.2,16.6,15.7,15.3,16.4,17.8,19.3,19.8,20.0,20.8,24.4]
-            
-        dlambda = np.zeros((6,nwave))
-        for i in range(0,6):
-            if (nwave==11) or (nwave==14):
-                dlambda[i,:] = wave/R[i,:]/2
-            elif nwave==233:
-                dlambda[i,:] = wave/500/2
-            else:
-                dlambda[i,:] = 0.03817
-        self.dlambda = dlambda 
-
+        self.getDlambda()
+        dlambda = self.dlambda
 
         # Initial guesses
         size = 5
