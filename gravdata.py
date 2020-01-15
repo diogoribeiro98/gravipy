@@ -86,6 +86,21 @@ class GravData():
         self.polmode = header['HIERARCH ESO INS POLA MODE']
         self.resolution = header['HIERARCH ESO INS SPEC RES']
         
+        tel = fits.open(self.name)[0].header["TELESCOP"]
+        if tel == 'ESO-VLTI-U1234':
+            self.tel = 'UT'
+        elif tel == 'ESO-VLTI-A1234':
+            self.tel = 'AT'
+        else:
+            raise ValueError('Telescope not AT or UT, seomtehign wrong with input data')
+        if self.verbose:
+            print('Data loaded as:')
+            print('Telescope: ' + self.tel)
+            print('Polarization: ' + self.polmode)
+            print('Resolution: ' + self.resolution)
+            print('Category: ' + self.datacatg)
+        
+        
         if not self.raw:
             if self.polmode == 'SPLIT':
                 self.wlSC_P1 = fits.open(self.name)['OI_WAVELENGTH', 11].data['EFF_WAVE']*1e6
@@ -200,6 +215,8 @@ class GravData():
             if mode =='SC':
                 self.u = fitsdata['OI_VIS', 11].data.field('UCOORD')
                 self.v = fitsdata['OI_VIS', 11].data.field('VCOORD')
+                
+                # spatial frequency
                 spFrequ = np.sqrt(self.u**2.+self.v**2.)
                 wave = self.wlSC_P1
                 u_as = np.zeros((len(self.u),len(wave)))
@@ -208,41 +225,57 @@ class GravData():
                     u_as[i,:] = self.u[i]/(wave*1.e-6) * np.pi / 180. / 3600. # 1/as
                     v_as[i,:] = self.v[i]/(wave*1.e-6) * np.pi / 180. / 3600. # 1/as
                 self.spFrequAS = np.sqrt(u_as**2.+v_as**2.)
-                
+
+                # spatial frequency T3
+                magu = np.sqrt(self.u**2.+self.v**2.)
+                max_spf = np.zeros((4))
+                max_spf[0] = np.max(np.array([magu[0],magu[3],magu[1]]))
+                max_spf[1] = np.max(np.array([magu[0],magu[4],magu[2]]))
+                max_spf[2] = np.max(np.array([magu[1],magu[5],magu[2]]))
+                max_spf[3] = np.max(np.array([magu[3],magu[5],magu[4]]))
+                self.max_spf = max_spf
+                spFrequAS_T3 = np.zeros((len(max_spf),len(wave)))
+                for idx in range(4):
+                    spFrequAS_T3[idx] = max_spf[idx]/(wave*1.e-6) * np.pi / 180. / 3600. # 1/as
+                self.spFrequAS_T3 = spFrequAS_T3
+                self.bispec_ind = np.array([[0,3,1],
+                                            [0,4,2],
+                                            [1,5,2],
+                                            [3,5,4]])
+                # Data
+                # P1
                 self.visampSC_P1 = fitsdata['OI_VIS', 11].data.field('VISAMP')
                 self.visamperrSC_P1 = fitsdata['OI_VIS', 11].data.field('VISAMPERR')
-
                 self.visphiSC_P1 = fitsdata['OI_VIS', 11].data.field('VISPHI')
                 self.visphierrSC_P1 = fitsdata['OI_VIS', 11].data.field('VISPHIERR')
-                
                 self.vis2SC_P1 = fitsdata['OI_VIS2', 11].data.field('VIS2DATA')
                 self.vis2errSC_P1 = fitsdata['OI_VIS2', 11].data.field('VIS2ERR')
-                
                 self.t3SC_P1 = fitsdata['OI_T3', 11].data.field('T3PHI')
                 self.t3errSC_P1 = fitsdata['OI_T3', 11].data.field('T3PHIERR')
-                self.visphiSC_P1 = fitsdata['OI_VIS', 11].data.field('VISPHI')
-                self.visphierrSC_P1 = fitsdata['OI_VIS', 11].data.field('VISPHIERR')
+                self.t3ampSC_P1 = fitsdata['OI_T3', 11].data.field('T3AMP')
+                self.t3amperrSC_P1 = fitsdata['OI_T3', 11].data.field('T3AMPERR')
                 
+                # P2
                 self.visampSC_P2 = fitsdata['OI_VIS', 12].data.field('VISAMP')
                 self.visamperrSC_P2 = fitsdata['OI_VIS', 12].data.field('VISAMPERR')
-                
                 self.visphiSC_P2 = fitsdata['OI_VIS', 12].data.field('VISPHI')
                 self.visphierrSC_P2 = fitsdata['OI_VIS', 12].data.field('VISPHIERR')
-                
                 self.vis2SC_P2 = fitsdata['OI_VIS2', 12].data.field('VIS2DATA')
                 self.vis2errSC_P2 = fitsdata['OI_VIS2', 12].data.field('VIS2ERR')
-                
                 self.t3SC_P2 = fitsdata['OI_T3', 12].data.field('T3PHI')
                 self.t3errSC_P2 = fitsdata['OI_T3', 12].data.field('T3PHIERR')
-                self.visphiSC_P2 = fitsdata['OI_VIS', 12].data.field('VISPHI')
-                self.visphierrSC_P2 = fitsdata['OI_VIS', 12].data.field('VISPHIERR')
-
+                self.t3ampSC_P2 = fitsdata['OI_T3', 12].data.field('T3AMP')
+                self.t3amperrSC_P2 = fitsdata['OI_T3', 12].data.field('T3AMPERR')
+                
+                # Flags
                 self.visampflagSC_P1 = fitsdata['OI_VIS', 11].data.field('FLAG')
                 self.visampflagSC_P2 = fitsdata['OI_VIS', 12].data.field('FLAG')
                 self.vis2flagSC_P1 = fitsdata['OI_VIS2', 11].data.field('FLAG')
                 self.vis2flagSC_P2 = fitsdata['OI_VIS2', 12].data.field('FLAG')
                 self.t3flagSC_P1 = fitsdata['OI_T3', 11].data.field('FLAG')
                 self.t3flagSC_P2 = fitsdata['OI_T3', 12].data.field('FLAG')
+                self.t3ampflagSC_P1 = fitsdata['OI_T3', 11].data.field('FLAG')
+                self.t3ampflagSC_P2 = fitsdata['OI_T3', 12].data.field('FLAG')
                 self.visphiflagSC_P1 = fitsdata['OI_VIS', 11].data.field('FLAG')
                 self.visphiflagSC_P2 = fitsdata['OI_VIS', 12].data.field('FLAG')
                 
@@ -262,16 +295,19 @@ class GravData():
                     self.t3SC_P2[self.t3flagSC_P2] = np.nan
                     self.t3errSC_P2[self.t3flagSC_P2] = np.nan
 
+                    self.t3ampSC_P1[self.t3ampflagSC_P1] = np.nan
+                    self.t3amperrSC_P1[self.t3ampflagSC_P1] = np.nan
+                    self.t3ampSC_P2[self.t3ampflagSC_P2] = np.nan
+                    self.t3amperrSC_P2[self.t3ampflagSC_P2] = np.nan
+
                     self.visphiSC_P1[self.visphiflagSC_P1] = np.nan
                     self.visphierrSC_P1[self.visphiflagSC_P1] = np.nan
                     self.visphiSC_P2[self.visphiflagSC_P2] = np.nan
                     self.visphierrSC_P2[self.visphiflagSC_P2] = np.nan
 
-                    
-                
                 if plot:
-                    gs = gridspec.GridSpec(2,2)
-                    plt.figure(figsize=(25,25))
+                    gs = gridspec.GridSpec(3,2)
+                    plt.figure(figsize=(15,15))
                     axis = plt.subplot(gs[0,0])
                     for idx in range(len(self.vis2SC_P1)):
                         plt.errorbar(self.spFrequAS[idx,:], self.visampSC_P1[idx,:], self.visamperrSC_P1[idx,:], ls='', marker='o',color=self.colors_baseline[idx%6])
@@ -290,7 +326,26 @@ class GravData():
                     plt.ylim(-0.0,1.1)
                     plt.ylabel('visibility squared')
 
+                    axis = plt.subplot(gs[1,0])
+                    for idx in range(len(self.t3SC_P2)):
+                        plt.errorbar(self.spFrequAS_T3[idx,:], self.t3ampSC_P2[idx,:], self.t3amperrSC_P2[idx,:], marker='o',color=self.colors_closure[idx%4],linestyle='')
+                    for idx in range(len(self.t3SC_P2)):
+                        plt.errorbar(self.spFrequAS_T3[idx,:], self.t3ampSC_P1[idx,:], self.t3amperrSC_P1[idx,:], marker='p',color=self.colors_closure[idx%4],linestyle='')
+                    plt.axhline(1, ls='--', lw=0.5)
+                    plt.ylim(-0.0,1.1)
+                    plt.xlabel('spatial frequency (1/arcsec)')
+                    plt.ylabel('closure amplitude')
+                    
                     axis = plt.subplot(gs[1,1])
+                    for idx in range(len(self.t3SC_P2)):
+                        plt.errorbar(self.spFrequAS_T3[idx,:], self.t3SC_P2[idx,:], self.t3errSC_P2[idx,:], marker='o',color=self.colors_closure[idx%4],linestyle='')
+                    for idx in range(len(self.t3SC_P2)):
+                        plt.errorbar(self.spFrequAS_T3[idx,:], self.t3SC_P1[idx,:], self.t3errSC_P1[idx,:], marker='p',color=self.colors_closure[idx%4],linestyle='')
+                    plt.axhline(0, ls='--', lw=0.5)
+                    plt.xlabel('spatial frequency (1/arcsec)')
+                    plt.ylabel('closure phase (deg)')
+                    
+                    axis = plt.subplot(gs[2,1])
                     for idx in range(len(self.vis2SC_P1)):
                         plt.errorbar(self.spFrequAS[idx,:], self.visphiSC_P1[idx,:],self.visphierrSC_P1[idx,:], ls='', marker='o',color=self.colors_baseline[idx%6])
                     for idx in range(len(self.vis2SC_P2)):
@@ -298,23 +353,7 @@ class GravData():
                     plt.axhline(0, ls='--', lw=0.5)
                     plt.xlabel('spatial frequency (1/arcsec)')
                     plt.ylabel('visibility phase')
-                    
-                    axis = plt.subplot(gs[1,0])
-                    max_u = np.zeros((4))
-                    max_u[0] = np.max(np.array([spFrequ[0],spFrequ[3],spFrequ[1]]))
-                    max_u[1] = np.max(np.array([spFrequ[0],spFrequ[4],spFrequ[2]]))
-                    max_u[2] = np.max(np.array([spFrequ[1],spFrequ[5],spFrequ[2]]))
-                    max_u[3] = np.max(np.array([spFrequ[3],spFrequ[5],spFrequ[4]]))
 
-                    for idx in range(len(self.t3SC_P2)):
-                        max_u_as = max_u[idx%4]/(wave*1.e-6) * np.pi / 180. / 3600.
-                        plt.errorbar(max_u_as, self.t3SC_P2[idx,:], self.t3errSC_P2[idx,:], marker='o',color=self.colors_closure[idx%4],linestyle='')
-                    for idx in range(len(self.t3SC_P2)):
-                        max_u_as = max_u[idx%4]/(wave*1.e-6) * np.pi / 180. / 3600.
-                        plt.errorbar(max_u_as, self.t3SC_P1[idx,:], self.t3errSC_P1[idx,:], marker='p',color=self.colors_closure[idx%4],linestyle='')
-                    plt.axhline(0, ls='--', lw=0.5)
-                    plt.xlabel('spatial frequency (1/arcsec)')
-                    plt.ylabel('closure phase (deg)')
                     plt.show()
         fitsdata.close()
                 
@@ -717,8 +756,8 @@ class GravData():
             s_S2 -= opd_s2
             
             # different coupling
-            cr1 = (cor_amp_s21 / cor_amp_sgr1)
-            cr2 = (cor_amp_s22 / cor_amp_sgr2)
+            cr1 = (cor_amp_s21 / cor_amp_sgr1)**2
+            cr2 = (cor_amp_s22 / cor_amp_sgr2)**2
             
             # interferometric intensities of all components
             intSgrA = self.vis_intensity(s_SgrA, alpha_SgrA, wave, dlambda)
@@ -809,7 +848,7 @@ class GravData():
         self.getDlambda()
         dlambda = self.dlambda
 
-        visamp, visphi, closure = self.calc_vis(theta, u, v, wave, dlambda)
+        visamp, visphi, closure, closamp = self.calc_vis(theta, u, v, wave, dlambda)
         vis2 = visamp**2
         
         if plot:
@@ -821,17 +860,10 @@ class GravData():
             for i in range(0,6):
                 dlambda_model[i,:] = np.interp(wave_model, wave, dlambda[i,:])
             (model_visamp_full, model_visphi_full, 
-            model_closure_full)  = self.calc_vis(theta, u, v, wave_model, dlambda_model)
+            model_closure_full, model_closamp_full)  = self.calc_vis(theta, u, v, wave_model, dlambda_model)
             model_vis2_full = model_visamp_full**2.
 
-            magu = np.sqrt(u**2.+v**2.)
-            u_as = np.zeros((len(u),len(wave)))
-            v_as = np.zeros((len(v),len(wave)))
-            for i in range(0,len(u)):
-                u_as[i,:] = u[i]/(wave*1.e-6) / rad2as
-                v_as[i,:] = v[i]/(wave*1.e-6) / rad2as
-            magu_as = np.sqrt(u_as**2.+v_as**2.)
-
+            magu_as = self.spFrequAS
             u_as_model = np.zeros((len(u),len(wave_model)))
             v_as_model = np.zeros((len(v),len(wave_model)))
             for i in range(0,len(u)):
@@ -862,17 +894,13 @@ class GravData():
             
             # T3
             axis = plt.subplot(gs[1,0])
-            max_u = np.zeros((4))
-            max_u[0] = np.max(np.array([magu[0],magu[3],magu[1]]))
-            max_u[1] = np.max(np.array([magu[0],magu[4],magu[2]]))
-            max_u[2] = np.max(np.array([magu[1],magu[5],magu[2]]))
-            max_u[3] = np.max(np.array([magu[3],magu[5],magu[4]]))
             maxval = []
             for i in range(0,4):
-                max_u_as = max_u[i]/(wave*1.e-6) / rad2as
-                max_u_as_model = max_u[i]/(wave_model*1.e-6) / rad2as
-                plt.errorbar(max_u_as, closure[i,:], color=self.colors_closure[i],ls='', marker='o')
-                plt.plot(max_u_as_model, model_closure_full[i,:], color=self.colors_closure[i])
+                max_u_as_model = self.max_spf[i]/(wave_model*1.e-6) / rad2as
+                plt.errorbar(self.spFrequAS_T3[i,:], closure[i,:],
+                             color=self.colors_closure[i],ls='', marker='o')
+                plt.plot(max_u_as_model, model_closure_full[i,:],
+                         color=self.colors_closure[i])
             plt.axhline(0, ls='--', lw=0.5)
             plt.xlabel('spatial frequency (1/arcsec)')
             plt.ylabel('T3Phi (deg)')
@@ -906,7 +934,7 @@ class GravData():
                          % (theta[0], theta[1], theta[2], theta[6], theta[8], theta[10], theta[11]), fontsize=12)
             plt.show()
 
-        return visamp, vis2, visphi, closure
+        return visamp, vis2, visphi, closure, closamp
 
 
     def calc_vis(self, theta, u, v, wave, dlambda):
@@ -1017,8 +1045,7 @@ class GravData():
                                     [cor_pha_s2[0], cor_pha_s2[3]],
                                     [cor_pha_s2[1], cor_pha_s2[2]],
                                     [cor_pha_s2[1], cor_pha_s2[3]],
-                                    [cor_pha_s2[2], cor_pha_s2[3]]])    
-            print(pm_pha_sgr.shape)
+                                    [cor_pha_s2[2], cor_pha_s2[3]]])   
 
             vis = np.zeros((6,len(wave))) + 0j
             for i in range(0,6):
@@ -1042,8 +1069,8 @@ class GravData():
                 s_SgrA -= opd_sgr
                 s_S2 -= opd_s2
                 
-                cr1 = (pm_amp_s2[i,0] / pm_amp_sgr[i,0])
-                cr2 = (pm_amp_s2[i,1] / pm_amp_sgr[i,1])
+                cr1 = (pm_amp_s2[i,0] / pm_amp_sgr[i,0])**2
+                cr2 = (pm_amp_s2[i,1] / pm_amp_sgr[i,1])**2
                 
                 # interferometric intensities of all components
                 intSgrA = self.vis_intensity(s_SgrA, alpha_SgrA, wave, dlambda[i,:])
@@ -1094,14 +1121,14 @@ class GravData():
         visamp = np.abs(vis)
         visphi = np.angle(vis, deg=True)
         closure = np.zeros((4, len(wave)))
-        closure[0,:] = visphi[0,:] + visphi[3,:] - visphi[1,:]
-        closure[1,:] = visphi[0,:] + visphi[4,:] - visphi[2,:]
-        closure[2,:] = visphi[1,:] + visphi[5,:] - visphi[2,:]
-        closure[3,:] = visphi[3,:] + visphi[5,:] - visphi[4,:]
+        closamp = np.zeros((4, len(wave)))
+        for idx in range(4):
+            closure[idx] = visphi[self.bispec_ind[idx,0]] + visphi[self.bispec_ind[idx,1]] - visphi[self.bispec_ind[idx,2]]
+            closamp[idx] = visamp[self.bispec_ind[idx,0]] * visamp[self.bispec_ind[idx,1]] * visamp[self.bispec_ind[idx,2]]
 
         visphi = visphi + 360.*(visphi<-180.) - 360.*(visphi>180.)
         closure = closure + 360.*(closure<-180.) - 360.*(closure>180.)
-        return visamp, visphi, closure 
+        return visamp, visphi, closure, closamp
     
     
     def lnprob(self, theta, fitdata, u, v, wave, dlambda, lower, upper):
@@ -1115,14 +1142,15 @@ class GravData():
         Calculate the likelihood estimation for the MCMC run
         """
         # Model
-        model_visamp, model_visphi, model_closure = self.calc_vis(theta,u,v,wave,dlambda)
+        model_visamp, model_visphi, model_closure, model_closamp = self.calc_vis(theta,u,v,wave,dlambda)
         model_vis2 = model_visamp**2.
         
         #Data
         (visamp, visamp_error, visamp_flag,
          vis2, vis2_error, vis2_flag,
          closure, closure_error, closure_flag,
-         visphi, visphi_error, visphi_flag) = fitdata
+         visphi, visphi_error, visphi_flag,
+         closamp, closamp_error, closamp_flag) = fitdata
         
         res_visamp = np.sum(-(model_visamp-visamp)**2/visamp_error**2*(1-visamp_flag))
         res_vis2 = np.sum(-(model_vis2-vis2)**2./vis2_error**2.*(1-vis2_flag))
@@ -1132,57 +1160,26 @@ class GravData():
         res_phi = np.sum(-np.minimum((model_visphi-visphi)**2.,
                                      (360-(model_visphi-visphi))**2.)/
                           visphi_error**2.*(1-visphi_flag))
+        res_closamp = np.sum(-(model_closamp-closamp)**2/closamp_error**2*(1-closamp_flag))
         
         ln_prob_res = 0.5 * (res_visamp * self.fit_for[0] + 
                              res_vis2 * self.fit_for[1] + 
                              res_clos * self.fit_for[2] + 
-                             res_phi * self.fit_for[3])
+                             res_phi * self.fit_for[3] + 
+                             res_closamp * self.fit_for[4])
         
         return ln_prob_res 
     
     
-    def lnlike_minimize(self, theta):       
-        """
-        Calculate the likelihood estimation for minimizing function
-        """        
-        fitdata = self.fitdata
-        u = self.u
-        v = self.v
-        wave = self.wlSC_P1
-        dlambda = self.dlambda
-        # Model
-        model_visamp, model_visphi, model_closure = self.calc_vis(theta,u,v,wave,dlambda)
-        model_vis2 = model_visamp**2.
-        
-        #Data
-        (visamp, visamp_error, visamp_flag,
-         vis2, vis2_error, vis2_flag,
-         closure, closure_error, closure_flag,
-         visphi, visphi_error, visphi_flag) = fitdata
-        
-        res_visamp = np.sum((model_visamp-visamp)**2/visamp_error**2*(1-visamp_flag))
-        res_vis2 = np.sum((model_vis2-vis2)**2./vis2_error**2.*(1-vis2_flag))
-        res_clos = np.sum(np.minimum((model_closure-closure)**2.,
-                                      (360-(model_closure-closure))**2.)/
-                          closure_error**2.*(1-closure_flag))
-        res_phi = np.sum(np.minimum((model_visphi-visphi)**2.,
-                                     (360-(model_visphi-visphi))**2.)/
-                          visphi_error**2.*(1-visphi_flag))
-        
-        ln_prob_res = 0.5 * (res_visamp * self.fit_for[0] + 
-                             res_vis2 * self.fit_for[1] + 
-                             res_clos * self.fit_for[2] + 
-                             res_phi * self.fit_for[3])
-        
-        return ln_prob_res     
     
     def fitBinary(self, nthreads=4, nwalkers=500, nruns=500, bestchi=True,
-                  plot=True, fit_for=np.array([0.5,0.5,1.0,0.0]), constant_f=True,
-                  use_opds=False, fixedBG=True, noS2=True,
+                  plot=True, fit_for=np.array([0.5,0.5,1.0,0.0,0.0]), constant_f=True,
+                  use_opds=False, fixedBG=True, noS2=True, redchi2=False,
                   write_results=True, flagtill=3, flagfrom=13,
                   dRA=0., dDEC=0., plotres=True, createpdf=True, bequiet=False,
                   fixpos=False, fixedBH=False, dphRA=0.1, dphDec=0.1,
-                  specialpar=np.array([0,0,0,0,0,0]), phasemaps=False):
+                  specialpar=np.array([0,0,0,0,0,0]), phasemaps=False,
+                  donotfit=False, donotfittheta=None):
         '''
         Parameter:
         nthreads:       number of cores [4] 
@@ -1192,7 +1189,7 @@ class GravData():
         plot:           plot MCMC results [True]
         plotres:        plot fit result [True]
         write_results:  Write fit results in file [True] 
-        fit_for:        weight of VA, V2, T3, VP [[0.5,0.5,1.0,0.0]] 
+        fit_for:        weight of VA, V2, T3, VP, T3AMP [[0.5,0.5,1.0,0.0,0.0]] 
         constant_f:     Constant coupling [True]
         use_opds:       Fit OPDs [False] 
         noS2:           Does not do anything if OFFX and OFFY=0
@@ -1275,7 +1272,7 @@ class GravData():
         elif tel == 'ESO-VLTI-A1234':
             self.tel = 'AT'
         else:
-            raise ValueError('Telescope not AT or UT, seomtehign wrong with input data')
+            raise ValueError('Telescope not AT or UT, something wrong with input data')
 
         nwave = self.channel
         self.getIntdata(plot=False, flag=False)
@@ -1395,10 +1392,20 @@ class GravData():
             todel.append(14)
         if not specialfit:
             todel.append(15)
-        ndof = 16 - len(todel)
+        ndof = ndim - len(todel)
         
-
-                
+        if donotfit:
+            if donotfittheta is None:
+                raise ValueError('If donotfit is True, fit values have to be given by donotfittheta')
+            if len(donotfittheta) != ndim:
+                print(theta_names_raw)
+                raise ValueError('donotfittheta has to have %i parameters, see above' % ndim)
+            if plot:
+                raise ValueError('If donotfit is True, cannot create MCMC plots')
+            if write_results or createpdf:
+                raise ValueError('If donotfit is True, write_results and createpdf should be False')
+            print('Will not fit the data, just print out the results for the given theta')
+            
         # Get data
         if self.polmode == 'SPLIT':
             visamp_P = [self.visampSC_P1, self.visampSC_P2]
@@ -1416,7 +1423,11 @@ class GravData():
             visphi_P = [self.visphiSC_P1, self.visphiSC_P2]
             visphi_error_P = [self.visphierrSC_P1, self.visphierrSC_P2]
             visphi_flag_P = [self.visampflagSC_P1, self.visampflagSC_P2]
-            
+
+            closamp_P = [self.t3ampSC_P1, self.t3ampSC_P2]
+            closamp_error_P = [self.t3amperrSC_P1, self.t3amperrSC_P2]
+            closamp_flag_P = [self.t3ampflagSC_P1, self.t3ampflagSC_P2]
+
             ndit = np.shape(self.visampSC_P1)[0]//6
             if not bequiet:
                 print('NDIT = %i' % ndit)
@@ -1497,7 +1508,10 @@ class GravData():
                     visphi = visphi_P[idx][ditstart:ditstop]
                     visphi_error = visphi_error_P[idx][ditstart:ditstop]
                     visphi_flag = visphi_flag_P[idx][ditstart:ditstop]
-
+                    closamp = closamp_P[idx][t3ditstart:t3ditstop]
+                    closamp_error = closamp_error_P[idx][t3ditstart:t3ditstop]
+                    closamp_flag = closamp_flag_P[idx][t3ditstart:t3ditstop]
+                    
                     # further flag if visamp/vis2 if >1 or NaN, and replace NaN with 0 
                     with np.errstate(invalid='ignore'):
                         visamp_flag1 = (visamp > 1) | (visamp < 1.e-5)
@@ -1525,11 +1539,13 @@ class GravData():
                         vis2_flag[:,0:p] = True
                         visphi_flag[:,0:p] = True
                         closure_flag[:,0:p] = True
+                        closamp_flag[:,0:p] = True
 
                         visamp_flag[:,t] = True
                         vis2_flag[:,t] = True
                         visphi_flag[:,t] = True
                         closure_flag[:,t] = True
+                        closamp_flag[:,t] = True
                     
                     width = 1e-1
                     pos = np.ones((nwalkers,ndim))
@@ -1541,100 +1557,104 @@ class GravData():
                     if not bequiet:
                         print('Run MCMC for Pol %i' % (idx+1))
                     fitdata = [visamp, visamp_error, visamp_flag,
-                            vis2, vis2_error, vis2_flag,
-                            closure, closure_error, closure_flag,
-                            visphi, visphi_error, visphi_flag]
-
-                    if nthreads == 1:
-                        sampler = emcee.EnsembleSampler(nwalkers, ndim, self.lnprob, 
-                                                            args=(fitdata, u, v, wave,
-                                                                dlambda, theta_lower,
-                                                                theta_upper))
-                        if bequiet:
-                            sampler.run_mcmc(pos, nruns, progress=False)
-                        else:
-                            sampler.run_mcmc(pos, nruns, progress=True)
-                    else:
-                        with Pool(processes=nthreads) as pool:
+                               vis2, vis2_error, vis2_flag,
+                               closure, closure_error, closure_flag,
+                               visphi, visphi_error, visphi_flag,
+                               closamp, closamp_error, closamp_flag]
+                    
+                    if not donotfit:
+                        if nthreads == 1:
                             sampler = emcee.EnsembleSampler(nwalkers, ndim, self.lnprob, 
-                                                            args=(fitdata, u, v, wave,
-                                                                dlambda, theta_lower,
-                                                                theta_upper),
-                                                            pool=pool)
+                                                                args=(fitdata, u, v, wave,
+                                                                    dlambda, theta_lower,
+                                                                    theta_upper))
                             if bequiet:
-                                sampler.run_mcmc(pos, nruns, progress=False) 
+                                sampler.run_mcmc(pos, nruns, progress=False)
                             else:
-                                sampler.run_mcmc(pos, nruns, progress=True)     
+                                sampler.run_mcmc(pos, nruns, progress=True)
+                        else:
+                            with Pool(processes=nthreads) as pool:
+                                sampler = emcee.EnsembleSampler(nwalkers, ndim, self.lnprob, 
+                                                                args=(fitdata, u, v, wave,
+                                                                    dlambda, theta_lower,
+                                                                    theta_upper),
+                                                                pool=pool)
+                                if bequiet:
+                                    sampler.run_mcmc(pos, nruns, progress=False) 
+                                else:
+                                    sampler.run_mcmc(pos, nruns, progress=True)     
+                                
+                        if not bequiet:
+                            print("---------------------------------------")
+                            print("Mean acceptance fraction: %.2f"  % np.mean(sampler.acceptance_fraction))
+                            print("---------------------------------------")
+                        if createpdf:
+                            pdf.cell(0, 10, txt="Polarization  %i" % (idx+1), ln=2, align="C", border='B')
+                            pdf.cell(0, 10, txt="Mean acceptance fraction: %.2f"  %
+                                    np.mean(sampler.acceptance_fraction), 
+                                    ln=2, align="L", border=0)
+                        samples = sampler.chain
+                        mostprop = sampler.flatchain[np.argmax(sampler.flatlnprobability)]
+
+                        # for debuggin: save the chain
+                        #samples = np.load("samples_MCMC_groupedM_%i.npy" % idx)
+                        #mostprop = np.load("samples_MCMC_groupedM_mostprop_%i.npy" % idx)
+                        
+                        clsamples = np.delete(samples, todel, 2)
+                        cllabels = np.delete(theta_names, todel)
+                        cllabels_raw = np.delete(theta_names_raw, todel)
+                        clmostprop = np.delete(mostprop, todel)
+                        
+                        cldim = len(cllabels)
+                        if plot:
+                            fig, axes = plt.subplots(cldim, figsize=(8, cldim/1.5),
+                                                    sharex=True)
+                            for i in range(cldim):
+                                ax = axes[i]
+                                ax.plot(clsamples[:, :, i].T, "k", alpha=0.3)
+                                ax.set_ylabel(cllabels[i])
+                                ax.yaxis.set_label_coords(-0.1, 0.5)
+                            axes[-1].set_xlabel("step number")
                             
-                    if not bequiet:
-                        print("---------------------------------------")
-                        print("Mean acceptance fraction: %.2f"  % np.mean(sampler.acceptance_fraction))
-                        print("---------------------------------------")
-                    if createpdf:
-                        pdf.cell(0, 10, txt="Polarization  %i" % (idx+1), ln=2, align="C", border='B')
-                        pdf.cell(0, 10, txt="Mean acceptance fraction: %.2f"  %
-                                np.mean(sampler.acceptance_fraction), 
-                                ln=2, align="L", border=0)
-                    samples = sampler.chain
-                    mostprop = sampler.flatchain[np.argmax(sampler.flatlnprobability)]
-
-                    # for debuggin: save the chain
-                    #samples = np.load("samples_MCMC_groupedM_%i.npy" % idx)
-                    #mostprop = np.load("samples_MCMC_groupedM_mostprop_%i.npy" % idx)
-                    
-                    clsamples = np.delete(samples, todel, 2)
-                    cllabels = np.delete(theta_names, todel)
-                    cllabels_raw = np.delete(theta_names_raw, todel)
-                    clmostprop = np.delete(mostprop, todel)
-                    
-                    cldim = len(cllabels)
-                    if plot:
-                        fig, axes = plt.subplots(cldim, figsize=(8, cldim/1.5),
-                                                sharex=True)
-                        for i in range(cldim):
-                            ax = axes[i]
-                            ax.plot(clsamples[:, :, i].T, "k", alpha=0.3)
-                            ax.set_ylabel(cllabels[i])
-                            ax.yaxis.set_label_coords(-0.1, 0.5)
-                        axes[-1].set_xlabel("step number")
+                            if createpdf:
+                                pdfname = '%s_pol%i_1.png' % (savetime, idx)
+                                plt.savefig(pdfname)
+                                plt.close()
+                            else:
+                                plt.show()
                         
-                        if createpdf:
-                            pdfname = '%s_pol%i_1.png' % (savetime, idx)
-                            plt.savefig(pdfname)
-                            plt.close()
+                        if nruns > 300:
+                            fl_samples = samples[:, -200:, :].reshape((-1, ndim))
+                            fl_clsamples = clsamples[:, -200:, :].reshape((-1, cldim))                
                         else:
-                            plt.show()
-                    
-                    if nruns > 300:
-                        fl_samples = samples[:, -200:, :].reshape((-1, ndim))
-                        fl_clsamples = clsamples[:, -200:, :].reshape((-1, cldim))                
-                    else:
-                        fl_samples = samples.reshape((-1, ndim))
-                        fl_clsamples = clsamples.reshape((-1, cldim))
+                            fl_samples = samples.reshape((-1, ndim))
+                            fl_clsamples = clsamples.reshape((-1, cldim))
 
-                    if plot:
-                        ranges = np.percentile(fl_clsamples, [3, 97], axis=0).T
-                        fig = corner.corner(fl_clsamples, quantiles=[0.16, 0.5, 0.84],
-                                            truths=clmostprop, labels=cllabels)
-                        if createpdf:
-                            pdfname = '%s_pol%i_2.png' % (savetime, idx)
-                            plt.savefig(pdfname)
-                            plt.close()
+                        if plot:
+                            ranges = np.percentile(fl_clsamples, [3, 97], axis=0).T
+                            fig = corner.corner(fl_clsamples, quantiles=[0.16, 0.5, 0.84],
+                                                truths=clmostprop, labels=cllabels)
+                            if createpdf:
+                                pdfname = '%s_pol%i_2.png' % (savetime, idx)
+                                plt.savefig(pdfname)
+                                plt.close()
+                            else:
+                                plt.show()
+                            
+                        # get the actual fit
+                        theta_fit = np.percentile(fl_samples, [50], axis=0).T
+                        if bestchi:
+                            theta_result = mostprop
                         else:
-                            plt.show()
-                        
-                    # get the actual fit
-                    theta_fit = np.percentile(fl_samples, [50], axis=0).T
-                    if bestchi:
-                        theta_result = mostprop
+                            theta_result = theta_fit
                     else:
-                        theta_result = theta_fit
-                    
-                    fit_visamp, fit_visphi, fit_closure = self.calc_vis(theta_result, u, v, wave, dlambda)
+                        theta_result = donotfittheta
+                    fit_visamp, fit_visphi, fit_closure, fit_closamp = self.calc_vis(theta_result, u, v, wave, dlambda)
                     fit_vis2 = fit_visamp**2.
                             
                     res_visamp = fit_visamp-visamp
                     res_vis2 = fit_vis2-vis2
+                    res_closamp = fit_closamp-closamp
                     res_closure_1 = fit_closure-closure
                     res_closure_2 = 360-(fit_closure-closure)
                     check = np.abs(res_closure_1) < np.abs(res_closure_2) 
@@ -1643,50 +1663,64 @@ class GravData():
                     res_visphi_2 = 360-(fit_visphi-visphi)
                     check = np.abs(res_visphi_1) < np.abs(res_visphi_2) 
                     res_visphi = res_visphi_1*check + res_visphi_2*(1-check)
+                    
+                    redchi2
 
-                    redchi_visamp = np.sum(res_visamp**2./visamp_error**2.*(1-visamp_flag))/(visamp.size-np.sum(visamp_flag)-ndof)
-                    redchi_vis2 = np.sum(res_vis2**2./vis2_error**2.*(1-vis2_flag))/(vis2.size-np.sum(vis2_flag)-ndof)
-                    redchi_closure = np.sum(res_closure**2./closure_error**2.*(1-closure_flag))/(closure.size-np.sum(closure_flag)-ndof)
-                    redchi_visphi = np.sum(res_visphi**2./visphi_error**2.*(1-visphi_flag))/(visphi.size-np.sum(visphi_flag)-ndof)
-                    redchi = [redchi_visamp, redchi_vis2, redchi_closure, redchi_visphi]
+                    redchi_visamp = np.sum(res_visamp**2./visamp_error**2.*(1-visamp_flag))
+                    redchi_vis2 = np.sum(res_vis2**2./vis2_error**2.*(1-vis2_flag))
+                    redchi_closure = np.sum(res_closure**2./closure_error**2.*(1-closure_flag))
+                    redchi_closamp = np.sum(res_closamp**2./closamp_error**2.*(1-closamp_flag))
+                    redchi_visphi = np.sum(res_visphi**2./visphi_error**2.*(1-visphi_flag))
+                    
+                    if redchi2:
+                        redchi_visamp /= (visamp.size-np.sum(visamp_flag)-ndof)
+                        redchi_vis2 /= (vis2.size-np.sum(vis2_flag)-ndof)
+                        redchi_closure /= (closure.size-np.sum(closure_flag)-ndof)
+                        redchi_closamp /= (closamp.size-np.sum(closamp_flag)-ndof)
+                        redchi_visphi /= (visphi.size-np.sum(visphi_flag)-ndof)
+                        chi2string = 'red. chi2'
+                    else:
+                        chi2string = 'chi2'
+                    
+                    redchi = [redchi_visamp, redchi_vis2, redchi_closure, redchi_visphi, redchi_closamp]
                     if idx == 0:
-                        redchi0 = [redchi_visamp, redchi_vis2, redchi_closure, redchi_visphi]
+                        redchi0 = [redchi_visamp, redchi_vis2, redchi_closure, redchi_visphi, redchi_closamp]
                     elif idx == 1:
-                        redchi1 = [redchi_visamp, redchi_vis2, redchi_closure, redchi_visphi]
+                        redchi1 = [redchi_visamp, redchi_vis2, redchi_closure, redchi_visphi, redchi_closamp]
                         
                     if not bequiet:
                         print('ndof: %i' % (vis2.size-np.sum(vis2_flag)-ndof))
-                        print("redchi for visamp: %.2f" % redchi_visamp)
-                        print("redchi for vis2: %.2f" % redchi_vis2)
-                        print("redchi for closure: %.2f" % redchi_closure)
-                        print("redchi for visphi: %.2f" % redchi_visphi)
-                        print("average visamp error: %.2f" % 
-                            np.mean(visamp_error*(1-visamp_flag)))
-                        print("average vis2 error: %.2f" % 
-                            np.mean(vis2_error*(1-vis2_flag)))
-                        print("average closure error (deg): %.2f" % 
-                            np.mean(closure_error*(1-closure_flag)))
-                        print("average visphi error (deg): %.2f" % 
-                            np.mean(visphi_error*(1-visphi_flag)))
+                        print(chi2string + " for visamp: %.2f" % redchi_visamp)
+                        print(chi2string + " redchi for vis2: %.2f" % redchi_vis2)
+                        print(chi2string + " redchi for closure: %.2f" % redchi_closure)
+                        print(chi2string + " redchi for visphi: %.2f" % redchi_visphi)
+                        #print("average visamp error: %.2f" % 
+                            #np.mean(visamp_error*(1-visamp_flag)))
+                        #print("average vis2 error: %.2f" % 
+                            #np.mean(vis2_error*(1-vis2_flag)))
+                        #print("average closure error (deg): %.2f" % 
+                            #np.mean(closure_error*(1-closure_flag)))
+                        #print("average visphi error (deg): %.2f" % 
+                            #np.mean(visphi_error*(1-visphi_flag)))
                     
-
-                    percentiles = np.percentile(fl_clsamples, [16, 50, 84],axis=0).T
-                    percentiles[:,0] = percentiles[:,1] - percentiles[:,0] 
-                    percentiles[:,2] = percentiles[:,2] - percentiles[:,1] 
-                    
-                    if not bequiet:
-                        print("-----------------------------------")
-                        print("Best chi2 result:")
-                        for i in range(0, cldim):
-                            print("%s = %.3f" % (cllabels_raw[i], clmostprop[i]))
-                        print("\n")
-                        print("MCMC Result:")
-                        for i in range(0, cldim):
-                            print("%s = %.3f + %.3f - %.3f" % (cllabels_raw[i],
-                                                               percentiles[i,1], 
-                                                               percentiles[i,2], 
-                                                               percentiles[i,0]))
-                        print("-----------------------------------")
+                    if not donotfit:
+                        percentiles = np.percentile(fl_clsamples, [16, 50, 84],axis=0).T
+                        percentiles[:,0] = percentiles[:,1] - percentiles[:,0] 
+                        percentiles[:,2] = percentiles[:,2] - percentiles[:,1] 
+                        
+                        if not bequiet:
+                            print("-----------------------------------")
+                            print("Best chi2 result:")
+                            for i in range(0, cldim):
+                                print("%s = %.3f" % (cllabels_raw[i], clmostprop[i]))
+                            print("\n")
+                            print("MCMC Result:")
+                            for i in range(0, cldim):
+                                print("%s = %.3f + %.3f - %.3f" % (cllabels_raw[i],
+                                                                percentiles[i,1], 
+                                                                percentiles[i,2], 
+                                                                percentiles[i,0]))
+                            print("-----------------------------------")
                     
                     if createpdf:
                         pdf.cell(40, 8, txt="", ln=0, align="L", border="B")
@@ -1779,10 +1813,14 @@ class GravData():
                         pdfcout = 2
 
                     if plotres:
-                        titles = ['Vis Amp', 'Vis 2', 'Closure Phase', 'Visibility Phase']
-                        for pa in range(4):
+                        titles = ['Vis Amp', 'Vis 2', 'Closure Phase', 'Visibility Phase', 'Closure Amp']
+                        for pa in range(5):
+                            if pa == 3 and not self.fit_for[pa]:
+                                continue
+                            if pa == 4 and not self.fit_for[pa]:
+                                continue
                             pdf.add_page()
-                            text = '%s, redchi: %.2f (P1), %.2f (P2)' % (titles[pa], redchi0[pa], redchi1[pa])
+                            text = '%s, %s: %.2f (P1), %.2f (P2)' % (titles[pa], chi2string, redchi0[pa], redchi1[pa])
                             pdf.cell(0, 10, txt=text, ln=1, align="C", border='B')
                             pdf.ln()
                             pdf.image(pdfimages0[pdfcout+pa], w=150)
@@ -1796,6 +1834,12 @@ class GravData():
                         os.remove(file)
             if write_results:
                 txtfile.close()
+            if not bequiet:
+                fitted = 1-(np.array(self.fit_for)==0)
+                redchi0_f = np.sum(redchi0*fitted)
+                redchi1_f = np.sum(redchi1*fitted)
+                redchi_f = redchi0_f + redchi1_f
+                print('Combined %s of fitted data: %i' % (chi2string, redchi_f))
         return 0
 
 
@@ -1807,9 +1851,11 @@ class GravData():
         """
         rad2as = 180 / np.pi * 3600
         
-        (visamp, visamp_error, visamp_flag, vis2, 
-         vis2_error, vis2_flag, closure, closure_error, 
-         closure_flag, visphi, visphi_error, visphi_flag) = fitdata
+        (visamp, visamp_error, visamp_flag, 
+         vis2, vis2_error, vis2_flag, 
+         closure, closure_error, closure_flag, 
+         visphi, visphi_error, visphi_flag,
+         closamp, closamp_error, closamp_flag) = fitdata
         wave = self.wlSC_P1
         dlambda = self.dlambda
         wave_model = np.linspace(wave[0],wave[len(wave)-1],1000)
@@ -1822,15 +1868,10 @@ class GravData():
         v = self.v
         magu = np.sqrt(u**2.+v**2.)
         (model_visamp_full, model_visphi_full, 
-         model_closure_full)  = self.calc_vis(theta, u, v, wave_model, dlambda_model)
+         model_closure_full, model_closamp_full)  = self.calc_vis(theta, u, v, wave_model, dlambda_model)
         model_vis2_full = model_visamp_full**2.
         
-        u_as = np.zeros((len(u),len(wave)))
-        v_as = np.zeros((len(v),len(wave)))
-        for i in range(0,len(u)):
-            u_as[i,:] = u[i]/(wave*1.e-6) / rad2as
-            v_as[i,:] = v[i]/(wave*1.e-6) / rad2as
-        magu_as = np.sqrt(u_as**2.+v_as**2.)
+        magu_as = self.spFrequAS
         
         u_as_model = np.zeros((len(u),len(wave_model)))
         v_as_model = np.zeros((len(v),len(wave_model)))
@@ -1881,18 +1922,12 @@ class GravData():
             plt.show()
         
         # T3
-        max_u = np.zeros((4))
-        max_u[0] = np.max(np.array([magu[0],magu[3],magu[1]]))
-        max_u[1] = np.max(np.array([magu[0],magu[4],magu[2]]))
-        max_u[2] = np.max(np.array([magu[1],magu[5],magu[2]]))
-        max_u[3] = np.max(np.array([magu[3],magu[5],magu[4]]))
         for i in range(0,4):
-            max_u_as = max_u[i]/(wave*1.e-6) / rad2as
-            max_u_as_model = max_u[i]/(wave_model*1.e-6) / rad2as
-            plt.errorbar(max_u_as, closure[i,:]*(1-closure_flag)[i],
+            max_u_as_model = self.max_spf[i]/(wave_model*1.e-6) / rad2as
+            plt.errorbar(self.spFrequAS_T3[i,:], closure[i,:]*(1-closure_flag)[i],
                          closure_error[i,:]*(1-closure_flag)[i],
                          color=self.colors_closure[i],ls='', lw=1, alpha=0.5, capsize=0)
-            plt.scatter(max_u_as, closure[i,:]*(1-closure_flag)[i],
+            plt.scatter(self.spFrequAS_T3[i,:], closure[i,:]*(1-closure_flag)[i],
                         color=self.colors_closure[i], alpha=0.5)
             plt.plot(max_u_as_model, model_closure_full[i,:], 
                      color='k', zorder=100)
@@ -1907,188 +1942,46 @@ class GravData():
             plt.show()
         
         # VisPhi
-        for i in range(0,6):
-            plt.errorbar(magu_as[i,:], visphi[i,:]*(1-visphi_flag)[i], 
-                        visphi_error[i,:]*(1-visphi_flag)[i],
-                        color=self.colors_baseline[i], ls='', lw=1, alpha=0.5, capsize=0)
-            plt.scatter(magu_as[i,:], visphi[i,:]*(1-visphi_flag)[i],
-                        color=self.colors_baseline[i], alpha=0.5)
-            plt.plot(magu_as_model[i,:], model_visphi_full[i,:],
-                    color='k', zorder=100)
-        plt.ylabel('visibility phase')
-        plt.xlabel('spatial frequency (1/arcsec)')
-        if createpdf:
-            plt.title('Polarization %i' % (idx + 1))
-            pdfname = '%s_pol%i_8.png' % (savetime, idx)
-            plt.savefig(pdfname)
-            plt.close()
-        else:
-            plt.show()
-        
-        
-    def plotFitCor(self, theta, theta_cor, fitdata, fitdata_cor, idx=0, createpdf=False):
-        """
-        Calculates the theoretical interferometric data for the given parameters in theta
-        and in theta cor, to compare two fits.
-        Plots them together with the data in fitdata.
-        Mainly used in fitBinary as result plots.
-        """
-        rad2as = 180 / np.pi * 3600
-        
-        (visamp, visamp_error, visamp_flag, vis2, 
-         vis2_error, vis2_flag, closure, closure_error, 
-         closure_flag, visphi, visphi_error, visphi_flag) = fitdata
-        (visamp, visamp_error_cor, visamp_flag, vis2, 
-         vis2_error_cor, vis2_flag, closure, closure_error_cor, 
-         closure_flag, visphi, visphi_error_cor, visphi_flag) = fitdata_cor
-        
-        
-        wave = self.wlSC_P1
-        dlambda = self.dlambda
-        wave_model = np.linspace(wave[0],wave[len(wave)-1],1000)
-        dlambda_model = np.zeros((6,len(wave_model)))
-        for i in range(0,6):
-            dlambda_model[i,:] = np.interp(wave_model, wave, dlambda[i,:])
+        if self.fit_for[3]:
+            for i in range(0,6):
+                plt.errorbar(magu_as[i,:], visphi[i,:]*(1-visphi_flag)[i], 
+                            visphi_error[i,:]*(1-visphi_flag)[i],
+                            color=self.colors_baseline[i], ls='', lw=1, alpha=0.5, capsize=0)
+                plt.scatter(magu_as[i,:], visphi[i,:]*(1-visphi_flag)[i],
+                            color=self.colors_baseline[i], alpha=0.5)
+                plt.plot(magu_as_model[i,:], model_visphi_full[i,:],
+                        color='k', zorder=100)
+            plt.ylabel('visibility phase')
+            plt.xlabel('spatial frequency (1/arcsec)')
+            if createpdf:
+                plt.title('Polarization %i' % (idx + 1))
+                pdfname = '%s_pol%i_8.png' % (savetime, idx)
+                plt.savefig(pdfname)
+                plt.close()
+            else:
+                plt.show()
             
-        # Fit
-        u = self.u
-        v = self.v
-        magu = np.sqrt(u**2.+v**2.)
-        (model_visamp_full, model_visphi_full, 
-         model_closure_full)  = self.calc_vis(theta, u, v, wave_model, dlambda_model)
-        model_vis2_full = model_visamp_full**2.
-        (model_visamp_cor, model_visphi_cor, 
-         model_closure_cor)  = self.calc_vis(theta_cor, u, v, wave_model, dlambda_model)
-        model_vis2_cor = model_visamp_cor**2.
-        
-        u_as = np.zeros((len(u),len(wave)))
-        v_as = np.zeros((len(v),len(wave)))
-        for i in range(0,len(u)):
-            u_as[i,:] = u[i]/(wave*1.e-6) / rad2as
-            v_as[i,:] = v[i]/(wave*1.e-6) / rad2as
-        magu_as = np.sqrt(u_as**2.+v_as**2.)
-        
-        u_as_model = np.zeros((len(u),len(wave_model)))
-        v_as_model = np.zeros((len(v),len(wave_model)))
-        for i in range(0,len(u)):
-            u_as_model[i,:] = u[i]/(wave_model*1.e-6) / rad2as
-            v_as_model[i,:] = v[i]/(wave_model*1.e-6) / rad2as
-        magu_as_model = np.sqrt(u_as_model**2.+v_as_model**2.)
-        
-        # Visamp 
-        for i in range(0,6):
-            plt.errorbar(magu_as[i,:], visamp[i,:]*(1-visamp_flag)[i],
-                         visamp_error[i,:]*(1-visamp_flag)[i],
-                         color=self.colors_baseline[i],ls='', lw=2, alpha=0.5, capsize=0)
-            plt.scatter(magu_as[i,:], visamp[i,:]*(1-visamp_flag)[i],
-                        color=self.colors_baseline[i], alpha=0.5)
-            plt.plot(magu_as_model[i,:], model_visamp_full[i,:],
-                     color=self.colors_baseline[i], alpha=1.0)
-            plt.errorbar(magu_as[i,:], visamp[i,:]*(1-visamp_flag)[i],
-                         visamp_error_cor[i,:]*(1-visamp_flag)[i],
-                         color=self.colors_baseline[i],ls='', lw=0.5, marker='', 
-                         alpha=1, capsize=0)
-            plt.plot(magu_as_model[i,:], model_visamp_cor[i,:],
-                     color=self.colors_baseline[i], alpha=1.0, ls='--')
-        plt.ylabel('visibility modulus')
-        plt.ylim(-0.1,1.1)
-        plt.xlabel('spatial frequency (1/arcsec)')
-        if createpdf:
-            savetime = self.savetime
-            plt.title('Polarization %i' % (idx + 1))
-            pdfname = '%s_pol%i_5.png' % (savetime, idx)
-            plt.savefig(pdfname)
-            plt.close()
-        else:
-            plt.show()
-        
-        # Vis2
-        for i in range(0,6):
-            plt.errorbar(magu_as[i,:], vis2[i,:]*(1-vis2_flag)[i], 
-                         vis2_error[i,:]*(1-vis2_flag)[i], 
-                         color=self.colors_baseline[i],ls='', lw=2, alpha=0.5, capsize=0)
-            plt.scatter(magu_as[i,:], vis2[i,:]*(1-vis2_flag)[i],
-                        color=self.colors_baseline[i],alpha=0.5)
-            plt.plot(magu_as_model[i,:], model_vis2_full[i,:],
-                     color=self.colors_baseline[i], alpha=1.0)
-            plt.errorbar(magu_as[i,:], vis2[i,:]*(1-vis2_flag)[i],
-                         vis2_error_cor[i,:]*(1-vis2_flag)[i],
-                         color=self.colors_baseline[i], ls='', marker='', lw=0.5, 
-                         alpha=1, capsize=0)
-            plt.plot(magu_as_model[i,:], model_vis2_cor[i,:],
-                     color=self.colors_baseline[i], alpha=1.0, ls='--')
-        plt.xlabel('spatial frequency (1/arcsec)')
-        plt.ylabel('visibility squared')
-        plt.ylim(-0.1,1.1)
-        if createpdf:
-            plt.title('Polarization %i' % (idx + 1))
-            pdfname = '%s_pol%i_6.png' % (savetime, idx)
-            plt.savefig(pdfname)
-            plt.close()
-        else:
-            plt.show()
-        
-        # T3
-        max_u = np.zeros((4))
-        max_u[0] = np.max(np.array([magu[0],magu[3],magu[1]]))
-        max_u[1] = np.max(np.array([magu[0],magu[4],magu[2]]))
-        max_u[2] = np.max(np.array([magu[1],magu[5],magu[2]]))
-        max_u[3] = np.max(np.array([magu[3],magu[5],magu[4]]))
-        for i in range(0,4):
-            max_u_as = max_u[i]/(wave*1.e-6) / rad2as
-            max_u_as_model = max_u[i]/(wave_model*1.e-6) / rad2as
-            plt.errorbar(max_u_as, closure[i,:]*(1-closure_flag)[i],
-                         closure_error[i,:]*(1-closure_flag)[i],
-                         color=self.colors_closure[i], ls='', lw=2, alpha=0.5, capsize=0)
-            plt.scatter(max_u_as, closure[i,:]*(1-closure_flag)[i],
-                        color=self.colors_closure[i], alpha=0.5)
-            plt.plot(max_u_as_model, model_closure_full[i,:], 
-                     color=self.colors_closure[i])
-            plt.errorbar(max_u_as, closure[i,:]*(1-closure_flag)[i],
-                         closure_error_cor[i,:]*(1-closure_flag)[i],
-                         color=self.colors_closure[i],ls='', lw=0.5, marker='',
-                         alpha=1, capsize=0)
-            plt.plot(max_u_as_model, model_closure_cor[i,:], 
-                     color=self.colors_closure[i], ls='--')
-        plt.xlabel('spatial frequency of largest baseline in triangle (1/arcsec)')
-        plt.ylabel('closure phase (deg)')
-        if createpdf:
-            plt.title('Polarization %i' % (idx + 1))
-            pdfname = '%s_pol%i_7.png' % (savetime, idx)
-            plt.savefig(pdfname)
-            plt.close()
-        else:
-            plt.show()
-        
-        # VisPhi
-        for i in range(0,6):
-            plt.errorbar(magu_as[i,:], visphi[i,:]*(1-visphi_flag)[i], 
-                        visphi_error[i,:]*(1-visphi_flag)[i],
-                        color=self.colors_baseline[i], ls='', lw=2, alpha=0.5, capsize=0)
-            plt.scatter(magu_as[i,:], visphi[i,:]*(1-visphi_flag)[i],
-                        color=self.colors_baseline[i], alpha=0.5)
-            plt.plot(magu_as_model[i,:], model_visphi_full[i,:],
-                    color=self.colors_baseline[i])
-            plt.errorbar(magu_as[i,:], visphi[i,:]*(1-visphi_flag)[i], 
-                        visphi_error_cor[i,:]*(1-visphi_flag)[i],
-                        color=self.colors_baseline[i], ls='', lw=0.5, marker='',
-                        alpha=1, capsize=0)
-            plt.plot(magu_as_model[i,:], model_visphi_cor[i,:],
-                    color=self.colors_baseline[i], ls='--')
-        plt.ylabel('visibility phase')
-        plt.xlabel('spatial frequency (1/arcsec)')
-        if createpdf:
-            plt.title('Polarization %i' % (idx + 1))
-            pdfname = '%s_pol%i_8.png' % (savetime, idx)
-            plt.savefig(pdfname)
-            plt.close()
-        else:
-            plt.show()
-            
-            
-            
-            
-        
+        # T3amp
+        if self.fit_for[4]:
+            for i in range(0,4):
+                max_u_as_model = self.max_spf[i]/(wave_model*1.e-6) / rad2as
+                plt.errorbar(self.spFrequAS_T3[i,:], closamp[i,:]*(1-closamp_flag)[i],
+                            closamp_error[i,:]*(1-closamp_flag)[i],
+                            color=self.colors_closure[i],ls='', lw=1, alpha=0.5, capsize=0)
+                plt.scatter(self.spFrequAS_T3[i,:], closamp[i,:]*(1-closamp_flag)[i],
+                            color=self.colors_closure[i], alpha=0.5)
+                plt.plot(max_u_as_model, model_closamp_full[i,:], 
+                        color='k', zorder=100)
+            plt.xlabel('spatial frequency of largest baseline in triangle (1/arcsec)')
+            plt.ylabel('closure Amplitude')
+            if createpdf:
+                plt.title('Polarization %i' % (idx + 1))
+                pdfname = '%s_pol%i_9.png' % (savetime, idx)
+                plt.savefig(pdfname)
+                plt.close()
+            else:
+                plt.show()
+
         
         
     ############################################    
@@ -2151,13 +2044,15 @@ class GravData():
                 for i in range(0,6):
                     dlambda_model[i,:] = np.interp(wave_model, wave, dlambda[i,:])
                 model_visphi_full  = self.calc_vis_unary(theta, u, v, wave_model, dlambda_model)
-                magu = np.sqrt(u**2.+v**2.)
-                u_as = np.zeros((len(u),len(wave)))
-                v_as = np.zeros((len(v),len(wave)))
-                for i in range(0,len(u)):
-                    u_as[i,:] = u[i]/(wave*1.e-6) / rad2as
-                    v_as[i,:] = v[i]/(wave*1.e-6) / rad2as
-                magu_as = np.sqrt(u_as**2.+v_as**2.)
+                
+                #magu = np.sqrt(u**2.+v**2.)
+                #u_as = np.zeros((len(u),len(wave)))
+                #v_as = np.zeros((len(v),len(wave)))
+                #for i in range(0,len(u)):
+                    #u_as[i,:] = u[i]/(wave*1.e-6) / rad2as
+                    #v_as[i,:] = v[i]/(wave*1.e-6) / rad2as
+                #magu_as = np.sqrt(u_as**2.+v_as**2.)
+                magu_as = self.spFrequAS
 
                 u_as_model = np.zeros((len(u),len(wave_model)))
                 v_as_model = np.zeros((len(v),len(wave_model)))
@@ -2899,15 +2794,16 @@ class GravData():
             dlambda_model[i,:] = np.interp(wave_model, wave, dlambda[i,:])
             
         # Fit
-        magu = np.sqrt(u**2.+v**2.)
+        #magu = np.sqrt(u**2.+v**2.)
         model_visphi_full = self.calc_vis_unary(theta, u, v, wave_model, dlambda_model)
 
-        u_as = np.zeros((len(u),len(wave)))
-        v_as = np.zeros((len(v),len(wave)))
-        for i in range(0,len(u)):
-            u_as[i,:] = u[i]/(wave*1.e-6) / rad2as
-            v_as[i,:] = v[i]/(wave*1.e-6) / rad2as
-        magu_as = np.sqrt(u_as**2.+v_as**2.)
+        #u_as = np.zeros((len(u),len(wave)))
+        #v_as = np.zeros((len(v),len(wave)))
+        #for i in range(0,len(u)):
+            #u_as[i,:] = u[i]/(wave*1.e-6) / rad2as
+            #v_as[i,:] = v[i]/(wave*1.e-6) / rad2as
+        #magu_as = np.sqrt(u_as**2.+v_as**2.)
+        magu_as = self.spFrequAS
         
         u_as_model = np.zeros((len(u),len(wave_model)))
         v_as_model = np.zeros((len(v),len(wave_model)))
