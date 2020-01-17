@@ -8,6 +8,7 @@ from multiprocessing import Pool
 from fpdf import FPDF
 from PIL import Image
 from scipy import optimize 
+from scipy import interpolate
 from matplotlib import gridspec
 from pkg_resources import resource_filename
 
@@ -219,6 +220,7 @@ class GravData():
                 # spatial frequency
                 spFrequ = np.sqrt(self.u**2.+self.v**2.)
                 wave = self.wlSC_P1
+                self.wave = wave
                 u_as = np.zeros((len(self.u),len(wave)))
                 v_as = np.zeros((len(self.v),len(wave)))
                 for i in range(0,len(self.u)):
@@ -442,10 +444,10 @@ class GravData():
         for tdx in range(tsteps):
             for idx in range(numspec):
                 try:
-                    red_spectra_i[tdx,idx,:] = sp.interpolate.interp1d(wavefits['WAVE_DATA_SC'].data['DATA%i' % (idx+1)][0],
+                    red_spectra_i[tdx,idx,:] = interpolate.interp1d(wavefits['WAVE_DATA_SC'].data['DATA%i' % (idx+1)][0],
                                                                     red_spectra[tdx,idx,:])(pp_wl)
                 except ValueError:
-                    red_spectra_i[tdx,idx,:] = sp.interpolate.interp1d(wavefits['WAVE_DATA_SC'].data['DATA%i' % (idx+1)][0],
+                    red_spectra_i[tdx,idx,:] = interpolate.interp1d(wavefits['WAVE_DATA_SC'].data['DATA%i' % (idx+1)][0],
                                                                     red_spectra[tdx,idx,:], bounds_error=False, fill_value='extrapolate')(pp_wl)
                     print('Extrapolation needed')
         
@@ -484,51 +486,58 @@ class GravData():
     
     
     
-    def getDlambda(self):
-        nwave = self.channel
-        wave = self.wlSC_P1
-        self.wave = wave
-        if nwave in [11, 14]:
-            if self.polmode == 'COMBINED':
-                R = np.zeros((6,nwave))
-                if nwave == 11:
-                    R[0,:] = [32.9,20.6,20.3,19.3,19.2,16.1,18.3,20.8,21.2,21.7,23.4]
-                    R[1,:] = [31.8,18.6,17.5,18.5,19.8,16.8,19.8,22.7,22.6,22.8,22.7]
-                    R[2,:] = [31.8,19.1,19.0,18.7,18.9,16.3,19.1,21.6,22.2,22.5,23.6]
-                    R[3,:] = [29.9,18.3,18.6,20.6,23.5,19.5,22.7,25.8,25.4,26.8,26.2]
-                    R[4,:] = [30.8,18.0,17.6,19.3,22.3,19.4,23.3,26.5,26.3,27.7,24.9]
-                    R[5,:] = [29.7,18.1,18.1,18.1,18.6,16.5,19.6,22.4,22.8,22.8,22.3]
-                elif nwave == 14:
-                    R[0,:] = [28.9,16.5,15.6,16.8,17.6,16.4,15.7,17.5,18.8,20.1,20.2,20.5,22.0,28.3]
-                    R[1,:] = [27.2,15.8,14.9,16.0,16.7,15.7,15.1,16.4,18.2,19.6,20.0,20.3,21.7,25.3]
-                    R[2,:] = [28.3,16.2,15.3,16.7,17.3,16.3,15.7,17.4,18.8,20.2,20.7,21.1,22.4,27.5]
-                    R[3,:] = [29.1,17.0,15.9,16.6,17.1,16.6,15.8,16.9,18.8,20.5,21.0,21.3,22.0,24.4]
-                    R[4,:] = [28.8,16.8,16.1,16.7,17.4,16.7,16.1,17.2,19.0,20.5,21.2,21.6,22.2,25.2]
-                    R[5,:] = [28.0,16.0,15.0,16.2,16.6,15.7,15.3,16.4,17.8,19.3,19.8,20.0,20.8,24.4]
-            else:
-                R = np.zeros((6,nwave))
-                if nwave == 11:
-                    R[0,:] = [25.0,18.3,20.1,20.7,20.0,16.7,17.9,20.1,20.5,21.3,23.9]
-                    R[1,:] = [24.0,16.5,15.9,17.2,17.6,15.3,17.3,19.7,20.2,20.8,22.4]
-                    R[2,:] = [26.2,19.5,19.8,19.3,18.9,16.1,17.6,19.9,20.7,21.3,23.4]
-                    R[3,:] = [24.6,16.4,15.5,17.2,18.2,16.9,19.5,22.2,22.6,23.0,22.5]
-                    R[4,:] = [26.4,17.5,16.2,17.2,17.9,16.3,18.8,21.4,21.6,21.8,22.1]
-                    R[5,:] = [27.4,18.8,17.5,17.6,17.4,15.2,16.8,19.2,19.8,20.0,21.1]
-                elif nwave == 14:
-                    R[0,:] = [28.9,16.5,15.6,16.8,17.6,16.4,15.7,17.5,18.8,20.1,20.2,20.5,22.0,28.3]
-                    R[1,:] = [27.2,15.8,14.9,16.0,16.7,15.7,15.1,16.4,18.2,19.6,20.0,20.3,21.7,25.3]
-                    R[2,:] = [28.3,16.2,15.3,16.7,17.3,16.3,15.7,17.4,18.8,20.2,20.7,21.1,22.4,27.5]
-                    R[3,:] = [29.1,17.0,15.9,16.6,17.1,16.6,15.8,16.9,18.8,20.5,21.0,21.3,22.0,24.4]
-                    R[4,:] = [28.8,16.8,16.1,16.7,17.4,16.7,16.1,17.2,19.0,20.5,21.2,21.6,22.2,25.2]
-                    R[5,:] = [28.0,16.0,15.0,16.2,16.6,15.7,15.3,16.4,17.8,19.3,19.8,20.0,20.8,24.4]
-        dlambda = np.zeros((6,nwave))
-        for i in range(0,6):
-            if (nwave==11) or (nwave==14):
-                dlambda[i,:] = wave/R[i,:]/2
-            elif nwave==233:
-                dlambda[i,:] = wave/500/2
-            else:
-                dlambda[i,:] = 0.03817
+    def getDlambda(self, idel=False):
+        if idel:
+            nwave = self.channel
+            wave = self.wlSC_P1
+            self.wave = wave
+            if nwave in [11, 14]:
+                if self.polmode == 'COMBINED':
+                    R = np.zeros((6,nwave))
+                    if nwave == 11:
+                        R[0,:] = [32.9,20.6,20.3,19.3,19.2,16.1,18.3,20.8,21.2,21.7,23.4]
+                        R[1,:] = [31.8,18.6,17.5,18.5,19.8,16.8,19.8,22.7,22.6,22.8,22.7]
+                        R[2,:] = [31.8,19.1,19.0,18.7,18.9,16.3,19.1,21.6,22.2,22.5,23.6]
+                        R[3,:] = [29.9,18.3,18.6,20.6,23.5,19.5,22.7,25.8,25.4,26.8,26.2]
+                        R[4,:] = [30.8,18.0,17.6,19.3,22.3,19.4,23.3,26.5,26.3,27.7,24.9]
+                        R[5,:] = [29.7,18.1,18.1,18.1,18.6,16.5,19.6,22.4,22.8,22.8,22.3]
+                    elif nwave == 14:
+                        R[0,:] = [28.9,16.5,15.6,16.8,17.6,16.4,15.7,17.5,18.8,20.1,20.2,20.5,22.0,28.3]
+                        R[1,:] = [27.2,15.8,14.9,16.0,16.7,15.7,15.1,16.4,18.2,19.6,20.0,20.3,21.7,25.3]
+                        R[2,:] = [28.3,16.2,15.3,16.7,17.3,16.3,15.7,17.4,18.8,20.2,20.7,21.1,22.4,27.5]
+                        R[3,:] = [29.1,17.0,15.9,16.6,17.1,16.6,15.8,16.9,18.8,20.5,21.0,21.3,22.0,24.4]
+                        R[4,:] = [28.8,16.8,16.1,16.7,17.4,16.7,16.1,17.2,19.0,20.5,21.2,21.6,22.2,25.2]
+                        R[5,:] = [28.0,16.0,15.0,16.2,16.6,15.7,15.3,16.4,17.8,19.3,19.8,20.0,20.8,24.4]
+                else:
+                    R = np.zeros((6,nwave))
+                    if nwave == 11:
+                        R[0,:] = [25.0,18.3,20.1,20.7,20.0,16.7,17.9,20.1,20.5,21.3,23.9]
+                        R[1,:] = [24.0,16.5,15.9,17.2,17.6,15.3,17.3,19.7,20.2,20.8,22.4]
+                        R[2,:] = [26.2,19.5,19.8,19.3,18.9,16.1,17.6,19.9,20.7,21.3,23.4]
+                        R[3,:] = [24.6,16.4,15.5,17.2,18.2,16.9,19.5,22.2,22.6,23.0,22.5]
+                        R[4,:] = [26.4,17.5,16.2,17.2,17.9,16.3,18.8,21.4,21.6,21.8,22.1]
+                        R[5,:] = [27.4,18.8,17.5,17.6,17.4,15.2,16.8,19.2,19.8,20.0,21.1]
+                    elif nwave == 14:
+                        R[0,:] = [28.9,16.5,15.6,16.8,17.6,16.4,15.7,17.5,18.8,20.1,20.2,20.5,22.0,28.3]
+                        R[1,:] = [27.2,15.8,14.9,16.0,16.7,15.7,15.1,16.4,18.2,19.6,20.0,20.3,21.7,25.3]
+                        R[2,:] = [28.3,16.2,15.3,16.7,17.3,16.3,15.7,17.4,18.8,20.2,20.7,21.1,22.4,27.5]
+                        R[3,:] = [29.1,17.0,15.9,16.6,17.1,16.6,15.8,16.9,18.8,20.5,21.0,21.3,22.0,24.4]
+                        R[4,:] = [28.8,16.8,16.1,16.7,17.4,16.7,16.1,17.2,19.0,20.5,21.2,21.6,22.2,25.2]
+                        R[5,:] = [28.0,16.0,15.0,16.2,16.6,15.7,15.3,16.4,17.8,19.3,19.8,20.0,20.8,24.4]
+            dlambda = np.zeros((6,nwave))
+            for i in range(0,6):
+                if (nwave==11) or (nwave==14):
+                    dlambda[i,:] = wave/R[i,:]/2
+                elif nwave==233:
+                    dlambda[i,:] = wave/500/2
+                else:
+                    dlambda[i,:] = 0.03817
+        else:
+            nwave = self.channel
+            effband = fits.open(self.name)['OI_WAVELENGTH', 11].data['EFF_BAND']
+            dlambda = np.zeros((6,nwave))
+            for idx in range(6):
+                dlambda[idx] = effband/2*1e6
         self.dlambda = dlambda 
     
        
@@ -547,6 +556,23 @@ class GravData():
         phasemaps = fits.open(phasemapsfile)
         self.pm_amp = phasemaps['SC_AMP'].data
         self.pm_pha = phasemaps['SC_PHASE'].data
+        
+        x = np.arange(201)
+        y = np.arange(201)
+        pm_amp_int = []
+        pm_pha_int = []        
+        for idx in range(4):
+            amp = self.pm_amp[idx]
+            amp_mod = np.copy(amp)
+            amp_mod[np.isnan(amp)] = 0
+            pm_amp_int.append(interpolate.interp2d(x, y, amp_mod))
+
+            pha = self.pm_pha[idx]
+            pha_mod = np.copy(pha)
+            pha_mod[np.isnan(pha)] = 0
+            pm_pha_int.append(interpolate.interp2d(x, y, pha_mod))
+        self.pm_amp_int = pm_amp_int
+        self.pm_pha_int = pm_pha_int
         phasemaps.close()
 
 
@@ -555,8 +581,9 @@ class GravData():
                          [-np.sin(ang), np.cos(ang)]])
     
     
-    def readPhasemaps(self, ra, dec, fromFits=True, 
-                      northangle=None, dra=None, ddec=None):
+    def readPhasemaps(self, ra, dec, wave, fromFits=True, 
+                      northangle=None, dra=None, ddec=None,
+                      interp=True):
         """
         Calculates coupling amplitude / phase for given 
         
@@ -598,22 +625,25 @@ class GravData():
             dra = [dra1, dra2, dra3, dra4]
             
         lambda0 = 2.2
-        cor_amp = np.zeros((4, len(self.wave)))
-        cor_pha = np.zeros((4, len(self.wave)))
+        cor_amp = np.zeros((4, len(wave)))
+        cor_pha = np.zeros((4, len(wave)))
         for tel in range(4):
             pos = np.array([ra + dra[tel], dec + ddec[tel]])
             pos_rot = np.dot(self.rotation(northangle[tel]), pos)
-            for channel in range(len(self.wave)):
-                pos_scaled = pos_rot*lambda0/self.wave[channel]*scale + 100
-                pos_int = (np.round(pos_scaled)).astype(int)
-                cor_amp[tel, channel] = self.pm_amp[tel, pos_int[1], pos_int[0]]
-                cor_pha[tel, channel] = self.pm_pha[tel, pos_int[1], pos_int[0]]
-            
+            for channel in range(len(wave)):
+                pos_scaled = pos_rot*lambda0/wave[channel]/scale + 100
+                if interp:
+                    cor_amp[tel, channel] = self.pm_amp_int[tel](pos_scaled[0], pos_scaled[1])
+                    cor_pha[tel, channel] = self.pm_pha_int[tel](pos_scaled[0], pos_scaled[1])
+                else:
+                    pos_int = (np.round(pos_scaled)).astype(int)
+                    cor_amp[tel, channel] = self.pm_amp[tel, pos_int[1], pos_int[0]]
+                    cor_pha[tel, channel] = self.pm_pha[tel, pos_int[1], pos_int[0]]
         return cor_amp, cor_pha
     
     
     
-    def readPhasemapsSingle(self, ra, dec, northangle, dra, ddec, tel, lam):
+    def readPhasemapsSingle(self, ra, dec, northangle, dra, ddec, tel, lam, interp=True):
         """
         Calculates coupling amplitude / phase for given 
         
@@ -637,11 +667,15 @@ class GravData():
         lambda0 = 2.2
         pos = np.array([ra + dra, dec + ddec])
         pos_rot = np.dot(self.rotation(northangle), pos)
-        pos_scaled = pos_rot*lambda0/lam*scale + 100
-        pos_int = (np.round(pos_scaled)).astype(int)
+        pos_scaled = pos_rot*lambda0/lam/scale + 100
         
-        cor_amp = self.pm_amp[tel, pos_int[1], pos_int[0]]
-        cor_pha = self.pm_pha[tel, pos_int[1], pos_int[0]]
+        if interp:
+            cor_amp = self.pm_amp_int[tel](pos_scaled[0], pos_scaled[1])
+            cor_pha = self.pm_pha_int[tel](pos_scaled[0], pos_scaled[1])
+        else:
+            pos_int = (np.round(pos_scaled)).astype(int)
+            cor_amp = self.pm_amp[tel, pos_int[1], pos_int[0]]
+            cor_pha = self.pm_pha[tel, pos_int[1], pos_int[0]]
             
         return cor_amp, cor_pha
         
@@ -676,7 +710,8 @@ class GravData():
     
     def simulateVisdata_single(self, theta, wave, dlambda, u, v, 
                                fixedBG=True, fixedBH=True, 
-                               phasemaps=False, phasemapsstuff=None):
+                               phasemaps=False, phasemapsstuff=None,
+                               interppm=True):
         '''
         Test function to generate a single datapoint for a given u, v, lambda, dlamba & theta
         
@@ -733,22 +768,26 @@ class GravData():
                                                                   phaseCenterDEC,
                                                                   north_angle1, 
                                                                   dra1, ddec1,
-                                                                  tel1, wave)
+                                                                  tel1, wave,
+                                                                  interp=interppm)
             cor_amp_sgr2, cor_pha_sgr2 = self.readPhasemapsSingle(phaseCenterRA,
                                                                   phaseCenterDEC,
                                                                   north_angle2, 
                                                                   dra2, ddec2,
-                                                                  tel2, wave)
+                                                                  tel2, wave,
+                                                                  interp=interppm)
             cor_amp_s21, cor_pha_s21 = self.readPhasemapsSingle(dRA+phaseCenterRA, 
                                                                dDEC+phaseCenterDEC,
                                                                north_angle1, 
                                                                dra1, ddec1,
-                                                               tel1, wave)
+                                                               tel1, wave,
+                                                               interp=interppm)
             cor_amp_s22, cor_pha_s22 = self.readPhasemapsSingle(dRA+phaseCenterRA, 
                                                                dDEC+phaseCenterDEC,
                                                                north_angle2, 
                                                                dra2, ddec2,
-                                                               tel2, wave)
+                                                               tel2, wave,
+                                                               interp=interppm)
             # differential opd
             opd_sgr = (cor_pha_sgr1-cor_pha_sgr2)/360*wave
             s_SgrA -= opd_sgr
@@ -784,7 +823,8 @@ class GravData():
         return vis
     
     
-    def simulateVisdata(self, theta, constant_f=True, use_opds=False, fixedBG=True, fixedBH=True, fiberOff=None, plot=True, phasemaps=False, phasemapsstuff=None):
+    def simulateVisdata(self, theta, constant_f=True, use_opds=False, fixedBG=True, fixedBH=True, fiberOff=None, 
+                        plot=True, phasemaps=False, phasemapsstuff=None, interppm=True):
         """
         Test function to see how a given theta would look like
         Theta should be a list of:
@@ -818,6 +858,7 @@ class GravData():
         self.fixedBG = fixedBG
         self.use_opds = use_opds
         self.fixedBH = fixedBH
+        self.interppm = interppm
         self.fixpos = False
         self.specialfit = False
         
@@ -948,6 +989,7 @@ class GravData():
         fixpos = self.fixpos
         fixedBH = self.fixedBH
         specialfit = self.specialfit
+        interppm = self.interppm
 
         phasemaps = self.phasemaps
         if phasemaps:
@@ -1014,14 +1056,18 @@ class GravData():
             # result has tuple of shape 4,14
             cor_amp_sgr, cor_pha_sgr = self.readPhasemaps(phaseCenterRA,
                                                           phaseCenterDEC,
+                                                          wave,
                                                           fromFits=False, 
                                                           northangle=northangle,
-                                                          dra=dra, ddec=ddec)
+                                                          dra=dra, ddec=ddec,
+                                                          interp=interppm)
             cor_amp_s2, cor_pha_s2 = self.readPhasemaps(dRA+phaseCenterRA, 
                                                         dDEC+phaseCenterDEC,
+                                                        wave,
                                                         fromFits=False, 
                                                         northangle=northangle,
-                                                        dra=dra, ddec=ddec)
+                                                        dra=dra, ddec=ddec,
+                                                        interp=interppm)
             pm_amp_sgr = np.array([[cor_amp_sgr[0], cor_amp_sgr[1]],
                                     [cor_amp_sgr[0], cor_amp_sgr[2]],
                                     [cor_amp_sgr[0], cor_amp_sgr[3]],
@@ -1046,7 +1092,7 @@ class GravData():
                                     [cor_pha_s2[1], cor_pha_s2[2]],
                                     [cor_pha_s2[1], cor_pha_s2[3]],
                                     [cor_pha_s2[2], cor_pha_s2[3]]])   
-
+            
             vis = np.zeros((6,len(wave))) + 0j
             for i in range(0,6):
                 try:
@@ -1179,7 +1225,8 @@ class GravData():
                   dRA=0., dDEC=0., plotres=True, createpdf=True, bequiet=False,
                   fixpos=False, fixedBH=False, dphRA=0.1, dphDec=0.1,
                   specialpar=np.array([0,0,0,0,0,0]), phasemaps=False,
-                  donotfit=False, donotfittheta=None):
+                  interppm=True, donotfit=False, donotfittheta=None, 
+                  onlypol1=False):
         '''
         Parameter:
         nthreads:       number of cores [4] 
@@ -1228,6 +1275,7 @@ class GravData():
         self.fixedBG = fixedBG
         self.fixpos = fixpos
         self.fixedBH = fixedBH
+        self.interppm = interppm
         rad2as = 180 / np.pi * 3600
         if np.any(specialpar):
             self.specialfit = True
@@ -1488,14 +1536,18 @@ class GravData():
                     pdf.cell(40, 6, txt=str(fixedBH), ln=1, align="L", border=0)
                     pdf.ln()
                 
-                if not bequiet:
+                if not bequiet and not donotfit:
                     print('Run MCMC for DIT %i' % (dit+1))
                 ditstart = dit*6
                 ditstop = ditstart + 6
                 t3ditstart = dit*4
                 t3ditstop = t3ditstart + 4
                 
-                for idx in range(2):
+                if onlypol1:
+                    polnom = 1
+                else:
+                    polnom = 2
+                for idx in range(polnom):
                     visamp = visamp_P[idx][ditstart:ditstop]
                     visamp_error = visamp_error_P[idx][ditstart:ditstop]
                     visamp_flag = visamp_flag_P[idx][ditstart:ditstop]
@@ -1541,12 +1593,12 @@ class GravData():
                         closure_flag[:,0:p] = True
                         closamp_flag[:,0:p] = True
 
-                        visamp_flag[:,t] = True
-                        vis2_flag[:,t] = True
-                        visphi_flag[:,t] = True
-                        closure_flag[:,t] = True
-                        closamp_flag[:,t] = True
-                    
+                        visamp_flag[:,t:] = True
+                        vis2_flag[:,t:] = True
+                        visphi_flag[:,t:] = True
+                        closure_flag[:,t:] = True
+                        closamp_flag[:,t:] = True
+                                            
                     width = 1e-1
                     pos = np.ones((nwalkers,ndim))
                     for par in range(ndim):
@@ -1555,7 +1607,10 @@ class GravData():
                         else:
                             pos[:,par] = theta[par] + width*np.random.randn(nwalkers)
                     if not bequiet:
-                        print('Run MCMC for Pol %i' % (idx+1))
+                        if not donotfit:
+                            print('Run MCMC for Pol %i' % (idx+1))
+                        else:
+                            print('Pol %i' % (idx+1))
                     fitdata = [visamp, visamp_error, visamp_flag,
                                vis2, vis2_error, vis2_flag,
                                closure, closure_error, closure_flag,
@@ -1655,22 +1710,21 @@ class GravData():
                     res_visamp = fit_visamp-visamp
                     res_vis2 = fit_vis2-vis2
                     res_closamp = fit_closamp-closamp
-                    res_closure_1 = fit_closure-closure
-                    res_closure_2 = 360-(fit_closure-closure)
+                    res_closure_1 = np.abs(fit_closure-closure)
+                    res_closure_2 = 360-np.abs(fit_closure-closure)
                     check = np.abs(res_closure_1) < np.abs(res_closure_2) 
                     res_closure = res_closure_1*check + res_closure_2*(1-check)
-                    res_visphi_1 = fit_visphi-visphi
-                    res_visphi_2 = 360-(fit_visphi-visphi)
+                    res_visphi_1 = np.abs(fit_visphi-visphi)
+                    res_visphi_2 = 360-np.abs(fit_visphi-visphi)
                     check = np.abs(res_visphi_1) < np.abs(res_visphi_2) 
                     res_visphi = res_visphi_1*check + res_visphi_2*(1-check)
-                    
-                    redchi2
 
                     redchi_visamp = np.sum(res_visamp**2./visamp_error**2.*(1-visamp_flag))
                     redchi_vis2 = np.sum(res_vis2**2./vis2_error**2.*(1-vis2_flag))
                     redchi_closure = np.sum(res_closure**2./closure_error**2.*(1-closure_flag))
                     redchi_closamp = np.sum(res_closamp**2./closamp_error**2.*(1-closamp_flag))
                     redchi_visphi = np.sum(res_visphi**2./visphi_error**2.*(1-visphi_flag))
+                    
                     
                     if redchi2:
                         redchi_visamp /= (visamp.size-np.sum(visamp_flag)-ndof)
@@ -1689,11 +1743,14 @@ class GravData():
                         redchi1 = [redchi_visamp, redchi_vis2, redchi_closure, redchi_visphi, redchi_closamp]
                         
                     if not bequiet:
+                        print('\n')
                         print('ndof: %i' % (vis2.size-np.sum(vis2_flag)-ndof))
                         print(chi2string + " for visamp: %.2f" % redchi_visamp)
-                        print(chi2string + " redchi for vis2: %.2f" % redchi_vis2)
-                        print(chi2string + " redchi for closure: %.2f" % redchi_closure)
-                        print(chi2string + " redchi for visphi: %.2f" % redchi_visphi)
+                        print(chi2string + " for vis2: %.2f" % redchi_vis2)
+                        print(chi2string + " for visphi: %.2f" % redchi_visphi)
+                        print(chi2string + " for closure: %.2f" % redchi_closure)
+                        print(chi2string + " for closamp: %.2f" % redchi_closamp)
+                        print('\n')
                         #print("average visamp error: %.2f" % 
                             #np.mean(visamp_error*(1-visamp_flag)))
                         #print("average vis2 error: %.2f" % 
@@ -1837,9 +1894,11 @@ class GravData():
             if not bequiet:
                 fitted = 1-(np.array(self.fit_for)==0)
                 redchi0_f = np.sum(redchi0*fitted)
+                if onlypol1:
+                    redchi1 = np.zeros_like(redchi0)
                 redchi1_f = np.sum(redchi1*fitted)
                 redchi_f = redchi0_f + redchi1_f
-                print('Combined %s of fitted data: %i' % (chi2string, redchi_f))
+                print('Combined %s of fitted data: %.3f' % (chi2string, redchi_f))
         return 0
 
 
