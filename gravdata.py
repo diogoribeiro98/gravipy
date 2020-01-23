@@ -9,6 +9,7 @@ from fpdf import FPDF
 from PIL import Image
 from scipy import optimize 
 from scipy import interpolate
+import mpmath
 from matplotlib import gridspec
 from pkg_resources import resource_filename
 
@@ -662,7 +663,7 @@ class GravData():
         if self.tel == 'UT':
             scale = 1
         elif self.tel == 'AT':
-            scale = 4.4
+            scale = 8/1.8
 
         lambda0 = 2.2
         pos = np.array([ra + dra, dec + ddec])
@@ -670,8 +671,8 @@ class GravData():
         pos_scaled = pos_rot*lambda0/lam/scale + 100
         
         if interp:
-            cor_amp = self.pm_amp_int[tel](pos_scaled[0], pos_scaled[1])
-            cor_pha = self.pm_pha_int[tel](pos_scaled[0], pos_scaled[1])
+            cor_amp = self.pm_amp_int[tel](pos_scaled[0], pos_scaled[1])[0]
+            cor_pha = self.pm_pha_int[tel](pos_scaled[0], pos_scaled[1])[0]
         else:
             pos_int = (np.round(pos_scaled)).astype(int)
             cor_amp = self.pm_amp[tel, pos_int[1], pos_int[0]]
@@ -689,7 +690,7 @@ class GravData():
     ############################################
     ############################################
 
-    def vis_intensity(self, s, alpha, lambda0, dlambda):
+    def vis_intensity_approx(self, s, alpha, lambda0, dlambda):
         """
         Modulated interferometric intensity
         s = B*skypos-opd1-opd2
@@ -707,11 +708,44 @@ class GravData():
         sinc = np.sinc(x/np.pi)
         return (lambda0/2.2)**(-1-alpha)*2*dlambda*sinc*np.exp(-2.j*np.pi*s/lambda0)
     
+    def vis_intensity(self, s, alpha, lambda0, dlambda):
+        x1 = lambda0+dlambda
+        x2 = lambda0-dlambda
+        if not np.isscalar(lambda0):
+            if not np.isscalar(s):
+                res = np.zeros(len(lambda0), dtype=np.complex_)
+                for idx in range(len(lambda0)):
+                    up = self.vis_int_full(s[idx], alpha, x1[idx])
+                    low = self.vis_int_full(s[idx], alpha, x2[idx])
+                    res[idx] = up - low
+            else:
+                res = np.zeros(len(lambda0), dtype=np.complex_)
+                for idx in range(len(lambda0)):
+                    up = self.vis_int_full(s, alpha, x1[idx])
+                    low = self.vis_int_full(s, alpha, x2[idx])
+                    res[idx] = up - low
+        else:
+            up = self.vis_int_full(s, alpha, x1)
+            low = self.vis_int_full(s, alpha, x2)
+            res = up - low
+        return res
+        
+    def vis_int_full(self, s, alpha, difflam):
+        if s == 0:
+            return -2.2**(1 + alpha)/alpha*difflam**(-alpha)
+        a = difflam*(difflam/2.2)**(-1-alpha)
+        bval = mpmath.gammainc(alpha, (2*1j*np.pi*s/difflam))
+        b = float(bval.real)+float(bval.imag)*1j
+        c = (2*np.pi*1j*s/difflam)**alpha
+        return (a*b/c)
+        
+        
+    
     
     def simulateVisdata_single(self, theta, wave, dlambda, u, v, 
                                fixedBG=True, fixedBH=True, 
                                phasemaps=False, phasemapsstuff=None,
-                               interppm=True):
+                               interppm=True, approx=True):
         '''
         Test function to generate a single datapoint for a given u, v, lambda, dlamba & theta
         
@@ -797,25 +831,40 @@ class GravData():
             # different coupling
             cr1 = (cor_amp_s21 / cor_amp_sgr1)**2
             cr2 = (cor_amp_s22 / cor_amp_sgr2)**2
-            
-            # interferometric intensities of all components
-            intSgrA = self.vis_intensity(s_SgrA, alpha_SgrA, wave, dlambda)
-            intS2 = self.vis_intensity(s_S2, alpha_S2, wave, dlambda)
-            intSgrA_center = self.vis_intensity(0, alpha_SgrA, wave, dlambda)
-            intS2_center = self.vis_intensity(0, alpha_S2, wave, dlambda)
-            intBG = self.vis_intensity(0, alpha_bg, wave, dlambda)
+
+            if approx:
+                intSgrA = self.vis_intensity_approx(s_SgrA, alpha_SgrA, wave, dlambda)
+                intS2 = self.vis_intensity_approx(s_S2, alpha_S2, wave, dlambda)
+                intSgrA_center = self.vis_intensity_approx(0, alpha_SgrA, wave, dlambda)
+                intS2_center = self.vis_intensity_approx(0, alpha_S2, wave, dlambda)
+                intBG = self.vis_intensity_approx(0, alpha_bg, wave, dlambda)
+            else:
+                intSgrA = self.vis_intensity(s_SgrA, alpha_SgrA, wave, dlambda)
+                intS2 = self.vis_intensity(s_S2, alpha_S2, wave, dlambda)
+                intSgrA_center = self.vis_intensity(0, alpha_SgrA, wave, dlambda)
+                intS2_center = self.vis_intensity(0, alpha_S2, wave, dlambda)
+                intBG = self.vis_intensity(0, alpha_bg, wave, dlambda)
 
             vis = ((intSgrA + f*np.sqrt(cr1*cr2)*intS2)/
                    (np.sqrt(intSgrA_center + f*cr1*intS2_center + fluxRatioBG * intBG)*
                     np.sqrt(intSgrA_center + f*cr2*intS2_center + fluxRatioBG * intBG)))
             
         else:
-            # interferometric intensities of all components
-            intSgrA = self.vis_intensity(s_SgrA, alpha_SgrA, wave, dlambda)
-            intS2 = self.vis_intensity(s_S2, alpha_S2, wave, dlambda)
-            intSgrA_center = self.vis_intensity(0, alpha_SgrA, wave, dlambda)
-            intS2_center = self.vis_intensity(0, alpha_S2, wave, dlambda)
-            intBG = self.vis_intensity(0, alpha_bg, wave, dlambda)
+            if approx:
+                intSgrA = self.vis_intensity_approx(s_SgrA, alpha_SgrA, wave, dlambda)
+                intS2 = self.vis_intensity_approx(s_S2, alpha_S2, wave, dlambda)
+                intSgrA_center = self.vis_intensity_approx(0, alpha_SgrA, wave, dlambda)
+                intS2_center = self.vis_intensity_approx(0, alpha_S2, wave, dlambda)
+                intBG = self.vis_intensity_approx(0, alpha_bg, wave, dlambda)
+            else:
+                intSgrA = self.vis_intensity(s_SgrA, alpha_SgrA, wave, dlambda)
+                intS2 = self.vis_intensity(s_S2, alpha_S2, wave, dlambda)
+                intSgrA_center = self.vis_intensity(0, alpha_SgrA, wave, dlambda)
+                intS2_center = self.vis_intensity(0, alpha_S2, wave, dlambda)
+                intBG = self.vis_intensity(0, alpha_bg, wave, dlambda)
+            #print(s_SgrA, alpha_SgrA, wave, dlambda)
+            #print(intSgrA)
+                
             
             vis = ((intSgrA + f * intS2)/
                     (intSgrA_center + f * intS2_center + fluxRatioBG * intBG))
@@ -824,7 +873,8 @@ class GravData():
     
     
     def simulateVisdata(self, theta, constant_f=True, use_opds=False, fixedBG=True, fixedBH=True, fiberOff=None, 
-                        plot=True, phasemaps=False, phasemapsstuff=None, interppm=True):
+                        plot=True, phasemaps=False, phasemapsstuff=None, interppm=True,
+                        approx=False):
         """
         Test function to see how a given theta would look like
         Theta should be a list of:
@@ -859,6 +909,7 @@ class GravData():
         self.use_opds = use_opds
         self.fixedBH = fixedBH
         self.interppm = interppm
+        self.approx = approx
         self.fixpos = False
         self.specialfit = False
         
@@ -990,6 +1041,7 @@ class GravData():
         fixedBH = self.fixedBH
         specialfit = self.specialfit
         interppm = self.interppm
+        approx = self.approx
 
         phasemaps = self.phasemaps
         if phasemaps:
@@ -1118,12 +1170,18 @@ class GravData():
                 cr1 = (pm_amp_s2[i,0] / pm_amp_sgr[i,0])**2
                 cr2 = (pm_amp_s2[i,1] / pm_amp_sgr[i,1])**2
                 
-                # interferometric intensities of all components
-                intSgrA = self.vis_intensity(s_SgrA, alpha_SgrA, wave, dlambda[i,:])
-                intS2 = self.vis_intensity(s_S2, alpha_S2, wave, dlambda[i,:])
-                intSgrA_center = self.vis_intensity(0, alpha_SgrA, wave, dlambda[i,:])
-                intS2_center = self.vis_intensity(0, alpha_S2, wave, dlambda[i,:])
-                intBG = self.vis_intensity(0, alpha_bg, wave, dlambda[i,:])
+                if approx:
+                    intSgrA = self.vis_intensity_approx(s_SgrA, alpha_SgrA, wave, dlambda[i,:])
+                    intS2 = self.vis_intensity_approx(s_S2, alpha_S2, wave, dlambda[i,:])
+                    intSgrA_center = self.vis_intensity_approx(0, alpha_SgrA, wave, dlambda[i,:])
+                    intS2_center = self.vis_intensity_approx(0, alpha_S2, wave, dlambda[i,:])
+                    intBG = self.vis_intensity_approx(0, alpha_bg, wave, dlambda[i,:])
+                else:
+                    intSgrA = self.vis_intensity(s_SgrA, alpha_SgrA, wave, dlambda[i,:])
+                    intS2 = self.vis_intensity(s_S2, alpha_S2, wave, dlambda[i,:])
+                    intSgrA_center = self.vis_intensity(0, alpha_SgrA, wave, dlambda[i,:])
+                    intS2_center = self.vis_intensity(0, alpha_S2, wave, dlambda[i,:])
+                    intBG = self.vis_intensity(0, alpha_bg, wave, dlambda[i,:])
 
                 vis[i,:] = ((intSgrA + 
                             np.sqrt(f_bl[i,0] * f_bl[i,1] * cr1 * cr2) * intS2)/
@@ -1149,13 +1207,19 @@ class GravData():
                 if specialfit:
                     s_SgrA += sp_bl[i]
                     s_S2 += sp_bl[i]
-            
-                # interferometric intensities of all components
-                intSgrA = self.vis_intensity(s_SgrA, alpha_SgrA, wave, dlambda[i,:])
-                intS2 = self.vis_intensity(s_S2, alpha_S2, wave, dlambda[i,:])
-                intSgrA_center = self.vis_intensity(0, alpha_SgrA, wave, dlambda[i,:])
-                intS2_center = self.vis_intensity(0, alpha_S2, wave, dlambda[i,:])
-                intBG = self.vis_intensity(0, alpha_bg, wave, dlambda[i,:])
+                
+                if approx:
+                    intSgrA = self.vis_intensity_approx(s_SgrA, alpha_SgrA, wave, dlambda[i,:])
+                    intS2 = self.vis_intensity_approx(s_S2, alpha_S2, wave, dlambda[i,:])
+                    intSgrA_center = self.vis_intensity_approx(0, alpha_SgrA, wave, dlambda[i,:])
+                    intS2_center = self.vis_intensity_approx(0, alpha_S2, wave, dlambda[i,:])
+                    intBG = self.vis_intensity_approx(0, alpha_bg, wave, dlambda[i,:])
+                else:
+                    intSgrA = self.vis_intensity(s_SgrA, alpha_SgrA, wave, dlambda[i,:])
+                    intS2 = self.vis_intensity(s_S2, alpha_S2, wave, dlambda[i,:])
+                    intSgrA_center = self.vis_intensity(0, alpha_SgrA, wave, dlambda[i,:])
+                    intS2_center = self.vis_intensity(0, alpha_S2, wave, dlambda[i,:])
+                    intBG = self.vis_intensity(0, alpha_bg, wave, dlambda[i,:])
                     
                 vis[i,:] = ((intSgrA + 
                             np.sqrt(f_bl[i,0] * f_bl[i,1]) * intS2)/
@@ -1200,14 +1264,20 @@ class GravData():
         
         res_visamp = np.sum(-(model_visamp-visamp)**2/visamp_error**2*(1-visamp_flag))
         res_vis2 = np.sum(-(model_vis2-vis2)**2./vis2_error**2.*(1-vis2_flag))
-        res_clos = np.sum(-np.minimum((model_closure-closure)**2.,
-                                      (360-(model_closure-closure))**2.)/
-                          closure_error**2.*(1-closure_flag))
-        res_phi = np.sum(-np.minimum((model_visphi-visphi)**2.,
-                                     (360-(model_visphi-visphi))**2.)/
-                          visphi_error**2.*(1-visphi_flag))
         res_closamp = np.sum(-(model_closamp-closamp)**2/closamp_error**2*(1-closamp_flag))
         
+        res_closure_1 = np.abs(model_closure-closure)
+        res_closure_2 = 360-np.abs(model_closure-closure)
+        check = np.abs(res_closure_1) < np.abs(res_closure_2)
+        res_closure = res_closure_1*check + res_closure_2*(1-check)
+        res_clos = np.sum(-res_closure**2./closure_error**2.*(1-closure_flag))
+ 
+        res_visphi_1 = np.abs(model_visphi-visphi)
+        res_visphi_2 = 360-np.abs(model_visphi-visphi)
+        check = np.abs(res_visphi_1) < np.abs(res_visphi_2) 
+        res_visphi = res_visphi_1*check + res_visphi_2*(1-check)
+        res_phi = np.sum(-res_visphi**2./visphi_error**2.*(1-visphi_flag))
+
         ln_prob_res = 0.5 * (res_visamp * self.fit_for[0] + 
                              res_vis2 * self.fit_for[1] + 
                              res_clos * self.fit_for[2] + 
@@ -1215,6 +1285,40 @@ class GravData():
                              res_closamp * self.fit_for[4])
         
         return ln_prob_res 
+    
+    
+    def curvefitfunc(self, x, ra, dec, f1, alpha_a, f_BG):       
+        u = self.u
+        v = self.v 
+        wave = self.wave
+        dlambda = self.dlambda
+        fit_for = self.fit_for
+        flag = self.flag
+        
+        f2 = 0.1 
+        f3 = 0.1
+        f4 = 0.1 
+        alpha_BG = 4
+        pcra = -19
+        pcdec = -32
+        opd1 = 0
+        opd2 = 0
+        opd3 = 0
+        opd4 = 0
+        special = 0
+        
+        theta = [ra, dec, f1, f2, f3, f4, alpha_a, f_BG, alpha_BG, pcra, pcdec,
+                 opd1, opd2, opd3, opd4, special]
+        model_visamp, model_visphi, model_closure, model_closamp = self.calc_vis(theta,u,v,wave,dlambda)
+        model_vis2 = model_visamp**2.
+        
+        fit = (model_visamp*fit_for[0]*flag[0]).ravel()
+        fit = np.append(fit, (model_vis2*fit_for[1]*flag[1]).ravel())
+        fit = np.append(fit, (np.arctan(model_closure)**2*fit_for[2]*flag[2]).ravel())
+        fit = np.append(fit, (np.arctan(model_visphi)**2*fit_for[3]*flag[3]).ravel())
+        fit = np.append(fit, (model_closamp*fit_for[4]*flag[4]).ravel())  
+        
+        return fit
     
     
     
@@ -1226,7 +1330,7 @@ class GravData():
                   fixpos=False, fixedBH=False, dphRA=0.1, dphDec=0.1,
                   specialpar=np.array([0,0,0,0,0,0]), phasemaps=False,
                   interppm=True, donotfit=False, donotfittheta=None, 
-                  onlypol1=False):
+                  onlypol1=False, approx=True, initial=None):
         '''
         Parameter:
         nthreads:       number of cores [4] 
@@ -1276,6 +1380,7 @@ class GravData():
         self.fixpos = fixpos
         self.fixedBH = fixedBH
         self.interppm = interppm
+        self.approx = approx
         rad2as = 180 / np.pi * 3600
         if np.any(specialpar):
             self.specialfit = True
@@ -1365,34 +1470,62 @@ class GravData():
         dlambda = self.dlambda
 
         # Initial guesses
-        size = 4
-        dRA_init = np.array([dRA,dRA-size,dRA+size])
-        dDEC_init = np.array([dDEC,dDEC-size,dDEC+size])
+        if initial is not None:
+            if len(initial) != 16:
+                raise ValueError('Length of initial parameter list is not correct')
+            size = 2
+            dRA_init = np.array([initial[0],initial[0]-size,initial[0]+size])
+            dDEC_init = np.array([initial[1],initial[1]-size,initial[1]+size])
 
-        fr_start = np.log10(0.1)
-        flux_ratio_1_init = np.array([fr_start, np.log10(0.01), np.log10(10.)])
-        flux_ratio_2_init = np.array([fr_start, np.log10(0.001), np.log10(10.)])
-        flux_ratio_3_init = np.array([fr_start, np.log10(0.001), np.log10(10.)])
-        flux_ratio_4_init = np.array([fr_start, np.log10(0.001), np.log10(10.)])
+            flux_ratio_1_init = np.array([np.log10(initial[2]), np.log10(0.01), np.log10(10.)])
+            flux_ratio_2_init = np.array([np.log10(initial[3]), np.log10(0.001), np.log10(10.)])
+            flux_ratio_3_init = np.array([np.log10(initial[4]), np.log10(0.001), np.log10(10.)])
+            flux_ratio_4_init = np.array([np.log10(initial[5]), np.log10(0.001), np.log10(10.)])
 
-        alpha_SgrA_init = np.array([-1.,-10.,10.])
-        flux_ratio_bg_init = np.array([0.1,0.,20.])
-        color_bg_init = np.array([3.,-10.,10.])
+            alpha_SgrA_init = np.array([initial[6],-10.,10.])
+            flux_ratio_bg_init = np.array([initial[7],0.,20.])
+            color_bg_init = np.array([initial[8],-10.,10.])
 
-        size = 5
-        phase_center_RA = dphRA
-        phase_center_DEC = dphDec
+            size = 5
+            phase_center_RA_init = np.array([initial[9],initial[9]-size,initial[9]+size])
+            phase_center_DEC_init = np.array([initial[10],initial[10]-size,initial[10]+size])
 
-        phase_center_RA_init = np.array([phase_center_RA,phase_center_RA-size,phase_center_RA+size])
-        phase_center_DEC_init = np.array([phase_center_DEC,phase_center_DEC-size,phase_center_DEC+size])
+            opd_max = 0.5 # maximum opd in microns (lambda/4)
+            opd_1_init = [initial[11],-opd_max,opd_max]
+            opd_2_init = [initial[12],-opd_max,opd_max]
+            opd_3_init = [initial[13],-opd_max,opd_max]
+            opd_4_init = [initial[14],-opd_max,opd_max]
+            special_par = [initial[15], -2, 2]
+        else:
+            size = 4
+            dRA_init = np.array([dRA,dRA-size,dRA+size])
+            dDEC_init = np.array([dDEC,dDEC-size,dDEC+size])
 
-        opd_max = 0.5 # maximum opd in microns (lambda/4)
-        opd_1_init = [0.1,-opd_max,opd_max]
-        opd_2_init = [0.1,-opd_max,opd_max]
-        opd_3_init = [0.1,-opd_max,opd_max]
-        opd_4_init = [0.1,-opd_max,opd_max]
-        special_par = [-0.15, -2, 2]
+            fr_start = np.log10(0.1)
+            flux_ratio_1_init = np.array([fr_start, np.log10(0.01), np.log10(10.)])
+            flux_ratio_2_init = np.array([fr_start, np.log10(0.001), np.log10(10.)])
+            flux_ratio_3_init = np.array([fr_start, np.log10(0.001), np.log10(10.)])
+            flux_ratio_4_init = np.array([fr_start, np.log10(0.001), np.log10(10.)])
 
+            alpha_SgrA_init = np.array([-1.,-10.,10.])
+            flux_ratio_bg_init = np.array([0.1,0.,20.])
+            color_bg_init = np.array([3.,-10.,10.])
+
+            size = 5
+            phase_center_RA = dphRA
+            phase_center_DEC = dphDec
+
+            phase_center_RA_init = np.array([phase_center_RA,phase_center_RA-size,phase_center_RA+size])
+            phase_center_DEC_init = np.array([phase_center_DEC,phase_center_DEC-size,phase_center_DEC+size])
+
+            opd_max = 0.5 # maximum opd in microns (lambda/4)
+            opd_1_init = [0.1,-opd_max,opd_max]
+            opd_2_init = [0.1,-opd_max,opd_max]
+            opd_3_init = [0.1,-opd_max,opd_max]
+            opd_4_init = [0.1,-opd_max,opd_max]
+            special_par = [-0.15, -2, 2]
+            
+        
         # initial fit parameters 
         theta = np.array([dRA_init[0],dDEC_init[0],flux_ratio_1_init[0],flux_ratio_2_init[0],
                           flux_ratio_3_init[0],flux_ratio_4_init[0],alpha_SgrA_init[0],
@@ -1430,6 +1563,10 @@ class GravData():
             todel.append(6)
         if fixedBG:
             todel.append(8)
+        
+        # no phases, still in chi2, ATTENTION delete later
+        todel.append(9)
+        todel.append(10)
         if fit_for[3] == 0:
             todel.append(9)
             todel.append(10)
@@ -1617,6 +1754,8 @@ class GravData():
                                visphi, visphi_error, visphi_flag,
                                closamp, closamp_error, closamp_flag]
                     
+                    self.fitstuff = [fitdata, u, v, wave, dlambda, theta]
+
                     if not donotfit:
                         if nthreads == 1:
                             sampler = emcee.EnsembleSampler(nwalkers, ndim, self.lnprob, 
@@ -1681,6 +1820,9 @@ class GravData():
                         if nruns > 300:
                             fl_samples = samples[:, -200:, :].reshape((-1, ndim))
                             fl_clsamples = clsamples[:, -200:, :].reshape((-1, cldim))                
+                        elif nruns > 200:
+                            fl_samples = samples[:, -100:, :].reshape((-1, ndim))
+                            fl_clsamples = clsamples[:, -100:, :].reshape((-1, cldim))   
                         else:
                             fl_samples = samples.reshape((-1, ndim))
                             fl_clsamples = clsamples.reshape((-1, cldim))
