@@ -2492,96 +2492,29 @@ class GravData():
                     ### MCMC starts!
 
                     if not donotfit:
-                        if nthreads == 1:
-                            sampler = emcee.EnsembleSampler(nwalkers, ndim, self.lnprob, 
-                                                                args=(fitdata, u, v, wave,
-                                                                    dlambda, theta_lower,
-                                                                    theta_upper))
-                            if bequiet:
-                                sampler.run_mcmc(pos, nruns, progress=False)
-                            else:
-                                sampler.run_mcmc(pos, nruns, progress=True)
-                        else:
-                            with Pool(processes=nthreads) as pool:
-                                sampler = emcee.EnsembleSampler(nwalkers, ndim, self.lnprob, 
-                                                                args=(fitdata, u, v, wave,
-                                                                    dlambda, theta_lower,
-                                                                    theta_upper),
-                                                                pool=pool)
-                                if bequiet:
-                                    sampler.run_mcmc(pos, nruns, progress=False) 
-                                else:
-                                    sampler.run_mcmc(pos, nruns, progress=True)     
-                                
-                        if not bequiet:
-                            print("---------------------------------------")
-                            print("Mean acceptance fraction: %.2f"  % np.mean(sampler.acceptance_fraction))
-                            print("---------------------------------------")
-                        if createpdf:
-                            pdf.cell(0, 10, txt="Polarization  %i" % (idx+1), ln=2, align="C", border='B')
-                            pdf.cell(0, 10, txt="Mean acceptance fraction: %.2f"  %
-                                    np.mean(sampler.acceptance_fraction), 
-                                    ln=2, align="L", border=0)
-                        samples = sampler.chain
-                        mostprop = sampler.flatchain[np.argmax(sampler.flatlnprobability)]
+                        data = np.append(visamp.ravel(),vis2.ravel())
+                        data = np.append(data, np.arctan(np.radians(closure).ravel())**2)                                
+                        data = np.append(data, np.arctan(np.radians(visphi).ravel())**2)
+                        data = np.append(data, closamp.ravel())
+                        
+                        error = np.append(visamp_error.ravel(),vis2_error.ravel())
+                        error = np.append(error, np.arctan(np.radians(closure_error ).ravel())**2)                                
+                        error = np.append(error, np.arctan(np.radians(visphi_error  ).ravel())**2)
+                        error = np.append(error, closamp_error.ravel())
+                        
+                        flag = np.append(visamp_flag.ravel(),vis2_flag.ravel())
+                        flag = np.append(flag,closure_flag.ravel())                                
+                        flag = np.append(flag, visphi_flag.ravel())
+                        flag = np.append(flag, closamp_flag.ravel())
+                        
+                        data = data[flag]
+                        error = error[flag]
+                        popt, cov = curve_fit(self.curvefitfunc, np.ones_like(data), data, p0=theta)
 
-                        # for debuggin: save the chain
-                        #samples = np.load("samples_MCMC_groupedM_%i.npy" % idx)
-                        #mostprop = np.load("samples_MCMC_groupedM_mostprop_%i.npy" % idx)
+                        theta = popt
+                        theta_result = popt
                         
-                        clsamples = np.delete(samples, todel, 2)
-                        cllabels = np.delete(theta_names, todel)
-                        cllabels_raw = np.delete(theta_names_raw, todel)
-                        clmostprop = np.delete(mostprop, todel)
-                        
-                        cldim = len(cllabels)
-                        if plot:
-                            fig, axes = plt.subplots(cldim, figsize=(8, cldim/1.5),
-                                                    sharex=True)
-                            for i in range(cldim):
-                                ax = axes[i]
-                                ax.plot(clsamples[:, :, i].T, "k", alpha=0.3)
-                                ax.set_ylabel(cllabels[i])
-                                ax.yaxis.set_label_coords(-0.1, 0.5)
-                            axes[-1].set_xlabel("step number")
-                            
-                            if createpdf:
-                                pdfname = '%s_pol%i_1.png' % (savetime, idx)
-                                plt.savefig(pdfname)
-                                plt.close()
-                            else:
-                                plt.show()
-                        
-                        if nruns > 300:
-                            fl_samples = samples[:, -200:, :].reshape((-1, ndim))
-                            fl_clsamples = clsamples[:, -200:, :].reshape((-1, cldim))                
-                        elif nruns > 200:
-                            fl_samples = samples[:, -100:, :].reshape((-1, ndim))
-                            fl_clsamples = clsamples[:, -100:, :].reshape((-1, cldim))   
-                        else:
-                            fl_samples = samples.reshape((-1, ndim))
-                            fl_clsamples = clsamples.reshape((-1, cldim))
-
-                        if plot:
-                            ranges = np.percentile(fl_clsamples, [3, 97], axis=0).T
-                            fig = corner.corner(fl_clsamples, quantiles=[0.16, 0.5, 0.84],
-                                                truths=clmostprop, labels=cllabels)
-                            if createpdf:
-                                pdfname = '%s_pol%i_2.png' % (savetime, idx)
-                                plt.savefig(pdfname)
-                                plt.close()
-                            else:
-                                plt.show()
-                            
-                        # get the actual fit
-                        theta_fit = np.percentile(fl_samples, [50], axis=0).T
-                        if bestchi:
-                            theta_result = mostprop
-                        else:
-                            theta_result = theta_fit
-                    else:
-                        theta_result = donotfittheta
-                    fit_visamp, fit_visphi, fit_closure, fit_closamp = self.calc_vis(theta_result, u, v, wave, dlambda)
+                    fit_visamp, fit_visphi, fit_closure, fit_closamp = self.calc_vis(theta, u, v, wave, dlambda)
                     fit_vis2 = fit_visamp**2.
                             
                     res_visamp = fit_visamp-visamp
@@ -2637,24 +2570,7 @@ class GravData():
                         #print("average visphi error (deg): %.2f" % 
                             #np.mean(visphi_error*(1-visphi_flag)))
                     
-                    if not donotfit:
-                        percentiles = np.percentile(fl_clsamples, [16, 50, 84],axis=0).T
-                        percentiles[:,0] = percentiles[:,1] - percentiles[:,0] 
-                        percentiles[:,2] = percentiles[:,2] - percentiles[:,1] 
-                        
-                        if not bequiet:
-                            print("-----------------------------------")
-                            print("Best chi2 result:")
-                            for i in range(0, cldim):
-                                print("%s = %.3f" % (cllabels_raw[i], clmostprop[i]))
-                            print("\n")
-                            print("MCMC Result:")
-                            for i in range(0, cldim):
-                                print("%s = %.3f + %.3f - %.3f" % (cllabels_raw[i],
-                                                                percentiles[i,1], 
-                                                                percentiles[i,2], 
-                                                                percentiles[i,0]))
-                            print("-----------------------------------")
+
                     
                     if createpdf:
                         pdf.cell(40, 8, txt="", ln=0, align="L", border="B")
