@@ -1293,7 +1293,7 @@ class GravData():
         wave = self.wave
         dlambda = self.dlambda
         fit_for = self.fit_for
-        flag = self.flag
+        #flag = self.flag
         
         f2 = 0.1 
         f3 = 0.1
@@ -1310,14 +1310,24 @@ class GravData():
         theta = [ra, dec, f1, f2, f3, f4, alpha_a, f_BG, alpha_BG, pcra, pcdec,
                  opd1, opd2, opd3, opd4, special]
         model_visamp, model_visphi, model_closure, model_closamp = self.calc_vis(theta,u,v,wave,dlambda)
+
+        
         model_vis2 = model_visamp**2.
+        flag = np.repeat(np.ones_like(model_visamp),4)
         
-        fit = (model_visamp*fit_for[0]*flag[0]).ravel()
-        fit = np.append(fit, (model_vis2*fit_for[1]*flag[1]).ravel())
-        fit = np.append(fit, (np.arctan(model_closure)**2*fit_for[2]*flag[2]).ravel())
-        fit = np.append(fit, (np.arctan(model_visphi)**2*fit_for[3]*flag[3]).ravel())
-        fit = np.append(fit, (model_closamp*fit_for[4]*flag[4]).ravel())  
+        fit = np.append(model_visamp.ravel(), model_vis2.ravel())
+        fit = np.append(fit, np.arctan(np.radians(model_closure.ravel()))**2)
+        #fit = np.append(fit, np.arctan(np.radians(model_visphi.ravel() ))**2)
         
+        
+        
+        #fit = (model_visamp*fit_for[0]*flag[0]).ravel()
+        #fit = np.append(fit, (model_vis2*fit_for[1]*flag[1]).ravel())
+        #fit = np.append(fit, (np.arctan(model_closure)**2*fit_for[2]*flag[2]).ravel())
+        #fit = np.append(fit, (np.arctan(model_visphi)**2*fit_for[3]*flag[3]).ravel())
+        #fit = np.append(fit, (model_closamp*fit_for[4]*flag[4]).ravel())  
+        #print([type(m) for m in model_visamp])
+        #print(type(model_visamp))
         return fit
     
     
@@ -2042,6 +2052,733 @@ class GravData():
                 redchi_f = redchi0_f + redchi1_f
                 print('Combined %s of fitted data: %.3f' % (chi2string, redchi_f))
         return 0
+
+
+    def fitBinaryChiSquare(self, nthreads=4, nwalkers=500, nruns=500, bestchi=True,
+                  plot=True, fit_for=np.array([0.5,0.5,1.0,0.0,0.0]), constant_f=True,
+                  use_opds=False, fixedBG=True, noS2=True, redchi2=False,
+                  write_results=True, flagtill=3, flagfrom=13,
+                  dRA=0., dDEC=0., plotres=True, createpdf=True, bequiet=False,
+                  fixpos=False, fixedBH=False, dphRA=0.1, dphDec=0.1,
+                  specialpar=np.array([0,0,0,0,0,0]), phasemaps=False,
+                  interppm=True, donotfit=False, donotfittheta=None, 
+                  onlypol1=False, approx=True, initial=None):
+        '''
+        Parameter:
+        nthreads:       number of cores [4] 
+        nwalkers:       number of walkers [500] 
+        nruns:          number of MCMC runs [500] 
+        bestchi:        Gives best chi2 (for True) or mcmc res as output [True]
+        plot:           plot MCMC results [True]
+        plotres:        plot fit result [True]
+        write_results:  Write fit results in file [True] 
+        fit_for:        weight of VA, V2, T3, VP, T3AMP [[0.5,0.5,1.0,0.0,0.0]] 
+        constant_f:     Constant coupling [True]
+        use_opds:       Fit OPDs [False] 
+        noS2:           Does not do anything if OFFX and OFFY=0
+        fixedBG:        Fir for background power law [False]
+        flagtill:       Flag blue channels [3] 
+        flagfrom:       Flag red channels [13]
+        dRA:            Guess for dRA (taken from SOFFX if not 0)
+        dDEC:           Guess for dDEC (taken from SOFFY if not 0)
+        bequiet:        Suppresses ALL outputs
+        createpdf:      Creates a pdf with fit results and all plots [True] 
+        fixpos:         Does nto fit the distance between the sources [False]
+        fixedBH:        Fit for black hole power law [False]
+        
+        For a fit to two components: A (SgrA*) and B (S2)
+        The possible fit properties are:
+        dRA         Separation from A to B in RA [mas]
+        dDEC        Separation from A to B in Dec [mas]
+        f1          Flux ratio log(B/A) for telescope 1 (or all telescopes)
+        f2          Flux ratio log(B/A) for telescope 2
+        f3          Flux ratio log(B/A) for telescope 3
+        f4          Flux ratio log(B/A) for telescope 4
+        alpha A     spectral index of component A:  vSv = v^alpha 
+        f BG        Flux ratio of background: BG/A
+        alpha BG    spectral index of component BG:  vSv = v^alpha 
+        PC RA       Offset of the phasecenter from field center in RA [mas]
+        PC DEC      Offset of the phasecenter from field center in Dec [mas]
+        OPD1        OPD for telescope 1 [mum]
+        OPD2        OPD for telescope 2 [mum]
+        OPD3        OPD for telescope 3 [mum]
+        OPD4        OPD for telescope 4 [mum]
+        special"
+        '''
+        self.fit_for = fit_for
+        self.constant_f = constant_f
+        self.use_opds = use_opds
+        self.fixedBG = fixedBG
+        self.fixpos = fixpos
+        self.fixedBH = fixedBH
+        self.interppm = interppm
+        self.approx = approx
+        rad2as = 180 / np.pi * 3600
+        if np.any(specialpar):
+            self.specialfit = True
+            self.specialfit_bl = specialpar
+            if not bequiet:
+                print('Specialfit parameter applied to BLs:')
+                nonzero = np.nonzero(self.specialfit_bl)[0]
+                print(*list(nonzero*self.specialfit_bl[nonzero]))
+                print('\n')
+        else:
+            self.specialfit = False
+        specialfit = self.specialfit
+        
+        self.phasemaps = phasemaps
+        if phasemaps:
+            self.loadPhasemaps()
+            
+            header = fits.open(self.name)[0].header
+            northangle1 = header['ESO QC ACQ FIELD1 NORTH_ANGLE']/180*math.pi
+            northangle2 = header['ESO QC ACQ FIELD2 NORTH_ANGLE']/180*math.pi
+            northangle3 = header['ESO QC ACQ FIELD3 NORTH_ANGLE']/180*math.pi
+            northangle4 = header['ESO QC ACQ FIELD4 NORTH_ANGLE']/180*math.pi
+            self.northangle = [northangle1, northangle2, northangle3, northangle4]
+
+            ddec1 = header['ESO QC MET SOBJ DDEC1']
+            ddec2 = header['ESO QC MET SOBJ DDEC2']
+            ddec3 = header['ESO QC MET SOBJ DDEC3']
+            ddec4 = header['ESO QC MET SOBJ DDEC4']
+            self.ddec = [ddec1, ddec2, ddec3, ddec4]
+
+            dra1 = header['ESO QC MET SOBJ DRA1']
+            dra2 = header['ESO QC MET SOBJ DRA2']
+            dra3 = header['ESO QC MET SOBJ DRA3']
+            dra4 = header['ESO QC MET SOBJ DRA4']
+            self.dra = [dra1, dra2, dra3, dra4]
+
+
+        # Get data from file
+        tel = fits.open(self.name)[0].header["TELESCOP"]
+        if tel == 'ESO-VLTI-U1234':
+            self.tel = 'UT'
+        elif tel == 'ESO-VLTI-A1234':
+            self.tel = 'AT'
+        else:
+            raise ValueError('Telescope not AT or UT, something wrong with input data')
+
+        nwave = self.channel
+        self.getIntdata(plot=False, flag=False)
+        MJD = fits.open(self.name)[0].header["MJD-OBS"]
+        u = self.u
+        v = self.v
+        wave = self.wlSC_P1
+        self.fiberOffX = -fits.open(self.name)[0].header["HIERARCH ESO INS SOBJ OFFX"] 
+        self.fiberOffY = -fits.open(self.name)[0].header["HIERARCH ESO INS SOBJ OFFY"] 
+        if not bequiet:
+            print("fiber center: %.2f, %.2f (mas)" % (self.fiberOffX,
+                                                    self.fiberOffY))
+        if dRA == 0 and dDEC == 0:
+            if self.fiberOffX != 0 and self.fiberOffY != 0:
+                dRA = self.fiberOffX
+                dDEC = self.fiberOffY
+            if self.fiberOffX == 0 and self.fiberOffY == 0:
+                if noS2:
+                    if not bequiet:
+                        print('No Fiber offset, if you want to fit this file use noS2=False')
+                    return 0
+            if dRA == 0 and dDEC == 0:
+                if not bequiet:
+                    print('Fiber offset is zero, guess for dRA & dDEC should be given with function')
+        else:
+            print('Guess for RA & DEC from function as: %.2f, %.2f' % (dRA, dDEC))
+        
+        stname = self.name.find('GRAVI')        
+        txtfilename = 'binaryfit_' + self.name[stname:-5] + '.txt'
+        if write_results:
+            txtfile = open(txtfilename, 'w')
+            txtfile.write('# Results of binary fit for %s \n' % self.name[stname:])
+            txtfile.write('# Lines are: Best chi2, MCMC result, MCMC error -, MCMC error + \n')
+            txtfile.write('# Rowes are: dRA, dDEC, f1, f2, f3, f4, alpha flare, f BG, alpha BG, PC RA, PC DEC, OPD1, OPD2, OPD3, OPD4 \n')
+            txtfile.write('# Parameter which are not fitted have 0.0 as error \n')
+            txtfile.write('# MJD: %f \n' % MJD)
+            txtfile.write('# OFFX: %f \n' % self.fiberOffX)
+            txtfile.write('# OFFY: %f \n\n' % self.fiberOffY)
+
+        self.wave = wave
+        self.getDlambda()
+        dlambda = self.dlambda
+
+        # Initial guesses
+        if initial is not None:
+            if len(initial) != 16:
+                raise ValueError('Length of initial parameter list is not correct')
+            size = 2
+            dRA_init = np.array([initial[0],initial[0]-size,initial[0]+size])
+            dDEC_init = np.array([initial[1],initial[1]-size,initial[1]+size])
+
+            flux_ratio_1_init = np.array([np.log10(initial[2]), np.log10(0.01), np.log10(10.)])
+            flux_ratio_2_init = np.array([np.log10(initial[3]), np.log10(0.001), np.log10(10.)])
+            flux_ratio_3_init = np.array([np.log10(initial[4]), np.log10(0.001), np.log10(10.)])
+            flux_ratio_4_init = np.array([np.log10(initial[5]), np.log10(0.001), np.log10(10.)])
+
+            alpha_SgrA_init = np.array([initial[6],-10.,10.])
+            flux_ratio_bg_init = np.array([initial[7],0.,20.])
+            color_bg_init = np.array([initial[8],-10.,10.])
+
+            size = 5
+            phase_center_RA_init = np.array([initial[9],initial[9]-size,initial[9]+size])
+            phase_center_DEC_init = np.array([initial[10],initial[10]-size,initial[10]+size])
+
+            opd_max = 0.5 # maximum opd in microns (lambda/4)
+            opd_1_init = [initial[11],-opd_max,opd_max]
+            opd_2_init = [initial[12],-opd_max,opd_max]
+            opd_3_init = [initial[13],-opd_max,opd_max]
+            opd_4_init = [initial[14],-opd_max,opd_max]
+            special_par = [initial[15], -2, 2]
+        else:
+            size = 4
+            dRA_init = np.array([dRA,dRA-size,dRA+size])
+            dDEC_init = np.array([dDEC,dDEC-size,dDEC+size])
+
+            fr_start = np.log10(0.1)
+            flux_ratio_1_init = np.array([fr_start, np.log10(0.01), np.log10(10.)])
+            flux_ratio_2_init = np.array([fr_start, np.log10(0.001), np.log10(10.)])
+            flux_ratio_3_init = np.array([fr_start, np.log10(0.001), np.log10(10.)])
+            flux_ratio_4_init = np.array([fr_start, np.log10(0.001), np.log10(10.)])
+
+            alpha_SgrA_init = np.array([-1.,-10.,10.])
+            flux_ratio_bg_init = np.array([0.1,0.,20.])
+            color_bg_init = np.array([3.,-10.,10.])
+
+            size = 5
+            phase_center_RA = dphRA
+            phase_center_DEC = dphDec
+
+            phase_center_RA_init = np.array([phase_center_RA,phase_center_RA-size,phase_center_RA+size])
+            phase_center_DEC_init = np.array([phase_center_DEC,phase_center_DEC-size,phase_center_DEC+size])
+
+            opd_max = 0.5 # maximum opd in microns (lambda/4)
+            opd_1_init = [0.1,-opd_max,opd_max]
+            opd_2_init = [0.1,-opd_max,opd_max]
+            opd_3_init = [0.1,-opd_max,opd_max]
+            opd_4_init = [0.1,-opd_max,opd_max]
+            special_par = [-0.15, -2, 2]
+            
+        
+        # initial fit parameters 
+        theta = np.array([dRA_init[0],dDEC_init[0],flux_ratio_1_init[0],flux_ratio_2_init[0],
+                          flux_ratio_3_init[0],flux_ratio_4_init[0],alpha_SgrA_init[0],
+                          flux_ratio_bg_init[0],color_bg_init[0],phase_center_RA_init[0],
+                          phase_center_DEC_init[0],opd_1_init[0],opd_2_init[0],opd_3_init[0],opd_4_init[0],special_par[0]])
+
+        # lower limit on fit parameters 
+        theta_lower = np.array([dRA_init[1],dDEC_init[1],flux_ratio_1_init[1],flux_ratio_2_init[1],
+                                flux_ratio_3_init[1],flux_ratio_4_init[1],alpha_SgrA_init[1],
+                                flux_ratio_bg_init[1],color_bg_init[1],phase_center_RA_init[1],
+                                phase_center_DEC_init[1],opd_1_init[1],opd_2_init[1],opd_3_init[1],opd_4_init[1], special_par[1]])
+
+        # upper limit on fit parameters 
+        theta_upper = np.array([dRA_init[2],dDEC_init[2],flux_ratio_1_init[2],flux_ratio_2_init[2],
+                                flux_ratio_3_init[2],flux_ratio_4_init[2],alpha_SgrA_init[2],
+                                flux_ratio_bg_init[2],color_bg_init[2],phase_center_RA_init[2],
+                                phase_center_DEC_init[2],opd_1_init[2],opd_2_init[2],opd_3_init[2],opd_4_init[2], special_par[2]])
+
+        theta_names = np.array(["dRA", "dDEC", "f1", "f2", "f3", "f4" , r"$\alpha_{flare}$", r"$f_{bg}$",
+                                r"$\alpha_{bg}$", r"$RA_{PC}$", r"$DEC_{PC}$", "OPD1", "OPD2", "OPD3", "OPD4", "special"])
+        theta_names_raw = np.array(["dRA", "dDEC", "f1", "f2", "f3", "f4" , "alpha flare", "f BG",
+                                    "alpha BG", "PC RA", "PC DEC", "OPD1", "OPD2", "OPD3", "OPD4", "special"])
+
+
+        ndim = len(theta)
+        todel = []
+        if fixpos:
+            todel.append(0)
+            todel.append(1)
+        if constant_f:
+            todel.append(3)
+            todel.append(4)
+            todel.append(5)
+        if fixedBH:
+            todel.append(6)
+        if fixedBG:
+            todel.append(8)
+        
+        # no phases, still in chi2, ATTENTION delete later
+        todel.append(9)
+        todel.append(10)
+        if fit_for[3] == 0:
+            todel.append(9)
+            todel.append(10)
+        if not use_opds:
+            todel.append(11)
+            todel.append(12)
+            todel.append(13)
+            todel.append(14)
+        if not specialfit:
+            todel.append(15)
+        ndof = ndim - len(todel)
+        
+        if donotfit:
+            if donotfittheta is None:
+                raise ValueError('If donotfit is True, fit values have to be given by donotfittheta')
+            if len(donotfittheta) != ndim:
+                print(theta_names_raw)
+                raise ValueError('donotfittheta has to have %i parameters, see above' % ndim)
+            if plot:
+                raise ValueError('If donotfit is True, cannot create MCMC plots')
+            if write_results or createpdf:
+                raise ValueError('If donotfit is True, write_results and createpdf should be False')
+            print('Will not fit the data, just print out the results for the given theta')
+            
+        # Get data
+        if self.polmode == 'SPLIT':
+            visamp_P = [self.visampSC_P1, self.visampSC_P2]
+            visamp_error_P = [self.visamperrSC_P1, self.visamperrSC_P2]
+            visamp_flag_P = [self.visampflagSC_P1, self.visampflagSC_P2]
+            
+            vis2_P = [self.vis2SC_P1, self.vis2SC_P2]
+            vis2_error_P = [self.vis2errSC_P1, self.vis2errSC_P2]
+            vis2_flag_P = [self.vis2flagSC_P1, self.vis2flagSC_P2]
+
+            closure_P = [self.t3SC_P1, self.t3SC_P2]
+            closure_error_P = [self.t3errSC_P1, self.t3errSC_P2]
+            closure_flag_P = [self.t3flagSC_P1, self.t3flagSC_P2]
+            
+            visphi_P = [self.visphiSC_P1, self.visphiSC_P2]
+            visphi_error_P = [self.visphierrSC_P1, self.visphierrSC_P2]
+            visphi_flag_P = [self.visampflagSC_P1, self.visampflagSC_P2]
+
+            closamp_P = [self.t3ampSC_P1, self.t3ampSC_P2]
+            closamp_error_P = [self.t3amperrSC_P1, self.t3amperrSC_P2]
+            closamp_flag_P = [self.t3ampflagSC_P1, self.t3ampflagSC_P2]
+
+            ndit = np.shape(self.visampSC_P1)[0]//6
+            if not bequiet:
+                print('NDIT = %i' % ndit)
+            
+            for dit in range(ndit):
+                if write_results and ndit > 1:
+                    txtfile.write('# DIT %i \n' % dit)
+                if createpdf:
+                    savetime = str(datetime.now()).replace('-', '')
+                    savetime = savetime.replace(' ', '-')
+                    savetime = savetime.replace(':', '')
+                    self.savetime = savetime
+                    if ndit == 1:
+                        pdffilename = 'binaryfit_' + self.name[stname:-5] + '.pdf'
+                    else:
+                        pdffilename = 'binaryfit_' + self.name[stname:-5] + '_DIT' + str(dit) + '.pdf'
+                    pdf = FPDF(orientation='P', unit='mm', format='A4')
+                    pdf.add_page()
+                    pdf.set_font("Helvetica", size=12)
+                    pdf.set_margins(20,20)
+                    if ndit == 1:
+                        pdf.cell(0, 10, txt="Fit report for %s" % self.name[stname:], ln=2, align="C", border='B')
+                    else:
+                        pdf.cell(0, 10, txt="Fit report for %s, dit %i" % (self.name[stname:], dit), ln=2, align="C", border='B')
+                    pdf.ln()
+                    pdf.cell(40, 6, txt="Fringe Tracker", ln=0, align="L", border=0)
+                    pdf.cell(40, 6, txt=self.header["ESO FT ROBJ NAME"], ln=0, align="L", border=0)
+                    pdf.cell(40, 6, txt="Science Object", ln=0, align="L", border=0)
+                    pdf.cell(40, 6, txt=self.header["ESO INS SOBJ NAME"], ln=1, align="L", border=0)
+                    pdf.cell(40, 6, txt="Science Offset X", ln=0, align="L", border=0)
+                    pdf.cell(40, 6, txt=str(self.header["ESO INS SOBJ OFFX"]), 
+                            ln=0, align="L", border=0)
+                    pdf.cell(40, 6, txt="Science Offset Y", ln=0, align="L", border=0)
+                    pdf.cell(40, 6, txt=str(self.header["ESO INS SOBJ OFFY"]), 
+                            ln=1, align="L", border=0)
+                    pdf.cell(40, 6, txt="Fit for Visamp", ln=0, align="L", border=0)
+                    pdf.cell(40, 6, txt=str(fit_for[0]), ln=0, align="L", border=0)
+                    pdf.cell(40, 6, txt="Fit for Vis2", ln=0, align="L", border=0)
+                    pdf.cell(40, 6, txt=str(fit_for[1]), ln=1, align="L", border=0)
+                    pdf.cell(40, 6, txt="Fit for cl. Phase", ln=0, align="L", border=0)
+                    pdf.cell(40, 6, txt=str(fit_for[2]), ln=0, align="L", border=0)
+                    pdf.cell(40, 6, txt="Fit for Visphi", ln=0, align="L", border=0)
+                    pdf.cell(40, 6, txt=str(fit_for[3]), ln=1, align="L", border=0)
+                    pdf.cell(40, 6, txt="Constant coulping", ln=0, align="L", border=0)
+                    pdf.cell(40, 6, txt=str(constant_f), ln=0, align="L", border=0)
+                    pdf.cell(40, 6, txt="Fixed Bg", ln=0, align="L", border=0)
+                    pdf.cell(40, 6, txt=str(fixedBG), ln=1, align="L", border=0)
+                    pdf.cell(40, 6, txt="Flag before/after", ln=0, align="L", border=0)
+                    pdf.cell(40, 6, txt=str(flagtill) + '/' + str(flagfrom), 
+                            ln=1, align="L", border=0)
+                    pdf.cell(40, 6, txt="Result: Best Chi2", ln=0, align="L", border=0)
+                    pdf.cell(40, 6, txt=str(bestchi), ln=0, align="L", border=0)
+                    pdf.cell(40, 6, txt="Fit OPDs", ln=0, align="L", border=0)
+                    pdf.cell(40, 6, txt=str(use_opds), ln=1, align="L", border=0)
+                    pdf.cell(40, 6, txt="Fixpos", ln=0, align="L", border=0)
+                    pdf.cell(40, 6, txt=str(fixpos), ln=0, align="L", border=0)
+                    pdf.cell(40, 6, txt="Fixed BH", ln=0, align="L", border=0)
+                    pdf.cell(40, 6, txt=str(fixedBH), ln=1, align="L", border=0)
+                    pdf.ln()
+                
+                if not bequiet and not donotfit:
+                    print('Run MCMC for DIT %i' % (dit+1))
+                ditstart = dit*6
+                ditstop = ditstart + 6
+                t3ditstart = dit*4
+                t3ditstop = t3ditstart + 4
+                
+                if onlypol1:
+                    polnom = 1
+                else:
+                    polnom = 2
+                for idx in range(polnom):
+                    visamp = visamp_P[idx][ditstart:ditstop]
+                    visamp_error = visamp_error_P[idx][ditstart:ditstop]
+                    visamp_flag = visamp_flag_P[idx][ditstart:ditstop]
+                    vis2 = vis2_P[idx][ditstart:ditstop]
+                    vis2_error = vis2_error_P[idx][ditstart:ditstop]
+                    vis2_flag = vis2_flag_P[idx][ditstart:ditstop]
+                    closure = closure_P[idx][t3ditstart:t3ditstop]
+                    closure_error = closure_error_P[idx][t3ditstart:t3ditstop]
+                    closure_flag = closure_flag_P[idx][t3ditstart:t3ditstop]
+                    visphi = visphi_P[idx][ditstart:ditstop]
+                    visphi_error = visphi_error_P[idx][ditstart:ditstop]
+                    visphi_flag = visphi_flag_P[idx][ditstart:ditstop]
+                    closamp = closamp_P[idx][t3ditstart:t3ditstop]
+                    closamp_error = closamp_error_P[idx][t3ditstart:t3ditstop]
+                    closamp_flag = closamp_flag_P[idx][t3ditstart:t3ditstop]
+                    
+                    # further flag if visamp/vis2 if >1 or NaN, and replace NaN with 0 
+                    with np.errstate(invalid='ignore'):
+                        visamp_flag1 = (visamp > 1) | (visamp < 1.e-5)
+                    visamp_flag2 = np.isnan(visamp)
+                    visamp_flag_final = ((visamp_flag) | (visamp_flag1) | (visamp_flag2))
+                    visamp_flag = visamp_flag_final
+                    visamp = np.nan_to_num(visamp)
+                    visamp_error[visamp_flag] = 1.
+                
+                    with np.errstate(invalid='ignore'):
+                        vis2_flag1 = (vis2 > 1) | (vis2 < 1.e-5) 
+                    vis2_flag2 = np.isnan(vis2)
+                    vis2_flag_final = ((vis2_flag) | (vis2_flag1) | (vis2_flag2))
+                    vis2_flag = vis2_flag_final
+                    vis2 = np.nan_to_num(vis2)
+                    vis2_error[vis2_flag] = 1.
+
+                    if ((flagtill > 0) and (flagfrom > 0)):
+                        p = flagtill
+                        t = flagfrom
+                        if idx == 0 and dit == 0:
+                            if not bequiet:
+                                print('using channels from #%i to #%i' % (p, t))
+                        visamp_flag[:,0:p] = True
+                        vis2_flag[:,0:p] = True
+                        visphi_flag[:,0:p] = True
+                        closure_flag[:,0:p] = True
+                        closamp_flag[:,0:p] = True
+
+                        visamp_flag[:,t:] = True
+                        vis2_flag[:,t:] = True
+                        visphi_flag[:,t:] = True
+                        closure_flag[:,t:] = True
+                        closamp_flag[:,t:] = True
+                                            
+                    width = 1e-1
+                    pos = np.ones((nwalkers,ndim))
+                    for par in range(ndim):
+                        if par in todel:
+                            pos[:,par] = theta[par]
+                        else:
+                            pos[:,par] = theta[par] + width*np.random.randn(nwalkers)
+                    if not bequiet:
+                        if not donotfit:
+                            print('Run MCMC for Pol %i' % (idx+1))
+                        else:
+                            print('Pol %i' % (idx+1))
+                    fitdata = [visamp, visamp_error, visamp_flag,
+                               vis2, vis2_error, vis2_flag,
+                               closure, closure_error, closure_flag,
+                               visphi, visphi_error, visphi_flag,
+                               closamp, closamp_error, closamp_flag]
+                    
+                    self.fitstuff = [fitdata, u, v, wave, dlambda, theta]
+
+
+                    ### MCMC starts!
+
+                    if not donotfit:
+                        if nthreads == 1:
+                            sampler = emcee.EnsembleSampler(nwalkers, ndim, self.lnprob, 
+                                                                args=(fitdata, u, v, wave,
+                                                                    dlambda, theta_lower,
+                                                                    theta_upper))
+                            if bequiet:
+                                sampler.run_mcmc(pos, nruns, progress=False)
+                            else:
+                                sampler.run_mcmc(pos, nruns, progress=True)
+                        else:
+                            with Pool(processes=nthreads) as pool:
+                                sampler = emcee.EnsembleSampler(nwalkers, ndim, self.lnprob, 
+                                                                args=(fitdata, u, v, wave,
+                                                                    dlambda, theta_lower,
+                                                                    theta_upper),
+                                                                pool=pool)
+                                if bequiet:
+                                    sampler.run_mcmc(pos, nruns, progress=False) 
+                                else:
+                                    sampler.run_mcmc(pos, nruns, progress=True)     
+                                
+                        if not bequiet:
+                            print("---------------------------------------")
+                            print("Mean acceptance fraction: %.2f"  % np.mean(sampler.acceptance_fraction))
+                            print("---------------------------------------")
+                        if createpdf:
+                            pdf.cell(0, 10, txt="Polarization  %i" % (idx+1), ln=2, align="C", border='B')
+                            pdf.cell(0, 10, txt="Mean acceptance fraction: %.2f"  %
+                                    np.mean(sampler.acceptance_fraction), 
+                                    ln=2, align="L", border=0)
+                        samples = sampler.chain
+                        mostprop = sampler.flatchain[np.argmax(sampler.flatlnprobability)]
+
+                        # for debuggin: save the chain
+                        #samples = np.load("samples_MCMC_groupedM_%i.npy" % idx)
+                        #mostprop = np.load("samples_MCMC_groupedM_mostprop_%i.npy" % idx)
+                        
+                        clsamples = np.delete(samples, todel, 2)
+                        cllabels = np.delete(theta_names, todel)
+                        cllabels_raw = np.delete(theta_names_raw, todel)
+                        clmostprop = np.delete(mostprop, todel)
+                        
+                        cldim = len(cllabels)
+                        if plot:
+                            fig, axes = plt.subplots(cldim, figsize=(8, cldim/1.5),
+                                                    sharex=True)
+                            for i in range(cldim):
+                                ax = axes[i]
+                                ax.plot(clsamples[:, :, i].T, "k", alpha=0.3)
+                                ax.set_ylabel(cllabels[i])
+                                ax.yaxis.set_label_coords(-0.1, 0.5)
+                            axes[-1].set_xlabel("step number")
+                            
+                            if createpdf:
+                                pdfname = '%s_pol%i_1.png' % (savetime, idx)
+                                plt.savefig(pdfname)
+                                plt.close()
+                            else:
+                                plt.show()
+                        
+                        if nruns > 300:
+                            fl_samples = samples[:, -200:, :].reshape((-1, ndim))
+                            fl_clsamples = clsamples[:, -200:, :].reshape((-1, cldim))                
+                        elif nruns > 200:
+                            fl_samples = samples[:, -100:, :].reshape((-1, ndim))
+                            fl_clsamples = clsamples[:, -100:, :].reshape((-1, cldim))   
+                        else:
+                            fl_samples = samples.reshape((-1, ndim))
+                            fl_clsamples = clsamples.reshape((-1, cldim))
+
+                        if plot:
+                            ranges = np.percentile(fl_clsamples, [3, 97], axis=0).T
+                            fig = corner.corner(fl_clsamples, quantiles=[0.16, 0.5, 0.84],
+                                                truths=clmostprop, labels=cllabels)
+                            if createpdf:
+                                pdfname = '%s_pol%i_2.png' % (savetime, idx)
+                                plt.savefig(pdfname)
+                                plt.close()
+                            else:
+                                plt.show()
+                            
+                        # get the actual fit
+                        theta_fit = np.percentile(fl_samples, [50], axis=0).T
+                        if bestchi:
+                            theta_result = mostprop
+                        else:
+                            theta_result = theta_fit
+                    else:
+                        theta_result = donotfittheta
+                    fit_visamp, fit_visphi, fit_closure, fit_closamp = self.calc_vis(theta_result, u, v, wave, dlambda)
+                    fit_vis2 = fit_visamp**2.
+                            
+                    res_visamp = fit_visamp-visamp
+                    res_vis2 = fit_vis2-vis2
+                    res_closamp = fit_closamp-closamp
+                    res_closure_1 = np.abs(fit_closure-closure)
+                    res_closure_2 = 360-np.abs(fit_closure-closure)
+                    check = np.abs(res_closure_1) < np.abs(res_closure_2) 
+                    res_closure = res_closure_1*check + res_closure_2*(1-check)
+                    res_visphi_1 = np.abs(fit_visphi-visphi)
+                    res_visphi_2 = 360-np.abs(fit_visphi-visphi)
+                    check = np.abs(res_visphi_1) < np.abs(res_visphi_2) 
+                    res_visphi = res_visphi_1*check + res_visphi_2*(1-check)
+
+                    redchi_visamp = np.sum(res_visamp**2./visamp_error**2.*(1-visamp_flag))
+                    redchi_vis2 = np.sum(res_vis2**2./vis2_error**2.*(1-vis2_flag))
+                    redchi_closure = np.sum(res_closure**2./closure_error**2.*(1-closure_flag))
+                    redchi_closamp = np.sum(res_closamp**2./closamp_error**2.*(1-closamp_flag))
+                    redchi_visphi = np.sum(res_visphi**2./visphi_error**2.*(1-visphi_flag))
+                    
+                    
+                    if redchi2:
+                        redchi_visamp /= (visamp.size-np.sum(visamp_flag)-ndof)
+                        redchi_vis2 /= (vis2.size-np.sum(vis2_flag)-ndof)
+                        redchi_closure /= (closure.size-np.sum(closure_flag)-ndof)
+                        redchi_closamp /= (closamp.size-np.sum(closamp_flag)-ndof)
+                        redchi_visphi /= (visphi.size-np.sum(visphi_flag)-ndof)
+                        chi2string = 'red. chi2'
+                    else:
+                        chi2string = 'chi2'
+                    
+                    redchi = [redchi_visamp, redchi_vis2, redchi_closure, redchi_visphi, redchi_closamp]
+                    if idx == 0:
+                        redchi0 = [redchi_visamp, redchi_vis2, redchi_closure, redchi_visphi, redchi_closamp]
+                    elif idx == 1:
+                        redchi1 = [redchi_visamp, redchi_vis2, redchi_closure, redchi_visphi, redchi_closamp]
+                        
+                    if not bequiet:
+                        print('\n')
+                        print('ndof: %i' % (vis2.size-np.sum(vis2_flag)-ndof))
+                        print(chi2string + " for visamp: %.2f" % redchi_visamp)
+                        print(chi2string + " for vis2: %.2f" % redchi_vis2)
+                        print(chi2string + " for visphi: %.2f" % redchi_visphi)
+                        print(chi2string + " for closure: %.2f" % redchi_closure)
+                        print(chi2string + " for closamp: %.2f" % redchi_closamp)
+                        print('\n')
+                        #print("average visamp error: %.2f" % 
+                            #np.mean(visamp_error*(1-visamp_flag)))
+                        #print("average vis2 error: %.2f" % 
+                            #np.mean(vis2_error*(1-vis2_flag)))
+                        #print("average closure error (deg): %.2f" % 
+                            #np.mean(closure_error*(1-closure_flag)))
+                        #print("average visphi error (deg): %.2f" % 
+                            #np.mean(visphi_error*(1-visphi_flag)))
+                    
+                    if not donotfit:
+                        percentiles = np.percentile(fl_clsamples, [16, 50, 84],axis=0).T
+                        percentiles[:,0] = percentiles[:,1] - percentiles[:,0] 
+                        percentiles[:,2] = percentiles[:,2] - percentiles[:,1] 
+                        
+                        if not bequiet:
+                            print("-----------------------------------")
+                            print("Best chi2 result:")
+                            for i in range(0, cldim):
+                                print("%s = %.3f" % (cllabels_raw[i], clmostprop[i]))
+                            print("\n")
+                            print("MCMC Result:")
+                            for i in range(0, cldim):
+                                print("%s = %.3f + %.3f - %.3f" % (cllabels_raw[i],
+                                                                percentiles[i,1], 
+                                                                percentiles[i,2], 
+                                                                percentiles[i,0]))
+                            print("-----------------------------------")
+                    
+                    if createpdf:
+                        pdf.cell(40, 8, txt="", ln=0, align="L", border="B")
+                        pdf.cell(40, 8, txt="Best chi2 result", ln=0, align="L", border="LB")
+                        pdf.cell(60, 8, txt="MCMC result", ln=1, align="L", border="LB")
+                        for i in range(0, cldim):
+                            pdf.cell(40, 6, txt="%s" % cllabels_raw[i], 
+                                    ln=0, align="L", border=0)
+                            pdf.cell(40, 6, txt="%.3f" % clmostprop[i], 
+                                    ln=0, align="C", border="L")
+                            pdf.cell(60, 6, txt="%.3f + %.3f - %.3f" % 
+                                    (percentiles[i,1], percentiles[i,2], percentiles[i,0]),
+                                    ln=1, align="C", border="L")
+                        pdf.ln()
+                    
+                    if plotres:
+                        self.plotFit(theta_result, fitdata, idx, createpdf=createpdf)
+                    if write_results:
+                        txtfile.write("# Polarization %i  \n" % (idx+1))
+                        for tdx, t in enumerate(mostprop):
+                            txtfile.write(str(t))
+                            txtfile.write(', ')
+                        for tdx, t in enumerate(redchi):
+                            txtfile.write(str(t))
+                            if tdx != (len(redchi)-1):
+                                txtfile.write(', ')
+                            else:
+                                txtfile.write('\n')
+
+                        percentiles = np.percentile(fl_samples, [16, 50, 84],axis=0).T
+                        percentiles[:,0] = percentiles[:,1] - percentiles[:,0] 
+                        percentiles[:,2] = percentiles[:,2] - percentiles[:,1] 
+                        
+                        for tdx, t in enumerate(percentiles[:,1]):
+                            txtfile.write(str(t))
+                            txtfile.write(', ')
+                        for tdx, t in enumerate(redchi):
+                            txtfile.write(str(t))
+                            if tdx != (len(redchi)-1):
+                                txtfile.write(', ')
+                            else:
+                                txtfile.write('\n')
+
+                        for tdx, t in enumerate(percentiles[:,0]):
+                            if tdx in todel:
+                                txtfile.write(str(t*0.0))
+                            else:
+                                txtfile.write(str(t))
+                            if tdx != (len(percentiles[:,1])-1):
+                                txtfile.write(', ')
+                            else:
+                                txtfile.write(', 0, 0, 0, 0 \n')
+
+                        for tdx, t in enumerate(percentiles[:,2]):
+                            if tdx in todel:
+                                txtfile.write(str(t*0.0))
+                            else:
+                                txtfile.write(str(t))
+                            if tdx != (len(percentiles[:,1])-1):
+                                txtfile.write(', ')
+                            else:
+                                txtfile.write(', 0, 0, 0, 0 \n')
+                                
+                if createpdf:
+                    pdfimages0 = sorted(glob.glob(savetime + '_pol0*.png'))
+                    pdfimages1 = sorted(glob.glob(savetime + '_pol1*.png'))
+                    pdfcout = 0
+                    if plot:
+                        pdf.add_page()
+                        pdf.cell(0, 10, txt="Polarization  1", ln=1, align="C", border='B')
+                        pdf.ln()
+                        cover = Image.open(pdfimages0[0])
+                        width, height = cover.size
+                        ratio = width/height
+
+                        if ratio > (160/115):
+                            wi = 160
+                            he = 0
+                        else:
+                            he = 115
+                            wi = 0
+                        pdf.image(pdfimages0[0], h=he, w=wi)
+                        pdf.image(pdfimages0[1], h=115)
+                        
+                        pdf.add_page()
+                        pdf.cell(0, 10, txt="Polarization  2", ln=1, align="C", border='B')
+                        pdf.ln()
+                        pdf.image(pdfimages1[0], h=he, w=wi)
+                        pdf.image(pdfimages1[1], h=115)
+                        pdfcout = 2
+
+                    if plotres:
+                        titles = ['Vis Amp', 'Vis 2', 'Closure Phase', 'Visibility Phase', 'Closure Amp']
+                        for pa in range(5):
+                            if pa == 3 and not self.fit_for[pa]:
+                                continue
+                            if pa == 4 and not self.fit_for[pa]:
+                                continue
+                            pdf.add_page()
+                            text = '%s, %s: %.2f (P1), %.2f (P2)' % (titles[pa], chi2string, redchi0[pa], redchi1[pa])
+                            pdf.cell(0, 10, txt=text, ln=1, align="C", border='B')
+                            pdf.ln()
+                            pdf.image(pdfimages0[pdfcout+pa], w=150)
+                            pdf.image(pdfimages1[pdfcout+pa], w=150)
+                    
+                    if not bequiet:
+                        print('Save pdf as %s' % pdffilename)
+                    pdf.output(pdffilename)
+                    files = glob.glob(savetime + '_pol?_?.png')
+                    for file in files:
+                        os.remove(file)
+            if write_results:
+                txtfile.close()
+            if not bequiet:
+                fitted = 1-(np.array(self.fit_for)==0)
+                redchi0_f = np.sum(redchi0*fitted)
+                if onlypol1:
+                    redchi1 = np.zeros_like(redchi0)
+                redchi1_f = np.sum(redchi1*fitted)
+                redchi_f = redchi0_f + redchi1_f
+                print('Combined %s of fitted data: %.3f' % (chi2string, redchi_f))
+        return 0
+
+
 
 
     def plotFit(self, theta, fitdata, idx=0, createpdf=False):
