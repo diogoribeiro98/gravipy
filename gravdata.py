@@ -12,7 +12,7 @@ from scipy import interpolate
 import mpmath
 from matplotlib import gridspec
 from pkg_resources import resource_filename
-
+from numba import njit
 
 try:
     from generalFunctions import *
@@ -40,12 +40,20 @@ def convert_date(date):
     date = datetime.strptime(date, '%Y-%m-%d %H:%M:%S')
     return date_decimal, date
 
+@njit
+def mathfunc_real(values, dt):
+    return np.trapz(np.real(values), dx=dt)
+   
+@njit
+def mathfunc_imag(values, dt):
+    return np.trapz(np.imag(values), dx=dt)
 
-def complex_quadrature_num(func, a, b, theta, nsteps=int(1e3)):
+def complex_quadrature_num(func, a, b, theta, nsteps=int(1e2)):
     t = np.logspace(np.log10(a), np.log10(b), nsteps)
     dt = np.diff(t)
-    real_integral = np.trapz(np.real(func(t, *theta)), dx=dt)
-    imag_integral = np.trapz(np.imag(func(t, *theta)), dx=dt)
+    values = func(t, *theta)
+    real_integral = mathfunc_real(values, dt)
+    imag_integral = mathfunc_imag(values, dt)
     return real_integral + 1j*imag_integral
 
 class GravData():
@@ -751,14 +759,15 @@ class GravData():
         """
         complex integral to be integrated over wavelength
         wave in [micron]
-        theta holds the exponent gamma, and the seperation s
+        theta holds the exponent alpha, and the seperation s
         """
-        return (wave/2.2)**(-1-gamma)*np.exp(-2*np.pi*1j*s/wave)
+        return (wave/2.2)**(-1-alpha)*np.exp(-2*np.pi*1j*s/wave)
     
     def vis_intensity_num(self, s, alpha, lambda0, dlambda):
-        if s == 0:
-            return -2.2**(1 + alpha)/alpha*difflam**(-alpha)
-        return complex_quadrature_num(self.visibility_integrator, lambda0-dlambda, lambda0+dlambda, (s, alpha))
+        if s == 0.:
+            return -2.2**(1 + alpha)/alpha*(lambda0+dlambda)**(-alpha) - (-2.2**(1 + alpha)/alpha*(lambda0-dlambda)**(-alpha))
+        else:
+            return complex_quadrature_num(self.visibility_integrator, lambda0-dlambda, lambda0+dlambda, (s, alpha))
     
     def simulateVisdata_single(self, theta, wave, dlambda, u, v, 
                                fixedBG=True, fixedBH=True, 
@@ -777,6 +786,7 @@ class GravData():
         if phasemaps=True, phasemapsstuff must be a list of:
             [tel1, dra1, ddec1, north_angle1, tel2, dra2, ddec2, north_angle2]
         '''
+        
         theta_names_raw = np.array(["dRA", "dDEC", "f", "alpha flare", "f BG", 
                                     "alpha BG", "PC RA", "PC DEC"])
         rad2as = 180 / np.pi * 3600
@@ -857,7 +867,6 @@ class GravData():
                 intS2_center = self.vis_intensity_approx(0, alpha_S2, wave, dlambda)
                 intBG = self.vis_intensity_approx(0, alpha_bg, wave, dlambda)
             elif approx == "analytic":
-                print("doing this!")
                 intSgrA = self.vis_intensity(s_SgrA, alpha_SgrA, wave, dlambda)
                 intS2 = self.vis_intensity(s_S2, alpha_S2, wave, dlambda)
                 intSgrA_center = self.vis_intensity(0, alpha_SgrA, wave, dlambda)
@@ -877,20 +886,26 @@ class GravData():
                     np.sqrt(intSgrA_center + f*cr2*intS2_center + fluxRatioBG * intBG)))
             
         else:
-            if approx:
+            if approx == "approx":
+                print(s_SgrA, alpha_SgrA, wave, dlambda)
                 intSgrA = self.vis_intensity_approx(s_SgrA, alpha_SgrA, wave, dlambda)
                 intS2 = self.vis_intensity_approx(s_S2, alpha_S2, wave, dlambda)
                 intSgrA_center = self.vis_intensity_approx(0, alpha_SgrA, wave, dlambda)
                 intS2_center = self.vis_intensity_approx(0, alpha_S2, wave, dlambda)
                 intBG = self.vis_intensity_approx(0, alpha_bg, wave, dlambda)
-            else:
+            elif approx == "analytic":
                 intSgrA = self.vis_intensity(s_SgrA, alpha_SgrA, wave, dlambda)
                 intS2 = self.vis_intensity(s_S2, alpha_S2, wave, dlambda)
                 intSgrA_center = self.vis_intensity(0, alpha_SgrA, wave, dlambda)
                 intS2_center = self.vis_intensity(0, alpha_S2, wave, dlambda)
                 intBG = self.vis_intensity(0, alpha_bg, wave, dlambda)
-            #print(s_SgrA, alpha_SgrA, wave, dlambda)
-            #print(intSgrA)
+            elif approx == "numeric":
+                intSgrA = self.vis_intensity_num(s_SgrA, alpha_SgrA, wave, dlambda)
+                intS2 = self.vis_intensity_num(s_S2, alpha_S2, wave, dlambda)
+                intSgrA_center = self.vis_intensity_num(0, alpha_SgrA, wave, dlambda)
+                intS2_center = self.vis_intensity_num(0, alpha_S2, wave, dlambda)
+                intBG = self.vis_intensity_num(0, alpha_bg, wave, dlambda)
+
                 
             
             vis = ((intSgrA + f * intS2)/
