@@ -818,6 +818,7 @@ class GravData():
         c = (2*np.pi*1j*s/difflam)**alpha
         return (a*b/c)
     
+    
     def visibility_integrator(self, wave, s, alpha):
         """
         complex integral to be integrated over wavelength
@@ -826,11 +827,13 @@ class GravData():
         """
         return (wave/2.2)**(-1-alpha)*np.exp(-2*np.pi*1j*s/wave)
     
+    
     def vis_intensity_num(self, s, alpha, lambda0, dlambda):
-        if s == 0.:
+        if np.all(s == 0.):
             return -2.2**(1 + alpha)/alpha*(lambda0+dlambda)**(-alpha) - (-2.2**(1 + alpha)/alpha*(lambda0-dlambda)**(-alpha))
         else:
             return complex_quadrature_num(self.visibility_integrator, lambda0-dlambda, lambda0+dlambda, (s, alpha))
+    
     
     def simulateVisdata_single(self, theta, wave, dlambda, u, v, 
                                fixedBG=True, fixedBH=True, 
@@ -967,7 +970,8 @@ class GravData():
                 intSgrA_center = self.vis_intensity_num(0, alpha_SgrA, wave, dlambda)
                 intS2_center = self.vis_intensity_num(0, alpha_S2, wave, dlambda)
                 intBG = self.vis_intensity_num(0, alpha_bg, wave, dlambda)
-
+            else:
+                raise ValueError('apprix has to be approx, analytic or numeric')
                 
             
             vis = ((intSgrA + f * intS2)/
@@ -1274,19 +1278,27 @@ class GravData():
                 cr1 = (pm_amp_s2[i,0] / pm_amp_sgr[i,0])**2
                 cr2 = (pm_amp_s2[i,1] / pm_amp_sgr[i,1])**2
                 
-                if approx:
+                if approx == "approx":
                     intSgrA = self.vis_intensity_approx(s_SgrA, alpha_SgrA, wave, dlambda[i,:])
                     intS2 = self.vis_intensity_approx(s_S2, alpha_S2, wave, dlambda[i,:])
                     intSgrA_center = self.vis_intensity_approx(0, alpha_SgrA, wave, dlambda[i,:])
                     intS2_center = self.vis_intensity_approx(0, alpha_S2, wave, dlambda[i,:])
                     intBG = self.vis_intensity_approx(0, alpha_bg, wave, dlambda[i,:])
-                else:
+                elif approx == "analytic":
                     intSgrA = self.vis_intensity(s_SgrA, alpha_SgrA, wave, dlambda[i,:])
                     intS2 = self.vis_intensity(s_S2, alpha_S2, wave, dlambda[i,:])
                     intSgrA_center = self.vis_intensity(0, alpha_SgrA, wave, dlambda[i,:])
                     intS2_center = self.vis_intensity(0, alpha_S2, wave, dlambda[i,:])
                     intBG = self.vis_intensity(0, alpha_bg, wave, dlambda[i,:])
-
+                elif approx == "numeric":
+                    intSgrA = self.vis_intensity_num(s_SgrA, alpha_SgrA, wave, dlambda[i,:])
+                    intS2 = self.vis_intensity_num(s_S2, alpha_S2, wave, dlambda[i,:])
+                    intSgrA_center = self.vis_intensity_num(0, alpha_SgrA, wave, dlambda[i,:])
+                    intS2_center = self.vis_intensity_num(0, alpha_S2, wave, dlambda[i,:])
+                    intBG = self.vis_intensity_num(0, alpha_bg, wave, dlambda[i,:])
+                else:
+                    raise ValueError('approx has to be approx, analytic or numeric')
+                    
                 vis[i,:] = ((intSgrA + 
                             np.sqrt(f_bl[i,0] * f_bl[i,1] * cr1 * cr2) * intS2)/
                             (np.sqrt(intSgrA_center + f_bl[i,0] * cr1 * intS2_center 
@@ -1312,18 +1324,26 @@ class GravData():
                     s_SgrA += sp_bl[i]
                     s_S2 += sp_bl[i]
                 
-                if approx:
+                if approx == "approx":
                     intSgrA = self.vis_intensity_approx(s_SgrA, alpha_SgrA, wave, dlambda[i,:])
                     intS2 = self.vis_intensity_approx(s_S2, alpha_S2, wave, dlambda[i,:])
                     intSgrA_center = self.vis_intensity_approx(0, alpha_SgrA, wave, dlambda[i,:])
                     intS2_center = self.vis_intensity_approx(0, alpha_S2, wave, dlambda[i,:])
                     intBG = self.vis_intensity_approx(0, alpha_bg, wave, dlambda[i,:])
-                else:
+                elif approx == "analytic":
                     intSgrA = self.vis_intensity(s_SgrA, alpha_SgrA, wave, dlambda[i,:])
                     intS2 = self.vis_intensity(s_S2, alpha_S2, wave, dlambda[i,:])
                     intSgrA_center = self.vis_intensity(0, alpha_SgrA, wave, dlambda[i,:])
                     intS2_center = self.vis_intensity(0, alpha_S2, wave, dlambda[i,:])
                     intBG = self.vis_intensity(0, alpha_bg, wave, dlambda[i,:])
+                elif approx == "numeric":
+                    intSgrA = self.vis_intensity_num(s_SgrA, alpha_SgrA, wave, dlambda[i,:])
+                    intS2 = self.vis_intensity_num(s_S2, alpha_S2, wave, dlambda[i,:])
+                    intSgrA_center = self.vis_intensity_num(0, alpha_SgrA, wave, dlambda[i,:])
+                    intS2_center = self.vis_intensity_num(0, alpha_S2, wave, dlambda[i,:])
+                    intBG = self.vis_intensity_num(0, alpha_bg, wave, dlambda[i,:])
+                else:
+                    raise ValueError('approx has to be approx, analytic or numeric')
                     
                 vis[i,:] = ((intSgrA + 
                             np.sqrt(f_bl[i,0] * f_bl[i,1]) * intS2)/
@@ -1656,10 +1676,6 @@ class GravData():
             todel.append(6)
         if fixedBG:
             todel.append(8)
-        
-        # no phases, still in chi2, ATTENTION delete later
-        todel.append(9)
-        todel.append(10)
         if fit_for[3] == 0:
             todel.append(9)
             todel.append(10)
@@ -1764,6 +1780,10 @@ class GravData():
                     pdf.cell(40, 6, txt=str(fixpos), ln=0, align="L", border=0)
                     pdf.cell(40, 6, txt="Fixed BH", ln=0, align="L", border=0)
                     pdf.cell(40, 6, txt=str(fixedBH), ln=1, align="L", border=0)
+                    pdf.cell(40, 6, txt="Phasemaps", ln=0, align="L", border=0)
+                    pdf.cell(40, 6, txt=str(phasemaps), ln=0, align="L", border=0)
+                    pdf.cell(40, 6, txt="Integral solved by", ln=0, align="L", border=0)
+                    pdf.cell(40, 6, txt=approx, ln=1, align="L", border=0)
                     pdf.ln()
                 
                 if not bequiet and not donotfit:
