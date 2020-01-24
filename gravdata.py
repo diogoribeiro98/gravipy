@@ -13,6 +13,7 @@ import mpmath
 from matplotlib import gridspec
 from pkg_resources import resource_filename
 
+
 try:
     from generalFunctions import *
     set_style('show')
@@ -39,6 +40,13 @@ def convert_date(date):
     date = datetime.strptime(date, '%Y-%m-%d %H:%M:%S')
     return date_decimal, date
 
+
+def complex_quadrature_num(func, a, b, theta, nsteps=int(1e3)):
+    t = np.logspace(np.log10(a), np.log10(b), nsteps)
+    dt = np.diff(t)
+    real_integral = np.trapz(np.real(func(t, *theta)), dx=dt)
+    imag_integral = np.trapz(np.imag(func(t, *theta)), dx=dt)
+    return real_integral + 1j*imag_integral
 
 class GravData():
     def __init__(self, data, verbose=True):
@@ -738,14 +746,24 @@ class GravData():
         b = float(bval.real)+float(bval.imag)*1j
         c = (2*np.pi*1j*s/difflam)**alpha
         return (a*b/c)
-        
-        
     
+    def visibility_integrator(self, wave, s, alpha):
+        """
+        complex integral to be integrated over wavelength
+        wave in [micron]
+        theta holds the exponent gamma, and the seperation s
+        """
+        return (wave/2.2)**(-1-gamma)*np.exp(-2*np.pi*1j*s/wave)
+    
+    def vis_intensity_num(self, s, alpha, lambda0, dlambda):
+        if s == 0:
+            return -2.2**(1 + alpha)/alpha*difflam**(-alpha)
+        return complex_quadrature_num(self.visibility_integrator, lambda0-dlambda, lambda0+dlambda, (s, alpha))
     
     def simulateVisdata_single(self, theta, wave, dlambda, u, v, 
                                fixedBG=True, fixedBH=True, 
                                phasemaps=False, phasemapsstuff=None,
-                               interppm=True, approx=True):
+                               interppm=True, approx="approx"):
         '''
         Test function to generate a single datapoint for a given u, v, lambda, dlamba & theta
         
@@ -832,19 +850,28 @@ class GravData():
             cr1 = (cor_amp_s21 / cor_amp_sgr1)**2
             cr2 = (cor_amp_s22 / cor_amp_sgr2)**2
 
-            if approx:
+            if approx == "approx":
                 intSgrA = self.vis_intensity_approx(s_SgrA, alpha_SgrA, wave, dlambda)
                 intS2 = self.vis_intensity_approx(s_S2, alpha_S2, wave, dlambda)
                 intSgrA_center = self.vis_intensity_approx(0, alpha_SgrA, wave, dlambda)
                 intS2_center = self.vis_intensity_approx(0, alpha_S2, wave, dlambda)
                 intBG = self.vis_intensity_approx(0, alpha_bg, wave, dlambda)
-            else:
+            elif approx == "analytic":
+                print("doing this!")
                 intSgrA = self.vis_intensity(s_SgrA, alpha_SgrA, wave, dlambda)
                 intS2 = self.vis_intensity(s_S2, alpha_S2, wave, dlambda)
                 intSgrA_center = self.vis_intensity(0, alpha_SgrA, wave, dlambda)
                 intS2_center = self.vis_intensity(0, alpha_S2, wave, dlambda)
                 intBG = self.vis_intensity(0, alpha_bg, wave, dlambda)
-
+            elif approx == "numeric":
+                intSgrA = self.vis_intensity_num(s_SgrA, alpha_SgrA, wave, dlambda)
+                intS2 = self.vis_intensity_num(s_S2, alpha_S2, wave, dlambda)
+                intSgrA_center = self.vis_intensity_num(0, alpha_SgrA, wave, dlambda)
+                intS2_center = self.vis_intensity_num(0, alpha_S2, wave, dlambda)
+                intBG = self.vis_intensity_num(0, alpha_bg, wave, dlambda)
+            else:
+                raise ValueError("approx needs to be in [approx, analytic, numeric]")
+            
             vis = ((intSgrA + f*np.sqrt(cr1*cr2)*intS2)/
                    (np.sqrt(intSgrA_center + f*cr1*intS2_center + fluxRatioBG * intBG)*
                     np.sqrt(intSgrA_center + f*cr2*intS2_center + fluxRatioBG * intBG)))
@@ -1287,48 +1314,23 @@ class GravData():
         return ln_prob_res 
     
     
-    def curvefitfunc(self, x, ra, dec, f1, alpha_a, f_BG):       
+    def curvefitfunc(self, x, *theta):       
         u = self.u
         v = self.v 
         wave = self.wave
         dlambda = self.dlambda
         fit_for = self.fit_for
-        #flag = self.flag
-        
-        f2 = 0.1 
-        f3 = 0.1
-        f4 = 0.1 
-        alpha_BG = 4
-        pcra = -19
-        pcdec = -32
-        opd1 = 0
-        opd2 = 0
-        opd3 = 0
-        opd4 = 0
-        special = 0
-        
-        theta = [ra, dec, f1, f2, f3, f4, alpha_a, f_BG, alpha_BG, pcra, pcdec,
-                 opd1, opd2, opd3, opd4, special]
-        model_visamp, model_visphi, model_closure, model_closamp = self.calc_vis(theta,u,v,wave,dlambda)
+        flag = self.chisuare_flag
 
-        
+        model_visamp, model_visphi, model_closure, model_closamp = self.calc_vis(theta,u,v,wave,dlambda)
         model_vis2 = model_visamp**2.
-        flag = np.repeat(np.ones_like(model_visamp),4)
         
         fit = np.append(model_visamp.ravel(), model_vis2.ravel())
         fit = np.append(fit, np.arctan(np.radians(model_closure.ravel()))**2)
-        #fit = np.append(fit, np.arctan(np.radians(model_visphi.ravel() ))**2)
+        fit = np.append(fit, np.arctan(np.radians(model_visphi.ravel() ))**2)
+        fit = np.append(fit, model_closamp.ravel())
         
-        
-        
-        #fit = (model_visamp*fit_for[0]*flag[0]).ravel()
-        #fit = np.append(fit, (model_vis2*fit_for[1]*flag[1]).ravel())
-        #fit = np.append(fit, (np.arctan(model_closure)**2*fit_for[2]*flag[2]).ravel())
-        #fit = np.append(fit, (np.arctan(model_visphi)**2*fit_for[3]*flag[3]).ravel())
-        #fit = np.append(fit, (model_closamp*fit_for[4]*flag[4]).ravel())  
-        #print([type(m) for m in model_visamp])
-        #print(type(model_visamp))
-        return fit
+        return fit[flag]
     
     
     
@@ -2488,7 +2490,6 @@ class GravData():
                     
                     self.fitstuff = [fitdata, u, v, wave, dlambda, theta]
 
-
                     ### MCMC starts!
 
                     if not donotfit:
@@ -2506,11 +2507,12 @@ class GravData():
                         flag = np.append(flag,closure_flag.ravel())                                
                         flag = np.append(flag, visphi_flag.ravel())
                         flag = np.append(flag, closamp_flag.ravel())
-                        
+                        self.chisuare_flag = flag
                         data = data[flag]
                         error = error[flag]
-                        popt, cov = curve_fit(self.curvefitfunc, np.ones_like(data), data, p0=theta)
-
+                        popt, cov = optimize.curve_fit(self.curvefitfunc, np.ones_like(data), data, p0=theta)
+                        print("BEST FIT: ", popt)
+                        print("Initials: ", theta)
                         theta = popt
                         theta_result = popt
                         
