@@ -1,5 +1,7 @@
 from astropy.io import fits
+from astropy.convolution import Gaussian2DKernel
 import matplotlib.pyplot as plt
+from matplotlib import gridspec
 import numpy as np
 import scipy as sp
 import emcee
@@ -7,6 +9,7 @@ import corner
 from multiprocessing import Pool
 from fpdf import FPDF
 from PIL import Image
+from scipy import signal
 from scipy import optimize 
 from scipy import interpolate
 import mpmath
@@ -551,12 +554,42 @@ class GravData():
     ############################################
     ############################################
     
-    def loadPhasemaps(self):
+    def loadPhasemaps(self, smooth=True, smooth_fwhm=65):
         # load in phasmaps
-        phasemapsfile = resource_filename('gravipy', 'GRAVITY_SC_MAP_20200114.fits')
-        phasemaps = fits.open(phasemapsfile)
-        self.pm_amp = phasemaps['SC_AMP'].data
-        self.pm_pha = phasemaps['SC_PHASE'].data
+        if smooth:
+            smooth_name = 'GRAVITY_SC_MAP_20200124_SM%i.fits' % smooth_fwhm
+            sm_phasemapsfile = resource_filename('gravipy', smooth_name)
+            try:
+                phasemaps = fits.open(sm_phasemapsfile)
+                self.pm_amp = phasemaps['SC_AMP'].data
+                self.pm_pha = phasemaps['SC_PHASE'].data
+
+            except FileNotFoundError:
+                print('Creating new smoothed pm file with fwhm=%i' % smooth_fwhm)
+                phasemapsfile = resource_filename('gravipy', 'GRAVITY_SC_MAP_20200124.fits')
+                phasemaps = fits.open(phasemapsfile)
+                pm_amp_full = phasemaps['SC_AMP'].data
+                pm_pha_full = phasemaps['SC_PHASE'].data
+                self.pm_amp = np.zeros_like(pm_amp_full)
+                self.pm_pha = np.zeros_like(pm_pha_full)
+                kernel = Gaussian2DKernel(x_stddev=smooth_fwhm/(2.*np.sqrt(2.*np.log(2.))))
+                for idx in range(4):
+                    pm = pm_amp_full[idx] * np.exp(1j*pm_pha_full[idx]/180*math.pi)
+                    pm[np.isnan(pm)] = 0
+                    pm_sm = signal.convolve2d(pm, kernel, mode='same')
+                    self.pm_amp[idx] = np.abs(pm_sm)
+                    self.pm_pha[idx] = np.angle(pm_sm, deg=True)
+                phasemaps['SC_AMP'].data = self.pm_amp
+                phasemaps['SC_PHASE'].data = self.pm_pha
+                phasemaps.writeto(sm_phasemapsfile)
+            self.pm_pha /= np.nanmax(self.pm_pha)
+            
+            
+        else:
+            phasemapsfile = resource_filename('gravipy', 'GRAVITY_SC_MAP_20200124.fits')
+            phasemaps = fits.open(phasemapsfile)
+            self.pm_amp = phasemaps['SC_AMP'].data
+            self.pm_pha = phasemaps['SC_PHASE'].data
         
         x = np.arange(201)
         y = np.arange(201)
@@ -584,7 +617,7 @@ class GravData():
     
     def readPhasemaps(self, ra, dec, wave, fromFits=True, 
                       northangle=None, dra=None, ddec=None,
-                      interp=True):
+                      interp=True, plot=False):
         """
         Calculates coupling amplitude / phase for given 
         
@@ -628,9 +661,28 @@ class GravData():
         lambda0 = 2.2
         cor_amp = np.zeros((4, len(wave)))
         cor_pha = np.zeros((4, len(wave)))
+        if plot and not interp:
+            pos_pm = np.zeros((4, 2, len(wave)))
         for tel in range(4):
             pos = np.array([ra + dra[tel], dec + ddec[tel]])
             pos_rot = np.dot(self.rotation(northangle[tel]), pos)
+            
+            # try to make it faster, did not work
+            #wave2 = np.zeros((2, len(wave)))
+            #wave2[0] = wave
+            #wave2[1] = wave
+            #pos_scaled = pos_rot*lambda0/wave2.T/scale + 100
+            #if interp:
+                #cor_amp[tel] = np.array([self.pm_amp_int[tel](x,y)[0] for x, y in zip(pos_scaled[:,0], pos_scaled[:,1])])
+                #cor_pha[tel] = np.array([self.pm_pha_int[tel](x,y)[0] for x, y in zip(pos_scaled[:,0], pos_scaled[:,1])])
+            #else:
+                #pos_int = np.round(pos_scaled).astype(int)
+                #cor_amp[tel] = self.pm_amp[tel, pos_int[:,1], pos_int[:,0]]
+                #cor_pha[tel] = self.pm_pha[tel, pos_int[:,1], pos_int[:,0]]            
+                #if plot:
+                    #pos_pm[tel] = pos_int[:,1], pos_int[:,0]
+                    
+            # original function
             for channel in range(len(wave)):
                 pos_scaled = pos_rot*lambda0/wave[channel]/scale + 100
                 if interp:
@@ -640,6 +692,17 @@ class GravData():
                     pos_int = (np.round(pos_scaled)).astype(int)
                     cor_amp[tel, channel] = self.pm_amp[tel, pos_int[1], pos_int[0]]
                     cor_pha[tel, channel] = self.pm_pha[tel, pos_int[1], pos_int[0]]
+                    if plot and not interp:
+                        pos_pm[tel,channel] = pos_int[1], pos_int[0]
+                    
+        if plot and not interp:
+            gs = gridspec.GridSpec(1,4)
+            for tel in range(4):
+                axis = plt.subplot(gs[0,tel])
+                plt.imshow(self.pm_amp[tel], vmin=0, vmax=1)
+                plt.scatter(pos_pm[tel,0], pos_pm[tel,1], color=color1)
+            plt.show()
+        #print(cor_amp, cor_pha)
         return cor_amp, cor_pha
     
     
@@ -1330,7 +1393,7 @@ class GravData():
                   fixpos=False, fixedBH=False, dphRA=0.1, dphDec=0.1,
                   specialpar=np.array([0,0,0,0,0,0]), phasemaps=False,
                   interppm=True, donotfit=False, donotfittheta=None, 
-                  onlypol1=False, approx=True, initial=None):
+                  onlypol1=False, approx=True, initial=None, smoothpm=True):
         '''
         Parameter:
         nthreads:       number of cores [4] 
@@ -1396,7 +1459,7 @@ class GravData():
         
         self.phasemaps = phasemaps
         if phasemaps:
-            self.loadPhasemaps()
+            self.loadPhasemaps(smooth=smoothpm)
             
             header = fits.open(self.name)[0].header
             northangle1 = header['ESO QC ACQ FIELD1 NORTH_ANGLE']/180*math.pi
@@ -1453,8 +1516,11 @@ class GravData():
         else:
             print('Guess for RA & DEC from function as: %.2f, %.2f' % (dRA, dDEC))
         
-        stname = self.name.find('GRAVI')        
-        txtfilename = 'binaryfit_' + self.name[stname:-5] + '.txt'
+        stname = self.name.find('GRAVI')
+        if phasemaps:
+            txtfilename = 'pm_binaryfit_' + self.name[stname:-5] + '.txt'
+        else:
+            txtfilename = 'binaryfit_' + self.name[stname:-5] + '.txt'
         if write_results:
             txtfile = open(txtfilename, 'w')
             txtfile.write('# Results of binary fit for %s \n' % self.name[stname:])
@@ -1468,12 +1534,13 @@ class GravData():
         self.wave = wave
         self.getDlambda()
         dlambda = self.dlambda
+        results = []
 
         # Initial guesses
         if initial is not None:
             if len(initial) != 16:
                 raise ValueError('Length of initial parameter list is not correct')
-            size = 2
+            size = 10
             dRA_init = np.array([initial[0],initial[0]-size,initial[0]+size])
             dDEC_init = np.array([initial[1],initial[1]-size,initial[1]+size])
 
@@ -1846,6 +1913,8 @@ class GravData():
                             theta_result = theta_fit
                     else:
                         theta_result = donotfittheta
+                        
+                    results.append(theta_result)
                     fit_visamp, fit_visphi, fit_closure, fit_closamp = self.calc_vis(theta_result, u, v, wave, dlambda)
                     fit_vis2 = fit_visamp**2.
                             
@@ -2041,7 +2110,10 @@ class GravData():
                 redchi1_f = np.sum(redchi1*fitted)
                 redchi_f = redchi0_f + redchi1_f
                 print('Combined %s of fitted data: %.3f' % (chi2string, redchi_f))
-        return 0
+        if onlypol1 and ndit == 1:
+            return theta_result
+        else:
+            return results
 
 
     def plotFit(self, theta, fitdata, idx=0, createpdf=False):
