@@ -40,17 +40,17 @@ def convert_date(date):
     date = datetime.strptime(date, '%Y-%m-%d %H:%M:%S')
     return date_decimal, date
 
-@njit
+#@njit
 def mathfunc_real(values, dt):
-    return np.trapz(np.real(values), dx=dt)
+    return np.trapz(np.real(values), dx=dt, axis=0)
    
-@njit
+#@njit
 def mathfunc_imag(values, dt):
-    return np.trapz(np.imag(values), dx=dt)
+    return np.trapz(np.imag(values), dx=dt, axis=0)
 
 def complex_quadrature_num(func, a, b, theta, nsteps=int(1e2)):
     t = np.logspace(np.log10(a), np.log10(b), nsteps)
-    dt = np.diff(t)
+    dt = np.diff(t, axis=0)
     values = func(t, *theta)
     real_integral = mathfunc_real(values, dt)
     imag_integral = mathfunc_imag(values, dt)
@@ -887,7 +887,6 @@ class GravData():
             
         else:
             if approx == "approx":
-                print(s_SgrA, alpha_SgrA, wave, dlambda)
                 intSgrA = self.vis_intensity_approx(s_SgrA, alpha_SgrA, wave, dlambda)
                 intS2 = self.vis_intensity_approx(s_S2, alpha_S2, wave, dlambda)
                 intSgrA_center = self.vis_intensity_approx(0, alpha_SgrA, wave, dlambda)
