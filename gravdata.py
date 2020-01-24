@@ -78,11 +78,11 @@ class GravData():
         
         header = fits.open(self.name)[0].header
         date = header['DATE-OBS']
-        if header['HIERARCH ESO INS OPTI11 ID'] == 'ONAXIS':
-            onaxis = True
-            print('Found onaxis data!')
-        else:
-            onaxis = False
+        #if header['HIERARCH ESO INS OPTI11 ID'] == 'ONAXIS':
+            #onaxis = True
+            #print('Found onaxis data!')
+        #else:
+            #onaxis = False
             
         self.header = header
         self.date = convert_date(date)
@@ -1734,10 +1734,16 @@ class GravData():
                     savetime = savetime.replace(' ', '-')
                     savetime = savetime.replace(':', '')
                     self.savetime = savetime
-                    if ndit == 1:
-                        pdffilename = 'binaryfit_' + self.name[stname:-5] + '.pdf'
+                    if phasemaps:
+                        if ndit == 1:
+                            pdffilename = 'pm_binaryfit_' + self.name[stname:-5] + '.pdf'
+                        else:
+                            pdffilename = 'pm_binaryfit_' + self.name[stname:-5] + '_DIT' + str(dit) + '.pdf'
                     else:
-                        pdffilename = 'binaryfit_' + self.name[stname:-5] + '_DIT' + str(dit) + '.pdf'
+                        if ndit == 1:
+                            pdffilename = 'binaryfit_' + self.name[stname:-5] + '.pdf'
+                        else:
+                            pdffilename = 'binaryfit_' + self.name[stname:-5] + '_DIT' + str(dit) + '.pdf'
                     pdf = FPDF(orientation='P', unit='mm', format='A4')
                     pdf.add_page()
                     pdf.set_font("Helvetica", size=12)
