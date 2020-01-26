@@ -1439,7 +1439,8 @@ class GravData():
                   fixpos=False, fixedBH=False, dphRA=0.1, dphDec=0.1,
                   specialpar=np.array([0,0,0,0,0,0]), phasemaps=False,
                   interppm=True, donotfit=False, donotfittheta=None, 
-                  onlypol1=False, approx=True, initial=None, smoothpm=True):
+                  onlypol1=False, approx=True, initial=None, smoothpm=True,
+                  smoothfwhm=65):
         '''
         Parameter:
         nthreads:       number of cores [4] 
@@ -1490,6 +1491,7 @@ class GravData():
         self.fixedBH = fixedBH
         self.interppm = interppm
         self.approx = approx
+        self.smoothfwhm = smoothfwhm
         rad2as = 180 / np.pi * 3600
         if np.any(specialpar):
             self.specialfit = True
@@ -1505,7 +1507,7 @@ class GravData():
         
         self.phasemaps = phasemaps
         if phasemaps:
-            self.loadPhasemaps(smooth=smoothpm)
+            self.loadPhasemaps(smooth=smoothpm, smooth_fwhm=smoothfwhm)
             
             header = fits.open(self.name)[0].header
             northangle1 = header['ESO QC ACQ FIELD1 NORTH_ANGLE']/180*math.pi
@@ -1790,6 +1792,10 @@ class GravData():
                     pdf.cell(40, 6, txt=str(phasemaps), ln=0, align="L", border=0)
                     pdf.cell(40, 6, txt="Integral solved by", ln=0, align="L", border=0)
                     pdf.cell(40, 6, txt=approx, ln=1, align="L", border=0)
+                    pdf.cell(40, 6, txt="Phasemaps smoothed", ln=0, align="L", border=0)
+                    pdf.cell(40, 6, txt=str(smoothpm), ln=0, align="L", border=0)
+                    pdf.cell(40, 6, txt="Smoothing FWHM", ln=0, align="L", border=0)
+                    pdf.cell(40, 6, txt=str(smoothfwhm), ln=1, align="L", border=0)
                     pdf.ln()
                 
                 if not bequiet and not donotfit:
