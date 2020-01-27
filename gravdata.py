@@ -684,17 +684,23 @@ class GravData():
     
     def loadPhasemaps(self, smooth=True, smooth_fwhm=65):
         # load in phasmaps
+        try:
+           self.pm_name
+           pm_name = self.pm_name
+        except AttributeError:            
+            pm_name = 'GRAVITY_SC_MAP_20200114'
         if smooth:
-            smooth_name = 'GRAVITY_SC_MAP_20200124_SM%i.fits' % smooth_fwhm
+            smooth_name = pm_name + '_SM%i.fits' % smooth_fwhm
             sm_phasemapsfile = resource_filename('gravipy', smooth_name)
             try:
                 phasemaps = fits.open(sm_phasemapsfile)
                 self.pm_amp = phasemaps['SC_AMP'].data
                 self.pm_pha = phasemaps['SC_PHASE'].data
+                phasemapsfile = sm_phasemapsfile
 
             except FileNotFoundError:
                 print('Creating new smoothed pm file with fwhm=%i' % smooth_fwhm)
-                phasemapsfile = resource_filename('gravipy', 'GRAVITY_SC_MAP_20200124.fits')
+                phasemapsfile = resource_filename('gravipy', pm_name + '.fits')
                 phasemaps = fits.open(phasemapsfile)
                 pm_amp_full = phasemaps['SC_AMP'].data
                 pm_pha_full = phasemaps['SC_PHASE'].data
@@ -710,31 +716,38 @@ class GravData():
                 phasemaps['SC_AMP'].data = self.pm_amp
                 phasemaps['SC_PHASE'].data = self.pm_pha
                 phasemaps.writeto(sm_phasemapsfile)
-            self.pm_pha /= np.nanmax(self.pm_pha)
-            
             
         else:
-            phasemapsfile = resource_filename('gravipy', 'GRAVITY_SC_MAP_20200124.fits')
+            phasemapsfile = resource_filename('gravipy', pm_name + '.fits')
             phasemaps = fits.open(phasemapsfile)
             self.pm_amp = phasemaps['SC_AMP'].data
             self.pm_pha = phasemaps['SC_PHASE'].data
+        print('%s used' % phasemapsfile)
         
         x = np.arange(201)
         y = np.arange(201)
         pm_amp_int = []
         pm_pha_int = []        
+        xnew = np.arange(2001)
+        ynew = np.arange(2001)
+        pm_amp_big = []
+        pm_pha_big = []        
         for idx in range(4):
             amp = self.pm_amp[idx]
             amp_mod = np.copy(amp)
             amp_mod[np.isnan(amp)] = 0
             pm_amp_int.append(interpolate.interp2d(x, y, amp_mod))
+            pm_amp_big.append(pm_amp_int[idx](xnew, ynew))
 
             pha = self.pm_pha[idx]
             pha_mod = np.copy(pha)
             pha_mod[np.isnan(pha)] = 0
             pm_pha_int.append(interpolate.interp2d(x, y, pha_mod))
+            pm_pha_big.append(pm_pha_int[idx](xnew, ynew))
         self.pm_amp_int = pm_amp_int
         self.pm_pha_int = pm_pha_int
+        self.pm_amp_big = pm_amp_big
+        self.pm_pha_big = pm_pha_big
         phasemaps.close()
 
 
@@ -763,7 +776,8 @@ class GravData():
                 
         try:
            self.pm_amp
-        except AttributeErrfor:
+        except AttributeError:
+            print('Check that this is not done all the time')
             self.loadPhasemaps()
         if fromFits:
             # should not do that in here for mcmc
@@ -794,12 +808,16 @@ class GravData():
         for tel in range(4):
             pos = np.array([ra + dra[tel], dec + ddec[tel]])
             pos_rot = np.dot(self.rotation(northangle[tel]), pos)
-            
-            # try to make it faster, did not work
-            #wave2 = np.zeros((2, len(wave)))
-            #wave2[0] = wave
-            #wave2[1] = wave
-            #pos_scaled = pos_rot*lambda0/wave2.T/scale + 100
+            if interp == 'bigmap':
+                wave2 = np.zeros((2, len(wave)))
+                wave2[0] = wave
+                wave2[1] = wave
+                pos_scaled = pos_rot*lambda0/wave2.T/scale + 100
+                pos_int = (np.round(pos_scaled*10)).astype(int)
+                cor_amp[tel] = self.pm_amp_big[tel][pos_int[:,0], pos_int[:,1]]
+                cor_pha[tel] = self.pm_pha_big[tel][pos_int[:,0], pos_int[:,1]]
+                
+                
             #if interp:
                 #cor_amp[tel] = np.array([self.pm_amp_int[tel](x,y)[0] for x, y in zip(pos_scaled[:,0], pos_scaled[:,1])])
                 #cor_pha[tel] = np.array([self.pm_pha_int[tel](x,y)[0] for x, y in zip(pos_scaled[:,0], pos_scaled[:,1])])
@@ -1552,7 +1570,7 @@ class GravData():
                   specialpar=np.array([0,0,0,0,0,0]), phasemaps=False,
                   interppm=True, donotfit=False, donotfittheta=None, 
                   onlypol1=False, approx=True, initial=None, smoothpm=True,
-                  smoothfwhm=65):
+                  smoothfwhm=65, nophases=False):
         '''
         Parameter:
         nthreads:       number of cores [4] 
@@ -1791,7 +1809,7 @@ class GravData():
             todel.append(6)
         if fixedBG:
             todel.append(8)
-        if fit_for[3] == 0:
+        if fit_for[3] == 0 or nophases:
             todel.append(9)
             todel.append(10)
         if not use_opds:
