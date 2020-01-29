@@ -1719,20 +1719,20 @@ class GravData():
         if initial is not None:
             if len(initial) != 16:
                 raise ValueError('Length of initial parameter list is not correct')
-            size = 10
+            size = 2
             dRA_init = np.array([initial[0],initial[0]-size,initial[0]+size])
             dDEC_init = np.array([initial[1],initial[1]-size,initial[1]+size])
 
-            flux_ratio_1_init = np.array([np.log10(initial[2]), np.log10(0.01), np.log10(10.)])
-            flux_ratio_2_init = np.array([np.log10(initial[3]), np.log10(0.001), np.log10(10.)])
-            flux_ratio_3_init = np.array([np.log10(initial[4]), np.log10(0.001), np.log10(10.)])
-            flux_ratio_4_init = np.array([np.log10(initial[5]), np.log10(0.001), np.log10(10.)])
+            flux_ratio_1_init = np.array([np.log10(initial[2]), np.log10(0.01), np.log10(100.)])
+            flux_ratio_2_init = np.array([np.log10(initial[3]), np.log10(0.001), np.log10(100.)])
+            flux_ratio_3_init = np.array([np.log10(initial[4]), np.log10(0.001), np.log10(100.)])
+            flux_ratio_4_init = np.array([np.log10(initial[5]), np.log10(0.001), np.log10(100.)])
 
-            alpha_SgrA_init = np.array([initial[6],-10.,10.])
+            alpha_SgrA_init = np.array([initial[6],-5.,7.])
             flux_ratio_bg_init = np.array([initial[7],0.,20.])
-            color_bg_init = np.array([initial[8],-10.,10.])
+            color_bg_init = np.array([initial[8],-5.,7.])
 
-            size = 5
+            size = 2
             phase_center_RA_init = np.array([initial[9],initial[9]-size,initial[9]+size])
             phase_center_DEC_init = np.array([initial[10],initial[10]-size,initial[10]+size])
 
