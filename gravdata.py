@@ -1832,6 +1832,7 @@ class GravData():
             if write_results or createpdf:
                 raise ValueError('If donotfit is True, write_results and createpdf should be False')
             print('Will not fit the data, just print out the results for the given theta')
+            #donotfittheta[2:6] = np.log10(donotfittheta[2:6])
             
         # Get data
         if self.polmode == 'SPLIT':
@@ -3269,17 +3270,19 @@ class GravData():
             if specialfit:
                 s_SgrA = s_SgrA + sp_bl[i]
 
-            # interferometric intensities of all components
-            intSgrA = self.vis_intensity(s_SgrA, alpha_SgrA, wave, dlambda[i,:])
-            intSgrA_center = self.vis_intensity(0, alpha_SgrA, wave, dlambda[i,:])
-            intBG = self.vis_intensity(0, alpha_bg, wave, dlambda[i,:])
-    
-            vis[i,:] = (intSgrA/
-                        (intSgrA_center + fluxRatioBG * intBG))
-            
             if michistyle:
                 s_sgra_ul = s_SgrA / wave
                 vis[i,:] = np.exp(-2j*np.pi*s_sgra_ul)
+            
+            else:
+                # interferometric intensities of all components
+                intSgrA = self.vis_intensity(s_SgrA, alpha_SgrA, wave, dlambda[i,:])
+                intSgrA_center = self.vis_intensity(0, alpha_SgrA, wave, dlambda[i,:])
+                intBG = self.vis_intensity(0, alpha_bg, wave, dlambda[i,:])
+                vis[i,:] = (intSgrA/
+                            (intSgrA_center + fluxRatioBG * intBG))
+            
+
             
         visphi = np.angle(vis, deg=True)
         visphi = visphi + 360.*(visphi<-180.) - 360.*(visphi>180.)
