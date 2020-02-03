@@ -3224,6 +3224,7 @@ class GravData():
         use_opds = self.use_opds
         specialfit = self.specialfit
         michistyle = self.michistyle
+        approx = self.approx
         
         phaseCenterRA = theta[0]
         phaseCenterDEC = theta[1]
@@ -3276,9 +3277,21 @@ class GravData():
             
             else:
                 # interferometric intensities of all components
-                intSgrA = self.vis_intensity(s_SgrA, alpha_SgrA, wave, dlambda[i,:])
-                intSgrA_center = self.vis_intensity(0, alpha_SgrA, wave, dlambda[i,:])
-                intBG = self.vis_intensity(0, alpha_bg, wave, dlambda[i,:])
+                if approx == "approx":
+                    intSgrA = self.vis_intensity_approx(s_SgrA, alpha_SgrA, wave, dlambda[i,:])
+                    intSgrA_center = self.vis_intensity_approx(0, alpha_SgrA, wave, dlambda[i,:])
+                    intBG = self.vis_intensity_approx(0, alpha_bg, wave, dlambda[i,:])
+                elif approx == "analytic":
+                    intSgrA = self.vis_intensity(s_SgrA, alpha_SgrA, wave, dlambda[i,:])
+                    intSgrA_center = self.vis_intensity(0, alpha_SgrA, wave, dlambda[i,:])
+                    intBG = self.vis_intensity(0, alpha_bg, wave, dlambda[i,:])
+                elif approx == "numeric":
+                    intSgrA = self.vis_intensity_num(s_SgrA, alpha_SgrA, wave, dlambda[i,:])
+                    intSgrA_center = self.vis_intensity_num(0, alpha_SgrA, wave, dlambda[i,:])
+                    intBG = self.vis_intensity_num(0, alpha_bg, wave, dlambda[i,:])
+                else:
+                    raise ValueError('approx has to be approx, analytic or numeric')                
+                
                 vis[i,:] = (intSgrA/
                             (intSgrA_center + fluxRatioBG * intBG))
             
@@ -3353,7 +3366,8 @@ class GravData():
                         flagtill=2, flagfrom=12, plotres=True, createpdf=True, 
                         bequiet=False, noS2=False, mindatapoints=3,
                         dontfit=None, dontfitbl=None, writefitdiff=False,
-                        specialpar=np.array([0,0,0,0,0,0]), michistyle=False):
+                        specialpar=np.array([0,0,0,0,0,0]), michistyle=False,
+                        approx='approx'):
         """
         Does a MCMC unary fit on the phases of the data.
         Parameter:
@@ -3385,6 +3399,7 @@ class GravData():
         self.fixedBH = fixedBH
         self.noBG = noBG
         self.michistyle = michistyle
+        self.approx = approx
         if np.any(fitopds):
             self.use_opds = True
             use_opds = True
