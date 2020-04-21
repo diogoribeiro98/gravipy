@@ -1591,25 +1591,6 @@ class GravData():
         return ln_prob_res 
     
     
-    def curvefitfunc(self, x, *theta):       
-        u = self.u
-        v = self.v 
-        wave = self.wave
-        dlambda = self.dlambda
-        fit_for = self.fit_for
-        flag = self.chisuare_flag
-
-        model_visamp, model_visphi, model_closure, model_closamp = self.calc_vis(theta,u,v,wave,dlambda)
-        model_vis2 = model_visamp**2.
-        
-        fit = np.append(model_visamp.ravel(), model_vis2.ravel())
-        fit = np.append(fit, np.arctan(np.radians(model_closure.ravel()))**2)
-        fit = np.append(fit, np.arctan(np.radians(model_visphi.ravel() ))**2)
-        fit = np.append(fit, model_closamp.ravel())
-        
-        return fit[flag]
-    
-    
     
     def fitBinary(self, nthreads=4, nwalkers=500, nruns=500, bestchi=True,
                   plot=True, fit_for=np.array([0.5,0.5,1.0,0.0,0.0]), constant_f=True,
@@ -1619,7 +1600,7 @@ class GravData():
                   fixpos=False, fixedBH=False, dphRA=0.1, dphDec=0.1,
                   specialpar=np.array([0,0,0,0,0,0]), phasemaps=False,
                   interppm=True, donotfit=False, donotfittheta=None, 
-                  onlypol1=False, approx=True, initial=None, smoothpm=True,
+                  onlypol1=False, approx='approx', initial=None, smoothpm=True,
                   smoothfwhm=65, nophases=False, simulate_pm=False):
         '''
         Parameter:
@@ -2112,7 +2093,8 @@ class GravData():
                             
                     if not bequiet:
                         print("---------------------------------------")
-                        print("Mean acceptance fraction: %.2f"  % np.mean(sampler.acceptance_fraction))
+                        print("Mean acceptance fraction: %.2f"  
+                              % np.mean(sampler.acceptance_fraction))
                         print("---------------------------------------")
                     if createpdf:
                         pdf.cell(0, 10, txt="Polarization  %i" % (idx+1), ln=2, align="C", border='B')
@@ -2384,10 +2366,611 @@ class GravData():
             return theta_result
         else:
             return results
+        
+        
+        
+        
+        
+        
+    ##################################################################################
+    ##################################################################################
+    ## Triple Fit
+    ##################################################################################
+    ##################################################################################
+        
+    def lnprob3(self, theta, fitdata, u, v, wave, dlambda, lower, upper):
+        if np.any(theta < lower) or np.any(theta > upper):
+            return -np.inf
+        return self.lnlike3(theta, fitdata, u, v, wave, dlambda)
+    
+    
+    def lnlike3(self, theta, fitdata, u, v, wave, dlambda):       
+        """
+        Calculate the likelihood estimation for the MCMC run
+        """
+        # Model
+        model_visamp, model_visphi, model_closure, model_closamp = self.calc_vis3(theta,u,v,wave,dlambda)
+        model_vis2 = model_visamp**2.
+        
+        #Data
+        (visamp, visamp_error, visamp_flag,
+         vis2, vis2_error, vis2_flag,
+         closure, closure_error, closure_flag,
+         visphi, visphi_error, visphi_flag,
+         closamp, closamp_error, closamp_flag) = fitdata
+        
+        res_visamp = np.sum(-(model_visamp-visamp)**2/visamp_error**2*(1-visamp_flag))
+        res_vis2 = np.sum(-(model_vis2-vis2)**2./vis2_error**2.*(1-vis2_flag))
+        res_closamp = np.sum(-(model_closamp-closamp)**2/closamp_error**2*(1-closamp_flag))
+        
+        res_closure_1 = np.abs(model_closure-closure)
+        res_closure_2 = 360-np.abs(model_closure-closure)
+        check = np.abs(res_closure_1) < np.abs(res_closure_2)
+        res_closure = res_closure_1*check + res_closure_2*(1-check)
+        res_clos = np.sum(-res_closure**2./closure_error**2.*(1-closure_flag))
+ 
+        res_visphi_1 = np.abs(model_visphi-visphi)
+        res_visphi_2 = 360-np.abs(model_visphi-visphi)
+        check = np.abs(res_visphi_1) < np.abs(res_visphi_2) 
+        res_visphi = res_visphi_1*check + res_visphi_2*(1-check)
+        res_phi = np.sum(-res_visphi**2./visphi_error**2.*(1-visphi_flag))
+
+        ln_prob_res = 0.5 * (res_visamp * self.fit_for[0] + 
+                             res_vis2 * self.fit_for[1] + 
+                             res_clos * self.fit_for[2] + 
+                             res_phi * self.fit_for[3] + 
+                             res_closamp * self.fit_for[4])
+        
+        return ln_prob_res 
+    
+    
+    
+    def calc_vis3(self, theta, u, v, wave, dlambda):
+        mas2rad = 1e-3 / 3600 / 180 * np.pi
+        rad2mas = 180 / np.pi * 3600 * 1e3
+        
+        fixedBG = self.fixedBG
+        fiberOffX = self.fiberOffX
+        fiberOffY = self.fiberOffY
+        fixpos = self.fixpos
+        fixedBH = self.fixedBH
+        approx = self.approx
+
+        if fixpos:
+            dRA = self.fiberOffX
+            dDEC = self.fiberOffY
+        else:
+            dRA = theta[0]
+            dDEC = theta[1]
+        fluxRatio = theta[2]
+        
+        dRA2 = theta[3]
+        dDEC2 = theta[4]
+        fluxRatio2 = theta[5]
+        
+        if fixedBH:
+            alpha_SgrA = -0.5
+        else:
+            alpha_SgrA = theta[6]
+
+        fluxRatioBG = theta[7]
+        if fixedBG:
+            alpha_bg = 3.
+        else:
+            alpha_bg = theta[8]
+        
+        if self.fit_for[3] == 0:
+            pc_RA = 0
+            pc_DEC = 0
+        else:
+            pc_RA = theta[9]
+            pc_DEC = theta[10]
+        alpha_S = 3
+        
+        f = 10**fluxRatio
+        f2 = 10**fluxRatio2
+        
+        vis = np.zeros((6,len(wave))) + 0j
+        for i in range(0,6):
+            s_SgrA = ((pc_RA)*u[i] + (pc_DEC)*v[i]) * mas2rad * 1e6
+            s_S1 = ((dRA+pc_RA)*u[i] + (dDEC+pc_DEC)*v[i]) * mas2rad * 1e6
+            s_S2 = ((dRA2+pc_RA)*u[i] + (dDEC2+pc_DEC)*v[i]) * mas2rad * 1e6
+            
+            if approx == "approx":
+                intSgrA = self.vis_intensity_approx(s_SgrA, alpha_SgrA, wave, dlambda[i,:])
+                intSgrA_center = self.vis_intensity_approx(0, alpha_SgrA, wave, dlambda[i,:])
+
+                intS1 = self.vis_intensity_approx(s_S1, alpha_S, wave, dlambda[i,:])
+                intS1_center = self.vis_intensity_approx(0, alpha_S, wave, dlambda[i,:])
+
+                intS2 = self.vis_intensity_approx(s_S2, alpha_S, wave, dlambda[i,:])
+                intS2_center = self.vis_intensity_approx(0, alpha_S, wave, dlambda[i,:])
+
+                intBG = self.vis_intensity_approx(0, alpha_bg, wave, dlambda[i,:])
+                
+            elif approx == "analytic":
+                intSgrA = self.vis_intensity(s_SgrA, alpha_SgrA, wave, dlambda[i,:])
+                intSgrA_center = self.vis_intensity(0, alpha_SgrA, wave, dlambda[i,:])
+
+                intS1 = self.vis_intensity(s_S1, alpha_S, wave, dlambda[i,:])
+                intS1_center = self.vis_intensity(0, alpha_S, wave, dlambda[i,:])
+
+                intS2 = self.vis_intensity(s_S2, alpha_S, wave, dlambda[i,:])
+                intS2_center = self.vis_intensity(0, alpha_S, wave, dlambda[i,:])
+
+                intBG = self.vis_intensity(0, alpha_bg, wave, dlambda[i,:])                
+                
+            elif approx == "numeric":
+                intSgrA = self.vis_intensity_num(s_SgrA, alpha_SgrA, wave, dlambda[i,:])
+                intSgrA_center = self.vis_intensity_num(0, alpha_SgrA, wave, dlambda[i,:])
+
+                intS1 = self.vis_intensity_num(s_S1, alpha_S, wave, dlambda[i,:])
+                intS1_center = self.vis_intensity_num(0, alpha_S, wave, dlambda[i,:])
+
+                intS2 = self.vis_intensity_num(s_S2, alpha_S, wave, dlambda[i,:])
+                intS2_center = self.vis_intensity_num(0, alpha_S, wave, dlambda[i,:])
+
+                intBG = self.vis_intensity_num(0, alpha_bg, wave, dlambda[i,:])                
+                intBG = self.vis_intensity_num(0, alpha_bg, wave, dlambda[i,:])
+
+            else:
+                raise ValueError('approx has to be approx, analytic or numeric')
+            
+            vis[i,:] = ((intSgrA + f*intS1 + f2*intS2)/
+                        (intSgrA_center + f*intS1_center + f2*intS2 + fluxRatioBG*intBG))
+
+        visamp = np.abs(vis)
+        visphi = np.angle(vis, deg=True)
+        closure = np.zeros((4, len(wave)))
+        closamp = np.zeros((4, len(wave)))
+        for idx in range(4):
+            closure[idx] = visphi[self.bispec_ind[idx,0]] + visphi[self.bispec_ind[idx,1]] - visphi[self.bispec_ind[idx,2]]
+            closamp[idx] = visamp[self.bispec_ind[idx,0]] * visamp[self.bispec_ind[idx,1]] * visamp[self.bispec_ind[idx,2]]
+
+        visphi = visphi + 360.*(visphi<-180.) - 360.*(visphi>180.)
+        closure = closure + 360.*(closure<-180.) - 360.*(closure>180.)
+        return visamp, visphi, closure, closamp
 
 
 
-    def plotFit(self, theta, fitdata, idx=0, createpdf=False):
+    def fitTriple(self, dRA2, dDEC2, fr2,
+                  nthreads=4, nwalkers=500, nruns=500, bestchi=True, approx='approx',
+                  plot=True, fit_for=np.array([0.5,0.5,1.0,0.0,0.0]),
+                  fixedBG=True, noS2=True, redchi2=False, flagtill=3, 
+                  flagfrom=13, dRA=0., dDEC=0., plotres=True, createpdf=True,
+                  bequiet=False, fixpos=False, fixedBH=False, dphRA=0.1, dphDec=0.1,
+                  donotfit=False, donotfittheta=None, onlypol1=False, initial=None):
+        
+        self.fit_for = fit_for
+        self.fixedBG = fixedBG
+        self.fixpos = fixpos
+        self.fixedBH = fixedBH
+        self.approx = approx
+        rad2as = 180 / np.pi * 3600
+        
+        nwave = self.channel
+        self.getIntdata(plot=False, flag=False)
+        MJD = fits.open(self.name)[0].header["MJD-OBS"]
+        u = self.u
+        v = self.v
+        wave = self.wlSC
+            
+        self.fiberOffX = -fits.open(self.name)[0].header["HIERARCH ESO INS SOBJ OFFX"] 
+        self.fiberOffY = -fits.open(self.name)[0].header["HIERARCH ESO INS SOBJ OFFY"] 
+        if not bequiet:
+            print("fiber center: %.2f, %.2f (mas)" % (self.fiberOffX,
+                                                    self.fiberOffY))
+        if dRA == 0 and dDEC == 0:
+            if self.fiberOffX != 0 and self.fiberOffY != 0:
+                dRA = self.fiberOffX
+                dDEC = self.fiberOffY
+            if self.fiberOffX == 0 and self.fiberOffY == 0:
+                if noS2:
+                    if not bequiet:
+                        print('No Fiber offset, if you want to fit this file use noS2=False')
+                    return 0
+            if dRA == 0 and dDEC == 0:
+                if not bequiet:
+                    print('Fiber offset is zero, guess for dRA & dDEC should be given with function')
+        else:
+            print('Guess for RA & DEC from function as: %.2f, %.2f' % (dRA, dDEC))
+            
+        self.wave = wave
+        self.getDlambda()
+        dlambda = self.dlambda
+        results = []
+        
+        # Initial guesses
+        if initial is not None:
+            if len(initial) != 11:
+                raise ValueError('Length of initial parameter list is not correct')
+            size = 2
+            dRA_init = np.array([initial[0],initial[0]-size,initial[0]+size])
+            dDEC_init = np.array([initial[1],initial[1]-size,initial[1]+size])
+            flux_ratio_init = np.array([np.log10(initial[2]), np.log10(0.01), np.log10(100.)])
+
+            dRA2_init = np.array([initial[3],initial[0]-size,initial[0]+size])
+            dDEC2_init = np.array([initial[4],initial[1]-size,initial[1]+size])
+            flux_ratio2_init = np.array([np.log10(initial[5]), np.log10(0.01), np.log10(100.)])
+
+            alpha_SgrA_init = np.array([initial[6],-5.,7.])
+            flux_ratio_bg_init = np.array([initial[7],0.,20.])
+            color_bg_init = np.array([initial[8],-5.,7.])
+
+            size = 2
+            phase_center_RA_init = np.array([initial[9],initial[9]-size,initial[9]+size])
+            phase_center_DEC_init = np.array([initial[10],initial[10]-size,initial[10]+size])
+
+        else:
+            size = 4
+            dRA_init = np.array([dRA,dRA-size,dRA+size])
+            dDEC_init = np.array([dDEC,dDEC-size,dDEC+size])
+
+            dRA2_init = np.array([dRA2,dRA2-size,dRA2+size])
+            dDEC2_init = np.array([dDEC2,dDEC2-size,dDEC2+size])
+
+            fr_start = np.log10(0.1)
+            flux_ratio_init = np.array([fr_start, np.log10(0.01), np.log10(100.)])
+            fr2_start = np.log10(fr2)
+            flux_ratio2_init = np.array([fr2_start, np.log10(0.01), np.log10(100.)])
+
+            alpha_SgrA_init = np.array([-1.,-10.,10.])
+            flux_ratio_bg_init = np.array([0.1,0.,20.])
+            color_bg_init = np.array([3.,-10.,10.])
+
+            size = 5
+            phase_center_RA_init = np.array([dphRA,dphRA-size,dphRA+size])
+            phase_center_DEC_init = np.array([dphDec,dphDec-size,dphDec+size])
+            
+        # initial fit parameters 
+        theta = np.array([dRA_init[0], dDEC_init[0], flux_ratio_init[0],
+                          dRA2_init[0], dDEC2_init[0], flux_ratio2_init[0],
+                          alpha_SgrA_init[0], flux_ratio_bg_init[0], color_bg_init[0], 
+                          phase_center_RA_init[0], phase_center_DEC_init[0]])
+
+        # lower limit on fit parameters 
+        theta_lower = np.array([dRA_init[1], dDEC_init[1], flux_ratio_init[1],
+                                dRA2_init[1], dDEC2_init[1], flux_ratio2_init[1],
+                                alpha_SgrA_init[1], flux_ratio_bg_init[1], color_bg_init[1], 
+                                phase_center_RA_init[1], phase_center_DEC_init[1]])
+
+        # upper limit on fit parameters 
+        theta_upper = np.array([dRA_init[2], dDEC_init[2], flux_ratio_init[2],
+                                dRA2_init[2], dDEC2_init[2], flux_ratio2_init[2],
+                                alpha_SgrA_init[2], flux_ratio_bg_init[2], color_bg_init[2], 
+                                phase_center_RA_init[2], phase_center_DEC_init[2]])
+
+        theta_names = np.array(["dRA", "dDEC", "fr", "dRA2", "dDEC2", "fr2",
+                                r"$\alpha_{flare}$", r"$f_{bg}$", r"$\alpha_{bg}$", 
+                                r"$RA_{PC}$", r"$DEC_{PC}$"])
+        theta_names_raw = np.array(["dRA", "dDEC", "fr", "dRA2", "dDEC2", "fr2",
+                                    "alpha flare", "f BG", "alpha BG", "PC RA", "PC DEC"])
+        
+
+        ndim = len(theta)
+        todel = []
+        if fixpos:
+            todel.append(0)
+            todel.append(1)
+        if fixedBH:
+            todel.append(6)
+        if fixedBG:
+            todel.append(8)
+        if fit_for[3] == 0:
+            todel.append(9)
+            todel.append(10)
+        ndof = ndim - len(todel)
+
+        if donotfit:
+            if donotfittheta is None:
+                raise ValueError('If donotfit is True, fit values have to be given by donotfittheta')
+            if len(donotfittheta) != ndim:
+                print(theta_names_raw)
+                raise ValueError('donotfittheta has to have %i parameters, see above' % ndim)
+            if plot:
+                raise ValueError('If donotfit is True, cannot create MCMC plots')
+            if write_results or createpdf:
+                raise ValueError('If donotfit is True, write_results and createpdf should be False')
+            print('Will not fit the data, just print out the results for the given theta')
+            
+        # Get data
+        if self.polmode == 'SPLIT':
+            visamp_P = [self.visampSC_P1, self.visampSC_P2]
+            visamp_error_P = [self.visamperrSC_P1, self.visamperrSC_P2]
+            visamp_flag_P = [self.visampflagSC_P1, self.visampflagSC_P2]
+            
+            vis2_P = [self.vis2SC_P1, self.vis2SC_P2]
+            vis2_error_P = [self.vis2errSC_P1, self.vis2errSC_P2]
+            vis2_flag_P = [self.vis2flagSC_P1, self.vis2flagSC_P2]
+
+            closure_P = [self.t3SC_P1, self.t3SC_P2]
+            closure_error_P = [self.t3errSC_P1, self.t3errSC_P2]
+            closure_flag_P = [self.t3flagSC_P1, self.t3flagSC_P2]
+            
+            visphi_P = [self.visphiSC_P1, self.visphiSC_P2]
+            visphi_error_P = [self.visphierrSC_P1, self.visphierrSC_P2]
+            visphi_flag_P = [self.visampflagSC_P1, self.visampflagSC_P2]
+
+            closamp_P = [self.t3ampSC_P1, self.t3ampSC_P2]
+            closamp_error_P = [self.t3amperrSC_P1, self.t3amperrSC_P2]
+            closamp_flag_P = [self.t3ampflagSC_P1, self.t3ampflagSC_P2]
+
+            ndit = np.shape(self.visampSC_P1)[0]//6
+            if not bequiet:
+                print('NDIT = %i' % ndit)
+            polnom = 2
+        elif self.polmode == 'COMBINED':
+            visamp_P = [self.visampSC]
+            visamp_error_P = [self.visamperrSC]
+            visamp_flag_P = [self.visampflagSC]
+            
+            vis2_P = [self.vis2SC]
+            vis2_error_P = [self.vis2errSC]
+            vis2_flag_P = [self.vis2flagSC]
+
+            closure_P = [self.t3SC]
+            closure_error_P = [self.t3errSC]
+            closure_flag_P = [self.t3flagSC]
+            
+            visphi_P = [self.visphiSC]
+            visphi_error_P = [self.visphierrSC]
+            visphi_flag_P = [self.visampflagSC]
+
+            closamp_P = [self.t3ampSC]
+            closamp_error_P = [self.t3amperrSC]
+            closamp_flag_P = [self.t3ampflagSC]
+
+            ndit = np.shape(self.visampSC)[0]//6
+            if not bequiet:
+                print('NDIT = %i' % ndit)
+            polnom = 1
+
+        for dit in range(ndit):
+            if not bequiet and not donotfit:
+                print('Run MCMC for DIT %i' % (dit+1))
+            ditstart = dit*6
+            ditstop = ditstart + 6
+            t3ditstart = dit*4
+            t3ditstop = t3ditstart + 4
+            
+            if onlypol1:
+                polnom = 1
+                
+            for idx in range(polnom):
+                visamp = visamp_P[idx][ditstart:ditstop]
+                visamp_error = visamp_error_P[idx][ditstart:ditstop]
+                visamp_flag = visamp_flag_P[idx][ditstart:ditstop]
+                vis2 = vis2_P[idx][ditstart:ditstop]
+                vis2_error = vis2_error_P[idx][ditstart:ditstop]
+                vis2_flag = vis2_flag_P[idx][ditstart:ditstop]
+                closure = closure_P[idx][t3ditstart:t3ditstop]
+                closure_error = closure_error_P[idx][t3ditstart:t3ditstop]
+                closure_flag = closure_flag_P[idx][t3ditstart:t3ditstop]
+                visphi = visphi_P[idx][ditstart:ditstop]
+                visphi_error = visphi_error_P[idx][ditstart:ditstop]
+                visphi_flag = visphi_flag_P[idx][ditstart:ditstop]
+                closamp = closamp_P[idx][t3ditstart:t3ditstop]
+                closamp_error = closamp_error_P[idx][t3ditstart:t3ditstop]
+                closamp_flag = closamp_flag_P[idx][t3ditstart:t3ditstop]
+                
+                # further flag if visamp/vis2 if >1 or NaN, and replace NaN with 0 
+                with np.errstate(invalid='ignore'):
+                    visamp_flag1 = (visamp > 1) | (visamp < 1.e-5)
+                visamp_flag2 = np.isnan(visamp)
+                visamp_flag_final = ((visamp_flag) | (visamp_flag1) | (visamp_flag2))
+                visamp_flag = visamp_flag_final
+                visamp = np.nan_to_num(visamp)
+                visamp_error[visamp_flag] = 1.
+            
+                with np.errstate(invalid='ignore'):
+                    vis2_flag1 = (vis2 > 1) | (vis2 < 1.e-5) 
+                vis2_flag2 = np.isnan(vis2)
+                vis2_flag_final = ((vis2_flag) | (vis2_flag1) | (vis2_flag2))
+                vis2_flag = vis2_flag_final
+                vis2 = np.nan_to_num(vis2)
+                vis2_error[vis2_flag] = 1.
+
+                if ((flagtill > 0) and (flagfrom > 0)):
+                    p = flagtill
+                    t = flagfrom
+                    if idx == 0 and dit == 0:
+                        if not bequiet:
+                            print('using channels from #%i to #%i' % (p, t))
+                    visamp_flag[:,0:p] = True
+                    vis2_flag[:,0:p] = True
+                    visphi_flag[:,0:p] = True
+                    closure_flag[:,0:p] = True
+                    closamp_flag[:,0:p] = True
+
+                    visamp_flag[:,t:] = True
+                    vis2_flag[:,t:] = True
+                    visphi_flag[:,t:] = True
+                    closure_flag[:,t:] = True
+                    closamp_flag[:,t:] = True
+                                        
+                width = 1e-1
+                pos = np.ones((nwalkers,ndim))
+                for par in range(ndim):
+                    if par in todel:
+                        pos[:,par] = theta[par]
+                    else:
+                        pos[:,par] = theta[par] + width*np.random.randn(nwalkers)
+                if not bequiet:
+                    if not donotfit:
+                        print('Run MCMC for Pol %i' % (idx+1))
+                    else:
+                        print('Pol %i' % (idx+1))
+                fitdata = [visamp, visamp_error, visamp_flag,
+                            vis2, vis2_error, vis2_flag,
+                            closure, closure_error, closure_flag,
+                            visphi, visphi_error, visphi_flag,
+                            closamp, closamp_error, closamp_flag]
+                
+                self.fitstuff = [fitdata, u, v, wave, dlambda, theta]
+
+                if not donotfit:
+                    if nthreads == 1:
+                        sampler = emcee.EnsembleSampler(nwalkers, ndim, self.lnprob3, 
+                                                        args=(fitdata, u, v, wave,
+                                                                dlambda, theta_lower,
+                                                                theta_upper))
+                        if bequiet:
+                            sampler.run_mcmc(pos, nruns, progress=False)
+                        else:
+                            sampler.run_mcmc(pos, nruns, progress=True)
+                    else:
+                        with Pool(processes=nthreads) as pool:
+                            sampler = emcee.EnsembleSampler(nwalkers, ndim, self.lnprob3, 
+                                                            args=(fitdata, u, v, wave,
+                                                                dlambda, theta_lower,
+                                                                theta_upper),
+                                                            pool=pool)
+                            if bequiet:
+                                sampler.run_mcmc(pos, nruns, progress=False) 
+                            else:
+                                sampler.run_mcmc(pos, nruns, progress=True)     
+
+                    if not bequiet:
+                        print("---------------------------------------")
+                        print("Mean acceptance fraction: %.2f"  %
+                              np.mean(sampler.acceptance_fraction))
+                        print("---------------------------------------")
+
+                    samples = sampler.chain
+                    mostprop = sampler.flatchain[np.argmax(sampler.flatlnprobability)]
+
+                    clsamples = np.delete(samples, todel, 2)
+                    cllabels = np.delete(theta_names, todel)
+                    cllabels_raw = np.delete(theta_names_raw, todel)
+                    clmostprop = np.delete(mostprop, todel)
+                    
+                    cldim = len(cllabels)
+                    if plot:
+                        fig, axes = plt.subplots(cldim, figsize=(8, cldim/1.5),
+                                                sharex=True)
+                        for i in range(cldim):
+                            ax = axes[i]
+                            ax.plot(clsamples[:, :, i].T, "k", alpha=0.3)
+                            ax.set_ylabel(cllabels[i])
+                            ax.yaxis.set_label_coords(-0.1, 0.5)
+                        axes[-1].set_xlabel("step number")
+                        plt.show()                            
+
+                    if nruns > 299:
+                        fl_samples = samples[:, -200:, :].reshape((-1, ndim))
+                        fl_clsamples = clsamples[:, -200:, :].reshape((-1, cldim))                
+                    elif nruns > 199:
+                        fl_samples = samples[:, -100:, :].reshape((-1, ndim))
+                        fl_clsamples = clsamples[:, -100:, :].reshape((-1, cldim))   
+                    else:
+                        fl_samples = samples.reshape((-1, ndim))
+                        fl_clsamples = clsamples.reshape((-1, cldim))
+
+                    if plot:
+                        ranges = np.percentile(fl_clsamples, [3, 97], axis=0).T
+                        fig = corner.corner(fl_clsamples, quantiles=[0.16, 0.5, 0.84],
+                                            truths=clmostprop, labels=cllabels)
+                        plt.show()
+
+                    # get the actual fit
+                    theta_fit = np.percentile(fl_samples, [50], axis=0).T
+                    if bestchi:
+                        theta_result = mostprop
+                    else:
+                        theta_result = theta_fit
+                else:
+                    theta_result = donotfittheta
+
+                results.append(theta_result)
+                fit_visamp, fit_visphi, fit_closure, fit_closamp = self.calc_vis3(theta_result, u, v, wave, dlambda)
+                fit_vis2 = fit_visamp**2.
+                        
+                res_visamp = fit_visamp-visamp
+                res_vis2 = fit_vis2-vis2
+                res_closamp = fit_closamp-closamp
+                res_closure_1 = np.abs(fit_closure-closure)
+                res_closure_2 = 360-np.abs(fit_closure-closure)
+                check = np.abs(res_closure_1) < np.abs(res_closure_2) 
+                res_closure = res_closure_1*check + res_closure_2*(1-check)
+                res_visphi_1 = np.abs(fit_visphi-visphi)
+                res_visphi_2 = 360-np.abs(fit_visphi-visphi)
+                check = np.abs(res_visphi_1) < np.abs(res_visphi_2) 
+                res_visphi = res_visphi_1*check + res_visphi_2*(1-check)
+
+                redchi_visamp = np.sum(res_visamp**2./visamp_error**2.*(1-visamp_flag))
+                redchi_vis2 = np.sum(res_vis2**2./vis2_error**2.*(1-vis2_flag))
+                redchi_closure = np.sum(res_closure**2./closure_error**2.*(1-closure_flag))
+                redchi_closamp = np.sum(res_closamp**2./closamp_error**2.*(1-closamp_flag))
+                redchi_visphi = np.sum(res_visphi**2./visphi_error**2.*(1-visphi_flag))
+                
+                
+                if redchi2:
+                    redchi_visamp /= (visamp.size-np.sum(visamp_flag)-ndof)
+                    redchi_vis2 /= (vis2.size-np.sum(vis2_flag)-ndof)
+                    redchi_closure /= (closure.size-np.sum(closure_flag)-ndof)
+                    redchi_closamp /= (closamp.size-np.sum(closamp_flag)-ndof)
+                    redchi_visphi /= (visphi.size-np.sum(visphi_flag)-ndof)
+                    chi2string = 'red. chi2'
+                else:
+                    chi2string = 'chi2'
+                
+                redchi = [redchi_visamp, redchi_vis2, redchi_closure, redchi_visphi, redchi_closamp]
+                if idx == 0:
+                    redchi0 = [redchi_visamp, redchi_vis2, redchi_closure, redchi_visphi, redchi_closamp]
+                elif idx == 1:
+                    redchi1 = [redchi_visamp, redchi_vis2, redchi_closure, redchi_visphi, redchi_closamp]
+                    
+                if not bequiet:
+                    print('\n')
+                    print('ndof: %i' % (vis2.size-np.sum(vis2_flag)-ndof))
+                    print(chi2string + " for visamp: %.2f" % redchi_visamp)
+                    print(chi2string + " for vis2: %.2f" % redchi_vis2)
+                    print(chi2string + " for visphi: %.2f" % redchi_visphi)
+                    print(chi2string + " for closure: %.2f" % redchi_closure)
+                    print(chi2string + " for closamp: %.2f" % redchi_closamp)
+                    print('\n')
+
+                if not donotfit:
+                    percentiles = np.percentile(fl_clsamples, [16, 50, 84],axis=0).T
+                    percentiles[:,0] = percentiles[:,1] - percentiles[:,0] 
+                    percentiles[:,2] = percentiles[:,2] - percentiles[:,1] 
+                    
+                    if not bequiet:
+                        print("-----------------------------------")
+                        print("Best chi2 result:")
+                        for i in range(0, cldim):
+                            print("%s = %.3f" % (cllabels_raw[i], clmostprop[i]))
+                        print("\n")
+                        print("MCMC Result:")
+                        for i in range(0, cldim):
+                            print("%s = %.3f + %.3f - %.3f" % (cllabels_raw[i],
+                                                                percentiles[i,1], 
+                                                                percentiles[i,2], 
+                                                                percentiles[i,0]))
+                        print("-----------------------------------")
+
+                if plotres:
+                    self.plotFit(theta_result, fitdata, idx, createpdf=False, mode='triple')
+
+        if not bequiet:
+            fitted = 1-(np.array(self.fit_for)==0)
+            redchi0_f = np.sum(redchi0*fitted)
+            if polnom < 2:
+                redchi1 = np.zeros_like(redchi0)
+            redchi1_f = np.sum(redchi1*fitted)
+            redchi_f = redchi0_f + redchi1_f
+            print('Combined %s of fitted data: %.3f' % (chi2string, redchi_f))
+        if onlypol1 and ndit == 1:
+            return theta_result
+        else:
+            return results
+        
+        
+        
+
+
+
+    def plotFit(self, theta, fitdata, idx=0, createpdf=False, mode='binary'):
         """
         Calculates the theoretical interferometric data for the given parameters in theta
         and plots them together with the data in fitdata.
@@ -2411,8 +2994,14 @@ class GravData():
         u = self.u
         v = self.v
         magu = np.sqrt(u**2.+v**2.)
-        (model_visamp_full, model_visphi_full, 
-         model_closure_full, model_closamp_full)  = self.calc_vis(theta, u, v, wave_model, dlambda_model)
+        if mode == 'binary':
+            (model_visamp_full, model_visphi_full, 
+            model_closure_full, model_closamp_full)  = self.calc_vis(theta, u, v, wave_model, dlambda_model)
+        elif mode == 'triple':
+            (model_visamp_full, model_visphi_full, 
+            model_closure_full, model_closamp_full)  = self.calc_vis3(theta, u, v, wave_model, dlambda_model)            
+        else:
+            raise ValueError('Plot mode has to be binary or triple')
         model_vis2_full = model_visamp_full**2.
         
         magu_as = self.spFrequAS
@@ -2528,11 +3117,14 @@ class GravData():
 
         
         
-    ############################################    
-    ############################################
-    ################ Unary model ###############
-    ############################################
-    ############################################    
+        
+        
+        
+    ##################################################################################
+    ##################################################################################
+    ## Unary Fit
+    ##################################################################################
+    ################################################################################## 
     
     def simulateUnaryphases(self, dRa, dDec, specialfit=False, specialpar=None, plot=False, compare=True, uvind=False):
         """
