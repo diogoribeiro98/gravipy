@@ -974,19 +974,30 @@ class GravData():
             if not np.isscalar(s):
                 res = np.zeros(len(lambda0), dtype=np.complex_)
                 for idx in range(len(lambda0)):
-                    up = self.vis_int_full(s[idx], alpha, x1[idx])
-                    low = self.vis_int_full(s[idx], alpha, x2[idx])
-                    res[idx] = up - low
+                    if s[idx] == 0 and alpha == 0:
+                        res[idx] = self.vis_intensity_num(s[idx], alpha, 
+                                                          lambda0[idx], dlambda[idx])
+                    else:
+                        up = self.vis_int_full(s[idx], alpha, x1[idx])
+                        low = self.vis_int_full(s[idx], alpha, x2[idx])
+                        res[idx] = up - low
             else:
                 res = np.zeros(len(lambda0), dtype=np.complex_)
                 for idx in range(len(lambda0)):
-                    up = self.vis_int_full(s, alpha, x1[idx])
-                    low = self.vis_int_full(s, alpha, x2[idx])
-                    res[idx] = up - low
+                    if s == 0 and alpha == 0:
+                        res[idx] = self.vis_intensity_num(s, alpha, lambda0[idx], 
+                                                          dlambda[idx])
+                    else:
+                        up = self.vis_int_full(s, alpha, x1[idx])
+                        low = self.vis_int_full(s, alpha, x2[idx])
+                        res[idx] = up - low
         else:
-            up = self.vis_int_full(s, alpha, x1)
-            low = self.vis_int_full(s, alpha, x2)
-            res = up - low
+            if s == 0 and alpha == 0:
+                res = self.vis_intensity_num(s, alpha, lambda0, dlambda)
+            else:
+                up = self.vis_int_full(s, alpha, x1)
+                low = self.vis_int_full(s, alpha, x2)
+                res = up - low
         return res
         
     def vis_int_full(self, s, alpha, difflam):
@@ -1009,10 +1020,11 @@ class GravData():
     
     
     def vis_intensity_num(self, s, alpha, lambda0, dlambda):
-        if np.all(s == 0.):
+        if np.all(s == 0.) and alpha != 0:
             return -2.2**(1 + alpha)/alpha*(lambda0+dlambda)**(-alpha) - (-2.2**(1 + alpha)/alpha*(lambda0-dlambda)**(-alpha))
         else:
             return complex_quadrature_num(self.visibility_integrator, lambda0-dlambda, lambda0+dlambda, (s, alpha))
+    
     
     
     def simulateVisdata_single(self, theta, wave, dlambda, u, v, 
