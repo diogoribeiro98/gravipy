@@ -1674,7 +1674,7 @@ class GravData():
                   plot=True, 
                   plotres=True, 
                   createpdf=True, 
-                  write_results=True, 
+                  writeresults=True, 
                   redchi2=False,
                   phasemaps=False,
                   interppm=True, 
@@ -1713,7 +1713,7 @@ class GravData():
         plot:           plot MCMC results [True]
         plotres:        plot fit result [True]
         createpdf:      Creates a pdf with fit results and all plots [True] 
-        write_results:  Write fit results in file [True]
+        writeresults:  Write fit results in file [True]
         redchi2:        Gives redchi2 instead of chi2 [False]
         phasemaps:      Use Phasemaps for fit [False]
         interppm:       Interpolate Phasemaps [True]
@@ -1830,7 +1830,7 @@ class GravData():
             txtfilename = 'pm_binaryfit_' + self.name[stname:-5] + '.txt'
         else:
             txtfilename = 'binaryfit_' + self.name[stname:-5] + '.txt'
-        if write_results:
+        if writeresults:
             txtfile = open(txtfilename, 'w')
             txtfile.write('# Results of binary fit for %s \n' % self.name[stname:])
             txtfile.write('# Lines are: Best chi2, MCMC result, MCMC error -, MCMC error + \n')
@@ -1959,8 +1959,8 @@ class GravData():
                 raise ValueError('donotfittheta has to have %i parameters, see above' % ndim)
             if plot:
                 raise ValueError('If donotfit is True, cannot create MCMC plots')
-            if write_results or createpdf:
-                raise ValueError('If donotfit is True, write_results and createpdf should be False')
+            if writeresults or createpdf:
+                raise ValueError('If donotfit is True, writeresults and createpdf should be False')
             print('Will not fit the data, just print out the results for the given theta')
             #donotfittheta[2:6] = np.log10(donotfittheta[2:6])
             
@@ -2017,7 +2017,7 @@ class GravData():
             polnom = 1
 
         for dit in range(ndit):
-            if write_results and ndit > 1:
+            if writeresults and ndit > 1:
                 txtfile.write('# DIT %i \n' % dit)
             if createpdf:
                 savetime = str(datetime.now()).replace('-', '')
@@ -2351,7 +2351,7 @@ class GravData():
                 
                 if plotres:
                     self.plotFit(theta_result, fitdata, idx, createpdf=createpdf)
-                if write_results:
+                if writeresults:
                     txtfile.write("# Polarization %i  \n" % (idx+1))
                     for tdx, t in enumerate(mostprop):
                         txtfile.write(str(t))
@@ -2450,7 +2450,7 @@ class GravData():
                 files = glob.glob(savetime + '_pol?_?.png')
                 for file in files:
                     os.remove(file)
-        if write_results:
+        if writeresults:
             txtfile.close()
         if not bequiet:
             fitted = 1-(np.array(self.fit_for)==0)
@@ -2823,8 +2823,8 @@ class GravData():
                 raise ValueError('donotfittheta has to have %i parameters, see above' % ndim)
             if plot:
                 raise ValueError('If donotfit is True, cannot create MCMC plots')
-            if write_results or createpdf:
-                raise ValueError('If donotfit is True, write_results and createpdf should be False')
+            if writeresults or createpdf:
+                raise ValueError('If donotfit is True, writeresults and createpdf should be False')
             print('Will not fit the data, just print out the results for the given theta')
             
         # Get data
@@ -3535,7 +3535,7 @@ class GravData():
                  specialpar=np.array([0,0,0,0,0,0]), 
                  plot=True, 
                  plotres=True, 
-                 write_results=True,
+                 writeresults=True,
                  createpdf=True, 
                  writefitdiff=False,
                  returnPos=False):
@@ -3564,7 +3564,7 @@ class GravData():
         
         plot:           plot MCMC results [True]
         plotres:        plot fit result [True]
-        write_results:  Write fit results in file [True] 
+        writeresults:  Write fit results in file [True] 
         createpdf:      Creates a pdf with fit results and all plots [True] 
         writefitdiff:   Writes the difference of the mean fit vs data instead of redchi2
         returnPos:      Retuns fitted position
@@ -3630,7 +3630,7 @@ class GravData():
             savefilename = 'punaryfit_' + self.name[stname:-5]
 
         txtfilename = savefilename + '.txt'
-        if write_results:
+        if writeresults:
             txtfile = open(txtfilename, 'w')
             txtfile.write('# Results of Unary fit for %s \n' % self.name[stname:])
             txtfile.write('# Lines are: Best chi2, MCMC result, MCMC error -, MCMC error + \n')
@@ -3727,7 +3727,7 @@ class GravData():
             savetime = savetime.replace(' ', '-')
             savetime = savetime.replace(':', '')
             self.savetime = savetime
-            if write_results and ndit > 1:
+            if writeresults and ndit > 1:
                 txtfile.write('# DIT %i \n' % dit)
             if createpdf:
                 savetime = str(datetime.now()).replace('-', '')
@@ -4024,7 +4024,7 @@ class GravData():
                 else:
                     fitdiff = 0
                     redchi_visphi = 0
-                if write_results:
+                if writeresults:
                     if writefitdiff:
                         fitqual = fitdiff
                     else:
@@ -4127,7 +4127,7 @@ class GravData():
                 files = glob.glob(savetime + '_pol?_?.png')
                 for file in files:
                     os.remove(file)
-            if write_results:
+            if writeresults:
                 txtfile.close()
         if returnPos:
             return np.array(returnList)
