@@ -1849,7 +1849,8 @@ class GravData():
                 if not bequiet:
                     print('Fiber offset is zero, guess for dRA & dDEC should be given with function')
         else:
-            print('Guess for RA & DEC from function as: %.2f, %.2f' % (dRA, dDEC))
+            if not bequiet:
+                print('Guess for RA & DEC from function as: %.2f, %.2f' % (dRA, dDEC))
         
         stname = self.name.find('GRAVI')
         if phasemaps:
