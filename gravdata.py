@@ -16,6 +16,10 @@ import mpmath
 from matplotlib import gridspec
 from pkg_resources import resource_filename
 from numba import njit
+from astropy.time import Time
+from datetime import timedelta, datetime
+import sys
+import os 
 
 try:
     from generalFunctions import *
@@ -23,16 +27,11 @@ try:
 except (NameError, ModuleNotFoundError):
     pass
 
-import sys
-import os 
-
 color1 = '#C02F1D'
 color2 = '#348ABD'
 color3 = '#F26D21'
 color4 = '#7A68A6'
 
-from astropy.time import Time
-from datetime import timedelta, datetime
 def convert_date(date):
     t = Time(date)
     t2 = Time('2000-01-01T12:00:00')
@@ -58,6 +57,9 @@ def complex_quadrature_num(func, a, b, theta, nsteps=int(1e2)):
     real_integral = mathfunc_real(values, dt)
     imag_integral = mathfunc_imag(values, dt)
     return real_integral + 1j*imag_integral
+
+
+
 
 class GravData():
     def __init__(self, data, verbose=True):
@@ -140,6 +142,9 @@ class GravData():
                
     
     def getValue(self, ext1, ext2=None, ext1num=None):
+        """
+        Get data from one or optional two extensions
+        """
         if self.raw:
             raise ValueError('Input is a RAW file, not usable for this function')
         if ext2:
@@ -155,6 +160,9 @@ class GravData():
 
     
     def getFlux(self, mode='SC', plot=False):
+        """
+        Get the flux data
+        """
         if self.raw:
             raise ValueError('Input is a RAW file, not usable for this function')
         if self.polmode == 'SPLIT':
@@ -228,7 +236,13 @@ class GravData():
 
 
 
-    def getIntdata(self, mode='SC', plot=False, flag=False):
+    def getIntdata(self, mode='SC', plot=False, plotTAmp=False, flag=False):
+        """
+        Reads out all interferometric data and saves it into the class:
+        visamp, visphi, visphi2, closure amplitude and phase
+        if plot it plots all data
+        
+        """
         if self.raw:
             raise ValueError('Input is a RAW file, not usable for this function')
         
@@ -329,8 +343,13 @@ class GravData():
                     self.visphierrSC_P2[self.visphiflagSC_P2] = np.nan
 
                 if plot:
-                    gs = gridspec.GridSpec(3,2)
-                    plt.figure(figsize=(15,15))
+                    if plotTAmp:
+                        gs = gridspec.GridSpec(3,2)
+                        plt.figure(figsize=(15,15))
+                    else:
+                        gs = gridspec.GridSpec(2,2)
+                        plt.figure(figsize=(15,12))
+                        
                     axis = plt.subplot(gs[0,0])
                     for idx in range(len(self.vis2SC_P1)):
                         plt.errorbar(self.spFrequAS[idx,:], self.visampSC_P1[idx,:], self.visamperrSC_P1[idx,:], ls='', marker='o',color=self.colors_baseline[idx%6])
@@ -351,16 +370,6 @@ class GravData():
 
                     axis = plt.subplot(gs[1,0])
                     for idx in range(len(self.t3SC_P2)):
-                        plt.errorbar(self.spFrequAS_T3[idx,:], self.t3ampSC_P2[idx,:], self.t3amperrSC_P2[idx,:], marker='o',color=self.colors_closure[idx%4],linestyle='')
-                    for idx in range(len(self.t3SC_P2)):
-                        plt.errorbar(self.spFrequAS_T3[idx,:], self.t3ampSC_P1[idx,:], self.t3amperrSC_P1[idx,:], marker='p',color=self.colors_closure[idx%4],linestyle='')
-                    plt.axhline(1, ls='--', lw=0.5)
-                    plt.ylim(-0.0,1.1)
-                    plt.xlabel('spatial frequency (1/arcsec)')
-                    plt.ylabel('closure amplitude')
-                    
-                    axis = plt.subplot(gs[1,1])
-                    for idx in range(len(self.t3SC_P2)):
                         plt.errorbar(self.spFrequAS_T3[idx,:], self.t3SC_P2[idx,:], self.t3errSC_P2[idx,:], marker='o',color=self.colors_closure[idx%4],linestyle='')
                     for idx in range(len(self.t3SC_P2)):
                         plt.errorbar(self.spFrequAS_T3[idx,:], self.t3SC_P1[idx,:], self.t3errSC_P1[idx,:], marker='p',color=self.colors_closure[idx%4],linestyle='')
@@ -368,7 +377,19 @@ class GravData():
                     plt.xlabel('spatial frequency (1/arcsec)')
                     plt.ylabel('closure phase (deg)')
                     
-                    axis = plt.subplot(gs[2,1])
+                    axis = plt.subplot(gs[1,1])
+                    if plotTAmp:
+                        for idx in range(len(self.t3SC_P2)):
+                            plt.errorbar(self.spFrequAS_T3[idx,:], self.t3ampSC_P2[idx,:], self.t3amperrSC_P2[idx,:], marker='o',color=self.colors_closure[idx%4],linestyle='')
+                        for idx in range(len(self.t3SC_P2)):
+                            plt.errorbar(self.spFrequAS_T3[idx,:], self.t3ampSC_P1[idx,:], self.t3amperrSC_P1[idx,:], marker='p',color=self.colors_closure[idx%4],linestyle='')
+                        plt.axhline(1, ls='--', lw=0.5)
+                        plt.ylim(-0.0,1.1)
+                        plt.xlabel('spatial frequency (1/arcsec)')
+                        plt.ylabel('closure amplitude')
+
+                        axis = plt.subplot(gs[2,1])
+                        
                     for idx in range(len(self.vis2SC_P1)):
                         plt.errorbar(self.spFrequAS[idx,:], self.visphiSC_P1[idx,:],self.visphierrSC_P1[idx,:], ls='', marker='o',color=self.colors_baseline[idx%6])
                     for idx in range(len(self.vis2SC_P2)):
@@ -447,8 +468,12 @@ class GravData():
                     self.visphierrSC[self.visphiflagSC] = np.nan
 
                 if plot:
-                    gs = gridspec.GridSpec(3,2)
-                    plt.figure(figsize=(15,15))
+                    if plotTAmp:
+                        gs = gridspec.GridSpec(3,2)
+                        plt.figure(figsize=(15,15))
+                    else:
+                        gs = gridspec.GridSpec(2,2)
+                        plt.figure(figsize=(15,12))
                     axis = plt.subplot(gs[0,0])
                     for idx in range(len(self.vis2SC)):
                         plt.errorbar(self.spFrequAS[idx,:], self.visampSC[idx,:], self.visamperrSC[idx,:], ls='', marker='o',color=self.colors_baseline[idx%6])
@@ -465,20 +490,21 @@ class GravData():
 
                     axis = plt.subplot(gs[1,0])
                     for idx in range(len(self.t3SC)):
-                        plt.errorbar(self.spFrequAS_T3[idx,:], self.t3ampSC[idx,:], self.t3amperrSC[idx,:], marker='o',color=self.colors_closure[idx%4],linestyle='')
-                    plt.axhline(1, ls='--', lw=0.5)
-                    plt.ylim(-0.0,1.1)
-                    plt.xlabel('spatial frequency (1/arcsec)')
-                    plt.ylabel('closure amplitude')
-                    
-                    axis = plt.subplot(gs[1,1])
-                    for idx in range(len(self.t3SC)):
                         plt.errorbar(self.spFrequAS_T3[idx,:], self.t3SC[idx,:], self.t3errSC[idx,:], marker='o',color=self.colors_closure[idx%4],linestyle='')
                     plt.axhline(0, ls='--', lw=0.5)
                     plt.xlabel('spatial frequency (1/arcsec)')
                     plt.ylabel('closure phase (deg)')
                     
-                    axis = plt.subplot(gs[2,1])
+                    axis = plt.subplot(gs[1,1])
+                    if plotTAmp:
+                        for idx in range(len(self.t3SC)):
+                            plt.errorbar(self.spFrequAS_T3[idx,:], self.t3ampSC[idx,:], self.t3amperrSC[idx,:], marker='o',color=self.colors_closure[idx%4],linestyle='')
+                        plt.axhline(1, ls='--', lw=0.5)
+                        plt.ylim(-0.0,1.1)
+                        plt.xlabel('spatial frequency (1/arcsec)')
+                        plt.ylabel('closure amplitude')
+                    
+                        axis = plt.subplot(gs[2,1])
                     for idx in range(len(self.vis2SC)):
                         plt.errorbar(self.spFrequAS[idx,:], self.visphiSC[idx,:],self.visphierrSC[idx,:], ls='', marker='o',color=self.colors_baseline[idx%6])
                     plt.axhline(0, ls='--', lw=0.5)
@@ -491,6 +517,12 @@ class GravData():
                 
     def getFluxfromRAW(self, flatfile, method, skyfile=None, wavefile=None, 
                        pp_wl=None, flatflux=False):
+        """
+        Get the flux values from a raw file
+        method has to be 'spectrum', 'preproc', 'p2vmred', 'dualscivis'
+        Depending on the method the flux extraction from the raw detector
+        frames is done until the given endproduct
+        """
         if not self.raw:
             raise ValueError('File has to be a RAW file for this method')
         usableMethods = ['spectrum', 'preproc', 'p2vmred', 'dualscivis']
@@ -508,7 +540,6 @@ class GravData():
             sky = fits.open(skyfile)['IMAGING_DATA_SC'].data
             red = (raw-sky)*det_gain
             
-        
         if red.ndim == 3:
             tsteps = red.shape[0]
 
@@ -538,10 +569,6 @@ class GravData():
         #specpos = sorted(specpos)
             
         flatfits = fits.open(flatfile)
-        
-
-        
-        
         fieldstart = flatfits['PROFILE_PARAMS'].header['ESO PRO PROFILE STARTX'] - 1
         fieldstop = fieldstart + flatfits['PROFILE_PARAMS'].header['ESO PRO PROFILE NX']
         
@@ -564,7 +591,6 @@ class GravData():
             raise ValueError('wavefile needed!')
         elif pp_wl is None:
             raise ValueError('pp_wl needed!')
-        
         
         
         # wl interpolation
@@ -616,6 +642,12 @@ class GravData():
     
     
     def getDlambda(self, idel=False):
+        """
+        Get the size of the spectral channels
+        if idel it is taken from the hardcoded size of the response functions,
+        otherwise it is read in from the OI_WAVELENGTH table
+        TODO Idel + medium/high resolution needs some work
+        """
         if idel:
             nwave = self.channel
             wave = self.wlSC
@@ -683,7 +715,11 @@ class GravData():
     ############################################
     
     def loadPhasemaps(self, smooth=True, smooth_fwhm=65):
-        # load in phasmaps
+        """
+        Load in the phasemaps
+        if smooth is true and fwhm not available a new fits will be 
+        created and saved
+        """
         try:
            self.pm_name
            pm_name = self.pm_name
@@ -752,6 +788,9 @@ class GravData():
 
 
     def rotation(self, ang):
+        """
+        Rotation matrix, needed for phasemaps
+        """
         return np.array([[np.cos(ang), np.sin(ang)],
                          [-np.sin(ang), np.cos(ang)]])
     
@@ -760,11 +799,12 @@ class GravData():
                       northangle=None, dra=None, ddec=None,
                       interp=True, plot=False):
         """
-        Calculates coupling amplitude / phase for given 
-        
+        Calculates coupling amplitude / phase for given coordinates
         ra,dec: RA, DEC position on sky relative to nominal field center = SOBJ [mas]
+        wave: wave;length of channels
         dra,ddec: ESO QC MET SOBJ DRA / DDEC: 
-            location of science object (= desired science fiber position, = field center) given by INS.SOBJ relative to *actual* fiber position measured by the laser metrology [mas]
+            location of science object (= desired science fiber position, = field center) 
+            given by INS.SOBJ relative to *actual* fiber position measured by the laser metrology [mas]
             mis-pointing = actual - desired fiber position = -(DRA,DDEC)
         north_angle: north direction on acqcam in degree
         if fromFits is true, northangle & dra,ddec are taken from fits file
@@ -905,14 +945,7 @@ class GravData():
     
     def readPhasemapsSingle(self, ra, dec, northangle, dra, ddec, tel, lam, interp=True):
         """
-        Calculates coupling amplitude / phase for given 
-        
-        ra,dec: RA, DEC position on sky relative to nominal field center = SOBJ [mas]
-        dra,ddec: ESO QC MET SOBJ DRA / DDEC: 
-            location of science object (= desired science fiber position, = field center) given by INS.SOBJ relative to *actual* fiber position measured by the laser metrology [mas]
-            mis-pointing = actual - desired fiber position = -(DRA,DDEC)
-        north_angle: north direction on acqcam in degree
-        if fromFits is true, northangle & dra,ddec are taken from fits file
+        Same as readPhasemaps, but only for a single point, for testing
         """
         try:
            self.pm_amp
@@ -951,23 +984,24 @@ class GravData():
 
     def vis_intensity_approx(self, s, alpha, lambda0, dlambda):
         """
-        Modulated interferometric intensity
-        s = B*skypos-opd1-opd2
-        alphs = power law
+        Approximation for Modulated interferometric intensity
+        s:      B*skypos-opd1-opd2
+        alpha:  power law index
+        lambda0:zentral wavelength
+        dlambda:size of channels 
         """
         x = 2*s*dlambda/lambda0**2.
-        
-        ## this should be the right solution, but x can be an array
-        #if x == 0:
-            #sinc = 1
-        #else:
-            #sinc = np.sin(x)/x
-            
-        # np.sinc = sin(pi*x)/(pi*x)
         sinc = np.sinc(x/np.pi)
         return (lambda0/2.2)**(-1-alpha)*2*dlambda*sinc*np.exp(-2.j*np.pi*s/lambda0)
     
     def vis_intensity(self, s, alpha, lambda0, dlambda):
+        """
+        Analytic solution for Modulated interferometric intensity
+        s:      B*skypos-opd1-opd2
+        alpha:  power law index
+        lambda0:zentral wavelength
+        dlambda:size of channels 
+        """
         x1 = lambda0+dlambda
         x2 = lambda0-dlambda
         if not np.isscalar(lambda0):
@@ -1020,6 +1054,13 @@ class GravData():
     
     
     def vis_intensity_num(self, s, alpha, lambda0, dlambda):
+        """
+        Dull numeric solution for Modulated interferometric intensity
+        s:      B*skypos-opd1-opd2
+        alpha:  power law index
+        lambda0:zentral wavelength
+        dlambda:size of channels 
+        """
         if np.all(s == 0.) and alpha != 0:
             return -2.2**(1 + alpha)/alpha*(lambda0+dlambda)**(-alpha) - (-2.2**(1 + alpha)/alpha*(lambda0-dlambda)**(-alpha))
         else:
@@ -1641,6 +1682,7 @@ class GravData():
                   smoothfwhm=65, 
                   simulate_pm=False):
         '''
+        Binary fit to GRAVITY data
         Parameter:
         nthreads:       number of cores [4] 
         nwalkers:       number of walkers [500] 
@@ -1662,7 +1704,7 @@ class GravData():
         flagtill:       Flag blue channels, has to be changed for not LOW [3] 
         flagfrom:       Flag red channels, has to be changed for not LOW [13]
         use_opds:       Fit OPDs [False] 
-        fixedBG:        Fir for background power law [False]
+        fixedBG:        Fit for background power law [False]
         noS2:           Does not do anything if OFFX and OFFY=0
         fixpos:         Does nto fit the distance between the sources [False]
         fixedBH:        Fit for black hole power law [False]
@@ -1696,8 +1738,10 @@ class GravData():
         OPD2        OPD for telescope 2 [mum]
         OPD3        OPD for telescope 3 [mum]
         OPD4        OPD for telescope 4 [mum]
-        special"
+        special     OPD for individual baselines
         '''
+        if self.resolution != 'LOW' and flagtill == 3 and flagfrom == 13:
+            raise ValueError('Initial values for flagtill and flagfrom have to be changed if not low resolution')
         self.fit_for = fit_for
         self.constant_f = constant_f
         self.use_opds = use_opds
@@ -2587,14 +2631,70 @@ class GravData():
 
 
 
-    def fitTriple(self, dRA2, dDEC2, fr2,
-                  nthreads=4, nwalkers=500, nruns=500, bestchi=True, approx='approx',
-                  plot=True, fit_for=np.array([0.5,0.5,1.0,0.0,0.0]),
-                  fixedBG=True, noS2=True, redchi2=False, flagtill=3, 
-                  flagfrom=13, dRA=0., dDEC=0., plotres=True, createpdf=True,
-                  bequiet=False, fixpos=False, fixedBH=False, dphRA=0.1, dphDec=0.1,
-                  donotfit=False, donotfittheta=None, onlypol1=False, initial=None):
+    def fitTriple(self, 
+                  dRA2, 
+                  dDEC2, 
+                  fr2,
+                  nthreads=4, 
+                  nwalkers=500, 
+                  nruns=500,
+                  bestchi=True, 
+                  bequiet=False, 
+                  fit_for=np.array([0.5,0.5,1.0,0.0,0.0]),
+                  approx='approx',
+                  donotfit=False, 
+                  donotfittheta=None, 
+                  onlypol1=False, 
+                  initial=None,
+                  dRA=0., 
+                  dDEC=0., 
+                  dphRA=0.1, 
+                  dphDec=0.1,
+                  flagtill=3, 
+                  flagfrom=13, 
+                  fixedBG=True, 
+                  noS2=True, 
+                  fixpos=False, 
+                  fixedBH=False, 
+                  plot=True, 
+                  plotres=True, 
+                  createpdf=True,
+                  redchi2=False):
+        '''
+        Tripple fit to GRAVITY data, reduced version of binary fit
+        Parameter:
+        dRA2:           Initial guess for position of 3rd source
+        dDEC2:          Initial guess for position of 3rd source 
+        fr2:            Initial guess for flux ratio of 3rd source
         
+        nthreads:       number of cores [4] 
+        nwalkers:       number of walkers [500] 
+        nruns:          number of MCMC runs [500] 
+        bestchi:        Gives best chi2 (for True) or mcmc res as output [True]
+        bequiet:        Suppresses ALL outputs
+        fit_for:        weight of VA, V2, T3, VP, T3AMP [[0.5,0.5,1.0,0.0,0.0]] 
+        approx:         Kind of integration for visibilities (approx, numeric, analytic)
+        donotfit:       Only gives fitting results for parameters from donotfittheta [False]
+        donotfittheta:  has to be given for donotfit [None]
+        onlypol1:       Only fits polarization 1 for split mode [False]
+        initial:        Initial guess for fit [None]
+        dRA:            Initial guess for dRA (taken from SOFFX if 0) [0]
+        dDEC:           Initial guess for dDEC (taken from SOFFY if 0) [0]
+        dphRA:          Initial guess for phase center RA [0]
+        dphDec:         Initial guess for phase center DEC [0]
+        flagtill:       Flag blue channels, has to be changed for not LOW [3] 
+        flagfrom:       Flag red channels, has to be changed for not LOW [13]
+        fixedBG:        Fir for background power law [False]
+        noS2:           Does not do anything if OFFX and OFFY=0
+        fixpos:         Does not fit the distance between the sources [False]
+        fixedBH:        Fit for black hole power law [False]
+        plot:           plot MCMC results [True]
+        plotres:        plot fit result [True]
+        createpdf:      Creates a pdf with fit results and all plots [True] 
+        redchi2:        Gives redchi2 instead of chi2 [False]
+        '''
+        if self.resolution != 'LOW' and flagtill == 3 and flagfrom == 13:
+            raise ValueError('Initial values for flagtill and flagfrom have to be changed if not low resolution')
         self.fit_for = fit_for
         self.fixedBG = fixedBG
         self.fixpos = fixpos
@@ -3020,10 +3120,6 @@ class GravData():
             return results
         
         
-        
-
-
-
     def plotFit(self, theta, fitdata, idx=0, createpdf=False, mode='binary'):
         """
         Calculates the theoretical interferometric data for the given parameters in theta
@@ -3186,7 +3282,7 @@ class GravData():
     
     def simulateUnaryphases(self, dRa, dDec, specialfit=False, specialpar=None, plot=False, compare=True, uvind=False):
         """
-        Test function to se how a given phasecenter shift would look like
+        Test function to see how a given phasecenter shift would look like
         """
         self.fixedBG = True
         self.fixedBH = True
@@ -3418,14 +3514,31 @@ class GravData():
         return visphi
         
 
-    def fitUnary(self, nthreads=4, nwalkers=500, nruns=500, bestchi=True,
-                 plot=True, fixedBG=True, fixedBH=True, noBG=True,
-                 fitopds=np.array([0,0,0,0]), write_results=True,
-                 flagtill=2, flagfrom=12, plotres=True, createpdf=True, 
-                 bequiet=False, noS2=False, mindatapoints=3,
-                 dontfit=None, dontfitbl=None, writefitdiff=False,
-                 specialpar=np.array([0,0,0,0,0,0]), michistyle=False,
-                 approx='approx', returnPos=False):
+    def fitUnary(self, 
+                 nthreads=4, 
+                 nwalkers=500, 
+                 nruns=500, 
+                 bestchi=True,
+                 bequiet=False, 
+                 michistyle=False,
+                 approx='approx', 
+                 mindatapoints=3,
+                 flagtill=2, 
+                 flagfrom=12, 
+                 dontfit=None, 
+                 dontfitbl=None, 
+                 noS2=False, 
+                 fixedBG=True, 
+                 fixedBH=True, 
+                 noBG=True,
+                 fitopds=np.array([0,0,0,0]), 
+                 specialpar=np.array([0,0,0,0,0,0]), 
+                 plot=True, 
+                 plotres=True, 
+                 write_results=True,
+                 createpdf=True, 
+                 writefitdiff=False,
+                 returnPos=False):
         """
         Does a MCMC unary fit on the phases of the data.
         Parameter:
@@ -3433,25 +3546,31 @@ class GravData():
         nwalkers:       number of walkers [500] 
         nruns:          number of MCMC runs [500] 
         bestchi:        Gives best chi2 (for True) or mcmc res as output [True]
-        plot:           plot MCMC results [True]
-        fixedBG:        Fit for background power law [False]
-        fixedBH:        Fit for black hole power law [False]
-        noBG:           Sets BG ratio to 0 [False]
-        fitopds:        Fit individual opds id equal 1 [0,0,0,0]
-        write_results:  Write fit results in file [True] 
-        flagtill:       Flag blue channels [1] 
-        flagfrom:       Flag red channels [13]
-        plotres:        plot fit result [True]
-        createpdf:      Creates a pdf with fit results and all plots [True] 
         bequiet:        Suppresses ALL outputs [False]
-        noS2:           If True ignores files where fiber offset is 0 [False]
-        mindatapoints:  if less valid datapoints in one baselin, file is rejected [3]
+        michistyle:     Uses a simple exponential fit instead of full 
+                        visibility calculation [False]
+        approx:         Kind of integration for visibilities (approx, numeric, analytic)
+        mindatapoints:  if less valid datapoints in one baseline, file is rejected [3]
+        flagtill:       Flag blue channels [2] 
+        flagfrom:       Flag red channels [12]
         dontfit:        Number of telescope to flag
         dontfitbl:      Number of baseline to flag
+        noS2:           If True ignores files where fiber offset is 0 [False]
+        fixedBG:        Fit for background power law [False]
+        fixedBH:        Fit for black hole power law [False]
+        noBG:           Sets background flux ratio to 0 [True]
+        fitopds:        Fit individual opds id equal 1 [0,0,0,0]
+        specialpar:     Allows OPD for individual baseline [0,0,0,0,0,0]
+        
+        plot:           plot MCMC results [True]
+        plotres:        plot fit result [True]
+        write_results:  Write fit results in file [True] 
+        createpdf:      Creates a pdf with fit results and all plots [True] 
         writefitdiff:   Writes the difference of the mean fit vs data instead of redchi2
-        specialfit:     Special version of fit, changing implementaion 
-                        (dummy to allow an additional fit parameter)
+        returnPos:      Retuns fitted position
         """
+        if self.resolution != 'LOW' and flagtill == 2 and flagfrom == 12:
+            raise ValueError('Initial values for flagtill and flagfrom have to be changed if not low resolution')
         rad2as = 180 / np.pi * 3600
         self.fixedBG = fixedBG
         self.fixedBH = fixedBH
@@ -4033,15 +4152,7 @@ class GravData():
             dlambda_model[i,:] = np.interp(wave_model, wave, dlambda[i,:])
             
         # Fit
-        #magu = np.sqrt(u**2.+v**2.)
         model_visphi_full = self.calc_vis_unary(theta, u, v, wave_model, dlambda_model)
-
-        #u_as = np.zeros((len(u),len(wave)))
-        #v_as = np.zeros((len(v),len(wave)))
-        #for i in range(0,len(u)):
-            #u_as[i,:] = u[i]/(wave*1.e-6) / rad2as
-            #v_as[i,:] = v[i]/(wave*1.e-6) / rad2as
-        #magu_as = np.sqrt(u_as**2.+v_as**2.)
         magu_as = self.spFrequAS
         
         u_as_model = np.zeros((len(u),len(wave_model)))
@@ -4050,7 +4161,6 @@ class GravData():
             u_as_model[i,:] = u[i]/(wave_model*1.e-6) / rad2as
             v_as_model[i,:] = v[i]/(wave_model*1.e-6) / rad2as
         magu_as_model = np.sqrt(u_as_model**2.+v_as_model**2.)
-        
         
         if uvind:
             gs = gridspec.GridSpec(1,2)
