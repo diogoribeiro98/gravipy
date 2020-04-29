@@ -1604,38 +1604,80 @@ class GravData():
     
     
     
-    def fitBinary(self, nthreads=4, nwalkers=500, nruns=500, bestchi=True,
-                  plot=True, fit_for=np.array([0.5,0.5,1.0,0.0,0.0]), constant_f=True,
-                  use_opds=False, fixedBG=True, noS2=True, redchi2=False,
-                  write_results=True, flagtill=3, flagfrom=13,
-                  dRA=0., dDEC=0., plotres=True, createpdf=True, bequiet=False,
-                  fixpos=False, fixedBH=False, dphRA=0.1, dphDec=0.1,
-                  specialpar=np.array([0,0,0,0,0,0]), phasemaps=False,
-                  interppm=True, donotfit=False, donotfittheta=None, 
-                  onlypol1=False, approx='approx', initial=None, smoothpm=True,
-                  smoothfwhm=65, nophases=False, simulate_pm=False):
+    def fitBinary(self, 
+                  nthreads=4, 
+                  nwalkers=500, 
+                  nruns=500, 
+                  bestchi=True,
+                  bequiet=False,
+                  fit_for=np.array([0.5,0.5,1.0,0.0,0.0]), 
+                  nophases=False, 
+                  approx='approx', 
+                  donotfit=False, 
+                  donotfittheta=None, 
+                  onlypol1=False, 
+                  initial=None, 
+                  dRA=0., 
+                  dDEC=0., 
+                  dphRA=0.1, 
+                  dphDec=0.1,
+                  flagtill=3, 
+                  flagfrom=13,
+                  use_opds=False, 
+                  fixedBG=True, 
+                  noS2=True, 
+                  fixpos=False, 
+                  fixedBH=False, 
+                  constant_f=True,
+                  specialpar=np.array([0,0,0,0,0,0]), 
+                  plot=True, 
+                  plotres=True, 
+                  createpdf=True, 
+                  write_results=True, 
+                  redchi2=False,
+                  phasemaps=False,
+                  interppm=True, 
+                  smoothpm=True,
+                  smoothfwhm=65, 
+                  simulate_pm=False):
         '''
         Parameter:
         nthreads:       number of cores [4] 
         nwalkers:       number of walkers [500] 
         nruns:          number of MCMC runs [500] 
         bestchi:        Gives best chi2 (for True) or mcmc res as output [True]
-        plot:           plot MCMC results [True]
-        plotres:        plot fit result [True]
-        write_results:  Write fit results in file [True] 
-        fit_for:        weight of VA, V2, T3, VP, T3AMP [[0.5,0.5,1.0,0.0,0.0]] 
-        constant_f:     Constant coupling [True]
-        use_opds:       Fit OPDs [False] 
-        noS2:           Does not do anything if OFFX and OFFY=0
-        fixedBG:        Fir for background power law [False]
-        flagtill:       Flag blue channels [3] 
-        flagfrom:       Flag red channels [13]
-        dRA:            Guess for dRA (taken from SOFFX if not 0)
-        dDEC:           Guess for dDEC (taken from SOFFY if not 0)
         bequiet:        Suppresses ALL outputs
-        createpdf:      Creates a pdf with fit results and all plots [True] 
+        fit_for:        weight of VA, V2, T3, VP, T3AMP [[0.5,0.5,1.0,0.0,0.0]] 
+        nophases:       Does not fit phases, but still considers them for chi2
+                        (for testing) [False]
+        approx:         Kind of integration for visibilities (approx, numeric, analytic)
+        donotfit:       Only gives fitting results for parameters from donotfittheta [False]
+        donotfittheta:  has to be given for donotfit [None]
+        onlypol1:       Only fits polarization 1 for split mode [False]
+        initial:        Initial guess for fit [None]
+        dRA:            Initial guess for dRA (taken from SOFFX if 0) [0]
+        dDEC:           Initial guess for dDEC (taken from SOFFY if 0) [0]
+        dphRA:          Initial guess for phase center RA [0]
+        dphDec:         Initial guess for phase center DEC [0]
+        flagtill:       Flag blue channels, has to be changed for not LOW [3] 
+        flagfrom:       Flag red channels, has to be changed for not LOW [13]
+        use_opds:       Fit OPDs [False] 
+        fixedBG:        Fir for background power law [False]
+        noS2:           Does not do anything if OFFX and OFFY=0
         fixpos:         Does nto fit the distance between the sources [False]
         fixedBH:        Fit for black hole power law [False]
+        constant_f:     Constant coupling [True]
+        specialpar:     Allows OPD for individual baseline [0,0,0,0,0,0]
+        plot:           plot MCMC results [True]
+        plotres:        plot fit result [True]
+        createpdf:      Creates a pdf with fit results and all plots [True] 
+        write_results:  Write fit results in file [True]
+        redchi2:        Gives redchi2 instead of chi2 [False]
+        phasemaps:      Use Phasemaps for fit [False]
+        interppm:       Interpolate Phasemaps [True]
+        smoothpm:       Smooth the phasemaps by smoothfwhm [True]
+        smoothfwhm:     FWHM for smoothing if smoothpm in mas [65] 
+        simulate_pm:    Phasemaps for suimulated data, sets ACQ parameter to 0 [False]
         
         For a fit to two components: A (SgrA*) and B (S2)
         The possible fit properties are:
@@ -3031,12 +3073,13 @@ class GravData():
                          visamp_error[i,:]*(1-visamp_flag)[i],
                          color=self.colors_baseline[i],ls='', lw=1, alpha=0.5, capsize=0)
             plt.scatter(magu_as[i,:], visamp[i,:]*(1-visamp_flag)[i],
-                        color=self.colors_baseline[i], alpha=0.5)
+                        color=self.colors_baseline[i], alpha=0.5, label=self.baseline_labels[i])
             plt.plot(magu_as_model[i,:], model_visamp_full[i,:],
                      color='k', zorder=100)
         plt.ylabel('visibility modulus')
         plt.ylim(-0.1,1.1)
         plt.xlabel('spatial frequency (1/arcsec)')
+        plt.legend()
         if createpdf:
             savetime = self.savetime
             plt.title('Polarization %i' % (idx + 1))
@@ -3052,12 +3095,13 @@ class GravData():
                          vis2_error[i,:]*(1-vis2_flag)[i], 
                          color=self.colors_baseline[i],ls='', lw=1, alpha=0.5, capsize=0)
             plt.scatter(magu_as[i,:], vis2[i,:]*(1-vis2_flag)[i],
-                        color=self.colors_baseline[i],alpha=0.5)
+                        color=self.colors_baseline[i],alpha=0.5, label=self.baseline_labels[i])
             plt.plot(magu_as_model[i,:], model_vis2_full[i,:],
                      color='k', zorder=100)
         plt.xlabel('spatial frequency (1/arcsec)')
         plt.ylabel('visibility squared')
         plt.ylim(-0.1,1.1)
+        plt.legend()
         if createpdf:
             plt.title('Polarization %i' % (idx + 1))
             pdfname = '%s_pol%i_6.png' % (savetime, idx)
@@ -3073,11 +3117,12 @@ class GravData():
                          closure_error[i,:]*(1-closure_flag)[i],
                          color=self.colors_closure[i],ls='', lw=1, alpha=0.5, capsize=0)
             plt.scatter(self.spFrequAS_T3[i,:], closure[i,:]*(1-closure_flag)[i],
-                        color=self.colors_closure[i], alpha=0.5)
+                        color=self.colors_closure[i], alpha=0.5, label=self.closure_labels[i])
             plt.plot(max_u_as_model, model_closure_full[i,:], 
                      color='k', zorder=100)
         plt.xlabel('spatial frequency of largest baseline in triangle (1/arcsec)')
         plt.ylabel('closure phase (deg)')
+        plt.legend()
         if createpdf:
             plt.title('Polarization %i' % (idx + 1))
             pdfname = '%s_pol%i_7.png' % (savetime, idx)
@@ -3093,11 +3138,12 @@ class GravData():
                             visphi_error[i,:]*(1-visphi_flag)[i],
                             color=self.colors_baseline[i], ls='', lw=1, alpha=0.5, capsize=0)
                 plt.scatter(magu_as[i,:], visphi[i,:]*(1-visphi_flag)[i],
-                            color=self.colors_baseline[i], alpha=0.5)
+                            color=self.colors_baseline[i], alpha=0.5, label=self.baseline_labels[i])
                 plt.plot(magu_as_model[i,:], model_visphi_full[i,:],
                         color='k', zorder=100)
             plt.ylabel('visibility phase')
             plt.xlabel('spatial frequency (1/arcsec)')
+            plt.legend()
             if createpdf:
                 plt.title('Polarization %i' % (idx + 1))
                 pdfname = '%s_pol%i_8.png' % (savetime, idx)

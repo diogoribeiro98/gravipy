@@ -8,7 +8,7 @@ from pkg_resources import resource_filename
 try:
     from generalFunctions import *
     set_style('show')
-except NameError:
+except (NameError, ModuleNotFoundError):
     pass
 
 ###############
