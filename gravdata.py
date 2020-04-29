@@ -133,7 +133,7 @@ class GravData():
             for bl in range(6):
                 t1 = np.where(sta_index == vis_index[bl,0])[0][0]
                 t2 = np.where(sta_index == vis_index[bl,1])[0][0]
-                baseline_labels.append(+tel_name[t1] + '-' + tel_name[t2][2])
+                baseline_labels.append(tel_name[t1] + '-' + tel_name[t2][2])
             for cl in range(4):
                 t1 = np.where(sta_index == t3_index[cl,0])[0][0]
                 t2 = np.where(sta_index == t3_index[cl,1])[0][0]
