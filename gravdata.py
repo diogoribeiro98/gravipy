@@ -68,9 +68,6 @@ class GravData():
         self.colors_baseline = np.array(['k', 'darkblue', color4, 
                                          color2, 'darkred', color1])
         self.colors_closure = np.array([color1, 'darkred', 'k', color2])
-        self.baseline_labels = np.array(["UT4-3","UT4-2","UT4-1",
-                                         "UT3-2","UT3-1","UT2-1"])
-        self.closure_labels = np.array(["UT4-3-2","UT4-3-1","UT4-2-1","UT3-2-1"])
         
         poscatg = ['VIS_DUAL_SCI_RAW', 'VIS_SINGLE_SCI_RAW', 'VIS_SINGLE_CAL_RAW', 
            'VIS_DUAL_CAL_RAW', 'VIS_SINGLE_CALIBRATED', 'VIS_DUAL_CALIBRATED',
@@ -116,6 +113,35 @@ class GravData():
             self.tel = 'AT'
         else:
             raise ValueError('Telescope not AT or UT, seomtehign wrong with input data')
+        
+        # Get BL names
+        if self.raw:
+            self.baseline_labels = np.array(["UT4-3","UT4-2","UT4-1",
+                                            "UT3-2","UT3-1","UT2-1"])
+            self.closure_labels = np.array(["UT4-3-2","UT4-3-1","UT4-2-1","UT3-2-1"])
+        else:
+            baseline_labels = []
+            closure_labels = []
+            tel_name = fits.open(self.name)['OI_ARRAY'].data['TEL_NAME']
+            sta_index = fits.open(self.name)['OI_ARRAY'].data['STA_INDEX']
+            if self.polmode == 'SPLIT':
+                vis_index = fits.open(self.name)['OI_VIS',11].data['STA_INDEX']
+                t3_index = fits.open(self.name)['OI_T3',11].data['STA_INDEX']
+            else:
+                vis_index = fits.open(self.name)['OI_VIS',10].data['STA_INDEX']
+                t3_index = fits.open(self.name)['OI_T3',10].data['STA_INDEX']
+            for bl in range(6):
+                t1 = np.where(sta_index == vis_index[bl,0])[0][0]
+                t2 = np.where(sta_index == vis_index[bl,1])[0][0]
+                baseline_labels.append(+tel_name[t1] + '-' + tel_name[t2][2])
+            for cl in range(4):
+                t1 = np.where(sta_index == t3_index[cl,0])[0][0]
+                t2 = np.where(sta_index == t3_index[cl,1])[0][0]
+                t3 = np.where(sta_index == t3_index[cl,2])[0][0]
+                closure_labels.append(tel_name[t1] + '-' + tel_name[t2][2]+ '-' + tel_name[t3][2])
+            self.closure_labels = np.array(closure_labels)
+            self.baseline_label = np.array(baseline_labels)
+        
         if self.verbose:
             print('Data loaded as:')
             print('Telescope: ' + self.tel)
