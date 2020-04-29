@@ -140,7 +140,7 @@ class GravData():
                 t3 = np.where(sta_index == t3_index[cl,2])[0][0]
                 closure_labels.append(tel_name[t1] + '-' + tel_name[t2][2]+ '-' + tel_name[t3][2])
             self.closure_labels = np.array(closure_labels)
-            self.baseline_label = np.array(baseline_labels)
+            self.baseline_labels = np.array(baseline_labels)
         
         if self.verbose:
             print('Data loaded as:')
