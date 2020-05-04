@@ -784,7 +784,8 @@ class GravData():
             phasemaps = fits.open(phasemapsfile)
             self.pm_amp = phasemaps['SC_AMP'].data
             self.pm_pha = phasemaps['SC_PHASE'].data
-        print('%s used' % phasemapsfile)
+        if not self.bequiet:
+            print('%s used' % phasemapsfile)
         
         x = np.arange(201)
         y = np.arange(201)
@@ -823,7 +824,7 @@ class GravData():
     
     def readPhasemaps(self, ra, dec, wave, fromFits=True, 
                       northangle=None, dra=None, ddec=None,
-                      interp=True, plot=False):
+                      interp=True, plot=False, givepos=False):
         """
         Calculates coupling amplitude / phase for given coordinates
         ra,dec: RA, DEC position on sky relative to nominal field center = SOBJ [mas]
@@ -872,7 +873,8 @@ class GravData():
             ddec = np.zeros_like(np.array(ddec))
             northangle = np.zeros_like(np.array(northangle))
             
-        lambda0 = 2.2
+        lambda0 = 2.2 
+        pm_pos = np.zeros((4, len(wave), 2))
         cor_amp = np.zeros((4, len(wave)))
         cor_pha = np.zeros((4, len(wave)))
         if plot and not interp:
@@ -885,6 +887,7 @@ class GravData():
                 wave2[0] = wave
                 wave2[1] = wave
                 pos_scaled = pos_rot*lambda0/wave2.T/scale + 100
+                pm_pos[tel] = pos_scaled
                 pos_int = (np.round(pos_scaled*10)).astype(int)
                 cor_amp[tel] = self.pm_amp_big[tel][pos_int[:,0], pos_int[:,1]]
                 cor_pha[tel] = self.pm_pha_big[tel][pos_int[:,0], pos_int[:,1]]
@@ -903,6 +906,7 @@ class GravData():
             # original function
             for channel in range(len(wave)):
                 pos_scaled = pos_rot*lambda0/wave[channel]/scale + 100
+                pm_pos[tel,channel] = pos_scaled
                 if interp:
                     cor_amp[tel, channel] = self.pm_amp_int[tel](pos_scaled[0], pos_scaled[1])
                     cor_pha[tel, channel] = self.pm_pha_int[tel](pos_scaled[0], pos_scaled[1])
@@ -920,8 +924,11 @@ class GravData():
                 plt.imshow(self.pm_amp[tel], vmin=0, vmax=1)
                 plt.scatter(pos_pm[tel,0], pos_pm[tel,1], color=color1)
             plt.show()
-        #print(cor_amp, cor_pha)
-        return cor_amp, cor_pha
+
+        if givepos:
+            return pm_pos
+        else:
+            return cor_amp, cor_pha
     
     
     def givePhasemapPos(self, ra, dec, wave, fromFits=True, 
@@ -1778,6 +1785,7 @@ class GravData():
         self.approx = approx
         self.smoothfwhm = smoothfwhm
         self.simulate_pm = simulate_pm
+        self.bequiet = bequiet
         rad2as = 180 / np.pi * 3600
         if np.any(specialpar):
             self.specialfit = True
