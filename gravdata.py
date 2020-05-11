@@ -3557,6 +3557,7 @@ class GravData():
                  bequiet=False, 
                  michistyle=False,
                  approx='approx', 
+                 onlypol1=False, 
                  mindatapoints=3,
                  flagtill=2, 
                  flagfrom=12, 
@@ -3586,6 +3587,7 @@ class GravData():
                         visibility calculation [False]
         approx:         Kind of integration for visibilities (approx, numeric, analytic)
         mindatapoints:  if less valid datapoints in one baseline, file is rejected [3]
+        onlypol1:       Only fits polarization 1 for split mode [False]
         flagtill:       Flag blue channels [2] 
         flagfrom:       Flag red channels [12]
         dontfit:        Number of telescope to flag
@@ -3816,7 +3818,10 @@ class GravData():
                 print('Run MCMC for DIT %i' % (dit+1))
             ditstart = dit*6
             ditstop = ditstart + 6
-            
+
+
+            if onlypol1:
+                polnom = 1
             bothdofit = np.ones(polnom)            
             for idx in range(polnom):
                 visphi = visphi_P[idx][ditstart:ditstop]
