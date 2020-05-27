@@ -2650,7 +2650,7 @@ class GravData():
                 raise ValueError('approx has to be approx, analytic or numeric')
             
             vis[i,:] = ((intSgrA + f*intS1 + f2*intS2)/
-                        (intSgrA_center + f*intS1_center + f2*intS2 + fluxRatioBG*intBG))
+                        (intSgrA_center + f*intS1_center + f2*intS2_center + fluxRatioBG*intBG))
 
         visamp = np.abs(vis)
         visphi = np.angle(vis, deg=True)
@@ -3574,7 +3574,8 @@ class GravData():
                  writeresults=True,
                  createpdf=True, 
                  writefitdiff=False,
-                 returnPos=False):
+                 returnPos=False,
+                 phaseinput=None):
         """
         Does a MCMC unary fit on the phases of the data.
         Parameter:
@@ -3741,7 +3742,10 @@ class GravData():
 
         # Get data
         if self.polmode == 'SPLIT':
-            visphi_P = [self.visphiSC_P1, self.visphiSC_P2]
+            if phaseinput is None:
+                visphi_P = [self.visphiSC_P1, self.visphiSC_P2]
+            else:
+                visphi_P = phaseinput
             visphi_error_P = [self.visphierrSC_P1, self.visphierrSC_P2]
             visphi_flag_P = [self.visampflagSC_P1, self.visampflagSC_P2]
             
