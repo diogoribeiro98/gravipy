@@ -4171,8 +4171,8 @@ class GravData():
                 files = glob.glob(savetime + '_pol?_?.png')
                 for file in files:
                     os.remove(file)
-            if writeresults:
-                txtfile.close()
+        if writeresults:
+            txtfile.close()
         if returnPos:
             return np.array(returnList)
         else:
