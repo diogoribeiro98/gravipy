@@ -59,6 +59,34 @@ def complex_quadrature_num(func, a, b, theta, nsteps=int(1e2)):
     return real_integral + 1j*imag_integral
 
 
+def procrustes(a,target,padval=0):
+    try:
+        if len(target) != a.ndim:
+            raise TypeError('Target shape must have the same number of dimensions as the input')
+    except TypeError:
+        raise TypeError('Target must be array-like')
+
+    try:
+        #Get array in the right size to use
+        b = np.ones(target,a.dtype)*padval
+    except TypeError:
+        raise TypeError('Pad value must be numeric')
+    except ValueError:
+        raise ValueError('Pad value must be scalar')
+
+    aind = [slice(None,None)]*a.ndim
+    bind = [slice(None,None)]*a.ndim
+
+    for dd in range(a.ndim):
+        if a.shape[dd] > target[dd]:
+            diff = (a.shape[dd]-target[dd])/2.
+            aind[dd] = slice(int(np.floor(diff)),int(a.shape[dd]-np.ceil(diff)))
+        elif a.shape[dd] < target[dd]:
+            diff = (target[dd]-a.shape[dd])/2.
+            bind[dd] = slice(int(np.floor(diff)),int(target[dd]-np.ceil(diff)))
+            
+    b[bind] = a[aind]
+    return b
 
 
 class GravData():
@@ -740,78 +768,146 @@ class GravData():
     ############################################
     ############################################
     
-    def loadPhasemaps(self, smooth=True, smooth_fwhm=65):
-        """
-        Load in the phasemaps
-        if smooth is true and fwhm not available a new fits will be 
-        created and saved
-        """
-        try:
-           self.pm_name
-           pm_name = self.pm_name
-        except AttributeError:            
-            pm_name = 'GRAVITY_SC_MAP_20200114'
-        if smooth:
-            smooth_name = pm_name + '_SM%i.fits' % smooth_fwhm
-            sm_phasemapsfile = resource_filename('gravipy', smooth_name)
-            try:
-                phasemaps = fits.open(sm_phasemapsfile)
-                self.pm_amp = phasemaps['SC_AMP'].data
-                self.pm_pha = phasemaps['SC_PHASE'].data
-                phasemapsfile = sm_phasemapsfile
-
-            except FileNotFoundError:
-                print('Creating new smoothed pm file with fwhm=%i' % smooth_fwhm)
-                phasemapsfile = resource_filename('gravipy', pm_name + '.fits')
-                phasemaps = fits.open(phasemapsfile)
-                pm_amp_full = phasemaps['SC_AMP'].data
-                pm_pha_full = phasemaps['SC_PHASE'].data
-                self.pm_amp = np.zeros_like(pm_amp_full)
-                self.pm_pha = np.zeros_like(pm_pha_full)
-                kernel = Gaussian2DKernel(x_stddev=smooth_fwhm/(2.*np.sqrt(2.*np.log(2.))))
-                for idx in range(4):
-                    pm = pm_amp_full[idx] * np.exp(1j*pm_pha_full[idx]/180*math.pi)
-                    pm[np.isnan(pm)] = 0
-                    pm_sm = signal.convolve2d(pm, kernel, mode='same')
-                    self.pm_amp[idx] = np.abs(pm_sm)
-                    self.pm_pha[idx] = np.angle(pm_sm, deg=True)
-                phasemaps['SC_AMP'].data = self.pm_amp
-                phasemaps['SC_PHASE'].data = self.pm_pha
-                phasemaps.writeto(sm_phasemapsfile)
-            
-        else:
-            phasemapsfile = resource_filename('gravipy', pm_name + '.fits')
-            phasemaps = fits.open(phasemapsfile)
-            self.pm_amp = phasemaps['SC_AMP'].data
-            self.pm_pha = phasemaps['SC_PHASE'].data
-        if not self.bequiet:
-            print('%s used' % phasemapsfile)
+    def createPhasemaps(self, smooth=15, zerfile='phasemap_zernike_20200629.npy'):
         
-        x = np.arange(201)
-        y = np.arange(201)
-        pm_amp_int = []
-        pm_pha_int = []        
-        xnew = np.arange(2001)
-        ynew = np.arange(2001)
-        pm_amp_big = []
-        pm_pha_big = []        
-        for idx in range(4):
-            amp = self.pm_amp[idx]
-            amp_mod = np.copy(amp)
-            amp_mod[np.isnan(amp)] = 0
-            pm_amp_int.append(interpolate.interp2d(x, y, amp_mod))
-            pm_amp_big.append(pm_amp_int[idx](xnew, ynew))
+        def phase_screen(A00, A1m1, A1p1, A2m2, A2p2, A20, A3m1, A3p1, A3m3, A3p3, 
+                         A4m2, A4p2, A4m4, A4p4, A40, d=8,
+                         MFR=0.6308, stopB=8.0, stopS=0.96, 
+                         dalpha=1, totN=6e3, lam0=2.2, fit=True):
+            
+            """
+            Simulate phase screens taking into account static aberrations.
+            
+            Parameters:
+            -----------
+            * Static aberrations in the pupil plane are described by low-order Zernicke polynomials
+            * Their amplitudes are in units of micro-meter
 
-            pha = self.pm_pha[idx]
-            pha_mod = np.copy(pha)
-            pha_mod[np.isnan(pha)] = 0
-            pm_pha_int.append(interpolate.interp2d(x, y, pha_mod))
-            pm_pha_big.append(pm_pha_int[idx](xnew, ynew))
-        self.pm_amp_int = pm_amp_int
-        self.pm_pha_int = pm_pha_int
-        self.pm_amp_big = pm_amp_big
-        self.pm_pha_big = pm_pha_big
-        phasemaps.close()
+            A00  (float) : piston
+            A1m1 (float) : vertical tilt
+            A1p1 (float) : horizontal tilt
+            A2m2 (float) : vertical astigmatism
+            A2p2 (float) : horizontal astigmatism
+            A20  (float) : defocuss
+            A3m1 (float) : vertical coma
+            A3p1 (float) : horizontal coma
+            A3m3 (float) : vertical trefoil
+            A3p3 (float) : oblique trefoil
+            A4m2 (float) : oblique secondary astigmatism
+            A4p2 (float) : vertical secondary astigmatism
+            A4m4 (float) : oblique quadrafoil
+            A4p4 (float) : vertical quadrafoil
+            A40  (float) : primary spherical
+
+            * optical system
+            MFR (float)   : sigma of the fiber mode profile in units of dish radius
+            stopB (float) : outer stop diameter in meters
+            stopS (float) : inner stop diameter in meters
+            -> for measurments with the GRAVITY GCU the dish diameter and central obscuration do not determine the stop size
+
+            * further parameters specify the output grid
+            dalpha (float) : pixel width in the imaging plane in mas
+            totN   (float) : total number of pixels in the pupil plane
+            lam0   (float) : wavelength at which the phase screen is computed in micro-meter
+            
+            """ 
+            
+            #--- instrument parameters ---#
+            d1   = d      # dish diameter in meters
+            
+            #--- coordinate scaling ---#
+            lam0   = lam0*1e-6
+            mas    = 1.e-3 * (2.*np.pi/360) *1./3600
+            ext    = totN*d1/lam0*mas*dalpha*dalpha
+            du     = dalpha/ext*d1/lam0
+            dishN  = 2*ext/dalpha    
+                
+            #--- coordinates ---#
+            ii     = np.arange(totN) - (totN/2)
+            ii     = np.fft.fftshift(ii)
+            
+            # image plane
+            a1, a2 = np.meshgrid(ii*dalpha, ii*dalpha)
+            aa     = np.sqrt(a1*a1 + a2*a2)
+            
+            # pupil plane
+            u1, u2 = np.meshgrid(ii*du, ii*du)
+            uu     = np.sqrt( u1*u1 + u2*u2 )
+            r      = lam0*uu
+            t      = np.angle(u1 + 1j*u2)
+            
+            # cut out slice
+            cn   = int(dishN/2)
+            ss   = slice(int(totN//2)-cn, int(totN//2)+cn+1)
+            amax = dalpha*cn
+            
+            #--- pupil function ---#
+            pupil = np.logical_and( r<(stopB/2.), r>(stopS/2.) )
+            
+            #--- fiber profile ---#
+            fiber = np.exp(-0.5*(r/(MFR*d1/2.))**2)
+            
+            #--- phase screens (pupil plane) ---#
+            zernike  = A00
+            zernike += A1m1*2*(2.*r/d1)*np.sin(t)
+            zernike += A1p1*2*(2.*r/d1)*np.cos(t)
+            zernike += A2m2*np.sqrt(6.)*(2.*r/d1)**2*np.sin(2.*t)
+            zernike += A2p2*np.sqrt(6.)*(2.*r/d1)**2*np.cos(2.*t)
+            zernike += A20 *np.sqrt(3.)*(2.*(2.*r/d1)**2 - 1)
+            zernike += A3m1*np.sqrt(8.)*(3.*(2.*r/d1)**3 - 2.*(2.*r/d1))*np.sin(t)
+            zernike += A3p1*np.sqrt(8.)*(3.*(2.*r/d1)**3 - 2.*(2.*r/d1))*np.cos(t)
+            zernike += A3m3*np.sqrt(8.)*(2.*r/d1)**3*np.sin(3.*t)
+            zernike += A3p3*np.sqrt(8.)*(2.*r/d1)**3*np.cos(3.*t)
+            zernike += A4m2*np.sqrt(10.)*(2.*r/d1)**4*np.sin(4.*t)
+            zernike += A4p2*np.sqrt(10.)*(2.*r/d1)**4*np.cos(4.*t)
+            zernike += A4m4*np.sqrt(10.)*(4.*(2.*r/d1)**4 -3.*(2.*r/d1)**2)*np.sin(2.*t)
+            zernike += A4p4*np.sqrt(10.)*(4.*(2.*r/d1)**4 -3.*(2.*r/d1)**2)*np.cos(2.*t)
+            zernike += A40*np.sqrt(5.)*(6.*(2.*r/d1)**4 - 6.*(2.*r/d1)**2 + 1)
+            
+            phase = 2.*np.pi/lam0*zernike*1.e-6
+
+            #--- transform to image plane ---#
+            complexPsf = np.fft.fftshift(np.fft.fft2( pupil * fiber * np.exp(1j*phase) ))
+            if fit:
+                return complexPsf[ss,ss]/np.abs(complexPsf[ss,ss]).max()
+            else:
+                return complexPsf, amax, ss, 2*cn+1
+        
+        zernikefile = resource_filename('gravipy', zerfile)
+        zer = np.load(zernikefile, allow_pickle=True).item()
+
+        wave = self.wlSC
+        
+        if self.tel == 'UT':
+            d = 8
+        elif self.tel == 'AT':
+            d = 1.8
+        
+        all_pm = np.zeros((len(wave), 4, 201, 201),
+                          dtype=np.complex_)
+        all_pm_denom = np.zeros((len(wave), 4, 201, 201),
+                                dtype=np.complex_)
+        kernel = Gaussian2DKernel(x_stddev=smooth)
+         
+        print('Creating phasemaps:')
+        for wdx, wl in enumerate(wave):
+            print_status(wdx, len(wave))
+            for GV in range(4):
+                zer_GV = zer['GV%i' % (GV+1)]
+                pm = phase_screen(*zer_GV, lam0=wl, d=d)
+                pm = procrustes(pm, (201,201), padval=0)
+                pm_sm = signal.convolve2d(pm, kernel, mode='same')
+                pm_sm_denom = signal.convolve2d(np.abs(pm)**2, kernel, mode='same')
+                
+                all_pm[wdx, GV] = pm_sm
+                all_pm_denom[wdx, GV] = pm_sm_denom
+                
+        savename = 'Phasemap_%s_%s_Smooth%i.npy' % (self.tel, self.resolution, smooth)
+        savefile = resource_filename('gravipy', savename)
+        np.save(savefile, all_pm)
+        savename = 'Phasemap_%s_%s_Smooth%i_denom.npy' % (self.tel, self.resolution, smooth)
+        savefile = resource_filename('gravipy', savename)
+        np.save(savefile, all_pm_denom)
 
 
     def rotation(self, ang):
@@ -822,13 +918,44 @@ class GravData():
                          [-np.sin(ang), np.cos(ang)]])
     
     
-    def readPhasemaps(self, ra, dec, wave, fromFits=True, 
+    def loadPhasemaps(self, interp):
+        if self.tel == 'UT':
+            if self.resolution == 'LOW':
+                pm1_file = 'Phasemap_UT_LOW_Smooth15.npy'
+                pm2_file = 'Phasemap_UT_LOW_Smooth15_denom.npy'
+                pm1 = np.load(resource_filename('gravipy', pm1_file))
+                pm2 = np.real(np.load(resource_filename('gravipy', pm2_file)))
+            else:
+                raise ValueError('Have to create phasemaps first')
+        elif self.tel == 'AT':
+            raise ValueError('Have to create phasemaps first')
+
+        wave = self.wlSC
+
+        self.amp_map = np.abs(pm1)
+        self.pha_map = np.angle(pm1, deg=True)
+        self.amp_map_denom = pm2
+        
+        if interp:
+            x = np.arange(201)
+            y = np.arange(201)
+            self.amp_map_int = np.zeros((len(wave),4), dtype=object)
+            self.pha_map_int = np.zeros((len(wave),4), dtype=object)
+            self.amp_map_denom_int = np.zeros((len(wave),4), dtype=object)
+            for tel in range(4):
+                for wdx in range(len(wave)):
+                    self.amp_map_int[wdx, tel] = interpolate.interp2d(x, y, self.amp_map[wdx, tel])
+                    self.pha_map_int[wdx, tel] = interpolate.interp2d(x, y, self.pha_map[wdx, tel])
+                    self.amp_map_denom_int[wdx, tel] = interpolate.interp2d(x, y, self.amp_map_denom[wdx, tel])
+                
+        
+        
+    def readPhasemaps(self, ra, dec, fromFits=True, 
                       northangle=None, dra=None, ddec=None,
-                      interp=True, plot=False, givepos=False):
+                      interp=True, givepos=False):
         """
         Calculates coupling amplitude / phase for given coordinates
         ra,dec: RA, DEC position on sky relative to nominal field center = SOBJ [mas]
-        wave: wave;length of channels
         dra,ddec: ESO QC MET SOBJ DRA / DDEC: 
             location of science object (= desired science fiber position, = field center) 
             given by INS.SOBJ relative to *actual* fiber position measured by the laser metrology [mas]
@@ -836,16 +963,6 @@ class GravData():
         north_angle: north direction on acqcam in degree
         if fromFits is true, northangle & dra,ddec are taken from fits file
         """
-        if self.tel == 'UT':
-            scale = 1
-        elif self.tel == 'AT':
-            scale = 4.4
-                
-        try:
-           self.pm_amp
-        except AttributeError:
-            print('Check that this is not done all the time')
-            self.loadPhasemaps()
         if fromFits:
             # should not do that in here for mcmc
             header = fits.open(self.name)[0].header
@@ -867,143 +984,115 @@ class GravData():
             dra4 = header['ESO QC MET SOBJ DRA4']
             dra = [dra1, dra2, dra3, dra4]
             
-            
+        wave = self.wlSC
+        
         if self.simulate_pm:
             dra = np.zeros_like(np.array(dra))
             ddec = np.zeros_like(np.array(ddec))
             northangle = np.zeros_like(np.array(northangle))
             
-        lambda0 = 2.2 
         pm_pos = np.zeros((4, len(wave), 2))
         cor_amp = np.zeros((4, len(wave)))
         cor_pha = np.zeros((4, len(wave)))
-        if plot and not interp:
-            pos_pm = np.zeros((4, 2, len(wave)))
+        cor_int_denom = np.zeros((4, len(wave)))
+        
         for tel in range(4):
             pos = np.array([ra + dra[tel], dec + ddec[tel]])
-            pos_rot = np.dot(self.rotation(northangle[tel]), pos)
-            if interp == 'bigmap':
-                wave2 = np.zeros((2, len(wave)))
-                wave2[0] = wave
-                wave2[1] = wave
-                pos_scaled = pos_rot*lambda0/wave2.T/scale + 100
-                pm_pos[tel] = pos_scaled
-                pos_int = (np.round(pos_scaled*10)).astype(int)
-                cor_amp[tel] = self.pm_amp_big[tel][pos_int[:,0], pos_int[:,1]]
-                cor_pha[tel] = self.pm_pha_big[tel][pos_int[:,0], pos_int[:,1]]
-                
-                
-            #if interp:
-                #cor_amp[tel] = np.array([self.pm_amp_int[tel](x,y)[0] for x, y in zip(pos_scaled[:,0], pos_scaled[:,1])])
-                #cor_pha[tel] = np.array([self.pm_pha_int[tel](x,y)[0] for x, y in zip(pos_scaled[:,0], pos_scaled[:,1])])
-            #else:
-                #pos_int = np.round(pos_scaled).astype(int)
-                #cor_amp[tel] = self.pm_amp[tel, pos_int[:,1], pos_int[:,0]]
-                #cor_pha[tel] = self.pm_pha[tel, pos_int[:,1], pos_int[:,0]]            
-                #if plot:
-                    #pos_pm[tel] = pos_int[:,1], pos_int[:,0]
-                    
-            # original function
-            for channel in range(len(wave)):
-                pos_scaled = pos_rot*lambda0/wave[channel]/scale + 100
-                pm_pos[tel,channel] = pos_scaled
+            pos_rot = np.dot(self.rotation(northangle[tel]), pos) + 100
+            
+            for wdx in range(len(wave)):
                 if interp:
-                    cor_amp[tel, channel] = self.pm_amp_int[tel](pos_scaled[0], pos_scaled[1])
-                    cor_pha[tel, channel] = self.pm_pha_int[tel](pos_scaled[0], pos_scaled[1])
+                    cor_amp[tel, wdx] = self.amp_map_int[wdx, tel](pos_rot[0], pos_rot[1])
+                    cor_pha[tel, wdx] = self.pha_map_int[wdx, tel](pos_rot[0], pos_rot[1])
+                    cor_int_denom[tel, wdx] = self.amp_map_denom_int[wdx, tel](pos_rot[0], pos_rot[1])
                 else:
-                    pos_int = (np.round(pos_scaled)).astype(int)
-                    cor_amp[tel, channel] = self.pm_amp[tel, pos_int[1], pos_int[0]]
-                    cor_pha[tel, channel] = self.pm_pha[tel, pos_int[1], pos_int[0]]
-                    if plot and not interp:
-                        pos_pm[tel,channel] = pos_int[1], pos_int[0]
+                    pos_int = np.round(pos_rot).astype(int)
+                    cor_amp[tel, wdx] = self.amp_map[wdx,tel][pos_int[0],pos_int[1]]
+                    cor_pha[tel, wdx] = self.pha_map[wdx,tel][pos_int[0],pos_int[1]]
+                    cor_int_denom[tel, wdx] = self.amp_map_denom_int[wdx,tel][pos_int[0],pos_int[1]]
                     
-        if plot and not interp:
-            gs = gridspec.GridSpec(1,4)
-            for tel in range(4):
-                axis = plt.subplot(gs[0,tel])
-                plt.imshow(self.pm_amp[tel], vmin=0, vmax=1)
-                plt.scatter(pos_pm[tel,0], pos_pm[tel,1], color=color1)
-            plt.show()
-
         if givepos:
             return pm_pos
         else:
-            return cor_amp, cor_pha
-    
-    
-    def givePhasemapPos(self, ra, dec, wave, fromFits=True, 
-                        northangle=None, dra=None, ddec=None,):
-        """
-        """
-        if self.tel == 'UT':
-            scale = 1
-        elif self.tel == 'AT':
-            scale = 4.4
-                
-        if fromFits:
-            # should not do that in here for mcmc
-            header = fits.open(self.name)[0].header
-            northangle1 = header['ESO QC ACQ FIELD1 NORTH_ANGLE']/180*math.pi
-            northangle2 = header['ESO QC ACQ FIELD2 NORTH_ANGLE']/180*math.pi
-            northangle3 = header['ESO QC ACQ FIELD3 NORTH_ANGLE']/180*math.pi
-            northangle4 = header['ESO QC ACQ FIELD4 NORTH_ANGLE']/180*math.pi
-            northangle = [northangle1, northangle2, northangle3, northangle4]
-
-            ddec1 = header['ESO QC MET SOBJ DDEC1']
-            ddec2 = header['ESO QC MET SOBJ DDEC2']
-            ddec3 = header['ESO QC MET SOBJ DDEC3']
-            ddec4 = header['ESO QC MET SOBJ DDEC4']
-            ddec = [ddec1, ddec2, ddec3, ddec4]
-
-            dra1 = header['ESO QC MET SOBJ DRA1']
-            dra2 = header['ESO QC MET SOBJ DRA2']
-            dra3 = header['ESO QC MET SOBJ DRA3']
-            dra4 = header['ESO QC MET SOBJ DRA4']
-            dra = [dra1, dra2, dra3, dra4]
-            
-        lambda0 = 2.2
-        position = np.zeros((4, len(wave), 2))
-        for tel in range(4):
-            pos = np.array([ra + dra[tel], dec + ddec[tel]])
-            pos_rot = np.dot(self.rotation(northangle[tel]), pos)
-            for channel in range(len(wave)):
-                pos_scaled = pos_rot*lambda0/wave[channel]/scale + 100
-                pos_int = (np.round(pos_scaled)).astype(int)
-                position[tel, channel] = pos_scaled
-
-        return position
-    
-    
-    
-    
-    def readPhasemapsSingle(self, ra, dec, northangle, dra, ddec, tel, lam, interp=True):
-        """
-        Same as readPhasemaps, but only for a single point, for testing
-        """
-        try:
-           self.pm_amp
-        except AttributeError:
-            self.loadPhasemaps()
-
-        if self.tel == 'UT':
-            scale = 1
-        elif self.tel == 'AT':
-            scale = 8/1.8
-
-        lambda0 = 2.2
-        pos = np.array([ra + dra, dec + ddec])
-        pos_rot = np.dot(self.rotation(northangle), pos)
-        pos_scaled = pos_rot*lambda0/lam/scale + 100
+            return cor_amp, cor_pha, cor_int_denom 
         
-        if interp:
-            cor_amp = self.pm_amp_int[tel](pos_scaled[0], pos_scaled[1])[0]
-            cor_pha = self.pm_pha_int[tel](pos_scaled[0], pos_scaled[1])[0]
-        else:
-            pos_int = (np.round(pos_scaled)).astype(int)
-            cor_amp = self.pm_amp[tel, pos_int[1], pos_int[0]]
-            cor_pha = self.pm_pha[tel, pos_int[1], pos_int[0]]
+        
+                
+
+    
+    #def givePhasemapPos(self, ra, dec, wave, fromFits=True, 
+                        #northangle=None, dra=None, ddec=None,):
+        #"""
+        #"""
+        #if self.tel == 'UT':
+            #scale = 1
+        #elif self.tel == 'AT':
+            #scale = 4.4
+                
+        #if fromFits:
+            ## should not do that in here for mcmc
+            #header = fits.open(self.name)[0].header
+            #northangle1 = header['ESO QC ACQ FIELD1 NORTH_ANGLE']/180*math.pi
+            #northangle2 = header['ESO QC ACQ FIELD2 NORTH_ANGLE']/180*math.pi
+            #northangle3 = header['ESO QC ACQ FIELD3 NORTH_ANGLE']/180*math.pi
+            #northangle4 = header['ESO QC ACQ FIELD4 NORTH_ANGLE']/180*math.pi
+            #northangle = [northangle1, northangle2, northangle3, northangle4]
+
+            #ddec1 = header['ESO QC MET SOBJ DDEC1']
+            #ddec2 = header['ESO QC MET SOBJ DDEC2']
+            #ddec3 = header['ESO QC MET SOBJ DDEC3']
+            #ddec4 = header['ESO QC MET SOBJ DDEC4']
+            #ddec = [ddec1, ddec2, ddec3, ddec4]
+
+            #dra1 = header['ESO QC MET SOBJ DRA1']
+            #dra2 = header['ESO QC MET SOBJ DRA2']
+            #dra3 = header['ESO QC MET SOBJ DRA3']
+            #dra4 = header['ESO QC MET SOBJ DRA4']
+            #dra = [dra1, dra2, dra3, dra4]
             
-        return cor_amp, cor_pha
+        #lambda0 = 2.2
+        #position = np.zeros((4, len(wave), 2))
+        #for tel in range(4):
+            #pos = np.array([ra + dra[tel], dec + ddec[tel]])
+            #pos_rot = np.dot(self.rotation(northangle[tel]), pos)
+            #for channel in range(len(wave)):
+                #pos_scaled = pos_rot*lambda0/wave[channel]/scale + 100
+                #pos_int = (np.round(pos_scaled)).astype(int)
+                #position[tel, channel] = pos_scaled
+
+        #return position
+    
+    
+    
+    
+    #def readPhasemapsSingle(self, ra, dec, northangle, dra, ddec, tel, lam, interp=True):
+        #"""
+        #Same as readPhasemaps, but only for a single point, for testing
+        #"""
+        #try:
+           #self.pm_amp
+        #except AttributeError:
+            #self.loadPhasemaps()
+
+        #if self.tel == 'UT':
+            #scale = 1
+        #elif self.tel == 'AT':
+            #scale = 8/1.8
+
+        #lambda0 = 2.2
+        #pos = np.array([ra + dra, dec + ddec])
+        #pos_rot = np.dot(self.rotation(northangle), pos)
+        #pos_scaled = pos_rot*lambda0/lam/scale + 100
+        
+        #if interp:
+            #cor_amp = self.pm_amp_int[tel](pos_scaled[0], pos_scaled[1])[0]
+            #cor_pha = self.pm_pha_int[tel](pos_scaled[0], pos_scaled[1])[0]
+        #else:
+            #pos_int = (np.round(pos_scaled)).astype(int)
+            #cor_amp = self.pm_amp[tel, pos_int[1], pos_int[0]]
+            #cor_pha = self.pm_pha[tel, pos_int[1], pos_int[0]]
+            
+        #return cor_amp, cor_pha
         
     
     
@@ -1101,306 +1190,306 @@ class GravData():
     
     
     
-    def simulateVisdata_single(self, theta, wave, dlambda, u, v, 
-                               fixedBG=True, fixedBH=True, 
-                               phasemaps=False, phasemapsstuff=None,
-                               interppm=True, approx="approx"):
-        '''
-        Test function to generate a single datapoint for a given u, v, lambda, dlamba & theta
+    #def simulateVisdata_single(self, theta, wave, dlambda, u, v, 
+                               #fixedBG=True, fixedBH=True, 
+                               #phasemaps=False, phasemapsstuff=None,
+                               #interppm=True, approx="approx"):
+        #'''
+        #Test function to generate a single datapoint for a given u, v, lambda, dlamba & theta
         
-        Theta should be a list of:
-        dRA, dDEC, f, alpha flare, f BG, (alpha BG), PC RA, PC DEC
+        #Theta should be a list of:
+        #dRA, dDEC, f, alpha flare, f BG, (alpha BG), PC RA, PC DEC
         
-        Values in bracket are by default not used, can be activated by options:
-        fixedBH:        Keep primary power law [False]        
-        fixedBG:        Keep background power law [True]  
+        #Values in bracket are by default not used, can be activated by options:
+        #fixedBH:        Keep primary power law [False]        
+        #fixedBG:        Keep background power law [True]  
         
-        if phasemaps=True, phasemapsstuff must be a list of:
-            [tel1, dra1, ddec1, north_angle1, tel2, dra2, ddec2, north_angle2]
-        '''
+        #if phasemaps=True, phasemapsstuff must be a list of:
+            #[tel1, dra1, ddec1, north_angle1, tel2, dra2, ddec2, north_angle2]
+        #'''
         
-        theta_names_raw = np.array(["dRA", "dDEC", "f", "alpha flare", "f BG", 
-                                    "alpha BG", "PC RA", "PC DEC"])
-        rad2as = 180 / np.pi * 3600
-        # check Theta
-        try:
-            if len(theta) != 8:
-                print('Theta has to include the following 8 parameter:')
-                print(theta_names_raw)
-                raise ValueError('Wrong number of input parameter given (should be 8)')
-        except(TypeError):
-            print('Thetha has to include the following 8 parameter:')
-            print(theta_names_raw)
-            raise ValueError('Wrong number of input parameter given (should be 8)') 
+        #theta_names_raw = np.array(["dRA", "dDEC", "f", "alpha flare", "f BG", 
+                                    #"alpha BG", "PC RA", "PC DEC"])
+        #rad2as = 180 / np.pi * 3600
+        ## check Theta
+        #try:
+            #if len(theta) != 8:
+                #print('Theta has to include the following 8 parameter:')
+                #print(theta_names_raw)
+                #raise ValueError('Wrong number of input parameter given (should be 8)')
+        #except(TypeError):
+            #print('Thetha has to include the following 8 parameter:')
+            #print(theta_names_raw)
+            #raise ValueError('Wrong number of input parameter given (should be 8)') 
         
-        mas2rad = 1e-3 / 3600 / 180 * np.pi
-        dRA = theta[0]
-        dDEC = theta[1]
-        f = theta[2]
-        if fixedBH:
-            alpha_SgrA = -0.5
-        else:
-            alpha_SgrA = theta[3]
-        fluxRatioBG = theta[4]
-        if fixedBG:
-            alpha_bg = 3.
-        else:
-            alpha_bg = theta[5]
-        phaseCenterRA = theta[6]
-        phaseCenterDEC = theta[7]
-        alpha_S2 = 3
-        f = 10.**f
+        #mas2rad = 1e-3 / 3600 / 180 * np.pi
+        #dRA = theta[0]
+        #dDEC = theta[1]
+        #f = theta[2]
+        #if fixedBH:
+            #alpha_SgrA = -0.5
+        #else:
+            #alpha_SgrA = theta[3]
+        #fluxRatioBG = theta[4]
+        #if fixedBG:
+            #alpha_bg = 3.
+        #else:
+            #alpha_bg = theta[5]
+        #phaseCenterRA = theta[6]
+        #phaseCenterDEC = theta[7]
+        #alpha_S2 = 3
+        #f = 10.**f
 
-        s_SgrA = ((phaseCenterRA)*u + (phaseCenterDEC)*v) * mas2rad * 1e6
-        s_S2 = ((dRA+phaseCenterRA)*u + (dDEC+phaseCenterDEC)*v) * mas2rad * 1e6
+        #s_SgrA = ((phaseCenterRA)*u + (phaseCenterDEC)*v) * mas2rad * 1e6
+        #s_S2 = ((dRA+phaseCenterRA)*u + (dDEC+phaseCenterDEC)*v) * mas2rad * 1e6
                 
-        if phasemaps:
-            (tel1, dra1, ddec1, north_angle1, 
-             tel2, dra2, ddec2, north_angle2) = phasemapsstuff
+        #if phasemaps:
+            #(tel1, dra1, ddec1, north_angle1, 
+             #tel2, dra2, ddec2, north_angle2) = phasemapsstuff
             
-            cor_amp_sgr1, cor_pha_sgr1 = self.readPhasemapsSingle(phaseCenterRA,
-                                                                  phaseCenterDEC,
-                                                                  north_angle1, 
-                                                                  dra1, ddec1,
-                                                                  tel1, wave,
-                                                                  interp=interppm)
-            cor_amp_sgr2, cor_pha_sgr2 = self.readPhasemapsSingle(phaseCenterRA,
-                                                                  phaseCenterDEC,
-                                                                  north_angle2, 
-                                                                  dra2, ddec2,
-                                                                  tel2, wave,
-                                                                  interp=interppm)
-            cor_amp_s21, cor_pha_s21 = self.readPhasemapsSingle(dRA+phaseCenterRA, 
-                                                               dDEC+phaseCenterDEC,
-                                                               north_angle1, 
-                                                               dra1, ddec1,
-                                                               tel1, wave,
-                                                               interp=interppm)
-            cor_amp_s22, cor_pha_s22 = self.readPhasemapsSingle(dRA+phaseCenterRA, 
-                                                               dDEC+phaseCenterDEC,
-                                                               north_angle2, 
-                                                               dra2, ddec2,
-                                                               tel2, wave,
-                                                               interp=interppm)
-            # differential opd
-            opd_sgr = (cor_pha_sgr1-cor_pha_sgr2)/360*wave
-            s_SgrA -= opd_sgr
-            opd_s2 = (cor_pha_s21-cor_pha_s22)/360*wave
-            s_S2 -= opd_s2
+            #cor_amp_sgr1, cor_pha_sgr1 = self.readPhasemapsSingle(phaseCenterRA,
+                                                                  #phaseCenterDEC,
+                                                                  #north_angle1, 
+                                                                  #dra1, ddec1,
+                                                                  #tel1, wave,
+                                                                  #interp=interppm)
+            #cor_amp_sgr2, cor_pha_sgr2 = self.readPhasemapsSingle(phaseCenterRA,
+                                                                  #phaseCenterDEC,
+                                                                  #north_angle2, 
+                                                                  #dra2, ddec2,
+                                                                  #tel2, wave,
+                                                                  #interp=interppm)
+            #cor_amp_s21, cor_pha_s21 = self.readPhasemapsSingle(dRA+phaseCenterRA, 
+                                                               #dDEC+phaseCenterDEC,
+                                                               #north_angle1, 
+                                                               #dra1, ddec1,
+                                                               #tel1, wave,
+                                                               #interp=interppm)
+            #cor_amp_s22, cor_pha_s22 = self.readPhasemapsSingle(dRA+phaseCenterRA, 
+                                                               #dDEC+phaseCenterDEC,
+                                                               #north_angle2, 
+                                                               #dra2, ddec2,
+                                                               #tel2, wave,
+                                                               #interp=interppm)
+            ## differential opd
+            #opd_sgr = (cor_pha_sgr1-cor_pha_sgr2)/360*wave
+            #s_SgrA -= opd_sgr
+            #opd_s2 = (cor_pha_s21-cor_pha_s22)/360*wave
+            #s_S2 -= opd_s2
             
-            # different coupling
-            cr1 = (cor_amp_s21 / cor_amp_sgr1)**2
-            cr2 = (cor_amp_s22 / cor_amp_sgr2)**2
+            ## different coupling
+            #cr1 = (cor_amp_s21 / cor_amp_sgr1)**2
+            #cr2 = (cor_amp_s22 / cor_amp_sgr2)**2
 
-            if approx == "approx":
-                intSgrA = self.vis_intensity_approx(s_SgrA, alpha_SgrA, wave, dlambda)
-                intS2 = self.vis_intensity_approx(s_S2, alpha_S2, wave, dlambda)
-                intSgrA_center = self.vis_intensity_approx(0, alpha_SgrA, wave, dlambda)
-                intS2_center = self.vis_intensity_approx(0, alpha_S2, wave, dlambda)
-                intBG = self.vis_intensity_approx(0, alpha_bg, wave, dlambda)
-            elif approx == "analytic":
-                intSgrA = self.vis_intensity(s_SgrA, alpha_SgrA, wave, dlambda)
-                intS2 = self.vis_intensity(s_S2, alpha_S2, wave, dlambda)
-                intSgrA_center = self.vis_intensity(0, alpha_SgrA, wave, dlambda)
-                intS2_center = self.vis_intensity(0, alpha_S2, wave, dlambda)
-                intBG = self.vis_intensity(0, alpha_bg, wave, dlambda)
-            elif approx == "numeric":
-                intSgrA = self.vis_intensity_num(s_SgrA, alpha_SgrA, wave, dlambda)
-                intS2 = self.vis_intensity_num(s_S2, alpha_S2, wave, dlambda)
-                intSgrA_center = self.vis_intensity_num(0, alpha_SgrA, wave, dlambda)
-                intS2_center = self.vis_intensity_num(0, alpha_S2, wave, dlambda)
-                intBG = self.vis_intensity_num(0, alpha_bg, wave, dlambda)
-            else:
-                raise ValueError("approx needs to be in [approx, analytic, numeric]")
+            #if approx == "approx":
+                #intSgrA = self.vis_intensity_approx(s_SgrA, alpha_SgrA, wave, dlambda)
+                #intS2 = self.vis_intensity_approx(s_S2, alpha_S2, wave, dlambda)
+                #intSgrA_center = self.vis_intensity_approx(0, alpha_SgrA, wave, dlambda)
+                #intS2_center = self.vis_intensity_approx(0, alpha_S2, wave, dlambda)
+                #intBG = self.vis_intensity_approx(0, alpha_bg, wave, dlambda)
+            #elif approx == "analytic":
+                #intSgrA = self.vis_intensity(s_SgrA, alpha_SgrA, wave, dlambda)
+                #intS2 = self.vis_intensity(s_S2, alpha_S2, wave, dlambda)
+                #intSgrA_center = self.vis_intensity(0, alpha_SgrA, wave, dlambda)
+                #intS2_center = self.vis_intensity(0, alpha_S2, wave, dlambda)
+                #intBG = self.vis_intensity(0, alpha_bg, wave, dlambda)
+            #elif approx == "numeric":
+                #intSgrA = self.vis_intensity_num(s_SgrA, alpha_SgrA, wave, dlambda)
+                #intS2 = self.vis_intensity_num(s_S2, alpha_S2, wave, dlambda)
+                #intSgrA_center = self.vis_intensity_num(0, alpha_SgrA, wave, dlambda)
+                #intS2_center = self.vis_intensity_num(0, alpha_S2, wave, dlambda)
+                #intBG = self.vis_intensity_num(0, alpha_bg, wave, dlambda)
+            #else:
+                #raise ValueError("approx needs to be in [approx, analytic, numeric]")
             
-            vis = ((intSgrA + f*np.sqrt(cr1*cr2)*intS2)/
-                   (np.sqrt(intSgrA_center + f*cr1*intS2_center + fluxRatioBG * intBG)*
-                    np.sqrt(intSgrA_center + f*cr2*intS2_center + fluxRatioBG * intBG)))
+            #vis = ((intSgrA + f*np.sqrt(cr1*cr2)*intS2)/
+                   #(np.sqrt(intSgrA_center + f*cr1*intS2_center + fluxRatioBG * intBG)*
+                    #np.sqrt(intSgrA_center + f*cr2*intS2_center + fluxRatioBG * intBG)))
             
-        else:
-            if approx == "approx":
-                intSgrA = self.vis_intensity_approx(s_SgrA, alpha_SgrA, wave, dlambda)
-                intS2 = self.vis_intensity_approx(s_S2, alpha_S2, wave, dlambda)
-                intSgrA_center = self.vis_intensity_approx(0, alpha_SgrA, wave, dlambda)
-                intS2_center = self.vis_intensity_approx(0, alpha_S2, wave, dlambda)
-                intBG = self.vis_intensity_approx(0, alpha_bg, wave, dlambda)
-            elif approx == "analytic":
-                intSgrA = self.vis_intensity(s_SgrA, alpha_SgrA, wave, dlambda)
-                intS2 = self.vis_intensity(s_S2, alpha_S2, wave, dlambda)
-                intSgrA_center = self.vis_intensity(0, alpha_SgrA, wave, dlambda)
-                intS2_center = self.vis_intensity(0, alpha_S2, wave, dlambda)
-                intBG = self.vis_intensity(0, alpha_bg, wave, dlambda)
-            elif approx == "numeric":
-                intSgrA = self.vis_intensity_num(s_SgrA, alpha_SgrA, wave, dlambda)
-                intS2 = self.vis_intensity_num(s_S2, alpha_S2, wave, dlambda)
-                intSgrA_center = self.vis_intensity_num(0, alpha_SgrA, wave, dlambda)
-                intS2_center = self.vis_intensity_num(0, alpha_S2, wave, dlambda)
-                intBG = self.vis_intensity_num(0, alpha_bg, wave, dlambda)
-            else:
-                raise ValueError('apprix has to be approx, analytic or numeric')
+        #else:
+            #if approx == "approx":
+                #intSgrA = self.vis_intensity_approx(s_SgrA, alpha_SgrA, wave, dlambda)
+                #intS2 = self.vis_intensity_approx(s_S2, alpha_S2, wave, dlambda)
+                #intSgrA_center = self.vis_intensity_approx(0, alpha_SgrA, wave, dlambda)
+                #intS2_center = self.vis_intensity_approx(0, alpha_S2, wave, dlambda)
+                #intBG = self.vis_intensity_approx(0, alpha_bg, wave, dlambda)
+            #elif approx == "analytic":
+                #intSgrA = self.vis_intensity(s_SgrA, alpha_SgrA, wave, dlambda)
+                #intS2 = self.vis_intensity(s_S2, alpha_S2, wave, dlambda)
+                #intSgrA_center = self.vis_intensity(0, alpha_SgrA, wave, dlambda)
+                #intS2_center = self.vis_intensity(0, alpha_S2, wave, dlambda)
+                #intBG = self.vis_intensity(0, alpha_bg, wave, dlambda)
+            #elif approx == "numeric":
+                #intSgrA = self.vis_intensity_num(s_SgrA, alpha_SgrA, wave, dlambda)
+                #intS2 = self.vis_intensity_num(s_S2, alpha_S2, wave, dlambda)
+                #intSgrA_center = self.vis_intensity_num(0, alpha_SgrA, wave, dlambda)
+                #intS2_center = self.vis_intensity_num(0, alpha_S2, wave, dlambda)
+                #intBG = self.vis_intensity_num(0, alpha_bg, wave, dlambda)
+            #else:
+                #raise ValueError('apprix has to be approx, analytic or numeric')
                 
             
-            vis = ((intSgrA + f * intS2)/
-                    (intSgrA_center + f * intS2_center + fluxRatioBG * intBG))
+            #vis = ((intSgrA + f * intS2)/
+                    #(intSgrA_center + f * intS2_center + fluxRatioBG * intBG))
             
-        return vis
+        #return vis
     
     
-    def simulateVisdata(self, theta, constant_f=True, use_opds=False, fixedBG=True, fixedBH=True, fiberOff=None, 
-                        plot=True, phasemaps=False, phasemapsstuff=None, interppm=True,
-                        approx=False):
-        """
-        Test function to see how a given theta would look like
-        Theta should be a list of:
-        dRA, dDEC, f1, (f2), (f3), (f4), alpha flare, f BG, (alpha BG), 
-        PC RA, PC DEC, (OPD1), (OPD2), (OPD3), (OPD4)
+    #def simulateVisdata(self, theta, constant_f=True, use_opds=False, fixedBG=True, fixedBH=True, fiberOff=None, 
+                        #plot=True, phasemaps=False, phasemapsstuff=None, interppm=True,
+                        #approx=False):
+        #"""
+        #Test function to see how a given theta would look like
+        #Theta should be a list of:
+        #dRA, dDEC, f1, (f2), (f3), (f4), alpha flare, f BG, (alpha BG), 
+        #PC RA, PC DEC, (OPD1), (OPD2), (OPD3), (OPD4)
         
-        Values in bracket are by default not used, can be activated by options:
-        constant_f:     Constant coupling [True]
-        use_opds:       Fit OPDs [False] 
-        fixedBG:        Keep background power law [True]
+        #Values in bracket are by default not used, can be activated by options:
+        #constant_f:     Constant coupling [True]
+        #use_opds:       Fit OPDs [False] 
+        #fixedBG:        Keep background power law [True]
 
-        if phasemaps=True, phasemapsstuff must be a list of:
-            [dra, ddec, north_angle]
+        #if phasemaps=True, phasemapsstuff must be a list of:
+            #[dra, ddec, north_angle]
         
-        """
-        theta_names_raw = np.array(["dRA", "dDEC", "f1", "f2", "f3", "f4" , "alpha flare",
-                                    "f BG", "alpha BG", "PC RA", "PC DEC", "OPD1", "OPD2",
-                                    "OPD3", "OPD4"])
-        rad2as = 180 / np.pi * 3600
-        try:
-            if len(theta) != 15:
-                print('Theta has to include the following 16 parameter:')
-                print(theta_names_raw)
-                raise ValueError('Wrong number of input parameter given (should be 16)')
-        except(TypeError):
-            print('Thetha has to include the following 16 parameter:')
-            print(theta_names_raw)
-            raise ValueError('Wrong number of input parameter given (should be 16)')            
+        #"""
+        #theta_names_raw = np.array(["dRA", "dDEC", "f1", "f2", "f3", "f4" , "alpha flare",
+                                    #"f BG", "alpha BG", "PC RA", "PC DEC", "OPD1", "OPD2",
+                                    #"OPD3", "OPD4"])
+        #rad2as = 180 / np.pi * 3600
+        #try:
+            #if len(theta) != 15:
+                #print('Theta has to include the following 16 parameter:')
+                #print(theta_names_raw)
+                #raise ValueError('Wrong number of input parameter given (should be 16)')
+        #except(TypeError):
+            #print('Thetha has to include the following 16 parameter:')
+            #print(theta_names_raw)
+            #raise ValueError('Wrong number of input parameter given (should be 16)')            
         
-        self.constant_f = constant_f
-        self.fixedBG = fixedBG
-        self.use_opds = use_opds
-        self.fixedBH = fixedBH
-        self.interppm = interppm
-        self.approx = approx
-        self.fixpos = False
-        self.specialfit = False
+        #self.constant_f = constant_f
+        #self.fixedBG = fixedBG
+        #self.use_opds = use_opds
+        #self.fixedBH = fixedBH
+        #self.interppm = interppm
+        #self.approx = approx
+        #self.fixpos = False
+        #self.specialfit = False
         
-        if fiberOff is None:
-            self.fiberOffX = -fits.open(self.name)[0].header["HIERARCH ESO INS SOBJ OFFX"] 
-            self.fiberOffY = -fits.open(self.name)[0].header["HIERARCH ESO INS SOBJ OFFY"] 
-        else:
-            self.fiberOffX = fiberOff[0]
-            self.fiberOffY = fiberOff[1]
-        print("fiber center: %.2f, %.2f (mas)" % (self.fiberOffX, self.fiberOffY))
+        #if fiberOff is None:
+            #self.fiberOffX = -fits.open(self.name)[0].header["HIERARCH ESO INS SOBJ OFFX"] 
+            #self.fiberOffY = -fits.open(self.name)[0].header["HIERARCH ESO INS SOBJ OFFY"] 
+        #else:
+            #self.fiberOffX = fiberOff[0]
+            #self.fiberOffY = fiberOff[1]
+        #print("fiber center: %.2f, %.2f (mas)" % (self.fiberOffX, self.fiberOffY))
         
-        if phasemaps:
-            self.dra = phasemapsstuff[0]*np.ones(4)
-            self.ddec = phasemapsstuff[1]*np.ones(4)
-            self.northangle = phasemapsstuff[2]*np.ones(4)
-            self.phasemaps = True
-        else:
-            self.phasemaps = False
+        #if phasemaps:
+            #self.dra = phasemapsstuff[0]*np.ones(4)
+            #self.ddec = phasemapsstuff[1]*np.ones(4)
+            #self.northangle = phasemapsstuff[2]*np.ones(4)
+            #self.phasemaps = True
+        #else:
+            #self.phasemaps = False
 
-        nwave = self.channel
-        if nwave != 14:
-            raise ValueError('Only usable for 14 channels')
-        self.getIntdata(plot=False, flag=False)
-        u = self.u
-        v = self.v
-        wave = self.wlSC_P1
+        #nwave = self.channel
+        #if nwave != 14:
+            #raise ValueError('Only usable for 14 channels')
+        #self.getIntdata(plot=False, flag=False)
+        #u = self.u
+        #v = self.v
+        #wave = self.wlSC_P1
         
-        self.getDlambda()
-        dlambda = self.dlambda
+        #self.getDlambda()
+        #dlambda = self.dlambda
 
-        visamp, visphi, closure, closamp = self.calc_vis(theta, u, v, wave, dlambda)
-        vis2 = visamp**2
+        #visamp, visphi, closure, closamp = self.calc_vis(theta, u, v, wave, dlambda)
+        #vis2 = visamp**2
         
-        if plot:
-            gs = gridspec.GridSpec(2,2)
-            plt.figure(figsize=(25,25))
+        #if plot:
+            #gs = gridspec.GridSpec(2,2)
+            #plt.figure(figsize=(25,25))
             
-            wave_model = np.linspace(wave[0],wave[len(wave)-1],1000)
-            dlambda_model = np.zeros((6,len(wave_model)))
-            for i in range(0,6):
-                dlambda_model[i,:] = np.interp(wave_model, wave, dlambda[i,:])
-            (model_visamp_full, model_visphi_full, 
-            model_closure_full, model_closamp_full)  = self.calc_vis(theta, u, v, wave_model, dlambda_model)
-            model_vis2_full = model_visamp_full**2.
+            #wave_model = np.linspace(wave[0],wave[len(wave)-1],1000)
+            #dlambda_model = np.zeros((6,len(wave_model)))
+            #for i in range(0,6):
+                #dlambda_model[i,:] = np.interp(wave_model, wave, dlambda[i,:])
+            #(model_visamp_full, model_visphi_full, 
+            #model_closure_full, model_closamp_full)  = self.calc_vis(theta, u, v, wave_model, dlambda_model)
+            #model_vis2_full = model_visamp_full**2.
 
-            magu_as = self.spFrequAS
-            u_as_model = np.zeros((len(u),len(wave_model)))
-            v_as_model = np.zeros((len(v),len(wave_model)))
-            for i in range(0,len(u)):
-                u_as_model[i,:] = u[i]/(wave_model*1.e-6) / rad2as
-                v_as_model[i,:] = v[i]/(wave_model*1.e-6) / rad2as
-            magu_as_model = np.sqrt(u_as_model**2.+v_as_model**2.)
+            #magu_as = self.spFrequAS
+            #u_as_model = np.zeros((len(u),len(wave_model)))
+            #v_as_model = np.zeros((len(v),len(wave_model)))
+            #for i in range(0,len(u)):
+                #u_as_model[i,:] = u[i]/(wave_model*1.e-6) / rad2as
+                #v_as_model[i,:] = v[i]/(wave_model*1.e-6) / rad2as
+            #magu_as_model = np.sqrt(u_as_model**2.+v_as_model**2.)
 
-            # Visamp 
-            axis = plt.subplot(gs[0,0])
-            for i in range(0,6):
-                plt.plot(magu_as[i,:], visamp[i,:], color=self.colors_baseline[i], ls='', marker='o')
-                plt.plot(magu_as_model[i,:], model_visamp_full[i,:], color=self.colors_baseline[i])
-            plt.ylabel('VisAmp')
-            plt.axhline(1, ls='--', lw=0.5)
-            plt.ylim(-0.0,1.1)
+            ## Visamp 
+            #axis = plt.subplot(gs[0,0])
+            #for i in range(0,6):
+                #plt.plot(magu_as[i,:], visamp[i,:], color=self.colors_baseline[i], ls='', marker='o')
+                #plt.plot(magu_as_model[i,:], model_visamp_full[i,:], color=self.colors_baseline[i])
+            #plt.ylabel('VisAmp')
+            #plt.axhline(1, ls='--', lw=0.5)
+            #plt.ylim(-0.0,1.1)
+            ##plt.xlabel('spatial frequency (1/arcsec)')
+            
+            ## Vis2
+            #axis = plt.subplot(gs[0,1])
+            #for i in range(0,6):
+                #plt.errorbar(magu_as[i,:], vis2[i,:], color=self.colors_baseline[i], ls='', marker='o')
+                #plt.plot(magu_as_model[i,:], model_vis2_full[i,:],
+                        #color=self.colors_baseline[i], alpha=1.0)
+            ##plt.xlabel('spatial frequency (1/arcsec)')
+            #plt.ylabel('V2')
+            #plt.axhline(1, ls='--', lw=0.5)
+            #plt.ylim(-0.0,1.1)
+            
+            ## T3
+            #axis = plt.subplot(gs[1,0])
+            #maxval = []
+            #for i in range(0,4):
+                #max_u_as_model = self.max_spf[i]/(wave_model*1.e-6) / rad2as
+                #plt.errorbar(self.spFrequAS_T3[i,:], closure[i,:],
+                             #color=self.colors_closure[i],ls='', marker='o')
+                #plt.plot(max_u_as_model, model_closure_full[i,:],
+                         #color=self.colors_closure[i])
+            #plt.axhline(0, ls='--', lw=0.5)
             #plt.xlabel('spatial frequency (1/arcsec)')
+            #plt.ylabel('T3Phi (deg)')
+            #maxval = np.max(np.abs(model_closure_full))
+            #if maxval < 15:
+                #maxplot=20
+            #elif maxval < 75:
+                #maxplot=80
+            #else:
+                #maxplot=180
+            #plt.ylim(-maxplot, maxplot)
             
-            # Vis2
-            axis = plt.subplot(gs[0,1])
-            for i in range(0,6):
-                plt.errorbar(magu_as[i,:], vis2[i,:], color=self.colors_baseline[i], ls='', marker='o')
-                plt.plot(magu_as_model[i,:], model_vis2_full[i,:],
-                        color=self.colors_baseline[i], alpha=1.0)
+            ## VisPhi
+            #axis = plt.subplot(gs[1,1])
+            #for i in range(0,6):
+                #plt.errorbar(magu_as[i,:], visphi[i,:], color=self.colors_baseline[i], ls='', marker='o')
+                #plt.plot(magu_as_model[i,:], model_visphi_full[i,:], color=self.colors_baseline[i],alpha=1.0)
+            #plt.ylabel('VisPhi')
             #plt.xlabel('spatial frequency (1/arcsec)')
-            plt.ylabel('V2')
-            plt.axhline(1, ls='--', lw=0.5)
-            plt.ylim(-0.0,1.1)
+            #plt.axhline(0, ls='--', lw=0.5)
+            #maxval = np.max(np.abs(model_visphi_full))
+            #if maxval < 45:
+                #maxplot=50
+            #elif maxval < 95:
+                #maxplot=100
+            #else:
+                #maxplot=180
+            #plt.ylim(-maxplot, maxplot)
             
-            # T3
-            axis = plt.subplot(gs[1,0])
-            maxval = []
-            for i in range(0,4):
-                max_u_as_model = self.max_spf[i]/(wave_model*1.e-6) / rad2as
-                plt.errorbar(self.spFrequAS_T3[i,:], closure[i,:],
-                             color=self.colors_closure[i],ls='', marker='o')
-                plt.plot(max_u_as_model, model_closure_full[i,:],
-                         color=self.colors_closure[i])
-            plt.axhline(0, ls='--', lw=0.5)
-            plt.xlabel('spatial frequency (1/arcsec)')
-            plt.ylabel('T3Phi (deg)')
-            maxval = np.max(np.abs(model_closure_full))
-            if maxval < 15:
-                maxplot=20
-            elif maxval < 75:
-                maxplot=80
-            else:
-                maxplot=180
-            plt.ylim(-maxplot, maxplot)
-            
-            # VisPhi
-            axis = plt.subplot(gs[1,1])
-            for i in range(0,6):
-                plt.errorbar(magu_as[i,:], visphi[i,:], color=self.colors_baseline[i], ls='', marker='o')
-                plt.plot(magu_as_model[i,:], model_visphi_full[i,:], color=self.colors_baseline[i],alpha=1.0)
-            plt.ylabel('VisPhi')
-            plt.xlabel('spatial frequency (1/arcsec)')
-            plt.axhline(0, ls='--', lw=0.5)
-            maxval = np.max(np.abs(model_visphi_full))
-            if maxval < 45:
-                maxplot=50
-            elif maxval < 95:
-                maxplot=100
-            else:
-                maxplot=180
-            plt.ylim(-maxplot, maxplot)
-            
-            plt.suptitle('dRa=%.1f, dDec=%.1f, fratio=%.1f, a=%.1f, fBG=%.1f, PCRa=%.1f, PCDec=%.1f' 
-                         % (theta[0], theta[1], theta[2], theta[6], theta[8], theta[10], theta[11]), fontsize=12)
-            plt.show()
+            #plt.suptitle('dRa=%.1f, dDec=%.1f, fratio=%.1f, a=%.1f, fBG=%.1f, PCRa=%.1f, PCDec=%.1f' 
+                         #% (theta[0], theta[1], theta[2], theta[6], theta[8], theta[10], theta[11]), fontsize=12)
+            #plt.show()
 
-        return visamp, vis2, visphi, closure, closamp
+        #return visamp, vis2, visphi, closure, closamp
 
 
     def calc_vis(self, theta, u, v, wave, dlambda):
@@ -1478,22 +1567,18 @@ class GravData():
                          [f[1],f[0]]])
         
         if phasemaps:
-            # read in amplitude & phasemaps
-            # result has tuple of shape 4,14
-            cor_amp_sgr, cor_pha_sgr = self.readPhasemaps(phaseCenterRA,
-                                                          phaseCenterDEC,
-                                                          wave,
-                                                          fromFits=False, 
-                                                          northangle=northangle,
-                                                          dra=dra, ddec=ddec,
-                                                          interp=interppm)
-            cor_amp_s2, cor_pha_s2 = self.readPhasemaps(dRA+phaseCenterRA, 
-                                                        dDEC+phaseCenterDEC,
-                                                        wave,
-                                                        fromFits=False, 
-                                                        northangle=northangle,
-                                                        dra=dra, ddec=ddec,
-                                                        interp=interppm)
+            cor_amp_sgr, cor_pha_sgr, cor_int_sgr = self.readPhasemaps(phaseCenterRA,
+                                                                       phaseCenterDEC,
+                                                                       fromFits=False, 
+                                                                       northangle=northangle,
+                                                                       dra=dra, ddec=ddec,
+                                                                       interp=interppm)
+            cor_amp_s2, cor_pha_s2, cor_int_s2 = self.readPhasemaps(dRA+phaseCenterRA, 
+                                                                    dDEC+phaseCenterDEC,
+                                                                    fromFits=False, 
+                                                                    northangle=northangle,
+                                                                    dra=dra, ddec=ddec,
+                                                                    interp=interppm)
             pm_amp_sgr = np.array([[cor_amp_sgr[0], cor_amp_sgr[1]],
                                     [cor_amp_sgr[0], cor_amp_sgr[2]],
                                     [cor_amp_sgr[0], cor_amp_sgr[3]],
@@ -1506,6 +1591,12 @@ class GravData():
                                     [cor_pha_sgr[1], cor_pha_sgr[2]],
                                     [cor_pha_sgr[1], cor_pha_sgr[3]],
                                     [cor_pha_sgr[2], cor_pha_sgr[3]]])
+            pm_int_sgr = np.array([[cor_int_sgr[0], cor_int_sgr[1]],
+                                    [cor_int_sgr[0], cor_int_sgr[2]],
+                                    [cor_int_sgr[0], cor_int_sgr[3]],
+                                    [cor_int_sgr[1], cor_int_sgr[2]],
+                                    [cor_int_sgr[1], cor_int_sgr[3]],
+                                    [cor_int_sgr[2], cor_int_sgr[3]]])
             pm_amp_s2 = np.array([[cor_amp_s2[0], cor_amp_s2[1]],
                                     [cor_amp_s2[0], cor_amp_s2[2]],
                                     [cor_amp_s2[0], cor_amp_s2[3]],
@@ -1518,6 +1609,12 @@ class GravData():
                                     [cor_pha_s2[1], cor_pha_s2[2]],
                                     [cor_pha_s2[1], cor_pha_s2[3]],
                                     [cor_pha_s2[2], cor_pha_s2[3]]])   
+            pm_int_s2 = np.array([[cor_int_s2[0], cor_int_s2[1]],
+                                    [cor_int_s2[0], cor_int_s2[2]],
+                                    [cor_int_s2[0], cor_int_s2[3]],
+                                    [cor_int_s2[1], cor_int_s2[2]],
+                                    [cor_int_s2[1], cor_int_s2[3]],
+                                    [cor_int_s2[2], cor_int_s2[3]]])   
             
             vis = np.zeros((6,len(wave))) + 0j
             for i in range(0,6):
@@ -1542,7 +1639,10 @@ class GravData():
                 s_S2 -= opd_s2
                 
                 cr1 = (pm_amp_s2[i,0] / pm_amp_sgr[i,0])**2
-                cr2 = (pm_amp_s2[i,1] / pm_amp_sgr[i,1])**2
+                cr2 = (pm_int_s2[i,1] / pm_int_s2[i,1])**2
+                
+                cr_denom1 = (pm_int_sgr[i,0] / pm_int_sgr[i,0])
+                cr_denom2 = (pm_amp_s2[i,0] / pm_amp_sgr[i,0])
                 
                 if approx == "approx":
                     intSgrA = self.vis_intensity_approx(s_SgrA, alpha_SgrA, wave, dlambda[i,:])
@@ -1567,9 +1667,9 @@ class GravData():
                     
                 vis[i,:] = ((intSgrA + 
                             np.sqrt(f_bl[i,0] * f_bl[i,1] * cr1 * cr2) * intS2)/
-                            (np.sqrt(intSgrA_center + f_bl[i,0] * cr1 * intS2_center 
+                            (np.sqrt(intSgrA_center + f_bl[i,0] * cr_denom1 * intS2_center 
                                     + fluxRatioBG * intBG) *
-                             np.sqrt(intSgrA_center + f_bl[i,1] * cr2 * intS2_center 
+                             np.sqrt(intSgrA_center + f_bl[i,1] * cr_denom2 * intS2_center 
                                     + fluxRatioBG * intBG)))  
 
         else:
@@ -1711,8 +1811,8 @@ class GravData():
                   redchi2=False,
                   phasemaps=False,
                   interppm=True, 
-                  smoothpm=True,
-                  smoothfwhm=65, 
+                  #smoothpm=True,
+                  #smoothfwhm=65, 
                   simulate_pm=False):
         '''
         Binary fit to GRAVITY data
@@ -1783,7 +1883,7 @@ class GravData():
         self.fixedBH = fixedBH
         self.interppm = interppm
         self.approx = approx
-        self.smoothfwhm = smoothfwhm
+        #self.smoothfwhm = smoothfwhm
         self.simulate_pm = simulate_pm
         self.bequiet = bequiet
         rad2as = 180 / np.pi * 3600
@@ -1801,7 +1901,7 @@ class GravData():
         
         self.phasemaps = phasemaps
         if phasemaps:
-            self.loadPhasemaps(smooth=smoothpm, smooth_fwhm=smoothfwhm)
+            self.loadPhasemaps(interp=interppm)
             
             header = fits.open(self.name)[0].header
             northangle1 = header['ESO QC ACQ FIELD1 NORTH_ANGLE']/180*math.pi
@@ -2115,10 +2215,10 @@ class GravData():
                 pdf.cell(40, 6, txt=str(phasemaps), ln=0, align="L", border=0)
                 pdf.cell(40, 6, txt="Integral solved by", ln=0, align="L", border=0)
                 pdf.cell(40, 6, txt=approx, ln=1, align="L", border=0)
-                pdf.cell(40, 6, txt="Phasemaps smoothed", ln=0, align="L", border=0)
-                pdf.cell(40, 6, txt=str(smoothpm), ln=0, align="L", border=0)
-                pdf.cell(40, 6, txt="Smoothing FWHM", ln=0, align="L", border=0)
-                pdf.cell(40, 6, txt=str(smoothfwhm), ln=1, align="L", border=0)
+                #pdf.cell(40, 6, txt="Phasemaps smoothed", ln=0, align="L", border=0)
+                #pdf.cell(40, 6, txt=str(smoothpm), ln=0, align="L", border=0)
+                #pdf.cell(40, 6, txt="Smoothing FWHM", ln=0, align="L", border=0)
+                #pdf.cell(40, 6, txt=str(smoothfwhm), ln=1, align="L", border=0)
                 pdf.ln()
             
             if not bequiet and not donotfit:
@@ -3170,7 +3270,10 @@ class GravData():
          closamp, closamp_error, closamp_flag) = fitdata
         wave = self.wlSC
         dlambda = self.dlambda
-        wave_model = np.linspace(wave[0],wave[len(wave)-1],1000)
+        if self.phasemaps:
+            wave_model = wave
+        else:
+            wave_model = np.linspace(wave[0],wave[len(wave)-1],1000)
         dlambda_model = np.zeros((6,len(wave_model)))
         for i in range(0,6):
             dlambda_model[i,:] = np.interp(wave_model, wave, dlambda[i,:])
