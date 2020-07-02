@@ -960,7 +960,13 @@ class GravData():
             else:
                 raise ValueError('Have to create phasemaps first')
         elif self.tel == 'AT':
-            raise ValueError('Have to create phasemaps first')
+            if self.resolution == 'MEDIUM':
+                pm1_file = 'Phasemap_UT_LOW_Smooth15.npy'
+                pm2_file = 'Phasemap_UT_LOW_Smooth15_denom.npy'
+                pm1 = np.load(resource_filename('gravipy', pm1_file))
+                pm2 = np.real(np.load(resource_filename('gravipy', pm2_file)))
+            else:
+                raise ValueError('Have to create phasemaps first')
 
         wave = self.wlSC
 
@@ -1023,7 +1029,7 @@ class GravData():
             ddec = np.zeros_like(np.array(ddec))
             northangle = np.zeros_like(np.array(northangle))
             
-        pm_pos = np.zeros((4, len(wave), 2))
+        pm_pos = np.zeros((4, 2))
         cor_amp = np.zeros((4, len(wave)))
         cor_pha = np.zeros((4, len(wave)))
         cor_int_denom = np.zeros((4, len(wave)))
@@ -1031,6 +1037,7 @@ class GravData():
         for tel in range(4):
             pos = np.array([ra + dra[tel], dec + ddec[tel]])
             pos_rot = np.dot(self.rotation(northangle[tel]), pos) + 100
+            pm_pos[tel] = pos_rot
             
             for wdx in range(len(wave)):
                 if interp:
