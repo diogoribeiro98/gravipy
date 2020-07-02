@@ -20,7 +20,7 @@ from astropy.time import Time
 from datetime import timedelta, datetime
 import sys
 import os 
-import multiprocessing
+from joblib import Parallel, delayed
 
 try:
     from generalFunctions import *
@@ -919,8 +919,7 @@ class GravData():
                     m_all_pm_denom[GV] = pm_sm_denom
                 return np.array([m_all_pm, m_all_pm_denom])
             
-            pool = multiprocessing.Pool(nthreads)
-            res = np.array(pool.map(multi_pm, wave))
+            res = np.array(Parallel(n_jobs=nthreads)(delayed(multi_pm)(lam) for lam in wave))
             
             all_pm = res[:,0,:,:,:]
             all_pm_denom = res[:,1,:,:,:]
