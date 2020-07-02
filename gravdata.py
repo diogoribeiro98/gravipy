@@ -880,11 +880,18 @@ class GravData():
         wave = self.wlSC
         
         if self.tel == 'UT':
+            stopB=8.0
+            stopS=0.96
+            dalpha=1
+            totN=6e3
             d = 8
+            
         elif self.tel == 'AT':
-            # for now produce the same phasemaps
-            # and scale the position later
-            d = 8
+            stopB = 8.0/4.4
+            stopS = 8.0/4.4*0.076
+            dalpha = 1.*4.4
+            totN = 6e3
+            d = 1.8
         
         kernel = Gaussian2DKernel(x_stddev=smooth)
          
@@ -898,7 +905,8 @@ class GravData():
                 print_status(wdx, len(wave))
                 for GV in range(4):
                     zer_GV = zer['GV%i' % (GV+1)]
-                    pm = phase_screen(*zer_GV, lam0=wl, d=d)
+                    pm = phase_screen(*zer_GV, lam0=wl, d=d, stopB=stopB, stopS=stopS, 
+                                      dalpha=dalpha, totN=totN)
                     pm = procrustes(pm, (201,201), padval=0)
                     pm_sm = signal.convolve2d(pm, kernel, mode='same')
                     pm_sm_denom = signal.convolve2d(np.abs(pm)**2, kernel, mode='same')
@@ -911,7 +919,8 @@ class GravData():
                 m_all_pm_denom = np.zeros((4, 201, 201), dtype=np.complex_)
                 for GV in range(2):
                     zer_GV = zer['GV%i' % (GV+1)]
-                    pm = phase_screen(*zer_GV, lam0=lam, d=d)
+                    pm = phase_screen(*zer_GV, lam0=lam, d=d, stopB=stopB, stopS=stopS, 
+                                      dalpha=dalpha, totN=totN)
                     pm = procrustes(pm, (201,201), padval=0)
                     pm_sm = signal.convolve2d(pm, kernel, mode='same')
                     pm_sm_denom = signal.convolve2d(np.abs(pm)**2, kernel, mode='same')
