@@ -768,7 +768,7 @@ class GravData():
     ############################################
     ############################################
     
-    def createPhasemaps(self, smooth=15, zerfile='phasemap_zernike_20200629.npy'):
+    def createPhasemaps(self, nthreads=1, smooth=15, zerfile='phasemap_zernike_20200629.npy'):
         
         def phase_screen(A00, A1m1, A1p1, A2m2, A2p2, A20, A3m1, A3p1, A3m3, A3p3, 
                          A4m2, A4p2, A4m4, A4p4, A40, d=8,
@@ -881,26 +881,48 @@ class GravData():
         if self.tel == 'UT':
             d = 8
         elif self.tel == 'AT':
-            d = 1.8
+            # for now produce the same phasemaps
+            # and scale the position later
+            d = 8
         
-        all_pm = np.zeros((len(wave), 4, 201, 201),
-                          dtype=np.complex_)
-        all_pm_denom = np.zeros((len(wave), 4, 201, 201),
-                                dtype=np.complex_)
         kernel = Gaussian2DKernel(x_stddev=smooth)
          
         print('Creating phasemaps:')
-        for wdx, wl in enumerate(wave):
-            print_status(wdx, len(wave))
-            for GV in range(4):
-                zer_GV = zer['GV%i' % (GV+1)]
-                pm = phase_screen(*zer_GV, lam0=wl, d=d)
-                pm = procrustes(pm, (201,201), padval=0)
-                pm_sm = signal.convolve2d(pm, kernel, mode='same')
-                pm_sm_denom = signal.convolve2d(np.abs(pm)**2, kernel, mode='same')
-                
-                all_pm[wdx, GV] = pm_sm
-                all_pm_denom[wdx, GV] = pm_sm_denom
+        if nthreads == 1:
+            all_pm = np.zeros((len(wave), 4, 201, 201),
+                            dtype=np.complex_)
+            all_pm_denom = np.zeros((len(wave), 4, 201, 201),
+                                    dtype=np.complex_)
+            for wdx, wl in enumerate(wave):
+                print_status(wdx, len(wave))
+                for GV in range(4):
+                    zer_GV = zer['GV%i' % (GV+1)]
+                    pm = phase_screen(*zer_GV, lam0=wl, d=d)
+                    pm = procrustes(pm, (201,201), padval=0)
+                    pm_sm = signal.convolve2d(pm, kernel, mode='same')
+                    pm_sm_denom = signal.convolve2d(np.abs(pm)**2, kernel, mode='same')
+                    
+                    all_pm[wdx, GV] = pm_sm
+                    all_pm_denom[wdx, GV] = pm_sm_denom
+        else:
+            def multi_pm(lam):
+                m_all_pm = np.zeros((4, 201, 201), dtype=np.complex_)
+                m_all_pm_denom = np.zeros((4, 201, 201), dtype=np.complex_)
+                for GV in range(2):
+                    zer_GV = zer['GV%i' % (GV+1)]
+                    pm = phase_screen(*zer_GV, lam0=lam, d=d)
+                    pm = procrustes(pm, (201,201), padval=0)
+                    pm_sm = signal.convolve2d(pm, kernel, mode='same')
+                    pm_sm_denom = signal.convolve2d(np.abs(pm)**2, kernel, mode='same')
+                    m_all_pm[GV] = pm_sm
+                    m_all_pm_denom[GV] = pm_sm_denom
+                return np.array([m_all_pm, m_all_pm_denom])
+            
+            pool = multiprocessing.Pool(nthreads)
+            res = np.array(pool.map(create_phasemas, wave))
+            
+            all_pm = res[:,0,:,:,:]
+            all_pm_denom = res[:,1,:,:,:]
                 
         savename = 'Phasemap_%s_%s_Smooth%i.npy' % (self.tel, self.resolution, smooth)
         savefile = resource_filename('gravipy', savename)
