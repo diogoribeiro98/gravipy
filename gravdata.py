@@ -920,10 +920,11 @@ class GravData():
                 return np.array([m_all_pm, m_all_pm_denom])
             
             pool = multiprocessing.Pool(nthreads)
-            res = np.array(pool.map(create_phasemas, wave))
+            res = np.array(pool.map(multi_pm, wave))
             
             all_pm = res[:,0,:,:,:]
             all_pm_denom = res[:,1,:,:,:]
+            print(all_pm_denom.shape)
                 
         savename = 'Phasemap_%s_%s_Smooth%i.npy' % (self.tel, self.resolution, smooth)
         savefile = resource_filename('gravipy', savename)
