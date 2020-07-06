@@ -968,7 +968,7 @@ class GravData():
             else:
                 raise ValueError('Have to create phasemaps first')
         elif self.tel == 'AT':
-            if self.resolution == 'MEDIUM':Phasemap_AT_MEDIUM_Smooth18_denom.npy
+            if self.resolution == 'MEDIUM':
                 pm1_file = 'Phasemap_AT_MEDIUM_Smooth18.npy'
                 pm2_file = 'Phasemap_AT_MEDIUM_Smooth18_denom.ny'
                 pm1 = np.load(resource_filename('gravipy', pm1_file))
