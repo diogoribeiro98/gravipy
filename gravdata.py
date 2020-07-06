@@ -970,7 +970,7 @@ class GravData():
         elif self.tel == 'AT':
             if self.resolution == 'MEDIUM':
                 pm1_file = 'Phasemap_AT_MEDIUM_Smooth18.npy'
-                pm2_file = 'Phasemap_AT_MEDIUM_Smooth18_denom.ny'
+                pm2_file = 'Phasemap_AT_MEDIUM_Smooth18_denom.npy'
                 pm1 = np.load(resource_filename('gravipy', pm1_file))
                 pm2 = np.real(np.load(resource_filename('gravipy', pm2_file)))
             else:
