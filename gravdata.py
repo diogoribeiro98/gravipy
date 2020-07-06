@@ -28,6 +28,14 @@ try:
 except (NameError, ModuleNotFoundError):
     pass
 
+
+def debug(string):
+    print('*******************')
+    print(string)
+    print('*******************')
+
+
+
 color1 = '#C02F1D'
 color2 = '#348ABD'
 color3 = '#F26D21'
@@ -969,11 +977,18 @@ class GravData():
                 raise ValueError('Have to create phasemaps first')
 
         wave = self.wlSC
+        if pm1.shape[0] != len(wave):
+            raise ValueError('Phasemap and data have different numbers of channels')
 
         self.amp_map = np.abs(pm1)
         self.pha_map = np.angle(pm1, deg=True)
         self.amp_map_denom = pm2
-        
+
+        for wdx in range(len(wave)):
+            for tel in range(4):
+                self.amp_map[wdx,tel] /= np.max(self.amp_map[wdx,tel])
+                self.amp_map_denom[wdx,tel] /= np.max(self.amp_map_denom[wdx,tel])
+                
         if interp:
             x = np.arange(201)
             y = np.arange(201)
@@ -1039,6 +1054,7 @@ class GravData():
             pos_rot = np.dot(self.rotation(northangle[tel]), pos) + 100
             pm_pos[tel] = pos_rot
             
+            
             for wdx in range(len(wave)):
                 if interp:
                     cor_amp[tel, wdx] = self.amp_map_int[wdx, tel](pos_rot[0], pos_rot[1])
@@ -1049,7 +1065,6 @@ class GravData():
                     cor_amp[tel, wdx] = self.amp_map[wdx,tel][pos_int[0],pos_int[1]]
                     cor_pha[tel, wdx] = self.pha_map[wdx,tel][pos_int[0],pos_int[1]]
                     cor_int_denom[tel, wdx] = self.amp_map_denom_int[wdx,tel][pos_int[0],pos_int[1]]
-                    
         if givepos:
             return pm_pos
         else:
@@ -1115,7 +1130,7 @@ class GravData():
 
         pos = np.array([ra + dra, dec + ddec])
         pos_rot = np.dot(self.rotation(northangle), pos)+100
-        print(pos_rot)
+
         wave = self.wlSC
         wdx = find_nearest(wave, lam)
         
@@ -1623,6 +1638,7 @@ class GravData():
                                                                     northangle=northangle,
                                                                     dra=dra, ddec=ddec,
                                                                     interp=interppm)
+
             pm_amp_sgr = np.array([[cor_amp_sgr[0], cor_amp_sgr[1]],
                                     [cor_amp_sgr[0], cor_amp_sgr[2]],
                                     [cor_amp_sgr[0], cor_amp_sgr[3]],
@@ -1683,10 +1699,10 @@ class GravData():
                 s_S2 -= opd_s2
                 
                 cr1 = (pm_amp_s2[i,0] / pm_amp_sgr[i,0])**2
-                cr2 = (pm_int_s2[i,1] / pm_int_s2[i,1])**2
+                cr2 = (pm_amp_s2[i,1] / pm_amp_sgr[i,1])**2
                 
-                cr_denom1 = (pm_int_sgr[i,0] / pm_int_sgr[i,0])
-                cr_denom2 = (pm_amp_s2[i,0] / pm_amp_sgr[i,0])
+                cr_denom1 = (pm_int_s2[i,0] / pm_int_sgr[i,0])
+                cr_denom2 = (pm_int_s2[i,0] / pm_int_sgr[i,0])
                 
                 if approx == "approx":
                     intSgrA = self.vis_intensity_approx(s_SgrA, alpha_SgrA, wave, dlambda[i,:])
