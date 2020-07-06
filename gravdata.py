@@ -1050,6 +1050,8 @@ class GravData():
         
         for tel in range(4):
             pos = np.array([ra + dra[tel], dec + ddec[tel]])
+            if self.tel == 'AT':
+                pos /= 4.4
             pos_rot = np.dot(self.rotation(northangle[tel]), pos) + 100
             pm_pos[tel] = pos_rot
             
@@ -1128,6 +1130,9 @@ class GravData():
             self.loadPhasemaps(interp=True)
 
         pos = np.array([ra + dra, dec + ddec])
+        if self.tel == 'AT':
+            pos /= 4.4
+
         pos_rot = np.dot(self.rotation(northangle), pos)+100
 
         wave = self.wlSC
