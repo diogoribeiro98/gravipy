@@ -925,7 +925,7 @@ class GravData():
             def multi_pm(lam):
                 m_all_pm = np.zeros((4, 201, 201), dtype=np.complex_)
                 m_all_pm_denom = np.zeros((4, 201, 201), dtype=np.complex_)
-                for GV in range(2):
+                for GV in range(4):
                     zer_GV = zer['GV%i' % (GV+1)]
                     pm = phase_screen(*zer_GV, lam0=lam, d=d, stopB=stopB, stopS=stopS, 
                                       dalpha=dalpha, totN=totN)
@@ -940,7 +940,6 @@ class GravData():
             
             all_pm = res[:,0,:,:,:]
             all_pm_denom = res[:,1,:,:,:]
-            print(all_pm_denom.shape)
                 
         savename = 'Phasemap_%s_%s_Smooth%i.npy' % (self.tel, self.resolution, smooth)
         savefile = resource_filename('gravipy', savename)
@@ -1064,7 +1063,7 @@ class GravData():
                     pos_int = np.round(pos_rot).astype(int)
                     cor_amp[tel, wdx] = self.amp_map[wdx,tel][pos_int[0],pos_int[1]]
                     cor_pha[tel, wdx] = self.pha_map[wdx,tel][pos_int[0],pos_int[1]]
-                    cor_int_denom[tel, wdx] = self.amp_map_denom_int[wdx,tel][pos_int[0],pos_int[1]]
+                    cor_int_denom[tel, wdx] = self.amp_map_denom[wdx,tel][pos_int[0],pos_int[1]]
         if givepos:
             return pm_pos
         else:
