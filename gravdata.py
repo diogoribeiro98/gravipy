@@ -1705,8 +1705,8 @@ class GravData():
                 cr1 = (pm_amp_s2[i,0] / pm_amp_sgr[i,0])**2
                 cr2 = (pm_amp_s2[i,1] / pm_amp_sgr[i,1])**2
                 
-                #cr_denom1 = (pm_int_s2[i,0] / pm_int_sgr[i,0])
-                #cr_denom2 = (pm_int_s2[i,0] / pm_int_sgr[i,0])
+                cr_denom1 = (pm_int_s2[i,0] / pm_int_sgr[i,0])
+                cr_denom2 = (pm_int_s2[i,1] / pm_int_sgr[i,1])
                 
                 if approx == "approx":
                     intSgrA = self.vis_intensity_approx(s_SgrA, alpha_SgrA, wave, dlambda[i,:])
