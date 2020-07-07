@@ -1705,8 +1705,8 @@ class GravData():
                 cr1 = (pm_amp_s2[i,0] / pm_amp_sgr[i,0])**2
                 cr2 = (pm_amp_s2[i,1] / pm_amp_sgr[i,1])**2
                 
-                cr_denom1 = (pm_int_s2[i,0] / pm_int_sgr[i,0])
-                cr_denom2 = (pm_int_s2[i,0] / pm_int_sgr[i,0])
+                #cr_denom1 = (pm_int_s2[i,0] / pm_int_sgr[i,0])
+                #cr_denom2 = (pm_int_s2[i,0] / pm_int_sgr[i,0])
                 
                 if approx == "approx":
                     intSgrA = self.vis_intensity_approx(s_SgrA, alpha_SgrA, wave, dlambda[i,:])
@@ -1728,12 +1728,12 @@ class GravData():
                     intBG = self.vis_intensity_num(0, alpha_bg, wave, dlambda[i,:])
                 else:
                     raise ValueError('approx has to be approx, analytic or numeric')
-                    
+                
                 vis[i,:] = ((intSgrA + 
                             np.sqrt(f_bl[i,0] * f_bl[i,1] * cr1 * cr2) * intS2)/
-                            (np.sqrt(intSgrA_center + f_bl[i,0] * cr_denom1 * intS2_center 
+                            (np.sqrt(intSgrA_center + f_bl[i,0] * cr1 * intS2_center 
                                     + fluxRatioBG * intBG) *
-                             np.sqrt(intSgrA_center + f_bl[i,1] * cr_denom2 * intS2_center 
+                             np.sqrt(intSgrA_center + f_bl[i,1] * cr2 * intS2_center 
                                     + fluxRatioBG * intBG)))  
 
         else:
@@ -1875,8 +1875,6 @@ class GravData():
                   redchi2=False,
                   phasemaps=False,
                   interppm=True, 
-                  #smoothpm=True,
-                  #smoothfwhm=65, 
                   simulate_pm=False):
         '''
         Binary fit to GRAVITY data
@@ -1914,8 +1912,6 @@ class GravData():
         redchi2:        Gives redchi2 instead of chi2 [False]
         phasemaps:      Use Phasemaps for fit [False]
         interppm:       Interpolate Phasemaps [True]
-        smoothpm:       Smooth the phasemaps by smoothfwhm [True]
-        smoothfwhm:     FWHM for smoothing if smoothpm in mas [65] 
         simulate_pm:    Phasemaps for suimulated data, sets ACQ parameter to 0 [False]
         
         For a fit to two components: A (SgrA*) and B (S2)
