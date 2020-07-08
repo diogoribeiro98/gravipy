@@ -958,22 +958,14 @@ class GravData():
     
     
     def loadPhasemaps(self, interp):
-        if self.tel == 'UT':
-            if self.resolution == 'LOW':
-                pm1_file = 'Phasemap_UT_LOW_Smooth15.npy'
-                pm2_file = 'Phasemap_UT_LOW_Smooth15_denom.npy'
-                pm1 = np.load(resource_filename('gravipy', pm1_file))
-                pm2 = np.real(np.load(resource_filename('gravipy', pm2_file)))
-            else:
-                raise ValueError('Have to create phasemaps first')
-        elif self.tel == 'AT':
-            if self.resolution == 'MEDIUM':
-                pm1_file = 'Phasemap_AT_MEDIUM_Smooth18.npy'
-                pm2_file = 'Phasemap_AT_MEDIUM_Smooth18_denom.npy'
-                pm1 = np.load(resource_filename('gravipy', pm1_file))
-                pm2 = np.real(np.load(resource_filename('gravipy', pm2_file)))
-            else:
-                raise ValueError('Have to create phasemaps first')
+        smoothkernel = self.smoothkernel
+        pm1_file = 'Phasemap_%s_%s_Smooth%i.npy' % (self.tel, self.resolution, smoothkernel)
+        pm2_file = 'Phasemap_%s_%s_Smooth%i_denom.npy' % (self.tel, self.resolution, smoothkernel)
+        try:
+            pm1 = np.load(resource_filename('gravipy', pm1_file))
+            pm2 = np.real(np.load(resource_filename('gravipy', pm2_file)))
+        except FileNotFoundError:
+            raise ValueError('%s does not exist, you have to create the phsemap first!' % pm1_file)
 
         wave = self.wlSC
         if pm1.shape[0] != len(wave):
@@ -1874,7 +1866,8 @@ class GravData():
                   writeresults=True, 
                   redchi2=False,
                   phasemaps=False,
-                  interppm=True, 
+                  interppm=True,
+                  smoothkernel=15,
                   simulate_pm=False):
         '''
         Binary fit to GRAVITY data
@@ -1912,6 +1905,7 @@ class GravData():
         redchi2:        Gives redchi2 instead of chi2 [False]
         phasemaps:      Use Phasemaps for fit [False]
         interppm:       Interpolate Phasemaps [True]
+        smoothkernel:   Size of smoothing kernel in mas [15]
         simulate_pm:    Phasemaps for suimulated data, sets ACQ parameter to 0 [False]
         
         For a fit to two components: A (SgrA*) and B (S2)
@@ -1946,6 +1940,7 @@ class GravData():
         #self.smoothfwhm = smoothfwhm
         self.simulate_pm = simulate_pm
         self.bequiet = bequiet
+        self.smoothkernel = smoothkernel
         rad2as = 180 / np.pi * 3600
         if np.any(specialpar):
             self.specialfit = True
@@ -2277,8 +2272,8 @@ class GravData():
                 pdf.cell(40, 6, txt=approx, ln=1, align="L", border=0)
                 #pdf.cell(40, 6, txt="Phasemaps smoothed", ln=0, align="L", border=0)
                 #pdf.cell(40, 6, txt=str(smoothpm), ln=0, align="L", border=0)
-                #pdf.cell(40, 6, txt="Smoothing FWHM", ln=0, align="L", border=0)
-                #pdf.cell(40, 6, txt=str(smoothfwhm), ln=1, align="L", border=0)
+                pdf.cell(40, 6, txt="Smoothing FWHM", ln=0, align="L", border=0)
+                pdf.cell(40, 6, txt=str(smoothkernel), ln=1, align="L", border=0)
                 pdf.ln()
             
             if not bequiet and not donotfit:
