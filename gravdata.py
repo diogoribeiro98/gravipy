@@ -779,6 +779,7 @@ class GravData():
     
     def createPhasemaps(self, nthreads=1, smooth=15, plot=True,
                         zerfile='phasemap_zernike_20200803.npy'):
+        print('Used file: %s' % zerfile)
         
         def phase_screen(A00, A1m1, A1p1, A2m2, A2p2, A20, A3m1, A3p1, A3m3, 
                         A3p3, A4m2, A4p2, A4m4, A4p4, A40, lam0=2.2, MFR=0.6308, 
