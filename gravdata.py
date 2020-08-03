@@ -777,12 +777,13 @@ class GravData():
     ############################################
     ############################################
     
-    def createPhasemaps(self, nthreads=1, smooth=15, zerfile='phasemap_zernike_20200629.npy'):
+    def createPhasemaps(self, nthreads=1, smooth=15, plot=True,
+                        zerfile='phasemap_zernike_20200803.npy'):
         
-        def phase_screen(A00, A1m1, A1p1, A2m2, A2p2, A20, A3m1, A3p1, A3m3, A3p3, 
-                         A4m2, A4p2, A4m4, A4p4, A40, d=8,
-                         MFR=0.6308, stopB=8.0, stopS=0.96, 
-                         dalpha=1, totN=6e3, lam0=2.2, fit=True):
+        def phase_screen(A00, A1m1, A1p1, A2m2, A2p2, A20, A3m1, A3p1, A3m3, 
+                        A3p3, A4m2, A4p2, A4m4, A4p4, A40, lam0=2.2, MFR=0.6308, 
+                        stopB=8.0, stopS=0.96, d1=8.0, dalpha=1., 
+                        totN=1024, amax=100):
             
             """
             Simulate phase screens taking into account static aberrations.
@@ -792,44 +793,41 @@ class GravData():
             * Static aberrations in the pupil plane are described by low-order Zernicke polynomials
             * Their amplitudes are in units of micro-meter
 
-            A00  (float) : piston
-            A1m1 (float) : vertical tilt
-            A1p1 (float) : horizontal tilt
-            A2m2 (float) : vertical astigmatism
-            A2p2 (float) : horizontal astigmatism
-            A20  (float) : defocuss
-            A3m1 (float) : vertical coma
-            A3p1 (float) : horizontal coma
-            A3m3 (float) : vertical trefoil
-            A3p3 (float) : oblique trefoil
-            A4m2 (float) : oblique secondary astigmatism
-            A4p2 (float) : vertical secondary astigmatism
-            A4m4 (float) : oblique quadrafoil
-            A4p4 (float) : vertical quadrafoil
-            A40  (float) : primary spherical
+            00: A00  (float) : piston
+            01: A1m1 (float) : vertical tilt
+            02: A1p1 (float) : horizontal tilt
+            03: A2m2 (float) : vertical astigmatism
+            04: A2p2 (float) : horizontal astigmatism
+            05: A20  (float) : defocuss
+            06: A3m1 (float) : vertical coma
+            07: A3p1 (float) : horizontal coma
+            08: A3m3 (float) : vertical trefoil
+            09: A3p3 (float) : oblique trefoil
+            10: A4m2 (float) : oblique secondary astigmatism
+            11: A4p2 (float) : vertical secondary astigmatism
+            12: A4m4 (float) : oblique quadrafoil
+            13: A4p4 (float) : vertical quadrafoil
+            14: A40  (float) : primary spherical
 
             * optical system
             MFR (float)   : sigma of the fiber mode profile in units of dish radius
             stopB (float) : outer stop diameter in meters
             stopS (float) : inner stop diameter in meters
-            -> for measurments with the GRAVITY GCU the dish diameter and central obscuration do not determine the stop size
 
             * further parameters specify the output grid
             dalpha (float) : pixel width in the imaging plane in mas
             totN   (float) : total number of pixels in the pupil plane
             lam0   (float) : wavelength at which the phase screen is computed in micro-meter
+            d1     (float) : telescope to normalize Zernike RMS in m (UT=8.0, AT=1.82)
+            amax   (float) : maximum off-axis distance in the maps returned
             
             """ 
-            
-            #--- instrument parameters ---#
-            d1   = d      # dish diameter in meters
             
             #--- coordinate scaling ---#
             lam0   = lam0*1e-6
             mas    = 1.e-3 * (2.*np.pi/360) *1./3600
             ext    = totN*d1/lam0*mas*dalpha*dalpha
             du     = dalpha/ext*d1/lam0
-            dishN  = 2*ext/dalpha    
                 
             #--- coordinates ---#
             ii     = np.arange(totN) - (totN/2)
@@ -844,14 +842,18 @@ class GravData():
             uu     = np.sqrt( u1*u1 + u2*u2 )
             r      = lam0*uu
             t      = np.angle(u1 + 1j*u2)
-            
-            # cut out slice
-            cn   = int(dishN/2)
-            ss   = slice(int(totN//2)-cn, int(totN//2)+cn+1)
-            amax = dalpha*cn
-            
+
+            #--- cut our central part ---#
+            hmapN = int(amax/dalpha)
+            cc = slice(int(totN/2)-hmapN, int(totN/2)+hmapN+1)
+            if 2*hmapN > totN:
+                print('Requested map sizes too large')
+                return False
+
             #--- pupil function ---#
-            pupil = np.logical_and( r<(stopB/2.), r>(stopS/2.) )
+            pupil = r<(stopB/2.)
+            if stopS > 0.:
+                pupil = np.logical_and( r<(stopB/2.), r>(stopS/2.) )
             
             #--- fiber profile ---#
             fiber = np.exp(-0.5*(r/(MFR*d1/2.))**2)
@@ -876,11 +878,9 @@ class GravData():
             phase = 2.*np.pi/lam0*zernike*1.e-6
 
             #--- transform to image plane ---#
-            complexPsf = np.fft.fftshift(np.fft.fft2( pupil * fiber * np.exp(1j*phase) ))
-            if fit:
-                return complexPsf[ss,ss]/np.abs(complexPsf[ss,ss]).max()
-            else:
-                return complexPsf, amax, ss, 2*cn+1
+            complexPsf = np.fft.fftshift(np.fft.fft2(pupil * fiber * np.exp(1j*phase) ))
+            return complexPsf[cc,cc]/np.abs(complexPsf[cc,cc]).max()
+            
         
         zernikefile = resource_filename('gravipy', zerfile)
         zer = np.load(zernikefile, allow_pickle=True).item()
@@ -891,14 +891,14 @@ class GravData():
             stopB=8.0
             stopS=0.96
             dalpha=1
-            totN=6e3
+            totN=1024
             d = 8
             
         elif self.tel == 'AT':
             stopB = 8.0/4.4
             stopS = 8.0/4.4*0.076
             dalpha = 1.*4.4
-            totN = 6e3
+            totN = 1024
             d = 1.8
         
         kernel = Gaussian2DKernel(x_stddev=smooth)
@@ -913,7 +913,7 @@ class GravData():
                 print_status(wdx, len(wave))
                 for GV in range(4):
                     zer_GV = zer['GV%i' % (GV+1)]
-                    pm = phase_screen(*zer_GV, lam0=wl, d=d, stopB=stopB, stopS=stopS, 
+                    pm = phase_screen(*zer_GV, lam0=wl, d1=d, stopB=stopB, stopS=stopS, 
                                       dalpha=dalpha, totN=totN)
                     pm = procrustes(pm, (201,201), padval=0)
                     pm_sm = signal.convolve2d(pm, kernel, mode='same')
@@ -921,13 +921,22 @@ class GravData():
                     
                     all_pm[wdx, GV] = pm_sm
                     all_pm_denom[wdx, GV] = pm_sm_denom
+                    
+                    if plot and wdx == len(wave)//2:
+                        plt.imshow(np.abs(pm_sm))
+                        plt.colorbar()
+                        plt.show()
+                        plt.imshow(np.angle(pm_sm))
+                        plt.colorbar()
+                        plt.show()
+                        
         else:
             def multi_pm(lam):
                 m_all_pm = np.zeros((4, 201, 201), dtype=np.complex_)
                 m_all_pm_denom = np.zeros((4, 201, 201), dtype=np.complex_)
                 for GV in range(4):
                     zer_GV = zer['GV%i' % (GV+1)]
-                    pm = phase_screen(*zer_GV, lam0=lam, d=d, stopB=stopB, stopS=stopS, 
+                    pm = phase_screen(*zer_GV, lam0=lam, d1=d, stopB=stopB, stopS=stopS, 
                                       dalpha=dalpha, totN=totN)
                     pm = procrustes(pm, (201,201), padval=0)
                     pm_sm = signal.convolve2d(pm, kernel, mode='same')
