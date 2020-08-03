@@ -1767,8 +1767,7 @@ class GravData():
                 else:
                     raise ValueError('approx has to be approx, analytic or numeric')
                     
-                vis[i,:] = ((intSgrA + 
-                            np.sqrt(f_bl[i,0] * f_bl[i,1]) * intS2)/
+                vis[i,:] = ((intSgrA + np.sqrt(f_bl[i,0] * f_bl[i,1]) * intS2)/
                             (np.sqrt(intSgrA_center + f_bl[i,0] * intS2_center 
                                     + fluxRatioBG * intBG) *
                             np.sqrt(intSgrA_center + f_bl[i,1] * intS2_center 
