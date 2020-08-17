@@ -844,9 +844,8 @@ class GravData():
             aa     = np.sqrt(a1*a1 + a2*a2)
             
             # pupil plane
-            u1, u2 = np.meshgrid(ii*du, ii*du)
-            uu     = np.sqrt( u1*u1 + u2*u2 )
-            r      = lam0*uu
+            u1, u2 = np.meshgrid(ii*du*lam0, ii*du*lam0)
+            r     = np.sqrt( u1*u1 + u2*u2 )
             t      = np.angle(u1 + 1j*u2)
 
             #--- cut our central part ---#
@@ -923,14 +922,16 @@ class GravData():
                     zer_GV = zer['GV%i' % (GV+1)]
                     pm = phase_screen(*zer_GV, lam0=wl, d1=d, stopB=stopB, stopS=stopS, 
                                       dalpha=dalpha, totN=totN)
-                    pm = procrustes(pm, (201,201), padval=0)
+                    if pm.shape != (201, 201):
+                        print('Need to convert to (201,201) shape')
+                        pm = procrustes(pm, (201,201), padval=0)
                     pm_sm = signal.convolve2d(pm, kernel, mode='same')
                     pm_sm_denom = signal.convolve2d(np.abs(pm)**2, kernel, mode='same')
                     
                     all_pm[wdx, GV] = pm_sm
                     all_pm_denom[wdx, GV] = pm_sm_denom
                     
-                    if plot and wdx == len(wave)//2:
+                    if plot and wdx == 0:
                         plt.imshow(np.abs(pm_sm))
                         plt.colorbar()
                         plt.show()
