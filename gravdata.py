@@ -778,13 +778,13 @@ class GravData():
     ############################################
     
     def createPhasemaps(self, nthreads=1, smooth=15, plot=True,
-                        zerfile='phasemap_zernike_20200803.npy'):
+                        zerfile='phasemap_zernike_20200817.npy'):
         print('Used file: %s' % zerfile)
         
         def phase_screen(A00, A1m1, A1p1, A2m2, A2p2, A20, A3m1, A3p1, A3m3, 
-                        A3p3, A4m2, A4p2, A4m4, A4p4, A40, lam0=2.2, MFR=0.6308, 
-                        stopB=8.0, stopS=0.96, d1=8.0, dalpha=1., 
-                        totN=1024, amax=100):
+                        A3p3, A4m2, A4p2, A4m4, A4p4, A40, B1m1=0., B1p1=0.,
+                        lam0=2.2, MFR=0.6308, stopB=8.0, stopS=0.96, 
+                        d1=8.0, dalpha=1., totN=1024, amax=100):
             
             """
             Simulate phase screens taking into account static aberrations.
@@ -809,6 +809,11 @@ class GravData():
             12: A4m4 (float) : oblique quadrafoil
             13: A4p4 (float) : vertical quadrafoil
             14: A40  (float) : primary spherical
+
+            * Fiber tilt (in the focal plane) shifts the fiber mode projected to 
+            * the image plane:
+            B1m1 (float) : missplacement of the fiber mode in u1-direction in meters
+            B1p1 (float) : missplacement of the fiber mode in u2-direction in meters
 
             * optical system
             MFR (float)   : sigma of the fiber mode profile in units of dish radius
@@ -858,6 +863,8 @@ class GravData():
             
             #--- fiber profile ---#
             fiber = np.exp(-0.5*(r/(MFR*d1/2.))**2)
+            if B1m1!=0 or B1p1!=0:
+                fiber = np.exp(-0.5*((u1-B1m1)**2 + (u2-B1p1)**2)/(MFR*d1/2.)**2)
             
             #--- phase screens (pupil plane) ---#
             zernike  = A00
