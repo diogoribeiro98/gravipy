@@ -947,7 +947,11 @@ class GravData():
                     zer_GV = zer['GV%i' % (GV+1)]
                     pm = phase_screen(*zer_GV, lam0=lam, d1=d, stopB=stopB, stopS=stopS, 
                                       dalpha=dalpha, totN=totN)
-                    pm = procrustes(pm, (201,201), padval=0)
+
+                    if pm.shape != (201, 201):
+                        print('Need to convert to (201,201) shape')
+                        pm = procrustes(pm, (201,201), padval=0)
+
                     pm_sm = signal.convolve2d(pm, kernel, mode='same')
                     pm_sm_denom = signal.convolve2d(np.abs(pm)**2, kernel, mode='same')
                     m_all_pm[GV] = pm_sm
