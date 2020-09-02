@@ -1484,7 +1484,6 @@ class GravData():
         dlambda = self.dlambda
         
         theta[2:6] = np.log10(theta[2:6])
-        #fr_start = np.log10(0.1)
 
         visamp, visphi, closure, closamp = self.calc_vis(theta, u, v, wave, dlambda)
         vis2 = visamp**2
@@ -1892,6 +1891,7 @@ class GravData():
                   fixedBG=True, 
                   noS2=True, 
                   fixpos=False, 
+                  onlypos=False,
                   fixedBH=False, 
                   constant_f=True,
                   specialpar=np.array([0,0,0,0,0,0]), 
@@ -1930,6 +1930,7 @@ class GravData():
         fixedBG:        Fit for background power law [False]
         noS2:           Does not do anything if OFFX and OFFY=0
         fixpos:         Does nto fit the distance between the sources [False]
+        onlypos:        Fixes everything except pos [False]
         fixedBH:        Fit for black hole power law [False]
         constant_f:     Constant coupling [True]
         specialpar:     Allows OPD for individual baseline [0,0,0,0,0,0]
@@ -2153,27 +2154,31 @@ class GravData():
 
         ndim = len(theta)
         todel = []
-        if fixpos:
-            todel.append(0)
-            todel.append(1)
-        if constant_f:
-            todel.append(3)
-            todel.append(4)
-            todel.append(5)
-        if fixedBH:
-            todel.append(6)
-        if fixedBG:
-            todel.append(8)
-        if fit_for[3] == 0 or nophases:
-            todel.append(9)
-            todel.append(10)
-        if not use_opds:
-            todel.append(11)
-            todel.append(12)
-            todel.append(13)
-            todel.append(14)
-        if not specialfit:
-            todel.append(15)
+        if onlypos:
+            for tdx in range(2,ndim):
+                todel.append(tdx)
+        else:
+            if fixpos:
+                todel.append(0)
+                todel.append(1)
+            if constant_f:
+                todel.append(3)
+                todel.append(4)
+                todel.append(5)
+            if fixedBH:
+                todel.append(6)
+            if fixedBG:
+                todel.append(8)
+            if fit_for[3] == 0 or nophases:
+                todel.append(9)
+                todel.append(10)
+            if not use_opds:
+                todel.append(11)
+                todel.append(12)
+                todel.append(13)
+                todel.append(14)
+            if not specialfit:
+                todel.append(15)
         ndof = ndim - len(todel)
         
         if donotfit:
@@ -3415,7 +3420,7 @@ class GravData():
                 plt.show()
         
         # Vis2
-        if self.fit_for[1]:        
+        if self.fit_for[1]:
             for i in range(0,6):
                 plt.errorbar(magu_as[i,:], vis2[i,:]*(1-vis2_flag)[i], 
                             vis2_error[i,:]*(1-vis2_flag)[i], 
@@ -3437,7 +3442,7 @@ class GravData():
                 plt.show()
         
         # T3
-        if self.fit_for[2]:        
+        if self.fit_for[2]:
             for i in range(0,4):
                 max_u_as_model = self.max_spf[i]/(wave_model*1.e-6) / rad2as
                 plt.errorbar(self.spFrequAS_T3[i,:], closure[i,:]*(1-closure_flag)[i],
@@ -3456,7 +3461,7 @@ class GravData():
                 plt.savefig(pdfname)
                 plt.close()
             else:
-                plt.show()  
+                plt.show()
         
         # VisPhi
         if self.fit_for[3]:
@@ -3511,7 +3516,8 @@ class GravData():
     ##################################################################################
     ################################################################################## 
     
-    def simulateUnaryphases(self, dRa, dDec, alpha=None, specialfit=False, specialpar=None, plot=False, compare=True, uvind=False):
+    def simulateUnaryphases(self, dRa, dDec, alpha=None, specialfit=False, 
+                            specialpar=None, plot=False, compare=True, uvind=False):
         """
         Test function to see how a given phasecenter shift would look like
         """
@@ -3562,6 +3568,7 @@ class GravData():
             #res_visphi = res_visphi_1*check + res_visphi_2*(1-check)
             chi2 = np.sum(res_visphi_1**2./visphi_error**2.*(1-visphi_flag))
             print(chi2)
+            return visphi
             
         else:
             if plot:
@@ -3751,13 +3758,14 @@ class GravData():
                  approx='approx', 
                  onlypol1=False, 
                  mindatapoints=3,
-                 flagtill=2, 
-                 flagfrom=12, 
-                 dontfit=None, 
-                 dontfitbl=None, 
-                 noS2=False, 
-                 fixedBG=True, 
-                 fixedBH=True, 
+                 flagtill=2,
+                 flagfrom=12,
+                 initpos=None,
+                 dontfit=None,
+                 dontfitbl=None,
+                 noS2=False,
+                 fixedBG=True,
+                 fixedBH=True,
                  noBG=True,
                  fitopds=np.array([0,0,0,0]), 
                  specialpar=np.array([0,0,0,0,0,0]), 
@@ -3794,7 +3802,7 @@ class GravData():
         
         plot:           plot MCMC results [True]
         plotres:        plot fit result [True]
-        writeresults:  Write fit results in file [True] 
+        writeresults:   Write fit results in file [True] 
         createpdf:      Creates a pdf with fit results and all plots [True] 
         writefitdiff:   Writes the difference of the mean fit vs data instead of redchi2
         returnPos:      Retuns fitted position
@@ -3815,9 +3823,6 @@ class GravData():
         
         if np.any(specialpar):
             self.specialfit = True
-            #self.specialfit_bl = np.array([0,1,1,1,1,0])
-            #self.specialfit_bl = np.array([1,0,0,0,0,1])
-            #self.specialfit_bl = np.array([1,1,0,0,-1,-1])
             self.specialfit_bl = specialpar
             if not bequiet:
                 print('Specialfit parameter applied to BLs:')
@@ -3878,6 +3883,13 @@ class GravData():
         size = 5
         phase_center_RA = 0.01
         phase_center_DEC = 0.01
+
+        if initpos is not None:
+            if len(initpos) != 2:
+                raise ValueError('Initpos has to be a list of 2 parameters')
+            phase_center_RA = initpos[0]
+            phase_center_DEC = initpos[1]
+
         phase_center_RA_init = np.array([phase_center_RA,
                                          phase_center_RA - size,
                                          phase_center_RA + size])
