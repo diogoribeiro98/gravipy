@@ -1185,7 +1185,9 @@ class GravData():
         dlambda:size of channels 
         """
         x = 2*s*dlambda/lambda0**2.
-        sinc = np.sinc(x/np.pi)
+        #sinc = np.sinc(x/np.pi)  # be aware that np.sinc = np.sin(pi*x)/(pi*x)
+        #print('wrong approx!')
+        sinc = np.sinc(x)  # be aware that np.sinc = np.sin(pi*x)/(pi*x)
         return (lambda0/2.2)**(-1-alpha)*2*dlambda*sinc*np.exp(-2.j*np.pi*s/lambda0)
     
     def vis_intensity(self, s, alpha, lambda0, dlambda):
@@ -1411,7 +1413,7 @@ class GravData():
     
     def simulateVisdata(self, theta, constant_f=True, use_opds=False, fixedBG=True, fixedBH=True, fiberOff=None, 
                         plot=True, phasemaps=False, phasemapsstuff=None, interppm=True,
-                        approx='numeric'):
+                        approx='numeric', source2alpha=None):
         """
         Test function to see how a given theta would look like
         Theta should be a list of:
@@ -1450,13 +1452,17 @@ class GravData():
         self.fixpos = False
         self.specialfit = False
         
+        if source2alpha is not None:
+            self.source2alpha = source2alpha
+        
         if fiberOff is None:
             self.fiberOffX = -fits.open(self.name)[0].header["HIERARCH ESO INS SOBJ OFFX"] 
             self.fiberOffY = -fits.open(self.name)[0].header["HIERARCH ESO INS SOBJ OFFY"] 
         else:
             self.fiberOffX = fiberOff[0]
             self.fiberOffY = fiberOff[1]
-        print("fiber center: %.2f, %.2f (mas)" % (self.fiberOffX, self.fiberOffY))
+        if self.verbose:
+            print("fiber center: %.2f, %.2f (mas)" % (self.fiberOffX, self.fiberOffY))
         
         if phasemaps:
             self.dra = phasemapsstuff[0]*np.ones(4)
@@ -1476,6 +1482,9 @@ class GravData():
         
         self.getDlambda()
         dlambda = self.dlambda
+        
+        theta[2:6] = np.log10(theta[2:6])
+        #fr_start = np.log10(0.1)
 
         visamp, visphi, closure, closamp = self.calc_vis(theta, u, v, wave, dlambda)
         vis2 = visamp**2
@@ -1628,7 +1637,13 @@ class GravData():
             special_par = theta[16] 
             sp_bl = np.ones(6)*special_par
             sp_bl *= self.specialfit_bl
-        alpha_S2 = 3
+        
+        try:
+            alpha_S2 = self.source2alpha
+            if self.verbose:
+                print('Alpha of second star is %.2f' % alpha_S2)
+        except:
+            alpha_S2 = 3
         
         # Flux Ratios
         if constant_f:
@@ -1693,7 +1708,6 @@ class GravData():
                                     [cor_int_s2[1], cor_int_s2[2]],
                                     [cor_int_s2[1], cor_int_s2[3]],
                                     [cor_int_s2[2], cor_int_s2[3]]])   
-            
             vis = np.zeros((6,len(wave))) + 0j
             for i in range(0,6):
                 try:
@@ -1788,7 +1802,7 @@ class GravData():
                     intBG = self.vis_intensity_num(0, alpha_bg, wave, dlambda[i,:])
                 else:
                     raise ValueError('approx has to be approx, analytic or numeric')
-                    
+
                 vis[i,:] = ((intSgrA + np.sqrt(f_bl[i,0] * f_bl[i,1]) * intS2)/
                             (np.sqrt(intSgrA_center + f_bl[i,0] * intS2_center 
                                     + fluxRatioBG * intBG) *
@@ -1922,7 +1936,7 @@ class GravData():
         plot:           plot MCMC results [True]
         plotres:        plot fit result [True]
         createpdf:      Creates a pdf with fit results and all plots [True] 
-        writeresults:  Write fit results in file [True]
+        writeresults:   Write fit results in file [True]
         redchi2:        Gives redchi2 instead of chi2 [False]
         phasemaps:      Use Phasemaps for fit [False]
         interppm:       Interpolate Phasemaps [True]
@@ -3378,68 +3392,71 @@ class GravData():
         magu_as_model = np.sqrt(u_as_model**2.+v_as_model**2.)
         
         # Visamp 
-        for i in range(0,6):
-            plt.errorbar(magu_as[i,:], visamp[i,:]*(1-visamp_flag)[i],
-                         visamp_error[i,:]*(1-visamp_flag)[i],
-                         color=self.colors_baseline[i],ls='', lw=1, alpha=0.5, capsize=0)
-            plt.scatter(magu_as[i,:], visamp[i,:]*(1-visamp_flag)[i],
-                        color=self.colors_baseline[i], alpha=0.5, label=self.baseline_labels[i])
-            plt.plot(magu_as_model[i,:], model_visamp_full[i,:],
-                     color='k', zorder=100)
-        plt.ylabel('visibility modulus')
-        plt.ylim(-0.1,1.1)
-        plt.xlabel('spatial frequency (1/arcsec)')
-        plt.legend()
-        if createpdf:
-            savetime = self.savetime
-            plt.title('Polarization %i' % (idx + 1))
-            pdfname = '%s_pol%i_5.png' % (savetime, idx)
-            plt.savefig(pdfname)
-            plt.close()
-        else:
-            plt.show()
+        if self.fit_for[0]:
+            for i in range(0,6):
+                plt.errorbar(magu_as[i,:], visamp[i,:]*(1-visamp_flag)[i],
+                            visamp_error[i,:]*(1-visamp_flag)[i],
+                            color=self.colors_baseline[i],ls='', lw=1, alpha=0.5, capsize=0)
+                plt.scatter(magu_as[i,:], visamp[i,:]*(1-visamp_flag)[i],
+                            color=self.colors_baseline[i], alpha=0.5, label=self.baseline_labels[i])
+                plt.plot(magu_as_model[i,:], model_visamp_full[i,:],
+                        color='k', zorder=100)
+            plt.ylabel('visibility modulus')
+            plt.ylim(-0.1,1.1)
+            plt.xlabel('spatial frequency (1/arcsec)')
+            plt.legend()
+            if createpdf:
+                savetime = self.savetime
+                plt.title('Polarization %i' % (idx + 1))
+                pdfname = '%s_pol%i_5.png' % (savetime, idx)
+                plt.savefig(pdfname)
+                plt.close()
+            else:
+                plt.show()
         
         # Vis2
-        for i in range(0,6):
-            plt.errorbar(magu_as[i,:], vis2[i,:]*(1-vis2_flag)[i], 
-                         vis2_error[i,:]*(1-vis2_flag)[i], 
-                         color=self.colors_baseline[i],ls='', lw=1, alpha=0.5, capsize=0)
-            plt.scatter(magu_as[i,:], vis2[i,:]*(1-vis2_flag)[i],
-                        color=self.colors_baseline[i],alpha=0.5, label=self.baseline_labels[i])
-            plt.plot(magu_as_model[i,:], model_vis2_full[i,:],
-                     color='k', zorder=100)
-        plt.xlabel('spatial frequency (1/arcsec)')
-        plt.ylabel('visibility squared')
-        plt.ylim(-0.1,1.1)
-        plt.legend()
-        if createpdf:
-            plt.title('Polarization %i' % (idx + 1))
-            pdfname = '%s_pol%i_6.png' % (savetime, idx)
-            plt.savefig(pdfname)
-            plt.close()
-        else:
-            plt.show()
+        if self.fit_for[1]:        
+            for i in range(0,6):
+                plt.errorbar(magu_as[i,:], vis2[i,:]*(1-vis2_flag)[i], 
+                            vis2_error[i,:]*(1-vis2_flag)[i], 
+                            color=self.colors_baseline[i],ls='', lw=1, alpha=0.5, capsize=0)
+                plt.scatter(magu_as[i,:], vis2[i,:]*(1-vis2_flag)[i],
+                            color=self.colors_baseline[i],alpha=0.5, label=self.baseline_labels[i])
+                plt.plot(magu_as_model[i,:], model_vis2_full[i,:],
+                        color='k', zorder=100)
+            plt.xlabel('spatial frequency (1/arcsec)')
+            plt.ylabel('visibility squared')
+            plt.ylim(-0.1,1.1)
+            plt.legend()
+            if createpdf:
+                plt.title('Polarization %i' % (idx + 1))
+                pdfname = '%s_pol%i_6.png' % (savetime, idx)
+                plt.savefig(pdfname)
+                plt.close()
+            else:
+                plt.show()
         
         # T3
-        for i in range(0,4):
-            max_u_as_model = self.max_spf[i]/(wave_model*1.e-6) / rad2as
-            plt.errorbar(self.spFrequAS_T3[i,:], closure[i,:]*(1-closure_flag)[i],
-                         closure_error[i,:]*(1-closure_flag)[i],
-                         color=self.colors_closure[i],ls='', lw=1, alpha=0.5, capsize=0)
-            plt.scatter(self.spFrequAS_T3[i,:], closure[i,:]*(1-closure_flag)[i],
-                        color=self.colors_closure[i], alpha=0.5, label=self.closure_labels[i])
-            plt.plot(max_u_as_model, model_closure_full[i,:], 
-                     color='k', zorder=100)
-        plt.xlabel('spatial frequency of largest baseline in triangle (1/arcsec)')
-        plt.ylabel('closure phase (deg)')
-        plt.legend()
-        if createpdf:
-            plt.title('Polarization %i' % (idx + 1))
-            pdfname = '%s_pol%i_7.png' % (savetime, idx)
-            plt.savefig(pdfname)
-            plt.close()
-        else:
-            plt.show()
+        if self.fit_for[2]:        
+            for i in range(0,4):
+                max_u_as_model = self.max_spf[i]/(wave_model*1.e-6) / rad2as
+                plt.errorbar(self.spFrequAS_T3[i,:], closure[i,:]*(1-closure_flag)[i],
+                            closure_error[i,:]*(1-closure_flag)[i],
+                            color=self.colors_closure[i],ls='', lw=1, alpha=0.5, capsize=0)
+                plt.scatter(self.spFrequAS_T3[i,:], closure[i,:]*(1-closure_flag)[i],
+                            color=self.colors_closure[i], alpha=0.5, label=self.closure_labels[i])
+                plt.plot(max_u_as_model, model_closure_full[i,:], 
+                        color='k', zorder=100)
+            plt.xlabel('spatial frequency of largest baseline in triangle (1/arcsec)')
+            plt.ylabel('closure phase (deg)')
+            plt.legend()
+            if createpdf:
+                plt.title('Polarization %i' % (idx + 1))
+                pdfname = '%s_pol%i_7.png' % (savetime, idx)
+                plt.savefig(pdfname)
+                plt.close()
+            else:
+                plt.show()  
         
         # VisPhi
         if self.fit_for[3]:
@@ -3494,7 +3511,7 @@ class GravData():
     ##################################################################################
     ################################################################################## 
     
-    def simulateUnaryphases(self, dRa, dDec, specialfit=False, specialpar=None, plot=False, compare=True, uvind=False):
+    def simulateUnaryphases(self, dRa, dDec, alpha=None, specialfit=False, specialpar=None, plot=False, compare=True, uvind=False):
         """
         Test function to see how a given phasecenter shift would look like
         """
@@ -3517,9 +3534,15 @@ class GravData():
         wave = self.wlSC_P1
         self.getDlambda()
         dlambda = self.dlambda
-                
-        theta = [dRa, dDec, 0, 0, 0, 0, 0, 0, 0, specialpar]
+        
+        if alpha is not None:
+            theta = [dRa, dDec, alpha, 0, 0, 0, 0, 0, 0, specialpar]
+            self.fixedBH = False
+        else:
+            theta = [dRa, dDec, 0, 0, 0, 0, 0, 0, 0, specialpar]
+            self.fixedBH = True
         fit_visphi = self.calc_vis_unary(theta, u, v, wave, dlambda)
+        magu_as = self.spFrequAS
         
         if compare:
             visphi = self.visphiSC_P1[:6]
@@ -3539,7 +3562,6 @@ class GravData():
             #res_visphi = res_visphi_1*check + res_visphi_2*(1-check)
             chi2 = np.sum(res_visphi_1**2./visphi_error**2.*(1-visphi_flag))
             print(chi2)
-            return visphi
             
         else:
             if plot:
@@ -3549,15 +3571,6 @@ class GravData():
                     dlambda_model[i,:] = np.interp(wave_model, wave, dlambda[i,:])
                 model_visphi_full  = self.calc_vis_unary(theta, u, v, wave_model, dlambda_model)
                 
-                #magu = np.sqrt(u**2.+v**2.)
-                #u_as = np.zeros((len(u),len(wave)))
-                #v_as = np.zeros((len(v),len(wave)))
-                #for i in range(0,len(u)):
-                    #u_as[i,:] = u[i]/(wave*1.e-6) / rad2as
-                    #v_as[i,:] = v[i]/(wave*1.e-6) / rad2as
-                #magu_as = np.sqrt(u_as**2.+v_as**2.)
-                magu_as = self.spFrequAS
-
                 u_as_model = np.zeros((len(u),len(wave_model)))
                 v_as_model = np.zeros((len(v),len(wave_model)))
                 for i in range(0,len(u)):
@@ -3580,7 +3593,7 @@ class GravData():
                 plt.ylim(-maxplot, maxplot)
                 plt.suptitle('dRa=%.1f, dDec=%.1f' % (theta[0], theta[1]), fontsize=12)
                 plt.show()
-        return visphi
+        return magu_as, fit_visphi
         
     
     def calc_vis_unary(self, theta, u, v, wave, dlambda):
