@@ -778,13 +778,15 @@ class GravData():
     ############################################
     
     def createPhasemaps(self, nthreads=1, smooth=15, plot=True,
-                        zerfile='phasemap_zernike_20200817.npy'):
+                        zerfile='phasemap_zernike_20200907.npy'):
         print('Used file: %s' % zerfile)
         
         def phase_screen(A00, A1m1, A1p1, A2m2, A2p2, A20, A3m1, A3p1, A3m3, 
-                        A3p3, A4m2, A4p2, A4m4, A4p4, A40, B1m1=0., B1p1=0.,
-                        lam0=2.2, MFR=0.6308, stopB=8.0, stopS=0.96, 
-                        d1=8.0, dalpha=1., totN=1024, amax=100):
+                         A3p3, A4m2, A4p2, A4m4, A4p4, A40,  A5m1, A5p1, A5m3, 
+                         A5p3, A5m5, A5p5, A6m6, A6p6, A6m4, A6p4, A6m2, A6p2,
+                         A60, B1m1, B1p1, B20, B2m2, B2p2,
+                         lam0=2.2, MFR=0.6308, stopB=8.0, stopS=0.96, 
+                         d1=8.0, dalpha=1., totN=1024, amax=100):
             
             """
             Simulate phase screens taking into account static aberrations.
@@ -809,11 +811,28 @@ class GravData():
             12: A4m4 (float) : oblique quadrafoil
             13: A4p4 (float) : vertical quadrafoil
             14: A40  (float) : primary spherical
+            15: A5m1
+            16: A5p1
+            17: A5m3
+            18: A5p3
+            19: A5m5
+            20: A5p5
+            21: A6m6
+            22: A6p6
+            23: A6m4
+            24: A6p4
+            25: A6m2
+            26: A6p2
+            27: A60
 
-            * Fiber tilt (in the focal plane) shifts the fiber mode projected to 
-            * the image plane:
-            B1m1 (float) : missplacement of the fiber mode in u1-direction in meters
-            B1p1 (float) : missplacement of the fiber mode in u2-direction in meters
+            * Static aberrations in the focal plane
+            B1m1 (float) : missplacement of the fiber mode in u1-direction in 
+                           meters / Zernike coefficient if coefficients > B20 != 0
+            B1p1 (float) : missplacement of the fiber mode in u2-direction in 
+                           meters / Zernike coefficient if coefficients > B20 != 0
+            B20  (float) : defocuss
+            B2m2 (float) : vertical astigmatism
+            B2p2 (float) : horizontal astigmatism
 
             * optical system
             MFR (float)   : sigma of the fiber mode profile in units of dish radius
@@ -823,7 +842,8 @@ class GravData():
             * further parameters specify the output grid
             dalpha (float) : pixel width in the imaging plane in mas
             totN   (float) : total number of pixels in the pupil plane
-            lam0   (float) : wavelength at which the phase screen is computed in micro-meter
+            lam0   (float) : wavelength at which the phase screen is computed in 
+                             micro-meter
             d1     (float) : telescope to normalize Zernike RMS in m (UT=8.0, AT=1.82)
             amax   (float) : maximum off-axis distance in the maps returned
             
@@ -865,6 +885,19 @@ class GravData():
             if B1m1!=0 or B1p1!=0:
                 fiber = np.exp(-0.5*((u1-B1m1)**2 + (u2-B1p1)**2)/(MFR*d1/2.)**2)
             
+            # for higher-order focal plane aberrations we need to compute the fourier transform explicitly
+            if np.any([B20, B2m2, B2p2]!=0):
+                sigma_fib = lam0/d1/np.pi/MFR/mas
+                zernike = 0
+                zernike += B1m1*2*(aa/sigma_fib)*np.sin(t)
+                zernike += B1p1*2*(aa/sigma_fib)*np.cos(t)
+                zernike += B20 *np.sqrt(3.)*(2.*(aa/sigma_fib)**2 - 1)
+                zernike += B2m2*np.sqrt(6.)*(aa/sigma_fib)**2*np.sin(2.*t)
+                zernike += B2p2*np.sqrt(6.)*(aa/sigma_fib)**2*np.cos(2.*t)
+
+                fiber = np.exp(-0.5*(aa/sigma_fib)**2) * np.exp(2.*np.pi/lam0*1j*zernike*1e-6)
+                fiber = np.fft.fft2(fiber)
+
             #--- phase screens (pupil plane) ---#
             zernike  = A00
             zernike += A1m1*2*(2.*r/d1)*np.sin(t)
@@ -881,6 +914,19 @@ class GravData():
             zernike += A4m4*np.sqrt(10.)*(4.*(2.*r/d1)**4 -3.*(2.*r/d1)**2)*np.sin(2.*t)
             zernike += A4p4*np.sqrt(10.)*(4.*(2.*r/d1)**4 -3.*(2.*r/d1)**2)*np.cos(2.*t)
             zernike += A40*np.sqrt(5.)*(6.*(2.*r/d1)**4 - 6.*(2.*r/d1)**2 + 1)
+            zernike += A5m1*2.*np.sqrt(3.)*(10*(2.*r/d1)**5 - 12*(2.*r/d1)**3 + 3.*2.*r/d1)*np.sin(t)
+            zernike += A5p1*2.*np.sqrt(3.)*(10*(2.*r/d1)**5 - 12*(2.*r/d1)**3 + 3.*2.*r/d1)*np.cos(t)
+            zernike += A5m3*2.*np.sqrt(3.)*(5.*(2.*r/d1)**5 - 4.*(2.*r/d1)**3)*np.sin(3.*t)
+            zernike += A5p3*2.*np.sqrt(3.)*(5.*(2.*r/d1)**5 - 4.*(2.*r/d1)**3)*np.cos(3.*t)
+            zernike += A5m5*2.*np.sqrt(3.)*(2.*r/d1)**5*np.sin(5*t)
+            zernike += A5p5*2.*np.sqrt(3.)*(2.*r/d1)**5*np.cos(5*t)
+            zernike += A6m6*np.sqrt(14.)*(2.*r/d1)**6*np.sin(6.*t)
+            zernike += A6p6*np.sqrt(14.)*(2.*r/d1)**6*np.cos(6.*t)
+            zernike += A6m4*np.sqrt(14.)*(6.*(2.*r/d1)**6 - 5.*(2.*r/d1)**4)*np.sin(4.*t)
+            zernike += A6p4*np.sqrt(14.)*(6.*(2.*r/d1)**6 - 5.*(2.*r/d1)**4)*np.cos(4.*t)
+            zernike += A6m2*np.sqrt(14.)*(15.*(2.*r/d1)**6 - 20.*(2.*r/d1)**4 - 6.*(2.*r/d1)**2)*np.sin(2.*t)
+            zernike += A6p2*np.sqrt(14.)*(15.*(2.*r/d1)**6 - 20.*(2.*r/d1)**4 - 6.*(2.*r/d1)**2)*np.cos(2.*t)
+            zernike += A60*np.sqrt(7.)*(20.*(2.*r/d1)**6 - 30.*(2.*r/d1)**4 +12*(2.*r/d1)**2 - 1)
             
             phase = 2.*np.pi/lam0*zernike*1.e-6
 
