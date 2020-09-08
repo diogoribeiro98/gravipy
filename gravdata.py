@@ -1025,7 +1025,7 @@ class GravData():
                          [-np.sin(ang), np.cos(ang)]])
     
     
-    def loadPhasemaps(self, interp):
+    def loadPhasemaps(self, interp, tofits=False):
         smoothkernel = self.smoothkernel
         pm1_file = 'Phasemap_%s_%s_Smooth%i.npy' % (self.tel, self.resolution, smoothkernel)
         pm2_file = 'Phasemap_%s_%s_Smooth%i_denom.npy' % (self.tel, self.resolution, smoothkernel)
@@ -1033,7 +1033,7 @@ class GravData():
             pm1 = np.load(resource_filename('gravipy', pm1_file))
             pm2 = np.real(np.load(resource_filename('gravipy', pm2_file)))
         except FileNotFoundError:
-            raise ValueError('%s does not exist, you have to create the phsemap first!' % pm1_file)
+            raise ValueError('%s does not exist, you have to create the phasemap first!' % pm1_file)
 
         wave = self.wlSC
         if pm1.shape[0] != len(wave):
@@ -1047,6 +1047,20 @@ class GravData():
             for tel in range(4):
                 self.amp_map[wdx,tel] /= np.max(self.amp_map[wdx,tel])
                 self.amp_map_denom[wdx,tel] /= np.max(self.amp_map_denom[wdx,tel])
+                
+        if tofits:
+            primary_hdu = fits.PrimaryHDU()
+            hlist = [primary_hdu]
+            for tel in range(4):
+                hlist.append(fits.ImageHDU(self.amp_map[:,tel], 
+                                           name='SC_AMP UT%i' % (4-tel)))
+                hlist.append(fits.ImageHDU(self.pha_map[:,tel], 
+                                           name='SC_PHA UT%i' % (4-tel)))
+            hdul = fits.HDUList(hlist)
+            hdul.writeto(resource_filename('gravipy', 'testfits.fits'),
+                         overwrite=True)
+            print('Saving phasemaps as fits file to: %s' 
+                  % resource_filename('gravipy', 'testfits.fits'))
                 
         if interp:
             x = np.arange(201)
@@ -1126,6 +1140,7 @@ class GravData():
                     cor_amp[tel, wdx] = self.amp_map[wdx,tel][pos_int[0],pos_int[1]]
                     cor_pha[tel, wdx] = self.pha_map[wdx,tel][pos_int[0],pos_int[1]]
                     cor_int_denom[tel, wdx] = self.amp_map_denom[wdx,tel][pos_int[0],pos_int[1]]
+
         if givepos:
             return pm_pos
         else:
