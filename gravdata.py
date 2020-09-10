@@ -1822,9 +1822,9 @@ class GravData():
                 
                 vis[i,:] = ((intSgrA + 
                             np.sqrt(f_bl[i,0] * f_bl[i,1] * cr1 * cr2) * intS2)/
-                            (np.sqrt(intSgrA_center + f_bl[i,0] * cr1 * intS2_center 
+                            (np.sqrt(intSgrA_center + f_bl[i,0] * cr_denom1 * intS2_center 
                                     + fluxRatioBG * intBG) *
-                             np.sqrt(intSgrA_center + f_bl[i,1] * cr2 * intS2_center 
+                             np.sqrt(intSgrA_center + f_bl[i,1] * cr_denom2 * intS2_center 
                                     + fluxRatioBG * intBG)))  
 
         else:
