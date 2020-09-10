@@ -777,7 +777,7 @@ class GravData():
     ############################################
     ############################################
     
-    def createPhasemaps(self, nthreads=1, smooth=15, plot=True,
+    def createPhasemaps(self, nthreads=1, smooth=19, plot=True,
                         zerfile='phasemap_zernike_20200907.npy'):
         print('Used file: %s' % zerfile)
         
@@ -941,8 +941,8 @@ class GravData():
         wave = self.wlSC
         
         if self.tel == 'UT':
-            stopB=8.0
-            stopS=0.96
+            stopB=10.0
+            stopS=0.
             dalpha=1
             totN=1024
             d = 8
@@ -957,6 +957,9 @@ class GravData():
         kernel = Gaussian2DKernel(x_stddev=smooth)
          
         print('Creating phasemaps:')
+        print('StopB : %.1f' % stopB)
+        print('StopS : %.1f' % stopS)
+        print('Smooth: %.1f' % smooth)
         if nthreads == 1:
             all_pm = np.zeros((len(wave), 4, 201, 201),
                             dtype=np.complex_)
