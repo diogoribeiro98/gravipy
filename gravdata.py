@@ -1733,7 +1733,7 @@ class GravData():
             wave = wave2
             for ddx in range(6):
                 dlambda[ddx] = dlambda2
-            
+
             
             
             print('using Franks wavelengths')
