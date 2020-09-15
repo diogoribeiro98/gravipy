@@ -1721,6 +1721,25 @@ class GravData():
                          [f[2],f[0]],
                          [f[1],f[0]]])
         
+        
+        if self.frankwave == True:
+            wave2 = np.array([1.99999999e-06, 2.03700006e-06, 2.07399989e-06, 2.11099996e-06,
+                                2.14800002e-06, 2.18500008e-06, 2.22199992e-06, 2.25899998e-06,
+                                2.29600005e-06, 2.33300011e-06, 2.36999995e-06, 2.40700001e-06,
+                                2.44400007e-06, 2.48099991e-06])*1e6
+            dlambda2 = np.array([0.03523 , 0.06215 , 0.0671  , 0.0639  , 0.06275 , 0.06725 ,
+                                 0.07115 , 0.0666  , 0.06175 , 0.05825 , 0.0579  , 0.05785 ,
+                                 0.056   , 0.047985])
+            wave = wave2
+            for ddx in range(6):
+                dlambda[ddx] = dlambda2
+            
+            
+            
+            print('using Franks wavelengths')
+        
+        
+        
         if phasemaps:
             cor_amp_sgr, cor_pha_sgr, cor_int_sgr = self.readPhasemaps(phaseCenterRA,
                                                                        phaseCenterDEC,
@@ -2827,6 +2846,8 @@ class GravData():
         fixpos = self.fixpos
         fixedBH = self.fixedBH
         approx = self.approx
+        fixS29 = self.fixS29
+        donotfit = self.donotfit
 
         if fixpos:
             dRA = self.fiberOffX
@@ -2835,10 +2856,32 @@ class GravData():
             dRA = theta[0]
             dDEC = theta[1]
         fluxRatio = theta[2]
+        f = 10**fluxRatio
         
         dRA2 = theta[3]
         dDEC2 = theta[4]
-        fluxRatio2 = theta[5]
+        if not fixS29:
+            fluxRatio2 = theta[5]
+            f2 = 10**fluxRatio2
+        else:
+            # Get S29 flux ratio from s2/sgra* flux ratio
+            s2_fr = 10**fluxRatio                   # s2/sgra incl. fiber coupling
+            if donotfit:
+                print('s2/sgra incl. fiber coupling: %.3f' % s2_fr)
+            s2_pos = np.array([dRA, dDEC])
+            fiber_coup_s2 = np.exp(-1*(2*np.pi*np.sqrt(np.sum(s2_pos**2))/280)**2)
+            s2_fr = s2_fr / fiber_coup_s2              # s2/sgra w/o fiber coupling
+            if donotfit:
+                print('s2/sgra w/o fiber coupling: %.3f' % s2_fr)
+            
+            f1_fr = 10**(-(18.7-14.1)/2.5)*s2_fr    # s29/sgra w/o fiber coupling
+            if donotfit:
+                print('s29/sgra w/o fiber coupling: %.3f' % f1_fr)
+            f1_pos = np.array([dRA2, dDEC2])
+            fiber_coup_f1 = np.exp(-1*(2*np.pi*np.sqrt(np.sum(f1_pos**2))/280)**2)
+            f2 = f1_fr * fiber_coup_f1         # s29/sgra incl. fiber coupling
+            if donotfit:
+                print('s29/sgra incl. fiber coupling: %.3f' % f2)
         
         if fixedBH:
             alpha_SgrA = -0.5
@@ -2859,8 +2902,6 @@ class GravData():
             pc_DEC = theta[10]
         alpha_S = 3
         
-        f = 10**fluxRatio
-        f2 = 10**fluxRatio2
         
         vis = np.zeros((6,len(wave))) + 0j
         for i in range(0,6):
@@ -2928,7 +2969,6 @@ class GravData():
     def fitTriple(self, 
                   dRA2, 
                   dDEC2, 
-                  fr2,
                   nthreads=4, 
                   nwalkers=500, 
                   nruns=500,
@@ -2940,6 +2980,7 @@ class GravData():
                   donotfittheta=None, 
                   onlypol1=False, 
                   initial=None,
+                  fixS29=False,
                   dRA=0., 
                   dDEC=0., 
                   dphRA=0.1, 
@@ -2959,7 +3000,6 @@ class GravData():
         Parameter:
         dRA2:           Initial guess for position of 3rd source
         dDEC2:          Initial guess for position of 3rd source 
-        fr2:            Initial guess for flux ratio of 3rd source
         
         nthreads:       number of cores [4] 
         nwalkers:       number of walkers [500] 
@@ -2994,6 +3034,8 @@ class GravData():
         self.fixpos = fixpos
         self.fixedBH = fixedBH
         self.approx = approx
+        self.fixS29 = fixS29
+        self.donotfit = donotfit
         rad2as = 180 / np.pi * 3600
         
         nwave = self.channel
@@ -3037,8 +3079,8 @@ class GravData():
             dDEC_init = np.array([initial[1],initial[1]-size,initial[1]+size])
             flux_ratio_init = np.array([np.log10(initial[2]), np.log10(0.01), np.log10(100.)])
 
-            dRA2_init = np.array([initial[3],initial[0]-size,initial[0]+size])
-            dDEC2_init = np.array([initial[4],initial[1]-size,initial[1]+size])
+            dRA2_init = np.array([initial[3],initial[3]-size,initial[3]+size])
+            dDEC2_init = np.array([initial[4],initial[4]-size,initial[4]+size])
             flux_ratio2_init = np.array([np.log10(initial[5]), np.log10(0.01), np.log10(100.)])
 
             alpha_SgrA_init = np.array([initial[6],-5.,7.])
@@ -3059,7 +3101,7 @@ class GravData():
 
             fr_start = np.log10(0.1)
             flux_ratio_init = np.array([fr_start, np.log10(0.01), np.log10(100.)])
-            fr2_start = np.log10(fr2)
+            fr2_start = np.log10(0.1)
             flux_ratio2_init = np.array([fr2_start, np.log10(0.01), np.log10(100.)])
 
             alpha_SgrA_init = np.array([-1.,-10.,10.])
@@ -3081,7 +3123,7 @@ class GravData():
                                 dRA2_init[1], dDEC2_init[1], flux_ratio2_init[1],
                                 alpha_SgrA_init[1], flux_ratio_bg_init[1], color_bg_init[1], 
                                 phase_center_RA_init[1], phase_center_DEC_init[1]])
-
+        
         # upper limit on fit parameters 
         theta_upper = np.array([dRA_init[2], dDEC_init[2], flux_ratio_init[2],
                                 dRA2_init[2], dDEC2_init[2], flux_ratio2_init[2],
@@ -3094,12 +3136,15 @@ class GravData():
         theta_names_raw = np.array(["dRA", "dDEC", "fr", "dRA2", "dDEC2", "fr2",
                                     "alpha flare", "f BG", "alpha BG", "PC RA", "PC DEC"])
         
-
         ndim = len(theta)
         todel = []
         if fixpos:
             todel.append(0)
             todel.append(1)
+        if fixS29:
+            todel.append(3)
+            todel.append(4)
+            todel.append(5)
         if fixedBH:
             todel.append(6)
         if fixedBG:
@@ -3117,9 +3162,11 @@ class GravData():
                 raise ValueError('donotfittheta has to have %i parameters, see above' % ndim)
             if plot:
                 raise ValueError('If donotfit is True, cannot create MCMC plots')
-            if writeresults or createpdf:
-                raise ValueError('If donotfit is True, writeresults and createpdf should be False')
+            if createpdf:
+                raise ValueError('If donotfit is True, createpdf should be False')
             print('Will not fit the data, just print out the results for the given theta')
+            donotfittheta[2] = np.log10(donotfittheta[2])
+            donotfittheta[5] = np.log10(donotfittheta[5])
             
         # Get data
         if self.polmode == 'SPLIT':
