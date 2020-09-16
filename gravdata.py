@@ -777,8 +777,8 @@ class GravData():
     ############################################
     ############################################
     
-    def createPhasemaps(self, nthreads=1, smooth=19, plot=True,
-                        zerfile='phasemap_zernike_20200907.npy'):
+    def createPhasemaps(self, nthreads=1, smooth=15, plot=True,
+                        zerfile='phasemap_zernike_20200914.npy'):
         print('Used file: %s' % zerfile)
         
         def phase_screen(A00, A1m1, A1p1, A2m2, A2p2, A20, A3m1, A3p1, A3m3, 
@@ -941,8 +941,8 @@ class GravData():
         wave = self.wlSC
         
         if self.tel == 'UT':
-            stopB=10.0
-            stopS=0.
+            stopB=8.0
+            stopS=0.96
             dalpha=1
             totN=1024
             d = 8
