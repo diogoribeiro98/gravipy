@@ -2046,6 +2046,10 @@ class GravData():
         '''
         if self.resolution != 'LOW' and flagtill == 3 and flagfrom == 13:
             raise ValueError('Initial values for flagtill and flagfrom have to be changed if not low resolution')
+        
+        self.frankwave = False
+        
+        
         self.fit_for = fit_for
         self.constant_f = constant_f
         self.use_opds = use_opds
