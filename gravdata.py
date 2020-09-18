@@ -884,20 +884,22 @@ class GravData():
             fiber = np.exp(-0.5*(r/(MFR*d1/2.))**2)
             if B1m1!=0 or B1p1!=0:
                 fiber = np.exp(-0.5*((u1-B1m1)**2 + (u2-B1p1)**2)/(MFR*d1/2.)**2)
-            
+
             # for higher-order focal plane aberrations we need to compute the fourier transform explicitly
             if np.any([B20, B2m2, B2p2]!=0):
                 sigma_fib = lam0/d1/np.pi/MFR/mas
+                sigma_ref = 2.2e-6/d1/np.pi/MFR/mas
                 zernike = 0
-                zernike += B1m1*2*(aa/sigma_fib)*np.sin(t)
-                zernike += B1p1*2*(aa/sigma_fib)*np.cos(t)
-                zernike += B20 *np.sqrt(3.)*(2.*(aa/sigma_fib)**2 - 1)
-                zernike += B2m2*np.sqrt(6.)*(aa/sigma_fib)**2*np.sin(2.*t)
-                zernike += B2p2*np.sqrt(6.)*(aa/sigma_fib)**2*np.cos(2.*t)
+                zernike += B1m1*2*(aa/sigma_ref)*np.sin(t)
+                zernike += B1p1*2*(aa/sigma_ref)*np.cos(t)
+                zernike += B20 *np.sqrt(3.)*(2.*(aa/sigma_ref)**2 - 1)
+                zernike += B2m2*np.sqrt(6.)*(aa/sigma_ref)**2*np.sin(2.*t)
+                zernike += B2p2*np.sqrt(6.)*(aa/sigma_ref)**2*np.cos(2.*t)
 
                 fiber = np.exp(-0.5*(aa/sigma_fib)**2) * np.exp(2.*np.pi/lam0*1j*zernike*1e-6)
                 fiber = np.fft.fft2(fiber)
 
+            
             #--- phase screens (pupil plane) ---#
             zernike  = A00
             zernike += A1m1*2*(2.*r/d1)*np.sin(t)
@@ -927,6 +929,7 @@ class GravData():
             zernike += A6m2*np.sqrt(14.)*(15.*(2.*r/d1)**6 - 20.*(2.*r/d1)**4 - 6.*(2.*r/d1)**2)*np.sin(2.*t)
             zernike += A6p2*np.sqrt(14.)*(15.*(2.*r/d1)**6 - 20.*(2.*r/d1)**4 - 6.*(2.*r/d1)**2)*np.cos(2.*t)
             zernike += A60*np.sqrt(7.)*(20.*(2.*r/d1)**6 - 30.*(2.*r/d1)**4 +12*(2.*r/d1)**2 - 1)
+
             
             phase = 2.*np.pi/lam0*zernike*1.e-6
 
@@ -1140,9 +1143,9 @@ class GravData():
                     cor_int_denom[tel, wdx] = self.amp_map_denom_int[wdx, tel](pos_rot[0], pos_rot[1])
                 else:
                     pos_int = np.round(pos_rot).astype(int)
-                    cor_amp[tel, wdx] = self.amp_map[wdx,tel][pos_int[0],pos_int[1]]
-                    cor_pha[tel, wdx] = self.pha_map[wdx,tel][pos_int[0],pos_int[1]]
-                    cor_int_denom[tel, wdx] = self.amp_map_denom[wdx,tel][pos_int[0],pos_int[1]]
+                    cor_amp[tel, wdx] = self.amp_map[wdx,tel][pos_int[1],pos_int[0]]
+                    cor_pha[tel, wdx] = self.pha_map[wdx,tel][pos_int[1],pos_int[0]]
+                    cor_int_denom[tel, wdx] = self.amp_map_denom[wdx,tel][pos_int[1],pos_int[0]]
 
         if givepos:
             return pm_pos
