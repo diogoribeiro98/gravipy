@@ -778,7 +778,7 @@ class GravData():
     ############################################
     
     def createPhasemaps(self, nthreads=1, smooth=10, plot=True,
-                        zerfile='phasemap_zernike_20200917_diff.npy'):
+                        zerfile='phasemap_zernike_20200918_diff.npy'):
         print('Used file: %s' % zerfile)
         
         def phase_screen(A00, A1m1, A1p1, A2m2, A2p2, A20, A3m1, A3p1, A3m3, 
@@ -960,9 +960,9 @@ class GravData():
         kernel = Gaussian2DKernel(x_stddev=smooth)
          
         print('Creating phasemaps:')
-        print('StopB : %.1f' % stopB)
-        print('StopS : %.1f' % stopS)
-        print('Smooth: %.1f' % smooth)
+        print('StopB : %.2f' % stopB)
+        print('StopS : %.2f' % stopS)
+        print('Smooth: %.2f' % smooth)
         if nthreads == 1:
             all_pm = np.zeros((len(wave), 4, 201, 201),
                             dtype=np.complex_)
