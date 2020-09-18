@@ -960,9 +960,9 @@ class GravData():
         kernel = Gaussian2DKernel(x_stddev=smooth)
          
         print('Creating phasemaps:')
-        print('StopB : %.1f' % stopB)
-        print('StopS : %.1f' % stopS)
-        print('Smooth: %.1f' % smooth)
+        print('StopB : %.2f' % stopB)
+        print('StopS : %.2f' % stopS)
+        print('Smooth: %.2f' % smooth)
         if nthreads == 1:
             all_pm = np.zeros((len(wave), 4, 201, 201),
                             dtype=np.complex_)
