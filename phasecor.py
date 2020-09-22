@@ -1158,6 +1158,7 @@ class GravPhaseNight():
         """
         self.night = night
         self.ndit = ndit
+        self.verbose = verbose
         
         nights = ['2019-03-27',
                 '2019-03-28',
@@ -1210,7 +1211,8 @@ class GravPhaseNight():
                     ] 
         try:
             self.calibrator = calibrators[nights.index(night)]
-            print('Night: %s, Calibrator: %s' % (night, self.calibrator))
+            if self.verbose:
+                print('Night: %s, Calibrator: %s' % (night, self.calibrator))
         except ValueError:
             print('Night is not available, try one of those:')
             print(nights)
@@ -1222,7 +1224,8 @@ class GravPhaseNight():
             self.folder = '/data/user/forFrank2/' + night + '/reduced_PL20200513_1frame'
         else:
             raise ValueError('Ndit has to be 1 or 32')
-        print('Use data from: %s' % self.folder)
+        if self.verbose:
+            print('Use data from: %s' % self.folder)
         self.bl_array = np.array([[0,1],
                             [0,2],
                             [0,3],
@@ -1278,31 +1281,42 @@ class GravPhaseNight():
                     if -640 > sobjy or sobjy > -590:
                         continue
                     sg_files.append(file)
-        print('%i SGRA , %i S2 files found' % (len(sg_files), len(s2_files)))
+        if self.verbose:
+            print('%i SGRA , %i S2 files found' % (len(sg_files), len(s2_files)))
         self.s2_files = s2_files
         self.sg_files = sg_files
         
-        corrections_dict = get_corrections(bequiet=True)
-        try:
-            interp_list = corrections_dict[mode]
-        except KeyError:
-            print('mode not avialable, use one of those:')
-            print(corrections_dict.keys())
-            raise KeyError
+        if isinstance(mode, str):
+            corrections_dict = get_corrections(bequiet=True)
+            try:
+                interp_list = corrections_dict[mode]
+            except KeyError:
+                print('mode not avialable, use one of those:')
+                print(corrections_dict.keys())
+                raise KeyError
 
-        if 'lst' in mode:
-            lst_corr = True
-            if ndit == 1:
-                raise ValueError('Ndit 1 and lst correction is not implemented properly')
-            print('Apply LST correction')
-        else:
-            lst_corr = False
+            if 'lst' in mode:
+                lst_corr = True
+                if ndit == 1:
+                    raise ValueError('Ndit 1 and lst correction is not implemented properly')
+                print('Apply LST correction')
+            else:
+                lst_corr = False
 
-        if 'bl' in mode:
-            bl_corr = True
-            print('Apply BL correction')
+            if 'bl' in mode:
+                bl_corr = True
+                print('Apply BL correction')
+            else:
+                bl_corr = False
         else:
-            bl_corr = False        
+            if len(mode) == 4:
+                bl_corr = False
+                lst_corr = False
+                interp_list = mode
+                if self.verbose:
+                    print('using the interpolations given in input')
+            else:
+                raise ValueError('If interpolations are given mode has to be a list of four')
             
         ################
         # read in al necessary data
@@ -1684,8 +1698,9 @@ class GravPhaseNight():
                 print('PosCor failed')
                 dS = [0,0]
 
-            print('Applied poscor: (%.3f,%.3f) mas ' % (dS[0], dS[1]))
-            print('Chi2 of poscor: %.2f \n' % np.sum(f(dS)**2))
+            if self.verbose:
+                print('Applied poscor: (%.3f,%.3f) mas ' % (dS[0], dS[1]))
+                print('Chi2 of poscor: %.2f \n' % np.sum(f(dS)**2))
 
             if plot:
                 n = nfiles
@@ -1840,7 +1855,7 @@ class GravPhaseNight():
             return self.alldata
         
         
-    def fit_night_1src(self, plot=True, plotfits=False, fitcut=2):
+    def fit_night_1src(self, plot=True, plotfits=False, ret_flux=True, fitcut=2):
         """
         Fit a pointsource model to all data from the night
         """
@@ -1888,19 +1903,20 @@ class GravPhaseNight():
 
         sg_flux = []
         for fdx, file in enumerate(sg_files):
-            header = self.sg_header[fdx]
-            obsdate = header['DATE-OBS']
-            try:
-                p1 = np.mean(self.pand["flux p1 [%S2]"].loc[self.pand['DATE-OBS'] == obsdate])
-                p2 = np.mean(self.pand["flux p2 [%S2]"].loc[self.pand['DATE-OBS'] == obsdate])
-            except AttributeError:
-                print('Read in pandas')
-                pandasfile = resource_filename('gravipy', 'GRAVITY_DATA_2019_4_frame.object')
-                self.pand = pd.read_pickle(pandasfile)
-                p1 = np.mean(self.pand["flux p1 [%S2]"].loc[self.pand['DATE-OBS'] == obsdate])
-                p2 = np.mean(self.pand["flux p2 [%S2]"].loc[self.pand['DATE-OBS'] == obsdate])
-            sg_fr = (p1+p2)/2
-            sg_flux.append(sg_fr)
+            if ret_flux or plot:
+                header = self.sg_header[fdx]
+                obsdate = header['DATE-OBS']
+                try:
+                    p1 = np.mean(self.pand["flux p1 [%S2]"].loc[self.pand['DATE-OBS'] == obsdate])
+                    p2 = np.mean(self.pand["flux p2 [%S2]"].loc[self.pand['DATE-OBS'] == obsdate])
+                except AttributeError:
+                    print('Read in pandas')
+                    pandasfile = resource_filename('gravipy', 'GRAVITY_DATA_2019_4_frame.object')
+                    self.pand = pd.read_pickle(pandasfile)
+                    p1 = np.mean(self.pand["flux p1 [%S2]"].loc[self.pand['DATE-OBS'] == obsdate])
+                    p2 = np.mean(self.pand["flux p2 [%S2]"].loc[self.pand['DATE-OBS'] == obsdate])
+                sg_fr = (p1+p2)/2
+                sg_flux.append(sg_fr)
 
             for dit in range(ndit):
                 u = sg_u_raw[fdx, dit*6:(dit+1)*6]
@@ -1957,7 +1973,10 @@ class GravPhaseNight():
 
         fitres = [[sg_t, sg_ra_p1, sg_de_p1, sg_ra_p2, sg_de_p2],
                   [s2_t, s2_ra_p1, s2_de_p1, s2_ra_p2, s2_de_p2]]
-        return sg_flux, fitres
+        if ret_flux:
+            return sg_flux, fitres
+        else:
+            return fitres
 
 
     def fit_night_3src(self, plot=True, plotfits=False, phasemaps=False, fitcut=2):
