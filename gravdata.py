@@ -778,7 +778,7 @@ class GravData():
     ############################################
     
     def createPhasemaps(self, nthreads=1, smooth=10, plot=True,
-                        zerfile='phasemap_zernike_20200918_diff.npy'):
+                        zerfile='phasemap_zernike_20200922_diff.npy'):
         print('Used file: %s' % zerfile)
         
         def phase_screen(A00, A1m1, A1p1, A2m2, A2p2, A20, A3m1, A3p1, A3m3, 
