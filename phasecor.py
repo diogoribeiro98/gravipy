@@ -93,67 +93,6 @@ def get_angle_header_mean(header, tel):
     angle = fangle + parang + 45.
     return (angle-180)%360
 
-
-#########################
-# Fitting functions
-
-def pointsource(uv, wave, x, y, mask=1, flatten=True):
-    mas2rad = 1e-3 / 3600 / 180 * np.pi
-    u = uv[0]
-    v = uv[1]
-    x_uas = x*mas2rad*1e6
-    y_uas = y*mas2rad*1e6
-    phi = np.zeros((6, len(wave)))
-    for wdx in range(len(wave)):
-        phi[:,wdx] = (u*x_uas + v*y_uas)/wave[wdx]
-    visphi = np.angle(np.exp(-2*np.pi*1j*phi), deg=True)
-    if flatten:
-        return visphi.flatten()[mask]
-    else:
-        return visphi
-
-def fit_pointsource(u,v,wave,visphi,visphierr,plot=False):
-    uv = [u.flatten(),v.flatten()]
-    visphif = visphi.flatten()
-    visphierrf = visphierr.flatten()
-    mask = ~np.isnan(visphif) * ~np.isnan(visphierrf)
-    popt, pcov = optimize.curve_fit(lambda uv, x, y: pointsource(uv, wave, x, y, mask),
-                                    uv, visphif[mask], sigma=visphierrf[mask],
-                                    bounds=(-10,10))
-    
-    if plot:
-        rad2as = 180 / np.pi * 3600
-        wave_model = np.linspace(wave[0],wave[len(wave)-1],1000)
-        u_as = np.zeros((len(u),len(wave)))
-        v_as = np.zeros((len(v),len(wave))) 
-        u_as_model = np.zeros((len(u),len(wave_model)))
-        v_as_model = np.zeros((len(v),len(wave_model)))
-        for i in range(0,len(u)):
-            u_as[i,:] = u[i]/(wave*1.e-6) / rad2as
-            v_as[i,:] = v[i]/(wave*1.e-6) / rad2as
-            u_as_model[i,:] = u[i]/(wave_model*1.e-6) / rad2as
-            v_as_model[i,:] = v[i]/(wave_model*1.e-6) / rad2as
-        magu_as_model = np.sqrt(u_as_model**2.+v_as_model**2.)
-        magu_as = np.sqrt(u_as**2.+v_as**2.)   
-        
-        model_visphi = pointsource(uv, wave_model, popt[0], popt[1], mask=1, flatten=False)
-        
-        for i in range(0,6):
-            plt.errorbar(magu_as[i,:], visphi[i,:], visphierr[i,:], 
-                         label=baseline[i], color=colors_baseline[i], 
-                         ls='', lw=1, alpha=0.5, capsize=0)
-            plt.scatter(magu_as[i,:], visphi[i,:],
-                        color=colors_baseline[i], alpha=0.5)
-            plt.plot(magu_as_model[i,:], model_visphi[i,:],
-                    color='k', zorder=100)
-        plt.ylabel('visibility phase [deg]')
-        plt.xlabel('spatial frequency [1/arcsec]')
-        plt.show()
-    return popt
-
-
-
-
 def rotation(ang):
     return np.array([[np.cos(ang), np.sin(ang)],
                      [-np.sin(ang), np.cos(ang)]])
@@ -167,272 +106,6 @@ def convert_date(date):
     date = date.split('.')[0]
     date = datetime.strptime(date, '%Y-%m-%d %H:%M:%S')
     return date_decimal, date
-
-def vis_intensity_approx(s, alpha, lambda0, dlambda):
-    """
-    Approximation for Modulated interferometric intensity
-    s:      B*skypos-opd1-opd2
-    alpha:  power law index
-    lambda0:zentral wavelength
-    dlambda:size of channels 
-    """
-    x = 2*s*dlambda/lambda0**2.
-    sinc = np.sinc(x/np.pi)
-    return (lambda0/2.2)**(-1-alpha)*2*dlambda*sinc*np.exp(-2.j*np.pi*s/lambda0)
-
-
-def threesource(uv, wave, dlambda, sources, x, y, mask=1,
-                alpha_SgrA=-0.5,alpha_S=3, alpha_bg=3, 
-                fluxRatioBG=0, flatten=True):
-    mas2rad = 1e-3 / 3600 / 180 * np.pi
-    u = uv[0]
-    v = uv[1]
-    
-    s2_pos, s2_fr, f1_pos, f1_fr, cor = sources
-    cor_amp_s2, cor_pha_s2, cor_amp_f1, cor_pha_f1 = cor
-    
-    
-    pm_amp_f1 = np.array([[cor_amp_f1[0], cor_amp_f1[1]],
-                            [cor_amp_f1[0], cor_amp_f1[2]],
-                            [cor_amp_f1[0], cor_amp_f1[3]],
-                            [cor_amp_f1[1], cor_amp_f1[2]],
-                            [cor_amp_f1[1], cor_amp_f1[3]],
-                            [cor_amp_f1[2], cor_amp_f1[3]]])
-    pm_pha_f1 = np.array([[cor_pha_f1[0], cor_pha_f1[1]],
-                            [cor_pha_f1[0], cor_pha_f1[2]],
-                            [cor_pha_f1[0], cor_pha_f1[3]],
-                            [cor_pha_f1[1], cor_pha_f1[2]],
-                            [cor_pha_f1[1], cor_pha_f1[3]],
-                            [cor_pha_f1[2], cor_pha_f1[3]]])
-    pm_amp_s2 = np.array([[cor_amp_s2[0], cor_amp_s2[1]],
-                            [cor_amp_s2[0], cor_amp_s2[2]],
-                            [cor_amp_s2[0], cor_amp_s2[3]],
-                            [cor_amp_s2[1], cor_amp_s2[2]],
-                            [cor_amp_s2[1], cor_amp_s2[3]],
-                            [cor_amp_s2[2], cor_amp_s2[3]]])
-    pm_pha_s2 = np.array([[cor_pha_s2[0], cor_pha_s2[1]],
-                            [cor_pha_s2[0], cor_pha_s2[2]],
-                            [cor_pha_s2[0], cor_pha_s2[3]],
-                            [cor_pha_s2[1], cor_pha_s2[2]],
-                            [cor_pha_s2[1], cor_pha_s2[3]],
-                            [cor_pha_s2[2], cor_pha_s2[3]]])
-
-    vis = np.zeros((6,len(wave))) + 0j
-    for i in range(0,6):
-        s_SgrA = ((x)*u[i] + (y)*v[i]) * mas2rad * 1e6
-        s_S2 = ((s2_pos[0]+x)*u[i] + (s2_pos[1]+y)*v[i]) * mas2rad * 1e6
-        s_F1 = ((f1_pos[0]+x)*u[i] + (f1_pos[1]+y)*v[i]) * mas2rad * 1e6
-        
-        opd_f1 = (pm_pha_f1[i,0] - pm_pha_f1[i,1])/360*wave
-        opd_s2 = (pm_pha_s2[i,0] - pm_pha_s2[i,1])/360*wave
-        s_F1 -= opd_f1
-        s_S2 -= opd_s2
-        
-        cr1_s2 = pm_amp_s2[i,0]
-        cr2_s2 = pm_amp_s2[i,1]
-        cr1_f1 = pm_amp_f1[i,0]
-        cr2_f1 = pm_amp_f1[i,1]
-        
-        intSgrA = vis_intensity_approx(s_SgrA, alpha_SgrA, wave, dlambda)
-        intSgrA_center = vis_intensity_approx(0, alpha_SgrA, wave, dlambda)
-
-        intS2 = vis_intensity_approx(s_S2, alpha_S, wave, dlambda)
-        intS2_center = vis_intensity_approx(0, alpha_S, wave, dlambda)
-
-        intF1 = vis_intensity_approx(s_F1, alpha_S, wave, dlambda)
-        intF1_center = vis_intensity_approx(0, alpha_S, wave, dlambda)
-
-        intBG = vis_intensity_approx(0, alpha_bg, wave, dlambda)
-
-        vis[i,:] = ((intSgrA + cr1_f1*cr2_f1*f1_fr*intF1 + cr1_s2*cr2_s2*s2_fr*intS2)/
-                    (intSgrA_center + cr1_f1*cr2_f1*f1_fr*intF1_center + 
-                     cr1_s2*cr2_s2*s2_fr*intS2_center + fluxRatioBG*intBG))
-    visphi = np.angle(vis, deg=True)
-    visphi = visphi + 360.*(visphi<-180.) - 360.*(visphi>180.)  
-
-    if flatten:
-        return visphi.flatten()[mask]
-    else:
-        return visphi
-    
-    
-def fit_threesource(u, v, wave, dlambda, visphi, visphierr, header, sg_fr, phasemaps=False, plot=False):
-    uv = [u.flatten(),v.flatten()]
-    visphif = visphi.flatten()
-    visphierrf = visphierr.flatten()
-    mask = ~np.isnan(visphif) * ~np.isnan(visphierrf)
-
-    obsdate = header['DATE-OBS']
-    ddate = convert_date(obsdate)[0]
-    orbitfile = resource_filename('gravipy', 's2_orbit_082020.txt')
-    orbit = np.genfromtxt(orbitfile)
-    s2_pos = orbit[find_nearest(orbit[:,0], ddate)][1:]*1000
-    s2_fr = 1/sg_fr
-    
-    f1_pos = np.array([-18.78, 19.80])
-    f1_fr = 10**(-(18.7-14.1)/2.5)*s2_fr
-    
-    if phasemaps:
-        northangle1 = header['ESO QC ACQ FIELD1 NORTH_ANGLE']/180*math.pi
-        northangle2 = header['ESO QC ACQ FIELD2 NORTH_ANGLE']/180*math.pi
-        northangle3 = header['ESO QC ACQ FIELD3 NORTH_ANGLE']/180*math.pi
-        northangle4 = header['ESO QC ACQ FIELD4 NORTH_ANGLE']/180*math.pi
-        northangle = [northangle1, northangle2, northangle3, northangle4]
-        ddec1 = header['ESO QC MET SOBJ DDEC1']
-        ddec2 = header['ESO QC MET SOBJ DDEC2']
-        ddec3 = header['ESO QC MET SOBJ DDEC3']
-        ddec4 = header['ESO QC MET SOBJ DDEC4']
-        ddec = [ddec1, ddec2, ddec3, ddec4]
-        dra1 = header['ESO QC MET SOBJ DRA1']
-        dra2 = header['ESO QC MET SOBJ DRA2']
-        dra3 = header['ESO QC MET SOBJ DRA3']
-        dra4 = header['ESO QC MET SOBJ DRA4']
-        dra = [dra1, dra2, dra3, dra4]
-        
-        pmfile = resource_filename('gravipy', 'GRAVITY_SC_MAP_20200306_SM45.fits')
-        phasemaps = fits.open(pmfile)
-        pm_amp = phasemaps['SC_AMP'].data
-        pm_pha = phasemaps['SC_PHASE'].data
-
-        x = np.arange(201)
-        y = np.arange(201)
-        pm_amp_int = []
-        pm_pha_int = []        
-        for idx in range(4):
-            amp = pm_amp[idx]
-            amp /= np.max(amp)
-            amp_mod = np.copy(amp)
-            amp_mod[np.isnan(amp)] = 0
-            pm_amp_int.append(interpolate.interp2d(x, y, amp_mod))
-
-            pha = pm_pha[idx]
-            pha_mod = np.copy(pha)
-            pha_mod[np.isnan(pha)] = 0
-            pm_pha_int.append(interpolate.interp2d(x, y, pha_mod))
-
-        ra = s2_pos[0]
-        dec = s2_pos[1]
-        lambda0 = 2.2 
-        cor_amp_s2 = np.ones((4, len(wave)))
-        cor_pha_s2 = np.zeros((4, len(wave)))
-        for tel in range(4):
-            pos = np.array([ra + dra[tel], dec + ddec[tel]])
-            pos_rot = np.dot(rotation(northangle[tel]), pos)
-            for channel in range(len(wave)):
-                pos_scaled = pos_rot*lambda0/wave[channel] + 100
-                cor_amp_s2[tel, channel] = pm_amp_int[tel](pos_scaled[0], pos_scaled[1])
-                cor_pha_s2[tel, channel] = pm_pha_int[tel](pos_scaled[0], pos_scaled[1])
-
-        
-        ra = f1_pos[0]
-        dec = f1_pos[1]
-        cor_amp_f1 = np.ones((4, len(wave)))
-        cor_pha_f1 = np.zeros((4, len(wave)))
-        for tel in range(4):
-            pos = np.array([ra + dra[tel], dec + ddec[tel]])
-            pos_rot = np.dot(rotation(northangle[tel]), pos)
-            for channel in range(len(wave)):
-                pos_scaled = pos_rot*lambda0/wave[channel] + 100
-                cor_amp_f1[tel, channel] = pm_amp_int[tel](pos_scaled[0], pos_scaled[1])
-                cor_pha_f1[tel, channel] = pm_pha_int[tel](pos_scaled[0], pos_scaled[1])
-        
-        
-    else:
-        cor_amp_s2 = np.ones((4, len(wave)))
-        cor_pha_s2 = np.zeros((4, len(wave)))
-        cor_amp_f1 = np.ones((4, len(wave)))
-        cor_pha_f1 = np.zeros((4, len(wave)))
-        fiber_coup = np.exp(-1*(2*np.pi*np.sqrt(np.sum(s2_pos**2))/280)**2)
-        s2_fr = s2_fr * fiber_coup
-        fiber_coup = np.exp(-1*(2*np.pi*np.sqrt(np.sum(f1_pos**2))/280)**2)
-        f1_fr = f1_fr * fiber_coup
-
-    cor = [cor_amp_s2, cor_pha_s2, cor_amp_f1, cor_pha_f1]
-    sources = [s2_pos, s2_fr, f1_pos, f1_fr, cor]
-    
-    popt, pcov = optimize.curve_fit(lambda uv, x, y: threesource(uv, wave, dlambda, sources, x, y, mask=mask),
-                                    uv, visphif[mask], sigma=visphierrf[mask],
-                                    bounds=(-10,10))#, method="dogbox",**{"loss":'cauchy'})
-    
-    if plot:
-        rad2as = 180 / np.pi * 3600
-        wave_model = np.linspace(wave[0],wave[len(wave)-1],1000)
-        dlambda_model = np.interp(wave_model, wave, dlambda)
-        u_as = np.zeros((len(u),len(wave)))
-        v_as = np.zeros((len(v),len(wave))) 
-        u_as_model = np.zeros((len(u),len(wave_model)))
-        v_as_model = np.zeros((len(v),len(wave_model)))
-        for i in range(0,len(u)):
-            u_as[i,:] = u[i]/(wave*1.e-6) / rad2as
-            v_as[i,:] = v[i]/(wave*1.e-6) / rad2as
-            u_as_model[i,:] = u[i]/(wave_model*1.e-6) / rad2as
-            v_as_model[i,:] = v[i]/(wave_model*1.e-6) / rad2as
-        magu_as_model = np.sqrt(u_as_model**2.+v_as_model**2.)
-        magu_as = np.sqrt(u_as**2.+v_as**2.)   
-        
-        if phasemaps:
-            ra = s2_pos[0]
-            dec = s2_pos[1]
-            lambda0 = 2.2 
-            cor_amp_s2 = np.ones((4, len(wave_model)))
-            cor_pha_s2 = np.zeros((4, len(wave_model)))
-            for tel in range(4):
-                pos = np.array([ra + dra[tel], dec + ddec[tel]])
-                pos_rot = np.dot(rotation(northangle[tel]), pos)
-                for channel in range(len(wave_model)):
-                    pos_scaled = pos_rot*lambda0/wave_model[channel] + 100
-                    cor_amp_s2[tel, channel] = pm_amp_int[tel](pos_scaled[0], pos_scaled[1])
-                    cor_pha_s2[tel, channel] = pm_pha_int[tel](pos_scaled[0], pos_scaled[1])
-            ra = f1_pos[0]
-            dec = f1_pos[1]
-            cor_amp_f1 = np.ones((4, len(wave_model)))
-            cor_pha_f1 = np.zeros((4, len(wave_model)))
-            for tel in range(4):
-                pos = np.array([ra + dra[tel], dec + ddec[tel]])
-                pos_rot = np.dot(rotation(northangle[tel]), pos)
-                for channel in range(len(wave_model)):
-                    pos_scaled = pos_rot*lambda0/wave_model[channel] + 100
-                    cor_amp_f1[tel, channel] = pm_amp_int[tel](pos_scaled[0], pos_scaled[1])
-                    cor_pha_f1[tel, channel] = pm_pha_int[tel](pos_scaled[0], pos_scaled[1])
-        else:
-            cor_amp_s2 = np.ones((4, len(wave_model)))
-            cor_pha_s2 = np.zeros((4, len(wave_model)))
-            cor_amp_f1 = np.ones((4, len(wave_model)))
-            cor_pha_f1 = np.zeros((4, len(wave_model)))
-        
-        cor = [cor_amp_s2, cor_pha_s2, cor_amp_f1, cor_pha_f1]
-        sources = [s2_pos, s2_fr, f1_pos, f1_fr, cor]
-        
-        model_visphi = threesource(uv, wave_model, dlambda_model, sources,
-                                   popt[0], popt[1], mask=1, flatten=False)
-        
-        for i in range(0,6):
-            plt.errorbar(magu_as[i,:], visphi[i,:], visphierr[i,:], 
-                         color=colors_baseline[i], label=baseline[i], 
-                         ls='', lw=1, alpha=0.5, capsize=0)
-            plt.scatter(magu_as[i,:], visphi[i,:],
-                        color=colors_baseline[i], alpha=0.5)
-            plt.plot(magu_as_model[i,:], model_visphi[i,:],
-                    color='k', zorder=100)
-        plt.legend()
-        plt.ylabel('visibility phase [deg]')
-        plt.xlabel('spatial frequency [1/arcsec]')
-        plt.show()
-    return popt
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -1158,6 +831,7 @@ class GravPhaseNight():
         """
         self.night = night
         self.ndit = ndit
+        self.verbose = verbose
         
         nights = ['2019-03-27',
                 '2019-03-28',
@@ -1210,7 +884,8 @@ class GravPhaseNight():
                     ] 
         try:
             self.calibrator = calibrators[nights.index(night)]
-            print('Night: %s, Calibrator: %s' % (night, self.calibrator))
+            if self.verbose:
+                print('Night: %s, Calibrator: %s' % (night, self.calibrator))
         except ValueError:
             print('Night is not available, try one of those:')
             print(nights)
@@ -1222,13 +897,79 @@ class GravPhaseNight():
             self.folder = '/data/user/forFrank2/' + night + '/reduced_PL20200513_1frame'
         else:
             raise ValueError('Ndit has to be 1 or 32')
-        print('Use data from: %s' % self.folder)
+        if self.verbose:
+            print('Use data from: %s' % self.folder)
         self.bl_array = np.array([[0,1],
                             [0,2],
                             [0,3],
                             [1,2],
                             [1,3],
                             [2,3]])
+        
+        allfiles = sorted(glob.glob(self.folder + '/GRAVI*dualscivis.fits'))
+        sg_files = []
+        s2_files = []
+        for file in allfiles:
+            h = fits.open(file)[0].header
+            if h['ESO FT ROBJ NAME'] != 'IRS16C':
+                continue
+            if h['ESO INS SOBJ NAME'] == 'S2':
+                if h['ESO INS SOBJ OFFX'] == 0:
+                    s2_files.append(file)
+                else:
+                    sobjx = h['ESO INS SOBJ X']
+                    sobjy = h['ESO INS SOBJ Y']
+                    if -990 > sobjx or sobjx > -950:
+                        continue
+                    if -640 > sobjy or sobjy > -590:
+                        continue
+                    sg_files.append(file)
+        if self.verbose:
+            print('%i SGRA , %i S2 files found' % (len(sg_files), len(s2_files)))
+        self.s2_files = s2_files
+        self.sg_files = sg_files
+        
+        
+        ################
+        # read in flux from pandas
+        ################
+            
+        pandasfile = resource_filename('gravipy', 'GRAVITY_DATA_2019_4_frame.object')
+        pand = pd.read_pickle(pandasfile)
+        self.pand = pand
+        sg_flux = []
+        sg_header = []
+        s2_pos = []
+        for fdx, file in enumerate(sg_files):
+            d = fits.open(file)
+            h = d[0].header
+            sg_header.append(h)
+            obsdate = h['DATE-OBS']
+            try:
+                p1 = np.mean(self.pand["flux p1 [%S2]"].loc[self.pand['DATE-OBS'] == obsdate])
+                p2 = np.mean(self.pand["flux p2 [%S2]"].loc[self.pand['DATE-OBS'] == obsdate])
+            except AttributeError:
+                print('Read in pandas')
+                pandasfile = resource_filename('gravipy', 'GRAVITY_DATA_2019_4_frame.object')
+                self.pand = pd.read_pickle(pandasfile)
+                p1 = np.mean(self.pand["flux p1 [%S2]"].loc[self.pand['DATE-OBS'] == obsdate])
+                p2 = np.mean(self.pand["flux p2 [%S2]"].loc[self.pand['DATE-OBS'] == obsdate])
+            sg_fr = (p1+p2)/2
+            if np.isnan(sg_fr):
+                print('%s has no flux value' % file)
+            sg_flux.append(sg_fr)
+            
+            ddate = convert_date(obsdate)[0]
+            orbitfile = resource_filename('gravipy', 's2_orbit_082020.txt')
+            orbit = np.genfromtxt(orbitfile)
+            s2_pos.append(orbit[find_nearest(orbit[:,0], ddate)][1:]*1000)
+                
+        self.s2_pos = s2_pos
+        self.sg_flux = sg_flux
+        self.sg_header = sg_header
+
+        
+        
         
         
     def process_night(self, mode,  fluxcut=0.0, subspacing=1,
@@ -1254,55 +995,46 @@ class GravPhaseNight():
         ret         : Returns list with all results
         """
         ndit = self.ndit
-        if fluxcut > 0:
-            pandasfile = resource_filename('gravipy', 'GRAVITY_DATA_2019_4_frame.object')
-            pand = pd.read_pickle(pandasfile)
-            self.pand = pand
 
-        allfiles = sorted(glob.glob(self.folder + '/GRAVI*dualscivis.fits'))
-
-        sg_files = []
-        s2_files = []
-        for file in allfiles:
-            h = fits.open(file)[0].header
-            if h['ESO FT ROBJ NAME'] != 'IRS16C':
-                continue
-            if h['ESO INS SOBJ NAME'] == 'S2':
-                if h['ESO INS SOBJ OFFX'] == 0:
-                    s2_files.append(file)
-                else:
-                    sobjx = h['ESO INS SOBJ X']
-                    sobjy = h['ESO INS SOBJ Y']
-                    if -990 > sobjx or sobjx > -950:
-                        continue
-                    if -640 > sobjy or sobjy > -590:
-                        continue
-                    sg_files.append(file)
-        print('%i SGRA , %i S2 files found' % (len(sg_files), len(s2_files)))
-        self.s2_files = s2_files
-        self.sg_files = sg_files
+        s2_files = self.s2_files
+        sg_files = self.sg_files
+        sg_flux = self.sg_flux
         
-        corrections_dict = get_corrections(bequiet=True)
-        try:
-            interp_list = corrections_dict[mode]
-        except KeyError:
-            print('mode not avialable, use one of those:')
-            print(corrections_dict.keys())
-            raise KeyError
+        if isinstance(mode, str):
+            corrections_dict = get_corrections(bequiet=True)
+            try:
+                interp_list = corrections_dict[mode]
+            except KeyError:
+                print('mode not avialable, use one of those:')
+                print(corrections_dict.keys())
+                raise KeyError
 
-        if 'lst' in mode:
-            lst_corr = True
-            if ndit == 1:
-                raise ValueError('Ndit 1 and lst correction is not implemented properly')
-            print('Apply LST correction')
-        else:
-            lst_corr = False
+            if 'lst' in mode:
+                lst_corr = True
+                if ndit == 1:
+                    raise ValueError('Ndit 1 and lst correction is not implemented properly')
+                print('Apply LST correction')
+            else:
+                lst_corr = False
 
-        if 'bl' in mode:
-            bl_corr = True
-            print('Apply BL correction')
+            if 'bl' in mode:
+                bl_corr = True
+                print('Apply BL correction')
+            else:
+                bl_corr = False
         else:
-            bl_corr = False        
+            if len(mode) == 4:
+                bl_corr = False
+                lst_corr = False
+                interp_list = mode
+                if self.verbose:
+                    print('using the interpolations given in input')
+            else:
+                raise ValueError('If interpolations are given mode has to be a list of four')
+            
+            
+
+        
             
         ################
         # read in al necessary data
@@ -1320,19 +1052,12 @@ class GravPhaseNight():
         sg_u_raw = np.zeros((len(sg_files), ndit*6))*np.nan
         sg_v_raw = np.zeros((len(sg_files), ndit*6))*np.nan
         
-        sg_header = []
         for fdx, file in enumerate(sg_files):
             d = fits.open(file)
             h = d[0].header
-            sg_header.append(h)
             if fluxcut > 0:
-                obsdate = h['DATE-OBS']
-                p1 = np.mean(pand["flux p1 [%S2]"].loc[pand['DATE-OBS'] == obsdate])
-                p2 = np.mean(pand["flux p2 [%S2]"].loc[pand['DATE-OBS'] == obsdate])
-                f = (p1+p2)/2
-                if f < fluxcut:
+                if f < self.sg_flux[fdx]:
                     continue
-
             sg_t[fdx] = d['OI_VIS', 12].data['MJD'][::6]
             o_ndit = h['ESO DET2 NDIT']
             lst0 = h['LST']/3600
@@ -1446,7 +1171,6 @@ class GravPhaseNight():
         self.sg_v_raw = sg_v_raw
         self.wave = wave
         self.dlambda = dlambda
-        self.sg_header = sg_header
 
         s2_visphi_p1 = np.zeros((len(s2_files), ndit*6, 14))
         s2_visphi_p2 = np.zeros((len(s2_files), ndit*6, 14))
@@ -1684,8 +1408,9 @@ class GravPhaseNight():
                 print('PosCor failed')
                 dS = [0,0]
 
-            print('Applied poscor: (%.3f,%.3f) mas ' % (dS[0], dS[1]))
-            print('Chi2 of poscor: %.2f \n' % np.sum(f(dS)**2))
+            if self.verbose:
+                print('Applied poscor: (%.3f,%.3f) mas ' % (dS[0], dS[1]))
+                print('Chi2 of poscor: %.2f \n' % np.sum(f(dS)**2))
 
             if plot:
                 n = nfiles
@@ -1840,7 +1565,72 @@ class GravPhaseNight():
             return self.alldata
         
         
-    def fit_night_1src(self, plot=True, plotfits=False, fitcut=2):
+
+
+    #########################
+    # Fitting functions
+
+    def pointsource(self,uv, wave, x, y, mask=1, flatten=True):
+        mas2rad = 1e-3 / 3600 / 180 * np.pi
+        u = uv[0]
+        v = uv[1]
+        x_uas = x*mas2rad*1e6
+        y_uas = y*mas2rad*1e6
+        phi = np.zeros((6, len(wave)))
+        for wdx in range(len(wave)):
+            phi[:,wdx] = (u*x_uas + v*y_uas)/wave[wdx]
+        visphi = np.angle(np.exp(-2*np.pi*1j*phi), deg=True)
+        if flatten:
+            return visphi.flatten()[mask]
+        else:
+            return visphi
+
+    def fit_pointsource(self,u,v,wave,visphi,visphierr,plot=False):
+        uv = [u.flatten(),v.flatten()]
+        visphif = visphi.flatten()
+        visphierrf = visphierr.flatten()
+        mask = ~np.isnan(visphif) * ~np.isnan(visphierrf)
+        popt, pcov = optimize.curve_fit(lambda uv, x, y: self.pointsource(uv, wave, x, y, mask),
+                                        uv, visphif[mask], sigma=visphierrf[mask],
+                                        bounds=(-10,10))
+        
+        if plot:
+            rad2as = 180 / np.pi * 3600
+            wave_model = np.linspace(wave[0],wave[len(wave)-1],1000)
+            u_as = np.zeros((len(u),len(wave)))
+            v_as = np.zeros((len(v),len(wave))) 
+            u_as_model = np.zeros((len(u),len(wave_model)))
+            v_as_model = np.zeros((len(v),len(wave_model)))
+            for i in range(0,len(u)):
+                u_as[i,:] = u[i]/(wave*1.e-6) / rad2as
+                v_as[i,:] = v[i]/(wave*1.e-6) / rad2as
+                u_as_model[i,:] = u[i]/(wave_model*1.e-6) / rad2as
+                v_as_model[i,:] = v[i]/(wave_model*1.e-6) / rad2as
+            magu_as_model = np.sqrt(u_as_model**2.+v_as_model**2.)
+            magu_as = np.sqrt(u_as**2.+v_as**2.)   
+            
+            model_visphi = pointsource(uv, wave_model, popt[0], popt[1], mask=1, flatten=False)
+            
+            for i in range(0,6):
+                plt.errorbar(magu_as[i,:], visphi[i,:], visphierr[i,:], 
+                            label=baseline[i], color=colors_baseline[i], 
+                            ls='', lw=1, alpha=0.5, capsize=0)
+                plt.scatter(magu_as[i,:], visphi[i,:],
+                            color=colors_baseline[i], alpha=0.5)
+                plt.plot(magu_as_model[i,:], model_visphi[i,:],
+                        color='k', zorder=100)
+            plt.ylabel('visibility phase [deg]')
+            plt.xlabel('spatial frequency [1/arcsec]')
+            plt.show()
+        return popt
+
+
+
+        
+        
+        
+        
+    def fit_night_1src(self, plot=True, plotfits=False, ret_flux=True, only_sgr=False, fitcut=2):
         """
         Fit a pointsource model to all data from the night
         """
@@ -1855,53 +1645,40 @@ class GravPhaseNight():
 
         [[sg_t, sg_lst, sg_ang, sg_visphi_p1, sg_visphi_err_p1, sg_visphi_p2, sg_visphi_err_p2],
          [s2_t, s2_lst, s2_ang, s2_visphi_p1, s2_visphi_err_p1, s2_visphi_p2, s2_visphi_err_p2]] = self.alldata
-        s2_ra_p1 = np.zeros((len(s2_files), ndit))*np.nan
-        s2_de_p1 = np.zeros((len(s2_files), ndit))*np.nan
-        s2_ra_p2 = np.zeros((len(s2_files), ndit))*np.nan
-        s2_de_p2 = np.zeros((len(s2_files), ndit))*np.nan
 
-        for fdx, file in enumerate(s2_files):
-            for dit in range(ndit):
-                u = s2_u_raw[fdx, dit*6:(dit+1)*6]
-                v = s2_v_raw[fdx, dit*6:(dit+1)*6]
-                if np.sum(u==0) > 0:
-                    continue
+        if not only_sgr:
+            s2_ra_p1 = np.zeros((len(s2_files), ndit))*np.nan
+            s2_de_p1 = np.zeros((len(s2_files), ndit))*np.nan
+            s2_ra_p2 = np.zeros((len(s2_files), ndit))*np.nan
+            s2_de_p2 = np.zeros((len(s2_files), ndit))*np.nan
+            for fdx, file in enumerate(s2_files):
+                for dit in range(ndit):
+                    u = s2_u_raw[fdx, dit*6:(dit+1)*6]
+                    v = s2_v_raw[fdx, dit*6:(dit+1)*6]
+                    if np.sum(u==0) > 0:
+                        continue
 
-                visphi = s2_visphi_p1[fdx, dit*6:(dit+1)*6][:,fitcut:-fitcut]
-                visphierr = s2_visphi_err_p1[fdx, dit*6:(dit+1)*6][:,fitcut:-fitcut]
-                wcut = np.copy(wave)[fitcut:-fitcut]
-                if np.sum(np.isnan(visphi)) > 10:
-                    continue
-                s2_ra_p1[fdx, dit], s2_de_p1[fdx, dit] = fit_pointsource(u,v,wcut,visphi,visphierr,plot=plotfits)
+                    visphi = s2_visphi_p1[fdx, dit*6:(dit+1)*6][:,fitcut:-fitcut]
+                    visphierr = s2_visphi_err_p1[fdx, dit*6:(dit+1)*6][:,fitcut:-fitcut]
+                    wcut = np.copy(wave)[fitcut:-fitcut]
+                    if np.sum(np.isnan(visphi)) > 10:
+                        continue
+                    s2_ra_p1[fdx, dit], s2_de_p1[fdx, dit] = self.fit_pointsource(u,v,wcut,visphi,visphierr,plot=plotfits)
 
-                visphi = s2_visphi_p2[fdx, dit*6:(dit+1)*6][:,fitcut:-fitcut]
-                visphierr = s2_visphi_err_p2[fdx, dit*6:(dit+1)*6][:,fitcut:-fitcut]
-                wcut = np.copy(wave)[fitcut:-fitcut]
-                if np.sum(np.isnan(visphi)) > 10:
-                    continue
-                s2_ra_p2[fdx, dit], s2_de_p2[fdx, dit] = fit_pointsource(u,v,wcut,visphi,visphierr,plot=plotfits)
+                    visphi = s2_visphi_p2[fdx, dit*6:(dit+1)*6][:,fitcut:-fitcut]
+                    visphierr = s2_visphi_err_p2[fdx, dit*6:(dit+1)*6][:,fitcut:-fitcut]
+                    wcut = np.copy(wave)[fitcut:-fitcut]
+                    if np.sum(np.isnan(visphi)) > 10:
+                        continue
+                    s2_ra_p2[fdx, dit], s2_de_p2[fdx, dit] = self.fit_pointsource(u,v,wcut,visphi,visphierr,plot=plotfits)
 
         sg_ra_p1 = np.zeros((len(sg_files), ndit))*np.nan
         sg_de_p1 = np.zeros((len(sg_files), ndit))*np.nan
         sg_ra_p2 = np.zeros((len(sg_files), ndit))*np.nan
         sg_de_p2 = np.zeros((len(sg_files), ndit))*np.nan
 
-        sg_flux = []
+        sg_flux = self.sg_flux
         for fdx, file in enumerate(sg_files):
-            header = self.sg_header[fdx]
-            obsdate = header['DATE-OBS']
-            try:
-                p1 = np.mean(self.pand["flux p1 [%S2]"].loc[self.pand['DATE-OBS'] == obsdate])
-                p2 = np.mean(self.pand["flux p2 [%S2]"].loc[self.pand['DATE-OBS'] == obsdate])
-            except AttributeError:
-                print('Read in pandas')
-                pandasfile = resource_filename('gravipy', 'GRAVITY_DATA_2019_4_frame.object')
-                self.pand = pd.read_pickle(pandasfile)
-                p1 = np.mean(self.pand["flux p1 [%S2]"].loc[self.pand['DATE-OBS'] == obsdate])
-                p2 = np.mean(self.pand["flux p2 [%S2]"].loc[self.pand['DATE-OBS'] == obsdate])
-            sg_fr = (p1+p2)/2
-            sg_flux.append(sg_fr)
-
             for dit in range(ndit):
                 u = sg_u_raw[fdx, dit*6:(dit+1)*6]
                 v = sg_v_raw[fdx, dit*6:(dit+1)*6]
@@ -1913,14 +1690,14 @@ class GravPhaseNight():
                 wcut = np.copy(wave)[fitcut:-fitcut]
                 if np.sum(np.isnan(visphi)) > 10:
                     continue
-                sg_ra_p1[fdx, dit], sg_de_p1[fdx, dit] = fit_pointsource(u,v,wcut,visphi,visphierr,plot=plotfits)
+                sg_ra_p1[fdx, dit], sg_de_p1[fdx, dit] = self.fit_pointsource(u,v,wcut,visphi,visphierr,plot=plotfits)
 
                 visphi = sg_visphi_p2[fdx, dit*6:(dit+1)*6][:,fitcut:-fitcut]
                 visphierr = sg_visphi_err_p2[fdx, dit*6:(dit+1)*6][:,fitcut:-fitcut]
                 wcut = np.copy(wave)[fitcut:-fitcut]
                 if np.sum(np.isnan(visphi)) > 10:
                     continue
-                sg_ra_p2[fdx, dit], sg_de_p2[fdx, dit] = fit_pointsource(u,v,wcut,visphi,visphierr,plot=plotfits)            
+                sg_ra_p2[fdx, dit], sg_de_p2[fdx, dit] = self.fit_pointsource(u,v,wcut,visphi,visphierr,plot=plotfits)            
             
         if plot:
             if ndit == 1:
@@ -1937,7 +1714,8 @@ class GravPhaseNight():
             plt.ylabel('Flux [S2]')
             plt.ylim(0,1.5)
             axis = plt.subplot(gs[1,0])
-            plt.plot(s2_t.flatten(), (s2_ra_p1.flatten()+s2_ra_p2.flatten())/2, 
+            if not only_sgr:
+                plt.plot(s2_t.flatten(), (s2_ra_p1.flatten()+s2_ra_p2.flatten())/2, 
                      color='k', ls='', marker=umark, label='S2')
             plt.plot(sg_t.flatten(), (sg_ra_p1.flatten()+sg_ra_p2.flatten())/2, 
                      color=color1, ls='', marker=umark, label='SgrA*')
@@ -1946,24 +1724,305 @@ class GravPhaseNight():
             axis.set_xticklabels([])
             plt.ylabel('RA [mas]')
             axis = plt.subplot(gs[2,0])
-            plt.plot(s2_t.flatten(), (s2_de_p1.flatten()+s2_de_p2.flatten())/2, 
-                     color='k', ls='', marker=umark)
+            if not only_sgr:
+                plt.plot(s2_t.flatten(), (s2_de_p1.flatten()+s2_de_p2.flatten())/2, 
+                        color='k', ls='', marker=umark)
             plt.plot(sg_t.flatten(), (sg_de_p1.flatten()+sg_de_p2.flatten())/2, 
                      color=color1, ls='', marker=umark)
             plt.axhline(0, color='grey', lw=0.5, zorder=0)
             plt.xlabel('Time [min]')
             plt.ylabel('Dec [mas]')
             plt.show()
+        
+        if not only_sgr:
+            fitres = [[sg_t, sg_ra_p1, sg_de_p1, sg_ra_p2, sg_de_p2],
+                      [s2_t, s2_ra_p1, s2_de_p1, s2_ra_p2, s2_de_p2]]
+        else:
+            fitres = [sg_t, sg_ra_p1, sg_de_p1, sg_ra_p2, sg_de_p2]
+        if ret_flux:
+            return sg_flux, fitres
+        else:
+            return fitres
+        
+        
+            
+            
+    def vis_intensity_approx(self, s, alpha, lambda0, dlambda):
+        """
+        Approximation for Modulated interferometric intensity
+        s:      B*skypos-opd1-opd2
+        alpha:  power law index
+        lambda0:zentral wavelength
+        dlambda:size of channels 
+        """
+        x = 2*s*dlambda/lambda0**2.
+        sinc = np.sinc(x/np.pi)
+        return (lambda0/2.2)**(-1-alpha)*2*dlambda*sinc*np.exp(-2.j*np.pi*s/lambda0)
 
-        fitres = [[sg_t, sg_ra_p1, sg_de_p1, sg_ra_p2, sg_de_p2],
-                  [s2_t, s2_ra_p1, s2_de_p1, s2_ra_p2, s2_de_p2]]
-        return sg_flux, fitres
+
+    def threesource(self, uv, wave, dlambda, sources, x, y, mask=1,
+                    alpha_SgrA=-0.5,alpha_S=3, alpha_bg=3, 
+                    fluxRatioBG=0, flatten=True):
+        phasemaps = self.fit_phasemaps
+        mas2rad = 1e-3 / 3600 / 180 * np.pi
+        u = uv[0]
+        v = uv[1]
+        
+        if phasemaps:
+            s2_pos, s2_fr, f1_pos, f1_fr, cor = sources
+            cor_amp_s2, cor_pha_s2, cor_amp_f1, cor_pha_f1 = cor
+            
+            
+            pm_amp_f1 = np.array([[cor_amp_f1[0], cor_amp_f1[1]],
+                                    [cor_amp_f1[0], cor_amp_f1[2]],
+                                    [cor_amp_f1[0], cor_amp_f1[3]],
+                                    [cor_amp_f1[1], cor_amp_f1[2]],
+                                    [cor_amp_f1[1], cor_amp_f1[3]],
+                                    [cor_amp_f1[2], cor_amp_f1[3]]])
+            pm_pha_f1 = np.array([[cor_pha_f1[0], cor_pha_f1[1]],
+                                    [cor_pha_f1[0], cor_pha_f1[2]],
+                                    [cor_pha_f1[0], cor_pha_f1[3]],
+                                    [cor_pha_f1[1], cor_pha_f1[2]],
+                                    [cor_pha_f1[1], cor_pha_f1[3]],
+                                    [cor_pha_f1[2], cor_pha_f1[3]]])
+            pm_amp_s2 = np.array([[cor_amp_s2[0], cor_amp_s2[1]],
+                                    [cor_amp_s2[0], cor_amp_s2[2]],
+                                    [cor_amp_s2[0], cor_amp_s2[3]],
+                                    [cor_amp_s2[1], cor_amp_s2[2]],
+                                    [cor_amp_s2[1], cor_amp_s2[3]],
+                                    [cor_amp_s2[2], cor_amp_s2[3]]])
+            pm_pha_s2 = np.array([[cor_pha_s2[0], cor_pha_s2[1]],
+                                    [cor_pha_s2[0], cor_pha_s2[2]],
+                                    [cor_pha_s2[0], cor_pha_s2[3]],
+                                    [cor_pha_s2[1], cor_pha_s2[2]],
+                                    [cor_pha_s2[1], cor_pha_s2[3]],
+                                    [cor_pha_s2[2], cor_pha_s2[3]]])
+            vis = np.zeros((6,len(wave))) + 0j
+            for i in range(0,6):
+                s_SgrA = ((x)*u[i] + (y)*v[i]) * mas2rad * 1e6
+                s_S2 = ((s2_pos[0]+x)*u[i] + (s2_pos[1]+y)*v[i]) * mas2rad * 1e6
+                s_F1 = ((f1_pos[0]+x)*u[i] + (f1_pos[1]+y)*v[i]) * mas2rad * 1e6
+                
+                opd_f1 = (pm_pha_f1[i,0] - pm_pha_f1[i,1])/360*wave
+                opd_s2 = (pm_pha_s2[i,0] - pm_pha_s2[i,1])/360*wave
+                s_F1 -= opd_f1
+                s_S2 -= opd_s2
+                
+                cr1_s2 = pm_amp_s2[i,0]
+                cr2_s2 = pm_amp_s2[i,1]
+                cr1_f1 = pm_amp_f1[i,0]
+                cr2_f1 = pm_amp_f1[i,1]
+                
+                intSgrA = self.vis_intensity_approx(s_SgrA, alpha_SgrA, wave, dlambda)
+                intSgrA_center = self.vis_intensity_approx(0, alpha_SgrA, wave, dlambda)
+                intS2 = self.vis_intensity_approx(s_S2, alpha_S, wave, dlambda)
+                intS2_center = self.vis_intensity_approx(0, alpha_S, wave, dlambda)
+                intF1 = self.vis_intensity_approx(s_F1, alpha_S, wave, dlambda)
+                intF1_center = self.vis_intensity_approx(0, alpha_S, wave, dlambda)
+                intBG = self.vis_intensity_approx(0, alpha_bg, wave, dlambda)
+
+                vis[i,:] = ((intSgrA + cr1_f1*cr2_f1*f1_fr*intF1 + cr1_s2*cr2_s2*s2_fr*intS2)/
+                            (intSgrA_center + cr1_f1*cr2_f1*f1_fr*intF1_center + 
+                            cr1_s2*cr2_s2*s2_fr*intS2_center + fluxRatioBG*intBG))
+            
+        else:
+            s2_pos, s2_fr, f1_pos, f1_fr = sources
+
+            vis = np.zeros((6,len(wave))) + 0j
+            for i in range(0,6):
+                s_SgrA = ((x)*u[i] + (y)*v[i]) * mas2rad * 1e6
+                s_S2 = ((s2_pos[0]+x)*u[i] + (s2_pos[1]+y)*v[i]) * mas2rad * 1e6
+                s_F1 = ((f1_pos[0]+x)*u[i] + (f1_pos[1]+y)*v[i]) * mas2rad * 1e6
+                
+                intSgrA = self.vis_intensity_approx(s_SgrA, alpha_SgrA, wave, dlambda)
+                intSgrA_center = self.vis_intensity_approx(0, alpha_SgrA, wave, dlambda)
+                intS2 = self.vis_intensity_approx(s_S2, alpha_S, wave, dlambda)
+                intS2_center = self.vis_intensity_approx(0, alpha_S, wave, dlambda)
+                intF1 = self.vis_intensity_approx(s_F1, alpha_S, wave, dlambda)
+                intF1_center = self.vis_intensity_approx(0, alpha_S, wave, dlambda)
+                intBG = self.vis_intensity_approx(0, alpha_bg, wave, dlambda)
+
+                vis[i,:] = ((intSgrA + f1_fr*intF1 + s2_fr*intS2)/
+                            (intSgrA_center + f1_fr*intF1_center + 
+                            s2_fr*intS2_center + fluxRatioBG*intBG))
+        visphi = np.angle(vis, deg=True)
+        visphi = visphi + 360.*(visphi<-180.) - 360.*(visphi>180.)  
+
+        if flatten:
+            return visphi.flatten()[mask]
+        else:
+            return visphi
+        
+        
+    def fit_threesource(self, u, v, wave, dlambda, visphi, visphierr, header, sg_fr, s2_pos, plot=False):
+        phasemaps = self.fit_phasemaps
+        uv = [u.flatten(),v.flatten()]
+        visphif = visphi.flatten()
+        visphierrf = visphierr.flatten()
+        mask = ~np.isnan(visphif) * ~np.isnan(visphierrf)
+
+        s2_fr = 1/sg_fr
+        f1_pos = np.array([-18.78, 19.80])
+        f1_fr = 10**(-(18.7-14.1)/2.5)*s2_fr
+        
+        if phasemaps:
+            northangle1 = header['ESO QC ACQ FIELD1 NORTH_ANGLE']/180*math.pi
+            northangle2 = header['ESO QC ACQ FIELD2 NORTH_ANGLE']/180*math.pi
+            northangle3 = header['ESO QC ACQ FIELD3 NORTH_ANGLE']/180*math.pi
+            northangle4 = header['ESO QC ACQ FIELD4 NORTH_ANGLE']/180*math.pi
+            northangle = [northangle1, northangle2, northangle3, northangle4]
+            ddec1 = header['ESO QC MET SOBJ DDEC1']
+            ddec2 = header['ESO QC MET SOBJ DDEC2']
+            ddec3 = header['ESO QC MET SOBJ DDEC3']
+            ddec4 = header['ESO QC MET SOBJ DDEC4']
+            ddec = [ddec1, ddec2, ddec3, ddec4]
+            dra1 = header['ESO QC MET SOBJ DRA1']
+            dra2 = header['ESO QC MET SOBJ DRA2']
+            dra3 = header['ESO QC MET SOBJ DRA3']
+            dra4 = header['ESO QC MET SOBJ DRA4']
+            dra = [dra1, dra2, dra3, dra4]
+            
+            pmfile = resource_filename('gravipy', 'GRAVITY_SC_MAP_20200306_SM45.fits')
+            phasemaps = fits.open(pmfile)
+            pm_amp = phasemaps['SC_AMP'].data
+            pm_pha = phasemaps['SC_PHASE'].data
+
+            x = np.arange(201)
+            y = np.arange(201)
+            pm_amp_int = []
+            pm_pha_int = []        
+            for idx in range(4):
+                amp = pm_amp[idx]
+                amp /= np.max(amp)
+                amp_mod = np.copy(amp)
+                amp_mod[np.isnan(amp)] = 0
+                pm_amp_int.append(interpolate.interp2d(x, y, amp_mod))
+
+                pha = pm_pha[idx]
+                pha_mod = np.copy(pha)
+                pha_mod[np.isnan(pha)] = 0
+                pm_pha_int.append(interpolate.interp2d(x, y, pha_mod))
+
+            ra = s2_pos[0]
+            dec = s2_pos[1]
+            lambda0 = 2.2 
+            cor_amp_s2 = np.ones((4, len(wave)))
+            cor_pha_s2 = np.zeros((4, len(wave)))
+            for tel in range(4):
+                pos = np.array([ra + dra[tel], dec + ddec[tel]])
+                pos_rot = np.dot(rotation(northangle[tel]), pos)
+                for channel in range(len(wave)):
+                    pos_scaled = pos_rot*lambda0/wave[channel] + 100
+                    cor_amp_s2[tel, channel] = pm_amp_int[tel](pos_scaled[0], pos_scaled[1])
+                    cor_pha_s2[tel, channel] = pm_pha_int[tel](pos_scaled[0], pos_scaled[1])
+
+            
+            ra = f1_pos[0]
+            dec = f1_pos[1]
+            cor_amp_f1 = np.ones((4, len(wave)))
+            cor_pha_f1 = np.zeros((4, len(wave)))
+            for tel in range(4):
+                pos = np.array([ra + dra[tel], dec + ddec[tel]])
+                pos_rot = np.dot(rotation(northangle[tel]), pos)
+                for channel in range(len(wave)):
+                    pos_scaled = pos_rot*lambda0/wave[channel] + 100
+                    cor_amp_f1[tel, channel] = pm_amp_int[tel](pos_scaled[0], pos_scaled[1])
+                    cor_pha_f1[tel, channel] = pm_pha_int[tel](pos_scaled[0], pos_scaled[1])
+                    
+            cor = [cor_amp_s2, cor_pha_s2, cor_amp_f1, cor_pha_f1]
+            sources = [s2_pos, s2_fr, f1_pos, f1_fr, cor]
+            
+        else:
+            cor_amp_s2 = np.ones((4, len(wave)))
+            cor_pha_s2 = np.zeros((4, len(wave)))
+            cor_amp_f1 = np.ones((4, len(wave)))
+            cor_pha_f1 = np.zeros((4, len(wave)))
+            fiber_coup = np.exp(-1*(2*np.pi*np.sqrt(np.sum(s2_pos**2))/280)**2)
+            s2_fr = s2_fr * fiber_coup
+            fiber_coup = np.exp(-1*(2*np.pi*np.sqrt(np.sum(f1_pos**2))/280)**2)
+            f1_fr = f1_fr * fiber_coup
+
+            sources = [s2_pos, s2_fr, f1_pos, f1_fr]
+
+        
+        popt, pcov = optimize.curve_fit(lambda uv, x, y: self.threesource(uv, wave, dlambda, sources, x, y, mask=mask),
+                                        uv, visphif[mask], sigma=visphierrf[mask],
+                                        bounds=(-10,10))
+        
+        if plot:
+            rad2as = 180 / np.pi * 3600
+            wave_model = np.linspace(wave[0],wave[len(wave)-1],1000)
+            dlambda_model = np.interp(wave_model, wave, dlambda)
+            u_as = np.zeros((len(u),len(wave)))
+            v_as = np.zeros((len(v),len(wave))) 
+            u_as_model = np.zeros((len(u),len(wave_model)))
+            v_as_model = np.zeros((len(v),len(wave_model)))
+            for i in range(0,len(u)):
+                u_as[i,:] = u[i]/(wave*1.e-6) / rad2as
+                v_as[i,:] = v[i]/(wave*1.e-6) / rad2as
+                u_as_model[i,:] = u[i]/(wave_model*1.e-6) / rad2as
+                v_as_model[i,:] = v[i]/(wave_model*1.e-6) / rad2as
+            magu_as_model = np.sqrt(u_as_model**2.+v_as_model**2.)
+            magu_as = np.sqrt(u_as**2.+v_as**2.)   
+            
+            if phasemaps:
+                ra = s2_pos[0]
+                dec = s2_pos[1]
+                lambda0 = 2.2 
+                cor_amp_s2 = np.ones((4, len(wave_model)))
+                cor_pha_s2 = np.zeros((4, len(wave_model)))
+                for tel in range(4):
+                    pos = np.array([ra + dra[tel], dec + ddec[tel]])
+                    pos_rot = np.dot(rotation(northangle[tel]), pos)
+                    for channel in range(len(wave_model)):
+                        pos_scaled = pos_rot*lambda0/wave_model[channel] + 100
+                        cor_amp_s2[tel, channel] = pm_amp_int[tel](pos_scaled[0], pos_scaled[1])
+                        cor_pha_s2[tel, channel] = pm_pha_int[tel](pos_scaled[0], pos_scaled[1])
+                ra = f1_pos[0]
+                dec = f1_pos[1]
+                cor_amp_f1 = np.ones((4, len(wave_model)))
+                cor_pha_f1 = np.zeros((4, len(wave_model)))
+                for tel in range(4):
+                    pos = np.array([ra + dra[tel], dec + ddec[tel]])
+                    pos_rot = np.dot(rotation(northangle[tel]), pos)
+                    for channel in range(len(wave_model)):
+                        pos_scaled = pos_rot*lambda0/wave_model[channel] + 100
+                        cor_amp_f1[tel, channel] = pm_amp_int[tel](pos_scaled[0], pos_scaled[1])
+                        cor_pha_f1[tel, channel] = pm_pha_int[tel](pos_scaled[0], pos_scaled[1])
+            else:
+                cor_amp_s2 = np.ones((4, len(wave_model)))
+                cor_pha_s2 = np.zeros((4, len(wave_model)))
+                cor_amp_f1 = np.ones((4, len(wave_model)))
+                cor_pha_f1 = np.zeros((4, len(wave_model)))
+            
+            cor = [cor_amp_s2, cor_pha_s2, cor_amp_f1, cor_pha_f1]
+            sources = [s2_pos, s2_fr, f1_pos, f1_fr, cor]
+            
+            model_visphi = self.threesource(uv, wave_model, dlambda_model, sources,
+                                    popt[0], popt[1], mask=1, flatten=False)
+            
+            for i in range(0,6):
+                plt.errorbar(magu_as[i,:], visphi[i,:], visphierr[i,:], 
+                            color=colors_baseline[i], label=baseline[i], 
+                            ls='', lw=1, alpha=0.5, capsize=0)
+                plt.scatter(magu_as[i,:], visphi[i,:],
+                            color=colors_baseline[i], alpha=0.5)
+                plt.plot(magu_as_model[i,:], model_visphi[i,:],
+                        color='k', zorder=100)
+            plt.legend()
+            plt.ylabel('visibility phase [deg]')
+            plt.xlabel('spatial frequency [1/arcsec]')
+            plt.show()
+        return popt
+        
+        
 
 
-    def fit_night_3src(self, plot=True, plotfits=False, phasemaps=False, fitcut=2):
+    def fit_night_3src(self, plot=True, plotfits=False, phasemaps=False, only_sgr=False, ret_flux=True, fitcut=2):
         """
         Fit a 3 source model to all data from the night
         """
+        self.fit_phasemaps = phasemaps
         ndit = self.ndit
         wave = self.wave
         dlambda = self.dlambda
@@ -1976,55 +2035,48 @@ class GravPhaseNight():
 
         [[sg_t, sg_lst, sg_ang, sg_visphi_p1, sg_visphi_err_p1, sg_visphi_p2, sg_visphi_err_p2],
          [s2_t, s2_lst, s2_ang, s2_visphi_p1, s2_visphi_err_p1, s2_visphi_p2, s2_visphi_err_p2]] = self.alldata
-        s2_ra_p1 = np.zeros((len(s2_files), ndit))*np.nan
-        s2_de_p1 = np.zeros((len(s2_files), ndit))*np.nan
-        s2_ra_p2 = np.zeros((len(s2_files), ndit))*np.nan
-        s2_de_p2 = np.zeros((len(s2_files), ndit))*np.nan
+        
+        if not only_sgr:
+            s2_ra_p1 = np.zeros((len(s2_files), ndit))*np.nan
+            s2_de_p1 = np.zeros((len(s2_files), ndit))*np.nan
+            s2_ra_p2 = np.zeros((len(s2_files), ndit))*np.nan
+            s2_de_p2 = np.zeros((len(s2_files), ndit))*np.nan
 
-        for fdx, file in enumerate(s2_files):
-            for dit in range(ndit):
-                u = s2_u_raw[fdx, dit*6:(dit+1)*6]
-                v = s2_v_raw[fdx, dit*6:(dit+1)*6]
-                if np.sum(u==0) > 0:
-                    continue
+            for fdx, file in enumerate(s2_files):
+                for dit in range(ndit):
+                    u = s2_u_raw[fdx, dit*6:(dit+1)*6]
+                    v = s2_v_raw[fdx, dit*6:(dit+1)*6]
+                    if np.sum(u==0) > 0:
+                        continue
 
-                visphi = s2_visphi_p1[fdx, dit*6:(dit+1)*6][:,fitcut:-fitcut]
-                visphierr = s2_visphi_err_p1[fdx, dit*6:(dit+1)*6][:,fitcut:-fitcut]
-                wcut = np.copy(wave)[fitcut:-fitcut]
-                if np.sum(np.isnan(visphi)) > 10:
-                    continue
-                s2_ra_p1[fdx, dit], s2_de_p1[fdx, dit] = fit_pointsource(u,v,wcut,visphi,visphierr,plot=plotfits)
+                    visphi = s2_visphi_p1[fdx, dit*6:(dit+1)*6][:,fitcut:-fitcut]
+                    visphierr = s2_visphi_err_p1[fdx, dit*6:(dit+1)*6][:,fitcut:-fitcut]
+                    wcut = np.copy(wave)[fitcut:-fitcut]
+                    if np.sum(np.isnan(visphi)) > 10:
+                        continue
+                    s2_ra_p1[fdx, dit], s2_de_p1[fdx, dit] = self.fit_pointsource(u,v,wcut,visphi,visphierr,plot=plotfits)
 
-                visphi = s2_visphi_p2[fdx, dit*6:(dit+1)*6][:,fitcut:-fitcut]
-                visphierr = s2_visphi_err_p2[fdx, dit*6:(dit+1)*6][:,fitcut:-fitcut]
-                wcut = np.copy(wave)[fitcut:-fitcut]
-                if np.sum(np.isnan(visphi)) > 10:
-                    continue
-                s2_ra_p2[fdx, dit], s2_de_p2[fdx, dit] = fit_pointsource(u,v,wcut,visphi,visphierr,plot=plotfits)
+                    visphi = s2_visphi_p2[fdx, dit*6:(dit+1)*6][:,fitcut:-fitcut]
+                    visphierr = s2_visphi_err_p2[fdx, dit*6:(dit+1)*6][:,fitcut:-fitcut]
+                    wcut = np.copy(wave)[fitcut:-fitcut]
+                    if np.sum(np.isnan(visphi)) > 10:
+                        continue
+                    s2_ra_p2[fdx, dit], s2_de_p2[fdx, dit] = self.fit_pointsource(u,v,wcut,visphi,visphierr,plot=plotfits)
 
         sg_ra_p1 = np.zeros((len(sg_files), ndit))*np.nan
         sg_de_p1 = np.zeros((len(sg_files), ndit))*np.nan
         sg_ra_p2 = np.zeros((len(sg_files), ndit))*np.nan
         sg_de_p2 = np.zeros((len(sg_files), ndit))*np.nan
         
-        sg_flux = []
+        sg_flux = self.sg_flux
+        s2_lpos = self.s2_pos
         for fdx, file in enumerate(sg_files):
+            sg_fr = sg_flux[fdx]
+            s2_pos = s2_lpos[fdx]
             header = self.sg_header[fdx]
-            obsdate = header['DATE-OBS']
-            try:
-                p1 = np.mean(self.pand["flux p1 [%S2]"].loc[self.pand['DATE-OBS'] == obsdate])
-                p2 = np.mean(self.pand["flux p2 [%S2]"].loc[self.pand['DATE-OBS'] == obsdate])
-            except AttributeError:
-                print('Read in pandas')
-                pandasfile = resource_filename('gravipy', 'GRAVITY_DATA_2019_4_frame.object')
-                self.pand = pd.read_pickle(pandasfile)
-                p1 = np.mean(self.pand["flux p1 [%S2]"].loc[self.pand['DATE-OBS'] == obsdate])
-                p2 = np.mean(self.pand["flux p2 [%S2]"].loc[self.pand['DATE-OBS'] == obsdate])
-            sg_fr = (p1+p2)/2
-            sg_flux.append(sg_fr)
-            
             if np.isnan(sg_fr):
-                print('SgrA* flux not available for %s' % sg_files[fdx])
+                if self.verbose:
+                    print('SgrA* flux not available for %s' % sg_files[fdx])
                 sg_ra_p1[fdx] = np.nan
                 sg_de_p1[fdx] = np.nan
                 sg_ra_p2[fdx] = np.nan
@@ -2043,9 +2095,8 @@ class GravPhaseNight():
                 dwcut = np.copy(dlambda)[fitcut:-fitcut]
                 if np.sum(np.isnan(visphi)) > 10:
                     continue
-                sg_ra_p1[fdx, dit], sg_de_p1[fdx, dit] = fit_threesource(u,v,wcut,dwcut,
-                                                                         visphi,visphierr,header, sg_fr,
-                                                                         phasemaps=phasemaps,
+                sg_ra_p1[fdx, dit], sg_de_p1[fdx, dit] = self.fit_threesource(u,v,wcut,dwcut,
+                                                                         visphi,visphierr,header, sg_fr, s2_pos, 
                                                                          plot=plotfits)
 
                 visphi = sg_visphi_p2[fdx, dit*6:(dit+1)*6][:,fitcut:-fitcut]
@@ -2054,9 +2105,8 @@ class GravPhaseNight():
                 dwcut = np.copy(dlambda)[fitcut:-fitcut]
                 if np.sum(np.isnan(visphi)) > 10:
                     continue
-                sg_ra_p2[fdx, dit], sg_de_p2[fdx, dit] = fit_threesource(u,v,wcut,dwcut,
-                                                                         visphi,visphierr,header, sg_fr, 
-                                                                         phasemaps=phasemaps,
+                sg_ra_p2[fdx, dit], sg_de_p2[fdx, dit] = self.fit_threesource(u,v,wcut,dwcut,
+                                                                         visphi,visphierr,header, sg_fr, s2_pos, 
                                                                          plot=plotfits)    
             
         if plot:
@@ -2074,8 +2124,9 @@ class GravPhaseNight():
             plt.ylabel('Flux [S2]')
             plt.ylim(0,1.5)
             axis = plt.subplot(gs[1,0])
-            plt.plot(s2_t.flatten(), (s2_ra_p1.flatten()+s2_ra_p2.flatten())/2, 
-                     color='k', ls='', marker=umark, label='S2')
+            if not only_sgr:
+                plt.plot(s2_t.flatten(), (s2_ra_p1.flatten()+s2_ra_p2.flatten())/2, 
+                        color='k', ls='', marker=umark, label='S2')
             plt.plot(sg_t.flatten(), (sg_ra_p1.flatten()+sg_ra_p2.flatten())/2, 
                      color=color1, ls='', marker=umark, label='SgrA* (3src fit)')
             plt.axhline(0, color='grey', lw=0.5, zorder=0)
@@ -2083,8 +2134,9 @@ class GravPhaseNight():
             axis.set_xticklabels([])
             plt.ylabel('RA [mas]')
             axis = plt.subplot(gs[2,0])
-            plt.plot(s2_t.flatten(), (s2_de_p1.flatten()+s2_de_p2.flatten())/2, 
-                     color='k', ls='', marker=umark)
+            if not only_sgr:
+                plt.plot(s2_t.flatten(), (s2_de_p1.flatten()+s2_de_p2.flatten())/2, 
+                        color='k', ls='', marker=umark)
             plt.plot(sg_t.flatten(), (sg_de_p1.flatten()+sg_de_p2.flatten())/2, 
                      color=color1, ls='', marker=umark)
             plt.axhline(0, color='grey', lw=0.5, zorder=0)
@@ -2092,6 +2144,12 @@ class GravPhaseNight():
             plt.ylabel('Dec [mas]')
             plt.show()
 
-        fitres = [[sg_t, sg_ra_p1, sg_de_p1, sg_ra_p2, sg_de_p2],
-                  [s2_t, s2_ra_p1, s2_de_p1, s2_ra_p2, s2_de_p2]]
-        return sg_flux, fitres
+        if not only_sgr:
+            fitres = [[sg_t, sg_ra_p1, sg_de_p1, sg_ra_p2, sg_de_p2],
+                      [s2_t, s2_ra_p1, s2_de_p1, s2_ra_p2, s2_de_p2]]
+        else:
+            fitres = [sg_t, sg_ra_p1, sg_de_p1, sg_ra_p2, sg_de_p2]
+        if ret_flux:
+            return sg_flux, fitres
+        else:
+            return fitres
