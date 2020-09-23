@@ -21,6 +21,7 @@ from datetime import timedelta, datetime
 import sys
 import os 
 from joblib import Parallel, delayed
+import multiprocessing
 
 try:
     from generalFunctions import *
@@ -949,20 +950,24 @@ class GravData():
             dalpha=1
             totN=1024
             d = 8
-            
+            amax = 100
+
         elif self.tel == 'AT':
             stopB = 8.0/4.4
             stopS = 8.0/4.4*0.076
             dalpha = 1.*4.4
             totN = 1024
             d = 1.8
-        
+            amax = 100*4.4
+
         kernel = Gaussian2DKernel(x_stddev=smooth)
          
         print('Creating phasemaps:')
         print('StopB : %.2f' % stopB)
         print('StopS : %.2f' % stopS)
         print('Smooth: %.2f' % smooth)
+        print('amax: %i' % amax)
+
         if nthreads == 1:
             all_pm = np.zeros((len(wave), 4, 201, 201),
                             dtype=np.complex_)
@@ -973,8 +978,9 @@ class GravData():
                 for GV in range(4):
                     zer_GV = zer['GV%i' % (GV+1)]
                     pm = phase_screen(*zer_GV, lam0=wl, d1=d, stopB=stopB, stopS=stopS, 
-                                      dalpha=dalpha, totN=totN)
+                                      dalpha=dalpha, totN=totN, amax=amax)
                     if pm.shape != (201, 201):
+                        print(pm.shape)
                         print('Need to convert to (201,201) shape')
                         pm = procrustes(pm, (201,201), padval=0)
                     pm_sm = signal.convolve2d(pm, kernel, mode='same')
@@ -993,15 +999,17 @@ class GravData():
                         
         else:
             def multi_pm(lam):
+                print(lam)
                 m_all_pm = np.zeros((4, 201, 201), dtype=np.complex_)
                 m_all_pm_denom = np.zeros((4, 201, 201), dtype=np.complex_)
                 for GV in range(4):
                     zer_GV = zer['GV%i' % (GV+1)]
                     pm = phase_screen(*zer_GV, lam0=lam, d1=d, stopB=stopB, stopS=stopS, 
-                                      dalpha=dalpha, totN=totN)
+                                      dalpha=dalpha, totN=totN, amax=amax)
 
                     if pm.shape != (201, 201):
                         print('Need to convert to (201,201) shape')
+                        print(pm.shape)
                         pm = procrustes(pm, (201,201), padval=0)
 
                     pm_sm = signal.convolve2d(pm, kernel, mode='same')
@@ -1010,6 +1018,9 @@ class GravData():
                     m_all_pm_denom[GV] = pm_sm_denom
                 return np.array([m_all_pm, m_all_pm_denom])
             
+
+            #pool = multiprocessing.Pool(nthreads)
+            #res = np.array(pool.map(multi_pm, wave))
             res = np.array(Parallel(n_jobs=nthreads)(delayed(multi_pm)(lam) for lam in wave))
             
             all_pm = res[:,0,:,:,:]
