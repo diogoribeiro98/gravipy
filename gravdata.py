@@ -778,7 +778,7 @@ class GravData():
     ############################################
     
     def createPhasemaps(self, nthreads=1, smooth=10, plot=True,
-                        zerfile='phasemap_zernike_20200922_diff.npy'):
+                        zerfile='phasemap_zernike_20200918_diff_2019data.npy'):
         print('Used file: %s' % zerfile)
         
         def phase_screen(A00, A1m1, A1p1, A2m2, A2p2, A20, A3m1, A3p1, A3m3, 
@@ -1152,54 +1152,7 @@ class GravData():
         else:
             return cor_amp, cor_pha, cor_int_denom 
         
-        
-                
 
-    
-    #def givePhasemapPos(self, ra, dec, wave, fromFits=True, 
-                        #northangle=None, dra=None, ddec=None,):
-        #"""
-        #"""
-        #if self.tel == 'UT':
-            #scale = 1
-        #elif self.tel == 'AT':
-            #scale = 4.4
-                
-        #if fromFits:
-            ## should not do that in here for mcmc
-            #header = fits.open(self.name)[0].header
-            #northangle1 = header['ESO QC ACQ FIELD1 NORTH_ANGLE']/180*math.pi
-            #northangle2 = header['ESO QC ACQ FIELD2 NORTH_ANGLE']/180*math.pi
-            #northangle3 = header['ESO QC ACQ FIELD3 NORTH_ANGLE']/180*math.pi
-            #northangle4 = header['ESO QC ACQ FIELD4 NORTH_ANGLE']/180*math.pi
-            #northangle = [northangle1, northangle2, northangle3, northangle4]
-
-            #ddec1 = header['ESO QC MET SOBJ DDEC1']
-            #ddec2 = header['ESO QC MET SOBJ DDEC2']
-            #ddec3 = header['ESO QC MET SOBJ DDEC3']
-            #ddec4 = header['ESO QC MET SOBJ DDEC4']
-            #ddec = [ddec1, ddec2, ddec3, ddec4]
-
-            #dra1 = header['ESO QC MET SOBJ DRA1']
-            #dra2 = header['ESO QC MET SOBJ DRA2']
-            #dra3 = header['ESO QC MET SOBJ DRA3']
-            #dra4 = header['ESO QC MET SOBJ DRA4']
-            #dra = [dra1, dra2, dra3, dra4]
-            
-        #lambda0 = 2.2
-        #position = np.zeros((4, len(wave), 2))
-        #for tel in range(4):
-            #pos = np.array([ra + dra[tel], dec + ddec[tel]])
-            #pos_rot = np.dot(self.rotation(northangle[tel]), pos)
-            #for channel in range(len(wave)):
-                #pos_scaled = pos_rot*lambda0/wave[channel]/scale + 100
-                #pos_int = (np.round(pos_scaled)).astype(int)
-                #position[tel, channel] = pos_scaled
-
-        #return position
-    
-    
-    
     
     def readPhasemapsSingle(self, ra, dec, northangle, dra, ddec, tel, lam, interp=True):
         """
