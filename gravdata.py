@@ -959,6 +959,7 @@ class GravData():
             totN = 1024
             d = 1.8
             amax = 100*4.4
+            smooth /= 4.4
 
         kernel = Gaussian2DKernel(x_stddev=smooth)
          
@@ -1652,6 +1653,7 @@ class GravData():
             alpha_bg = theta[8]
         phaseCenterRA = theta[9]
         phaseCenterDEC = theta[10]
+
         if use_opds:
             opd1 = theta[11]
             opd2 = theta[12]
