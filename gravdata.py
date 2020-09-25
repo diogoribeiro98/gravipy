@@ -951,6 +951,7 @@ class GravData():
             totN=1024
             d = 8
             amax = 100
+            set_smooth = smooth
 
         elif self.tel == 'AT':
             stopB = 8.0/4.4
@@ -959,14 +960,14 @@ class GravData():
             totN = 1024
             d = 1.8
             amax = 100*4.4
-            smooth /= 4.4
+            set_smooth = smooth / 4.4
 
         kernel = Gaussian2DKernel(x_stddev=smooth)
          
         print('Creating phasemaps:')
         print('StopB : %.2f' % stopB)
         print('StopS : %.2f' % stopS)
-        print('Smooth: %.2f' % smooth)
+        print('Smooth: %.2f' % set_smooth)
         print('amax: %i' % amax)
 
         if nthreads == 1:
