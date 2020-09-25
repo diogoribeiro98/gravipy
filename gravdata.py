@@ -1146,17 +1146,17 @@ class GravData():
             pos_rot = np.dot(self.rotation(northangle[tel]), pos) + 100
             pm_pos[tel] = pos_rot
             
-            
-            for wdx in range(len(wave)):
-                if interp:
-                    cor_amp[tel, wdx] = self.amp_map_int[wdx, tel](pos_rot[0], pos_rot[1])
-                    cor_pha[tel, wdx] = self.pha_map_int[wdx, tel](pos_rot[0], pos_rot[1])
-                    cor_int_denom[tel, wdx] = self.amp_map_denom_int[wdx, tel](pos_rot[0], pos_rot[1])
-                else:
-                    pos_int = np.round(pos_rot).astype(int)
-                    cor_amp[tel, wdx] = self.amp_map[wdx,tel][pos_int[1],pos_int[0]]
-                    cor_pha[tel, wdx] = self.pha_map[wdx,tel][pos_int[1],pos_int[0]]
-                    cor_int_denom[tel, wdx] = self.amp_map_denom[wdx,tel][pos_int[1],pos_int[0]]
+            if not givepos:
+                for wdx in range(len(wave)):
+                    if interp:
+                        cor_amp[tel, wdx] = self.amp_map_int[wdx, tel](pos_rot[0], pos_rot[1])
+                        cor_pha[tel, wdx] = self.pha_map_int[wdx, tel](pos_rot[0], pos_rot[1])
+                        cor_int_denom[tel, wdx] = self.amp_map_denom_int[wdx, tel](pos_rot[0], pos_rot[1])
+                    else:
+                        pos_int = np.round(pos_rot).astype(int)
+                        cor_amp[tel, wdx] = self.amp_map[wdx,tel][pos_int[1],pos_int[0]]
+                        cor_pha[tel, wdx] = self.pha_map[wdx,tel][pos_int[1],pos_int[0]]
+                        cor_int_denom[tel, wdx] = self.amp_map_denom[wdx,tel][pos_int[1],pos_int[0]]
 
         if givepos:
             return pm_pos

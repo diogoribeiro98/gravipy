@@ -7,7 +7,8 @@ from astropy.io import fits
 from scipy import interpolate, optimize
 from astropy.time import Time
 from datetime import timedelta, datetime
-
+from joblib import Parallel, delayed
+import multiprocessing
 
 try:
     from generalFunctions import *
@@ -1745,6 +1746,109 @@ class GravPhaseNight():
             return fitres
         
         
+        
+    def fit_night_1src_mcore(self, nthreads, ret_flux=True, fitcut=2):
+        """
+        Fit a pointsource model to all data from the night
+        """
+        ndit = self.ndit
+        wave = self.wave
+        sg_files = self.sg_files
+        s2_files = self.s2_files
+        sg_u_raw = self.sg_u_raw
+        sg_v_raw = self.sg_v_raw
+        s2_u_raw = self.s2_u_raw
+        s2_v_raw = self.s2_v_raw
+
+        [[sg_t, sg_lst, sg_ang, sg_visphi_p1, sg_visphi_err_p1, sg_visphi_p2, sg_visphi_err_p2],
+         [s2_t, s2_lst, s2_ang, s2_visphi_p1, s2_visphi_err_p1, s2_visphi_p2, s2_visphi_err_p2]] = self.alldata
+
+        sg_ra_p1 = np.zeros((len(sg_files), ndit))*np.nan
+        sg_de_p1 = np.zeros((len(sg_files), ndit))*np.nan
+        sg_ra_p2 = np.zeros((len(sg_files), ndit))*np.nan
+        sg_de_p2 = np.zeros((len(sg_files), ndit))*np.nan
+
+        sg_flux = self.sg_flux
+        
+        
+        
+        #Parallel(n_jobs=args.numcores)(delayed(fit_file)(f, t) for t, f in enumerate(files))
+        #pool = multiprocessing.Pool(args.numcores)
+        #pool.map(fit_file, files)
+        
+        def _fitfile(fdx):
+            sg_ra_p1_file = np.zeros(ndit)*np.nan
+            sg_de_p1_file = np.zeros(ndit)*np.nan
+            sg_ra_p2_file = np.zeros(ndit)*np.nan
+            sg_de_p2_file = np.zeros(ndit)*np.nan
+            
+            for dit in range(ndit):
+                u = sg_u_raw[fdx, dit*6:(dit+1)*6]
+                v = sg_v_raw[fdx, dit*6:(dit+1)*6]
+                if np.sum(u==0) > 0:
+                    continue
+
+                visphi = sg_visphi_p1[fdx, dit*6:(dit+1)*6][:,fitcut:-fitcut]
+                visphierr = sg_visphi_err_p1[fdx, dit*6:(dit+1)*6][:,fitcut:-fitcut]
+                wcut = np.copy(wave)[fitcut:-fitcut]
+                if np.sum(np.isnan(visphi)) > 10:
+                    continue
+                sg_ra_p1_file[dit], sg_de_p1_file[dit] = self.fit_pointsource(u,v,wcut,visphi,visphierr,plot=False)
+
+                visphi = sg_visphi_p2[fdx, dit*6:(dit+1)*6][:,fitcut:-fitcut]
+                visphierr = sg_visphi_err_p2[fdx, dit*6:(dit+1)*6][:,fitcut:-fitcut]
+                wcut = np.copy(wave)[fitcut:-fitcut]
+                if np.sum(np.isnan(visphi)) > 10:
+                    continue
+                sg_ra_p2_file[dit], sg_de_p2_file[dit] = self.fit_pointsource(u,v,wcut,visphi,visphierr,plot=False)  
+            return sg_ra_p1_file, sg_de_p1_file, sg_ra_p2_file, sg_de_p2_file
+        
+        filelen = np.arange(len(sg_files))
+        res = Parallel(n_jobs=nthreads)(delayed(_fitfile)(f) for f in filelen)
+        #pool = multiprocessing.Pool(nthreads)
+        #res = pool.map(_fitfile, filelen)
+        
+        return res
+        
+        
+        #for fdx, file in enumerate(sg_files):
+            
+        #if plot:
+            #if ndit == 1:
+                #umark = 'o'
+            #else:
+                #umark = '.'
+            #plt.figure(figsize=(7,6))
+            #gs = gridspec.GridSpec(3,1, hspace=0.05)
+            #axis = plt.subplot(gs[0,0])
+            #plt.title('Position fit')
+            #plt.plot(sg_t.flatten()[::ndit], sg_flux, 
+                     #color=color1, ls='-',lw=0.5, marker='o')
+            #axis.set_xticklabels([])
+            #plt.ylabel('Flux [S2]')
+            #plt.ylim(0,1.5)
+            #axis = plt.subplot(gs[1,0])
+            #plt.plot(sg_t.flatten(), (sg_ra_p1.flatten()+sg_ra_p2.flatten())/2, 
+                     #color=color1, ls='', marker=umark, label='SgrA*')
+            #plt.axhline(0, color='grey', lw=0.5, zorder=0)
+            #plt.legend()
+            #axis.set_xticklabels([])
+            #plt.ylabel('RA [mas]')
+            #axis = plt.subplot(gs[2,0])
+            #plt.plot(sg_t.flatten(), (sg_de_p1.flatten()+sg_de_p2.flatten())/2, 
+                     #color=color1, ls='', marker=umark)
+            #plt.axhline(0, color='grey', lw=0.5, zorder=0)
+            #plt.xlabel('Time [min]')
+            #plt.ylabel('Dec [mas]')
+            #plt.show()
+        
+        #fitres = [sg_t, sg_ra_p1, sg_de_p1, sg_ra_p2, sg_de_p2]
+        #if ret_flux:
+            #return sg_flux, fitres
+        #else:
+            #return fitres
+        
+        
             
             
     def vis_intensity_approx(self, s, alpha, lambda0, dlambda):
@@ -2107,8 +2211,8 @@ class GravPhaseNight():
                     continue
                 sg_ra_p2[fdx, dit], sg_de_p2[fdx, dit] = self.fit_threesource(u,v,wcut,dwcut,
                                                                          visphi,visphierr,header, sg_fr, s2_pos, 
-                                                                         plot=plotfits)    
-            
+                                                                         plot=plotfits)
+                  
         if plot:
             if ndit == 1:
                 umark = 'o'
