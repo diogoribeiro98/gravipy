@@ -960,7 +960,7 @@ class GravData():
             totN = 1024
             d = 1.8
             amax = 100*4.4
-            set_smooth = smooth / 4.4
+            set_smooth = smooth #/ 4.4
 
         kernel = Gaussian2DKernel(x_stddev=smooth)
          
