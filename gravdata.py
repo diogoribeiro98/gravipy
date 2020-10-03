@@ -2418,6 +2418,10 @@ class GravData():
 
                 closure = np.nan_to_num(closure)
                 visphi = np.nan_to_num(visphi)
+                visphi_flag[np.where(visphi_error == 0)] = True
+                visphi_error[np.where(visphi_error == 0)] = 100
+                closure_flag[np.where(closure_error == 0)] = True
+                closure_error[np.where(closure_error == 0)] = 100
 
                 if ((flagtill > 0) and (flagfrom > 0)):
                     p = flagtill
