@@ -9,6 +9,7 @@ from astropy.time import Time
 from datetime import timedelta, datetime
 from joblib import Parallel, delayed
 import multiprocessing
+import os
 
 try:
     from generalFunctions import *
@@ -1524,14 +1525,16 @@ class GravPhaseNight():
         ##########################
         if save:
             if correction:
+                if linear_cor:
+                    folder = file[:file.find('GRAVI')] + 'correction_' + mode +'_new/'
+                else:
+                    folder = file[:file.find('GRAVI')] + 'correction_' + mode +'_nolin/'
+                if not os.path.isdir(folder):
+                    os.mkdir(folder)
+                if self.verbose:
+                    print('Save files in: %s' % folder)
                 for fdx, file in enumerate(sg_files):
                     fname = file[file.find('GRAVI'):]
-                    if linear_cor:
-                        folder = file[:file.find('GRAVI')] + 'correction_' + mode +'_new/'
-                    else:
-                        folder = file[:file.find('GRAVI')] + 'correction_' + mode +'_nolin/'
-                    if not os.path.isdir(folder):
-                        os.mkdir(folder)
                     visphi_p1 = result[0][3][fdx]
                     visphi_p2 = result[0][5][fdx]
 
@@ -1543,13 +1546,14 @@ class GravPhaseNight():
                         d['OI_VIS', 12].data['VISPHI'] = visphi_p2
                         d.writeto(folder+fname, overwrite=True)
             else:
+                if linear_cor:
+                    folder = file[:file.find('GRAVI')] + 'correction_nocor_new/'
+                else:
+                    folder = file[:file.find('GRAVI')] + 'correction_nocor_nolin/'
+                if not os.path.isdir(folder):
+                    os.mkdir(folder)
+                for fdx, file in enumerate(sg_files):
                     fname = file[file.find('GRAVI'):]
-                    if linear_cor:
-                        folder = file[:file.find('GRAVI')] + 'correction_nocor_new/'
-                    else:
-                        folder = file[:file.find('GRAVI')] + 'correction_nocor_nolin/'
-                    if not os.path.isdir(folder):
-                        os.mkdir(folder)
                     visphi_p1 = result[0][3][fdx]
                     visphi_p2 = result[0][5][fdx]
 
