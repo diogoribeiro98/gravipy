@@ -10,6 +10,9 @@ from datetime import timedelta, datetime
 from joblib import Parallel, delayed
 import multiprocessing
 import os
+import sys
+import emcee
+import corner
 
 try:
     from generalFunctions import *
@@ -1084,7 +1087,7 @@ class GravPhaseNight():
             angle = [get_angle_header_all(h, i, o_ndit) for i in range(4)]
             sg_ang[fdx] = np.mean([get_angle_header_all(h, i, ndit) for i in range(4)], 0)
             wave = d['OI_WAVELENGTH',12].data['EFF_WAVE']*1e6
-            dlambda = d['OI_WAVELENGTH',11].data['EFF_BAND']*1e6
+            dlambda = d['OI_WAVELENGTH',11].data['EFF_BAND']/2*1e6
             fullcor = np.zeros((6*ndit, len(wave)))
 
             try:
@@ -1164,10 +1167,10 @@ class GravPhaseNight():
             sg_visphi_err_p1[fdx] = d['OI_VIS', 11].data['VISPHIERR']
             sg_visphi_err_p2[fdx] = d['OI_VIS', 12].data['VISPHIERR']
 
-            sg_visphi_p1[fdx][np.where(flag1 ==True)] = np.nan
-            sg_visphi_p2[fdx][np.where(flag2 ==True)] = np.nan
-            sg_visphi_err_p1[fdx][np.where(flag1 ==True)] = np.nan
-            sg_visphi_err_p2[fdx][np.where(flag2 ==True)] = np.nan
+            sg_visphi_p1[fdx][np.where(flag1 == True)] = np.nan
+            sg_visphi_p2[fdx][np.where(flag2 == True)] = np.nan
+            sg_visphi_err_p1[fdx][np.where(flag1 == True)] = np.nan
+            sg_visphi_err_p2[fdx][np.where(flag2 == True)] = np.nan
 
         self.sg_u_raw = sg_u_raw
         self.sg_v_raw = sg_v_raw
@@ -1870,7 +1873,7 @@ class GravPhaseNight():
 
     def threesource(self, uv, wave, dlambda, sources, x, y, mask=1,
                     alpha_SgrA=-0.5,alpha_S=3, alpha_bg=3, 
-                    fluxRatioBG=0, flatten=True):
+                    fluxRatioBG=0, ret_flat=True):
         phasemaps = self.fit_phasemaps
         mas2rad = 1e-3 / 3600 / 180 * np.pi
         u = uv[0]
@@ -1955,14 +1958,32 @@ class GravPhaseNight():
                             s2_fr*intS2_center + fluxRatioBG*intBG))
         visphi = np.angle(vis, deg=True)
         visphi = visphi + 360.*(visphi<-180.) - 360.*(visphi>180.)  
-
-        if flatten:
+        
+        if ret_flat:
             return visphi.flatten()[mask]
         else:
             return visphi
         
         
-    def fit_threesource(self, u, v, wave, dlambda, visphi, visphierr, header, sg_fr, s2_pos, plot=False):
+    def lnprob_unary(self, theta, visphif, visphierrf, 
+                     mask, uv, wave, dlambda, sources, lower, upper):
+        if np.any(theta < lower) or np.any(theta > upper):
+            return -np.inf
+        return self.lnlike_unary(theta, visphif, visphierrf, mask, uv, wave, dlambda, sources)
+    
+    
+    def lnlike_unary(self, theta, visphi, visphi_error, mask, uv, wave, dlambda, sources):
+        model_visphi = self.threesource(uv, wave, dlambda, sources, theta[0], theta[1], mask=mask)
+        
+        res_phi = (-np.minimum((model_visphi-visphi)**2.,
+                                     (360-(model_visphi-visphi))**2.)/
+                          visphi_error**2.)
+        res_phi = np.sum(res_phi[~np.isnan(res_phi)])
+        return 0.5*res_phi
+        
+        
+        
+    def fit_threesource(self, u, v, wave, dlambda, visphi, visphierr, header, sg_fr, s2_pos, plot=False, mcmc=False):
         phasemaps = self.fit_phasemaps
         uv = [u.flatten(),v.flatten()]
         visphif = visphi.flatten()
@@ -2051,12 +2072,61 @@ class GravPhaseNight():
             f1_fr = f1_fr * fiber_coup
 
             sources = [s2_pos, s2_fr, f1_pos, f1_fr]
+            
+            
+        if mcmc:
+            nwalkers = 200
+            nruns = 200
+            size = 10
+            
+            popt1, pcov = optimize.curve_fit(lambda uv, x, y: self.pointsource(uv, wave, x, y, mask),
+                                            uv, visphif[mask], sigma=visphierrf[mask],
+                                            bounds=(-10,10))
+            theta = np.array(popt1)
+            theta_lower = np.array([-size, -size])
+            theta_upper = np.array([size, size])
+            theta_names = np.array([r"$RA_{PC}$", r"$DEC_{PC}$"])
+            theta_names_raw = np.array(["PC RA", "PC DEC"])
+            ndim = len(theta)
+            width = 1e-1
+            pos = np.ones((nwalkers,ndim))
+            for par in range(ndim):
+                pos[:,par] = theta[par] + width*np.random.randn(nwalkers)
+                
+            sampler = emcee.EnsembleSampler(nwalkers, ndim, self.lnprob_unary,
+                                            args=(visphif[mask], visphierrf[mask], mask, 
+                                                  uv, wave, dlambda, sources,
+                                                  theta_lower, theta_upper))
+            sampler.run_mcmc(pos, nruns, progress=False)
+            samples = sampler.chain
+            mostprop = sampler.flatchain[np.argmax(sampler.flatlnprobability)]
 
+            fl_samples = samples[:, -nruns//2:, :].reshape((-1, ndim))
+            if plot:
+                fig, axes = plt.subplots(ndim, figsize=(8, ndim/1.5),
+                                        sharex=True)
+                for i in range(ndim):
+                    ax = axes[i]
+                    ax.plot(samples[:, :, i].T, "k", alpha=0.3)
+                    ax.set_ylabel(theta_names[i])
+                    ax.yaxis.set_label_coords(-0.1, 0.5)
+                axes[-1].set_xlabel("step number")
+                plt.show()
+                
+                
+                
+                ranges = np.percentile(fl_samples, [3, 97], axis=0).T
+                fig = corner.corner(fl_samples, quantiles=[0.16, 0.5, 0.84],
+                                    truths=mostprop, labels=theta_names)
+                plt.show()
+            popt = np.percentile(fl_samples, [50], axis=0).T
         
-        popt, pcov = optimize.curve_fit(lambda uv, x, y: self.threesource(uv, wave, dlambda, sources, x, y, mask=mask),
-                                        uv, visphif[mask], sigma=visphierrf[mask],
-                                        bounds=(-10,10))
-        
+        else:
+            popt, pcov = optimize.curve_fit(lambda uv, x, y: self.threesource(uv, wave, dlambda, sources, x, y,
+                                                                            mask=mask), 
+                                            uv, visphif[mask], sigma=visphierrf[mask], 
+                                            bounds=(-10,10), p0=[-3,  0.6 ])#, method="dogbox",**{"loss":'cauchy'})
+
         if plot:
             rad2as = 180 / np.pi * 3600
             wave_model = np.linspace(wave[0],wave[len(wave)-1],1000)
@@ -2097,17 +2167,15 @@ class GravPhaseNight():
                         pos_scaled = pos_rot*lambda0/wave_model[channel] + 100
                         cor_amp_f1[tel, channel] = pm_amp_int[tel](pos_scaled[0], pos_scaled[1])
                         cor_pha_f1[tel, channel] = pm_pha_int[tel](pos_scaled[0], pos_scaled[1])
+                        
+                cor = [cor_amp_s2, cor_pha_s2, cor_amp_f1, cor_pha_f1]
+                sources = [s2_pos, s2_fr, f1_pos, f1_fr, cor]
+
             else:
-                cor_amp_s2 = np.ones((4, len(wave_model)))
-                cor_pha_s2 = np.zeros((4, len(wave_model)))
-                cor_amp_f1 = np.ones((4, len(wave_model)))
-                cor_pha_f1 = np.zeros((4, len(wave_model)))
-            
-            cor = [cor_amp_s2, cor_pha_s2, cor_amp_f1, cor_pha_f1]
-            sources = [s2_pos, s2_fr, f1_pos, f1_fr, cor]
+                sources = [s2_pos, s2_fr, f1_pos, f1_fr]
             
             model_visphi = self.threesource(uv, wave_model, dlambda_model, sources,
-                                    popt[0], popt[1], mask=1, flatten=False)
+                                    popt[0], popt[1], mask=1, ret_flat=False)
             
             for i in range(0,6):
                 plt.errorbar(magu_as[i,:], visphi[i,:], visphierr[i,:], 
@@ -2126,7 +2194,8 @@ class GravPhaseNight():
         
 
 
-    def fit_night_3src(self, plot=True, plotfits=False, phasemaps=False, only_sgr=False, ret_flux=True, fitcut=2):
+    def fit_night_3src(self, plot=True, plotfits=False, phasemaps=False, only_sgr=False, ret_flux=True, fitcut=2,
+                       mcmc=False):
         """
         Fit a 3 source model to all data from the night
         """
@@ -2151,7 +2220,6 @@ class GravPhaseNight():
             s2_de_p2 = np.zeros((len(s2_files), ndit))*np.nan
 
             for fdx, file in enumerate(s2_files):
-                for dit in range(ndit):
                     u = s2_u_raw[fdx, dit*6:(dit+1)*6]
                     v = s2_v_raw[fdx, dit*6:(dit+1)*6]
                     if np.sum(u==0) > 0:
@@ -2205,8 +2273,8 @@ class GravPhaseNight():
                     continue
                 sg_ra_p1[fdx, dit], sg_de_p1[fdx, dit] = self.fit_threesource(u,v,wcut,dwcut,
                                                                          visphi,visphierr,header, sg_fr, s2_pos, 
-                                                                         plot=plotfits)
-
+                                                                         plot=plotfits, mcmc=mcmc)
+                
                 visphi = sg_visphi_p2[fdx, dit*6:(dit+1)*6][:,fitcut:-fitcut]
                 visphierr = sg_visphi_err_p2[fdx, dit*6:(dit+1)*6][:,fitcut:-fitcut]
                 wcut = np.copy(wave)[fitcut:-fitcut]
@@ -2215,7 +2283,7 @@ class GravPhaseNight():
                     continue
                 sg_ra_p2[fdx, dit], sg_de_p2[fdx, dit] = self.fit_threesource(u,v,wcut,dwcut,
                                                                          visphi,visphierr,header, sg_fr, s2_pos, 
-                                                                         plot=plotfits)
+                                                                         plot=plotfits, mcmc=mcmc)
                   
         if plot:
             if ndit == 1:
