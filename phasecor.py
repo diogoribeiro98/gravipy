@@ -14,6 +14,7 @@ import sys
 import emcee
 import corner
 
+
 try:
     from generalFunctions import *
     import dill as pickle
@@ -331,34 +332,35 @@ def read_correction(mcor_files, xscale, list_dim=1, fancy=True, wrap=False, lst=
     
     for tel in range(4):
         TELFC_MCORR_S2_corr[:,:,tel] -= np.nanmean(TELFC_MCORR_S2_corr[:,:,tel])
-
-    gs = gridspec.GridSpec(2,2,wspace=0.1,hspace=0.1)
-    plt.figure(figsize=(8,6))
-    for tel in range(4):
-        ax = plt.subplot(gs[tel%2,tel//2])
-        for idx in range(ndata):
-            data = TELFC_MCORR_S2_corr[idx,:,tel]
-            if list_dim == 1:
-                plt.plot(x, data, marker='.', ls='', alpha=0.5, color='k')
+    
+    if not bequiet:
+        gs = gridspec.GridSpec(2,2,wspace=0.1,hspace=0.1)
+        plt.figure(figsize=(8,6))
+        for tel in range(4):
+            ax = plt.subplot(gs[tel%2,tel//2])
+            for idx in range(ndata):
+                data = TELFC_MCORR_S2_corr[idx,:,tel]
+                if list_dim == 1:
+                    plt.plot(x, data, marker='.', ls='', alpha=0.5, color='k')
+                else:
+                    ndx = np.where(np.array(len_lists) <= idx)[0][-1]
+                    plt.plot(x, data, marker='.', ls='', 
+                            alpha=0.1, color=colors_lists[ndx])
+            plt.text(textpos, -0.25, 'UT%i' % (4-tel))
+            plt.ylim(-0.3,0.3)
+            plt.plot(averaging(x,av), averaging(np.nanmedian(TELFC_MCORR_S2_corr[:,:,tel], 0), av), color=color1)
+            if tel//2 != 0:
+                ax.set_yticklabels([])
             else:
-                ndx = np.where(np.array(len_lists) <= idx)[0][-1]
-                plt.plot(x, data, marker='.', ls='', 
-                         alpha=0.1, color=colors_lists[ndx])
-        plt.text(textpos, -0.25, 'UT%i' % (4-tel))
-        plt.ylim(-0.3,0.3)
-        plt.plot(averaging(x,av), averaging(np.nanmedian(TELFC_MCORR_S2_corr[:,:,tel], 0), av), color=color1)
-        if tel//2 != 0:
-            ax.set_yticklabels([])
-        else:
-            plt.ylabel('TELFC_MCORR [$\mu$m]')
-        if tel%2 != 1:
-            ax.set_xticklabels([])
-        else:
-            if lst:
-                plt.xlabel('LST [h]')
+                plt.ylabel('TELFC_MCORR [$\mu$m]')
+            if tel%2 != 1:
+                ax.set_xticklabels([])
             else:
-                plt.xlabel('Ref. angle [deg]')
-    plt.show()
+                if lst:
+                    plt.xlabel('LST [h]')
+                else:
+                    plt.xlabel('Ref. angle [deg]')
+        plt.show()
 
     return x, TELFC_MCORR_S2_corr
 
@@ -880,7 +882,7 @@ class GravPhaseNight():
                     'GRAVI.2019-08-14T01:22:28.240_dualscivis.fits',
                     'GRAVI.2019-08-15T01:58:01.049_dualscivis.fits',
                     'GRAVI.2019-08-16T01:09:36.547_dualscivis.fits',
-                    'GRAVI.2019-08-18T23:55:52.258_dualscivis.fits',
+                    'GRAVI.2019-08-19T01:30:49.497_dualscivis.fits',#'GRAVI.2019-08-18T23:55:52.258_dualscivis.fits',
                     'GRAVI.2019-08-20T02:41:24.122_dualscivis.fits',
         #                'GRAVI.2019-09-12T01:26:51.547_dualscivis.fits',
                     'GRAVI.2019-09-12T23:48:18.886_dualscivis.fits',
@@ -941,7 +943,6 @@ class GravPhaseNight():
             
         pandasfile = resource_filename('gravipy', 'GRAVITY_DATA_2019_4_frame.object')
         pand = pd.read_pickle(pandasfile)
-        self.pand = pand
         sg_flux = []
         sg_header = []
         s2_pos = []
@@ -950,15 +951,8 @@ class GravPhaseNight():
             h = d[0].header
             sg_header.append(h)
             obsdate = h['DATE-OBS']
-            try:
-                p1 = np.mean(self.pand["flux p1 [%S2]"].loc[self.pand['DATE-OBS'] == obsdate])
-                p2 = np.mean(self.pand["flux p2 [%S2]"].loc[self.pand['DATE-OBS'] == obsdate])
-            except AttributeError:
-                print('Read in pandas')
-                pandasfile = resource_filename('gravipy', 'GRAVITY_DATA_2019_4_frame.object')
-                self.pand = pd.read_pickle(pandasfile)
-                p1 = np.mean(self.pand["flux p1 [%S2]"].loc[self.pand['DATE-OBS'] == obsdate])
-                p2 = np.mean(self.pand["flux p2 [%S2]"].loc[self.pand['DATE-OBS'] == obsdate])
+            p1 = np.mean(pand["flux p1 [%S2]"].loc[pand['DATE-OBS'] == obsdate])
+            p2 = np.mean(pand["flux p2 [%S2]"].loc[pand['DATE-OBS'] == obsdate])
             sg_fr = (p1+p2)/2
             if np.isnan(sg_fr):
                 print('%s has no flux value' % file)
@@ -1504,6 +1498,9 @@ class GravPhaseNight():
                     plt.plot(np.nanmean(result[1][1], 1), (np.nanmedian(result[1][3][:,idx::6,2:-2], (1,2))+
                                                            np.nanmedian(result[1][5][:,idx::6,2:-2], (1,2)))/2+idx*30, 
                              ls='', lw=0.5, marker='D', zorder=10, color=colors_baseline[idx])
+                    #plt.plot(result[1][1].flatten(), (np.nanmedian(result[1][3][:,idx::6,2:-2], (2).flatten())+
+                                                      #np.nanmedian(result[1][5][:,idx::6,2:-2], (2)).flatten())/2+idx*30, 
+                             #ls='', lw=0.5, marker='D', zorder=10, color=colors_baseline[idx])
                     plt.plot(np.nanmean(result[0][1], 1), (np.nanmedian(result[0][3][:,idx::6,2:-2], (1,2))+
                                                            np.nanmedian(result[0][5][:,idx::6,2:-2], (1,2)))/2+idx*30, 
                              ls='-', lw=0.5, marker='o', zorder=10, color=colors_baseline[idx])
@@ -1617,7 +1614,7 @@ class GravPhaseNight():
             magu_as_model = np.sqrt(u_as_model**2.+v_as_model**2.)
             magu_as = np.sqrt(u_as**2.+v_as**2.)   
             
-            model_visphi = pointsource(uv, wave_model, popt[0], popt[1], mask=1, flatten=False)
+            model_visphi = self.pointsource(uv, wave_model, popt[0], popt[1], mask=1, flatten=False)
             
             for i in range(0,6):
                 plt.errorbar(magu_as[i,:], visphi[i,:], visphierr[i,:], 
@@ -2122,10 +2119,22 @@ class GravPhaseNight():
             popt = np.percentile(fl_samples, [50], axis=0).T
         
         else:
+            popt1, pcov = optimize.curve_fit(lambda uv, x, y: self.pointsource(uv, wave, x, y, mask),
+                                            uv, visphif[mask], sigma=visphierrf[mask],
+                                            bounds=(-10,10))
+            
+            p0 = [popt1[0], popt1[1]]
+
             popt, pcov = optimize.curve_fit(lambda uv, x, y: self.threesource(uv, wave, dlambda, sources, x, y,
                                                                             mask=mask), 
                                             uv, visphif[mask], sigma=visphierrf[mask], 
-                                            bounds=(-10,10), p0=[-3,  0.6 ])#, method="dogbox",**{"loss":'cauchy'})
+                                            bounds=(-10,10), p0=p0)#, method="dogbox",**{"loss":'cauchy'})
+            
+        popt_res = self.threesource(uv, wave, dlambda, sources, *popt, mask=mask)
+        
+        chi = np.sum((visphif[mask] - popt_res)**2/visphierrf[mask]**2)
+        ndof = len(popt_res)-2
+        redchi = chi/ndof
 
         if plot:
             rad2as = 180 / np.pi * 3600
@@ -2189,13 +2198,13 @@ class GravPhaseNight():
             plt.ylabel('visibility phase [deg]')
             plt.xlabel('spatial frequency [1/arcsec]')
             plt.show()
-        return popt
+        return popt[0], popt[1], redchi
         
         
 
 
     def fit_night_3src(self, plot=True, plotfits=False, phasemaps=False, only_sgr=False, ret_flux=True, fitcut=2,
-                       mcmc=False):
+                       mcmc=False, nthreads=1):
         """
         Fit a 3 source model to all data from the night
         """
@@ -2220,6 +2229,10 @@ class GravPhaseNight():
             s2_de_p2 = np.zeros((len(s2_files), ndit))*np.nan
 
             for fdx, file in enumerate(s2_files):
+                if plotfits:
+                    print('S2')
+                    print(s2_files[fdx])
+                for dit in range(ndit):
                     u = s2_u_raw[fdx, dit*6:(dit+1)*6]
                     v = s2_v_raw[fdx, dit*6:(dit+1)*6]
                     if np.sum(u==0) > 0:
@@ -2243,47 +2256,128 @@ class GravPhaseNight():
         sg_de_p1 = np.zeros((len(sg_files), ndit))*np.nan
         sg_ra_p2 = np.zeros((len(sg_files), ndit))*np.nan
         sg_de_p2 = np.zeros((len(sg_files), ndit))*np.nan
+        sg_chi_p1 = np.zeros((len(sg_files), ndit))*np.nan
+        sg_chi_p2 = np.zeros((len(sg_files), ndit))*np.nan
         
         sg_flux = self.sg_flux
         s2_lpos = self.s2_pos
-        for fdx, file in enumerate(sg_files):
-            sg_fr = sg_flux[fdx]
-            s2_pos = s2_lpos[fdx]
-            header = self.sg_header[fdx]
-            if np.isnan(sg_fr):
-                if self.verbose:
-                    print('SgrA* flux not available for %s' % sg_files[fdx])
-                sg_ra_p1[fdx] = np.nan
-                sg_de_p1[fdx] = np.nan
-                sg_ra_p2[fdx] = np.nan
-                sg_de_p2[fdx] = np.nan
-                continue
-            
-            for dit in range(ndit):
-                u = sg_u_raw[fdx, dit*6:(dit+1)*6]
-                v = sg_v_raw[fdx, dit*6:(dit+1)*6]
-                if np.sum(u==0) > 0:
+        
+        if nthreads == 1:
+            for fdx, file in enumerate(sg_files):
+                if plotfits:
+                    print('SgrA*')
+                    print(sg_t[fdx])
+                sg_fr = sg_flux[fdx]
+                s2_pos = s2_lpos[fdx]
+                header = self.sg_header[fdx]
+                if np.isnan(sg_fr):
+                    if self.verbose:
+                        print('SgrA* flux not available for %s' % sg_files[fdx])
+                    sg_ra_p1[fdx] = np.nan
+                    sg_de_p1[fdx] = np.nan
+                    sg_ra_p2[fdx] = np.nan
+                    sg_de_p2[fdx] = np.nan
                     continue
-
-                visphi = sg_visphi_p1[fdx, dit*6:(dit+1)*6][:,fitcut:-fitcut]
-                visphierr = sg_visphi_err_p1[fdx, dit*6:(dit+1)*6][:,fitcut:-fitcut]
-                wcut = np.copy(wave)[fitcut:-fitcut]
-                dwcut = np.copy(dlambda)[fitcut:-fitcut]
-                if np.sum(np.isnan(visphi)) > 10:
-                    continue
-                sg_ra_p1[fdx, dit], sg_de_p1[fdx, dit] = self.fit_threesource(u,v,wcut,dwcut,
-                                                                         visphi,visphierr,header, sg_fr, s2_pos, 
-                                                                         plot=plotfits, mcmc=mcmc)
                 
-                visphi = sg_visphi_p2[fdx, dit*6:(dit+1)*6][:,fitcut:-fitcut]
-                visphierr = sg_visphi_err_p2[fdx, dit*6:(dit+1)*6][:,fitcut:-fitcut]
-                wcut = np.copy(wave)[fitcut:-fitcut]
-                dwcut = np.copy(dlambda)[fitcut:-fitcut]
-                if np.sum(np.isnan(visphi)) > 10:
-                    continue
-                sg_ra_p2[fdx, dit], sg_de_p2[fdx, dit] = self.fit_threesource(u,v,wcut,dwcut,
-                                                                         visphi,visphierr,header, sg_fr, s2_pos, 
-                                                                         plot=plotfits, mcmc=mcmc)
+                for dit in range(ndit):
+                    u = sg_u_raw[fdx, dit*6:(dit+1)*6]
+                    v = sg_v_raw[fdx, dit*6:(dit+1)*6]
+                    if np.sum(u==0) > 0:
+                        continue
+
+                    visphi = sg_visphi_p1[fdx, dit*6:(dit+1)*6][:,fitcut:-fitcut]
+                    visphierr = sg_visphi_err_p1[fdx, dit*6:(dit+1)*6][:,fitcut:-fitcut]
+                    wcut = np.copy(wave)[fitcut:-fitcut]
+                    dwcut = np.copy(dlambda)[fitcut:-fitcut]
+                    if np.sum(np.isnan(visphi)) > 10:
+                        continue
+                    sg_ra_p1[fdx, dit], sg_de_p1[fdx, dit], sg_chi_p1[fdx, dit] = self.fit_threesource(u,v,wcut,dwcut,
+                                                                            visphi,visphierr,header, sg_fr, s2_pos, 
+                                                                            plot=plotfits, mcmc=mcmc)
+                    
+                    visphi = sg_visphi_p2[fdx, dit*6:(dit+1)*6][:,fitcut:-fitcut]
+                    visphierr = sg_visphi_err_p2[fdx, dit*6:(dit+1)*6][:,fitcut:-fitcut]
+                    wcut = np.copy(wave)[fitcut:-fitcut]
+                    dwcut = np.copy(dlambda)[fitcut:-fitcut]
+                    if np.sum(np.isnan(visphi)) > 10:
+                        continue
+                    sg_ra_p2[fdx, dit], sg_de_p2[fdx, dit], sg_chi_p2[fdx, dit]  = self.fit_threesource(u,v,wcut,dwcut,
+                                                                            visphi,visphierr,header, sg_fr, s2_pos, 
+                                                                            plot=plotfits, mcmc=mcmc)
+        else:
+            def _fit_file(fdx):
+                print(fdx)
+                file = sg_files[fdx]
+                sg_fr = sg_flux[fdx]
+                s2_pos = s2_lpos[fdx]
+                header = self.sg_header[fdx]
+                
+                _ra_p1 = np.zeros(ndit)*np.nan
+                _de_p1 = np.zeros(ndit)*np.nan
+                _ra_p2 = np.zeros(ndit)*np.nan
+                _de_p2 = np.zeros(ndit)*np.nan
+                _chi_p1 = np.zeros(ndit)*np.nan
+                _chi_p2 = np.zeros(ndit)*np.nan
+                
+                if np.isnan(sg_fr):
+                    if self.verbose:
+                        print('SgrA* flux not available for %s' % sg_files[fdx])
+                    _ra_p1 = np.nan
+                    _de_p1 = np.nan
+                    _ra_p2 = np.nan
+                    _de_p2 = np.nan
+                    _res = np.array([_ra_p1, _de_p1, _ra_p2, _de_p2])
+                    return _res
+                
+                for dit in range(ndit):
+                    u = sg_u_raw[fdx, dit*6:(dit+1)*6]
+                    v = sg_v_raw[fdx, dit*6:(dit+1)*6]
+                    if np.sum(u==0) > 0:
+                        continue
+
+                    visphi = sg_visphi_p1[fdx, dit*6:(dit+1)*6][:,fitcut:-fitcut]
+                    visphierr = sg_visphi_err_p1[fdx, dit*6:(dit+1)*6][:,fitcut:-fitcut]
+                    wcut = np.copy(wave)[fitcut:-fitcut]
+                    dwcut = np.copy(dlambda)[fitcut:-fitcut]
+                    if np.sum(np.isnan(visphi)) > 10:
+                        continue
+                    _ra_p1[dit], _de_p1[dit], _chi_p1[dit] = self.fit_threesource(u,v,wcut,dwcut,
+                                                                    visphi,visphierr,header, sg_fr, s2_pos,
+                                                                    plot=plotfits, mcmc=mcmc)
+                    
+                    visphi = sg_visphi_p2[fdx, dit*6:(dit+1)*6][:,fitcut:-fitcut]
+                    visphierr = sg_visphi_err_p2[fdx, dit*6:(dit+1)*6][:,fitcut:-fitcut]
+                    wcut = np.copy(wave)[fitcut:-fitcut]
+                    dwcut = np.copy(dlambda)[fitcut:-fitcut]
+                    if np.sum(np.isnan(visphi)) > 10:
+                        continue
+                    _ra_p2[dit], _de_p2[dit], _chi_p2[dit] = self.fit_threesource(u,v,wcut,dwcut,
+                                                                    visphi,visphierr,header, sg_fr, s2_pos,
+                                                                    plot=plotfits, mcmc=mcmc)
+                _res = np.array([_ra_p1, _de_p1, _ra_p2, _de_p2, _chi_p1, _chi_p2])
+                return _res
+
+
+            #pool = multiprocessing.Pool(nthreads)
+            #mcoreres = np.array(pool.map(_fit_file, np.arange(len(sg_files))))
+            
+            #mcoreres = []
+            #for f in range(len(sg_files)):
+                #print(f)
+                #mcoreres.append(_fit_file(f))
+            #mcoreres = np.asarray(mcoreres)
+            mcoreres = np.array(Parallel(n_jobs=nthreads, 
+                                         verbose=51,
+                                         #backend="threading"
+                                         )(delayed(_fit_file)(fdx) for fdx in range(len(sg_files))))
+        
+            sg_ra_p1 = mcoreres[:,0,:]
+            sg_de_p1 = mcoreres[:,1,:]
+            sg_ra_p2 = mcoreres[:,2,:]
+            sg_de_p2 = mcoreres[:,3,:]
+            sg_chi_p1 = mcoreres[:,4,:]
+            sg_chi_p2 = mcoreres[:,5,:]
+                
                   
         if plot:
             if ndit == 1:
@@ -2324,7 +2418,7 @@ class GravPhaseNight():
             fitres = [[sg_t, sg_ra_p1, sg_de_p1, sg_ra_p2, sg_de_p2],
                       [s2_t, s2_ra_p1, s2_de_p1, s2_ra_p2, s2_de_p2]]
         else:
-            fitres = [sg_t, sg_ra_p1, sg_de_p1, sg_ra_p2, sg_de_p2]
+            fitres = [sg_t, sg_ra_p1, sg_de_p1, sg_ra_p2, sg_de_p2, sg_chi_p1, sg_chi_p2]
         if ret_flux:
             return sg_flux, fitres
         else:
