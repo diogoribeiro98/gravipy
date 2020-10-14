@@ -828,7 +828,7 @@ def get_corrections(bequiet=False):
 # Correct a full night
 
 class GravPhaseNight():
-    def __init__(self, night, ndit, verbose=True):
+    def __init__(self, night, ndit, verbose=True, nopandas=False):
         """
         Package to do the full phase calibration, poscor, correction and fitting
         
@@ -894,8 +894,9 @@ class GravPhaseNight():
             if self.verbose:
                 print('Night: %s, Calibrator: %s' % (night, self.calibrator))
         except ValueError:
-            print('Night is not available, try one of those:')
-            print(nights)
+            if self.verbose:
+                print('Night is not available, try one of those:')
+                print(nights)
             raise ValueError('Night is not available')
         
         if ndit == 1:
@@ -937,35 +938,36 @@ class GravPhaseNight():
         self.sg_files = sg_files
         
         
-        ################
-        # read in flux from pandas
-        ################
-            
-        pandasfile = resource_filename('gravipy', 'GRAVITY_DATA_2019_4_frame.object')
-        pand = pd.read_pickle(pandasfile)
-        sg_flux = []
-        sg_header = []
-        s2_pos = []
-        for fdx, file in enumerate(sg_files):
-            d = fits.open(file)
-            h = d[0].header
-            sg_header.append(h)
-            obsdate = h['DATE-OBS']
-            p1 = np.mean(pand["flux p1 [%S2]"].loc[pand['DATE-OBS'] == obsdate])
-            p2 = np.mean(pand["flux p2 [%S2]"].loc[pand['DATE-OBS'] == obsdate])
-            sg_fr = (p1+p2)/2
-            if np.isnan(sg_fr):
-                print('%s has no flux value' % file)
-            sg_flux.append(sg_fr)
-            
-            ddate = convert_date(obsdate)[0]
-            orbitfile = resource_filename('gravipy', 's2_orbit_082020.txt')
-            orbit = np.genfromtxt(orbitfile)
-            s2_pos.append(orbit[find_nearest(orbit[:,0], ddate)][1:]*1000)
+        if not nopandas:
+            ################
+            # read in flux from pandas
+            ################
                 
-        self.s2_pos = s2_pos
-        self.sg_flux = sg_flux
-        self.sg_header = sg_header
+            pandasfile = resource_filename('gravipy', 'GRAVITY_DATA_2019_4_frame.object')
+            pand = pd.read_pickle(pandasfile)
+            sg_flux = []
+            sg_header = []
+            s2_pos = []
+            for fdx, file in enumerate(sg_files):
+                d = fits.open(file)
+                h = d[0].header
+                sg_header.append(h)
+                obsdate = h['DATE-OBS']
+                p1 = np.mean(pand["flux p1 [%S2]"].loc[pand['DATE-OBS'] == obsdate])
+                p2 = np.mean(pand["flux p2 [%S2]"].loc[pand['DATE-OBS'] == obsdate])
+                sg_fr = (p1+p2)/2
+                if np.isnan(sg_fr):
+                    print('%s has no flux value' % file)
+                sg_flux.append(sg_fr)
+                
+                ddate = convert_date(obsdate)[0]
+                orbitfile = resource_filename('gravipy', 's2_orbit_082020.txt')
+                orbit = np.genfromtxt(orbitfile)
+                s2_pos.append(orbit[find_nearest(orbit[:,0], ddate)][1:]*1000)
+                    
+            self.s2_pos = s2_pos
+            self.sg_flux = sg_flux
+            self.sg_header = sg_header
 
         
         
@@ -997,7 +999,8 @@ class GravPhaseNight():
 
         s2_files = self.s2_files
         sg_files = self.sg_files
-        sg_flux = self.sg_flux
+        if fluxcut > 0:
+            sg_flux = self.sg_flux
         
         if isinstance(mode, str):
             corrections_dict = get_corrections(bequiet=True)
@@ -1050,6 +1053,7 @@ class GravPhaseNight():
         sg_v = np.zeros((len(sg_files), ndit*6, 14))*np.nan
         sg_u_raw = np.zeros((len(sg_files), ndit*6))*np.nan
         sg_v_raw = np.zeros((len(sg_files), ndit*6))*np.nan
+        sg_correction = np.zeros((len(sg_files), ndit*6, 14))*np.nan
         
         for fdx, file in enumerate(sg_files):
             d = fits.open(file)
@@ -1139,7 +1143,7 @@ class GravPhaseNight():
 
                     if ndit == 1:
                         cor = np.mean(cor)
-
+                        
                     wcor = np.zeros((ndit, len(wave)))
                     for w in range(len(wave)):
                         wcor[:,w] = cor/wave[w]*360
@@ -1147,6 +1151,7 @@ class GravPhaseNight():
                 fullcor[np.isnan(fullcor)] = 0
             except ValueError:
                 fullcor = 0
+            sg_correction[fdx] = fullcor
 
             flag1 = d['OI_VIS', 11].data['FLAG']
             flag2 = d['OI_VIS', 12].data['FLAG']
@@ -1182,6 +1187,7 @@ class GravPhaseNight():
         s2_v = np.zeros((len(s2_files), ndit*6, 14))
         s2_u_raw = np.zeros((len(s2_files), ndit*6))
         s2_v_raw = np.zeros((len(s2_files), ndit*6))
+        s2_correction = np.zeros((len(s2_files), ndit*6, 14))*np.nan
 
         for fdx, file in enumerate(s2_files):
             d = fits.open(file)
@@ -1276,6 +1282,7 @@ class GravPhaseNight():
                 fullcor[np.isnan(fullcor)] = 0
             except ValueError:
                 fullcor = 0
+            s2_correction[fdx] = fullcor
 
             flag1 = d['OI_VIS', 11].data['FLAG']
             flag2 = d['OI_VIS', 12].data['FLAG']
@@ -1482,40 +1489,65 @@ class GravPhaseNight():
         result = [[sg_t, sg_lst, sg_ang, sg_visphi_p1, sg_visphi_err_p1, sg_visphi_p2, sg_visphi_err_p2],
                   [s2_t, s2_lst, s2_ang, s2_visphi_p1, s2_visphi_err_p1, s2_visphi_p2, s2_visphi_err_p2]]
 
-
+        
         if plot:
+            fig = plt.figure()
+            ax1 = fig.add_subplot(111)
+            ax2 = ax1.twiny()
             for idx in range(6):
-                if idx == 0:
-                    plt.plot(np.nanmean(result[1][1], 1), (np.nanmedian(result[1][3][:,idx::6,2:-2], (1,2))+
-                                                           np.nanmedian(result[1][5][:,idx::6,2:-2], (1,2)))/2+idx*30, 
+                all_t = np.concatenate((sg_lst.flatten(), s2_lst.flatten()))
+                all_t_s = all_t.argsort()
+                all_cor = np.concatenate((np.nanmedian(sg_correction[:,idx::6,2:-2],2).flatten(), np.nanmedian(s2_correction[:,idx::6,2:-2],2).flatten()))
+                all_cor = -all_cor[all_t_s]
+                all_t = all_t[all_t_s]
+                
+                if idx == 3:
+                    ax1.plot(s2_lst.flatten(), (np.nanmedian(s2_visphi_p1[:,idx::6,2:-2],2).flatten()+
+                                              np.nanmedian(s2_visphi_p1[:,idx::6,2:-2],2).flatten())/2+idx*50, 
                              ls='', lw=0.5, marker='D', zorder=10, color=colors_baseline[idx],
-                             label='S2 files')
-                    plt.plot(np.nanmean(result[0][1], 1), (np.nanmedian(result[0][3][:,idx::6,2:-2], (1,2))+
-                                                           np.nanmedian(result[0][5][:,idx::6,2:-2], (1,2)))/2+idx*30, 
-                             ls='-', lw=0.5, marker='o', zorder=10, color=colors_baseline[idx],
-                             label='Sgr A* files')
+                             markersize=2, alpha=0.5, markeredgecolor='k', label='S2 files')
+                    ax1.plot(sg_lst.flatten(), (np.nanmedian(sg_visphi_p1[:,idx::6,2:-2],2).flatten()+
+                                              np.nanmedian(sg_visphi_p2[:,idx::6,2:-2],2).flatten())/2+idx*50, 
+                             ls='', lw=0.5, marker='o', zorder=10, color=colors_baseline[idx],
+                             markersize=2, alpha=0.5, label='Sgr A* files')
+                    ax1.plot(all_t, all_cor+idx*50, color='r', zorder=11, alpha=0.8, label='Correction')
                 else:
-                    plt.plot(np.nanmean(result[1][1], 1), (np.nanmedian(result[1][3][:,idx::6,2:-2], (1,2))+
-                                                           np.nanmedian(result[1][5][:,idx::6,2:-2], (1,2)))/2+idx*30, 
-                             ls='', lw=0.5, marker='D', zorder=10, color=colors_baseline[idx])
-                    #plt.plot(result[1][1].flatten(), (np.nanmedian(result[1][3][:,idx::6,2:-2], (2).flatten())+
-                                                      #np.nanmedian(result[1][5][:,idx::6,2:-2], (2)).flatten())/2+idx*30, 
-                             #ls='', lw=0.5, marker='D', zorder=10, color=colors_baseline[idx])
-                    plt.plot(np.nanmean(result[0][1], 1), (np.nanmedian(result[0][3][:,idx::6,2:-2], (1,2))+
-                                                           np.nanmedian(result[0][5][:,idx::6,2:-2], (1,2)))/2+idx*30, 
-                             ls='-', lw=0.5, marker='o', zorder=10, color=colors_baseline[idx])
-                plt.axhline(idx*30, lw=0.5, color=colors_baseline[idx])
+                    ax1.plot(s2_lst.flatten(), (np.nanmedian(s2_visphi_p1[:,idx::6,2:-2],2).flatten()+
+                                              np.nanmedian(s2_visphi_p1[:,idx::6,2:-2],2).flatten())/2+idx*50, 
+                             ls='', lw=0.5, marker='D', zorder=10, color=colors_baseline[idx],
+                             markersize=2, alpha=0.5, markeredgecolor='k')
+                    ax1.plot(sg_lst.flatten(), (np.nanmedian(sg_visphi_p1[:,idx::6,2:-2],2).flatten()+
+                                              np.nanmedian(sg_visphi_p2[:,idx::6,2:-2],2).flatten())/2+idx*50, 
+                             ls='', lw=0.5, marker='o', zorder=10, color=colors_baseline[idx],
+                             markersize=2, alpha=0.5)
+                    ax1.plot(all_t, all_cor+idx*50, color='r', zorder=11, alpha=0.8)
+                ax1.axhline(idx*50, lw=0.5, color=colors_baseline[idx])
             if linear_cor:
-                plt.axvline(np.nanmean(result[0][1], 1)[fitstart], ls='--', color='grey', lw=0.5)
-                plt.axvline(np.nanmean(result[0][1], 1)[fitstop-1], ls='--', color='grey', lw=0.5)
-            plt.legend()
+                ax1.axvline(np.nanmean(sg_t, 1)[fitstart], ls='--', color='grey', lw=0.5)
+                ax1.axvline(np.nanmean(sg_t, 1)[fitstop-1], ls='--', color='grey', lw=0.5)
+            ax1.set_xlim(15,21)
+            locs = ax1.get_xticks()
+            labe = ax1.get_xticklabels()
+            all_lst = np.concatenate((sg_lst.flatten(), s2_lst.flatten()))
+            all_ang = np.concatenate((sg_ang.flatten(), s2_ang.flatten()))
+            ang_loc = []
+            for loc in locs:
+                ang_loc.append("%i" % all_ang[find_nearest(loc, all_lst)])
+
+            ax_top_Ticks = ang_loc
+            ax2.set_xticks(locs)
+            ax2.set_xlim(ax1.get_xlim())
+            ax2.set_xticklabels(ang_loc)
+            ax2.set_xbound(ax1.get_xbound())
+            ax2.set_xlabel('Ref. Angle [deg]')
+
+            ax1.legend()
             if ndit == 1:
                 plt.ylabel('Phase [deg]')
             else:
                 plt.ylabel('Phase [deg]\n(Median per exposure)')
-            plt.xlabel('LST [h]')
-            plt.title('Average phase over the night')
-            plt.ylim(-35,185)
+            ax1.set_xlabel('LST [h]')
+            plt.ylim(-79,299)
             # plt.xlim(-5, xmax)
             plt.show()
             
@@ -2423,3 +2455,9 @@ class GravPhaseNight():
             return sg_flux, fitres
         else:
             return fitres
+
+    
+
+
+
+
