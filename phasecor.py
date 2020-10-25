@@ -820,6 +820,29 @@ def get_corrections(bequiet=False):
         print(corrections_dict.keys())
     return corrections_dict
 
+def get_phasecorrections(bequiet=False):
+    folder = '/data/user/fwidmann/Phase_fit_cor/corrections_phases/'
+    corr_ang = sorted(glob.glob(folder + 'phasecorrection*'))
+
+    corrections_dict = {} 
+    for cor in corr_ang:
+        name = cor[cor.find('/phasecorrection_')+17:-4]
+        data = np.load(cor)
+        if len(data) == 7:
+            interp = []
+            x = data[0]
+            y = data[1:]
+            for tel in range(6):
+                interp.append(interpolate.interp1d(x, y[tel]))
+            corrections_dict[name] = interp
+        else:
+            raise ValueError('Weird dimension of npy file')
+           
+    if not bequiet:
+        print('Available datasets:')
+        print(corrections_dict.keys())
+    return corrections_dict
+
 
 
 
@@ -976,7 +999,7 @@ class GravPhaseNight():
     def process_night(self, mode,  fluxcut=0.0, subspacing=1,
                       correction=True, poscor=True, plot=False,
                       fitstart=0, fitstop=-1, linear_cor=False,
-                      save=False, ret=False):
+                      save=False, ret=False, phasecorrection=None):
         """
         Function to corect, calibrate & poscor data
         mode        : mode for the correction. To see whats available run:
@@ -1035,8 +1058,18 @@ class GravPhaseNight():
                 raise ValueError('If interpolations are given mode has to be a list of four')
             
             
-
-        
+        if phasecorrection is not None:
+            cor_cor = True
+            corrections_dict = get_phasecorrections(bequiet=True)
+            try:
+                interp_list_phase = corrections_dict[phasecorrection]
+            except KeyError:
+                print('mode not avialable, use one of those:')
+                print(corrections_dict.keys())
+                raise KeyError
+        else:
+            cor_cor = False
+            
             
         ################
         # read in al necessary data
@@ -1054,6 +1087,7 @@ class GravPhaseNight():
         sg_u_raw = np.zeros((len(sg_files), ndit*6))*np.nan
         sg_v_raw = np.zeros((len(sg_files), ndit*6))*np.nan
         sg_correction = np.zeros((len(sg_files), ndit*6, 14))*np.nan
+        sg_correction_wo = np.zeros((len(sg_files), ndit*6, 14))*np.nan
         
         for fdx, file in enumerate(sg_files):
             d = fits.open(file)
@@ -1140,7 +1174,6 @@ class GravPhaseNight():
                         cor = cor1-cor2
                         if mode in ['lst_standard', 'standard']:
                             cor *= 1e6
-
                     if ndit == 1:
                         cor = np.mean(cor)
                         
@@ -1148,7 +1181,28 @@ class GravPhaseNight():
                     for w in range(len(wave)):
                         wcor[:,w] = cor/wave[w]*360
                     fullcor[base::6] = wcor
+                sg_correction_wo[fdx] = fullcor
+                if cor_cor:
+                    for base in range(6):
+                        t1 = self.bl_array[base][0]
+                        t2 = self.bl_array[base][1]
+                        ang1 = angle[t1]
+                        ang2 = angle[t2]
+                        mang = (ang1 + ang2)/2
+                        if subspacing != 1:
+                            mangdif = (mang[-1]-mang[-2])/2
+                            mang_s = np.linspace(mang[0] - mangdif, mang[-1] + mangdif, len(mang)*subspacing)
+                            phasecor = averaging(interp_list_phase[base](mang_s), subspacing)[:-1]
+                        else:
+                            phasecor = interp_list_phase[base](mang)
+                        if ndit == 1:
+                            phasecor = np.mean(phasecor)
+                        wphasecor = np.zeros((ndit, len(wave)))
+                        for w in range(len(wave)):
+                            wphasecor[:,w] = phasecor/wave[w]*360
+                        fullcor[base::6] -= wphasecor
                 fullcor[np.isnan(fullcor)] = 0
+
             except ValueError:
                 fullcor = 0
             sg_correction[fdx] = fullcor
@@ -1188,6 +1242,7 @@ class GravPhaseNight():
         s2_u_raw = np.zeros((len(s2_files), ndit*6))
         s2_v_raw = np.zeros((len(s2_files), ndit*6))
         s2_correction = np.zeros((len(s2_files), ndit*6, 14))*np.nan
+        s2_correction_wo = np.zeros((len(s2_files), ndit*6, 14))*np.nan
 
         for fdx, file in enumerate(s2_files):
             d = fits.open(file)
@@ -1279,6 +1334,28 @@ class GravPhaseNight():
                     for w in range(len(wave)):
                         wcor[:,w] = cor/wave[w]*360
                     fullcor[base::6] = wcor
+                s2_correction_wo[fdx] = fullcor
+                
+                if cor_cor:
+                    for base in range(6):
+                        t1 = self.bl_array[base][0]
+                        t2 = self.bl_array[base][1]
+                        ang1 = angle[t1]
+                        ang2 = angle[t2]
+                        mang = (ang1 + ang2)/2
+                        if subspacing != 1:
+                            mangdif = (mang[-1]-mang[-2])/2
+                            mang_s = np.linspace(mang[0] - mangdif, mang[-1] + mangdif, len(mang)*subspacing)
+                            phasecor = averaging(interp_list_phase[base](mang_s), subspacing)[:-1]
+                        else:
+                            phasecor = interp_list_phase[base](mang)
+                        if ndit == 1:
+                            phasecor = np.mean(phasecor)
+                        wphasecor = np.zeros((ndit, len(wave)))
+                        for w in range(len(wave)):
+                            wphasecor[:,w] = phasecor/wave[w]*360
+                        fullcor[base::6] -= wphasecor
+
                 fullcor[np.isnan(fullcor)] = 0
             except ValueError:
                 fullcor = 0
@@ -1498,7 +1575,10 @@ class GravPhaseNight():
                 all_t = np.concatenate((sg_lst.flatten(), s2_lst.flatten()))
                 all_t_s = all_t.argsort()
                 all_cor = np.concatenate((np.nanmedian(sg_correction[:,idx::6,2:-2],2).flatten(), np.nanmedian(s2_correction[:,idx::6,2:-2],2).flatten()))
+                all_cor_wo = np.concatenate((np.nanmedian(sg_correction_wo[:,idx::6,2:-2],2).flatten(), 
+                                             np.nanmedian(s2_correction_wo[:,idx::6,2:-2],2).flatten()))
                 all_cor = -all_cor[all_t_s]
+                all_cor_wo = -all_cor_wo[all_t_s]
                 all_t = all_t[all_t_s]
                 
                 if idx == 3:
@@ -1511,6 +1591,9 @@ class GravPhaseNight():
                              ls='', lw=0.5, marker='o', zorder=10, color=colors_baseline[idx],
                              markersize=2, alpha=0.5, label='Sgr A* files')
                     ax1.plot(all_t, all_cor+idx*50, color='r', zorder=11, alpha=0.8, label='Correction')
+                    if cor_cor:
+                        ax1.plot(all_t, all_cor_wo+idx*50, color='k', ls='--', zorder=11, alpha=0.8, 
+                                label='Correction w/o phasecor')
                 else:
                     ax1.plot(s2_lst.flatten(), (np.nanmedian(s2_visphi_p1[:,idx::6,2:-2],2).flatten()+
                                               np.nanmedian(s2_visphi_p1[:,idx::6,2:-2],2).flatten())/2+idx*50, 
@@ -1521,6 +1604,8 @@ class GravPhaseNight():
                              ls='', lw=0.5, marker='o', zorder=10, color=colors_baseline[idx],
                              markersize=2, alpha=0.5)
                     ax1.plot(all_t, all_cor+idx*50, color='r', zorder=11, alpha=0.8)
+                    if cor_cor:
+                        ax1.plot(all_t, all_cor_wo+idx*50, color='k', ls='--', zorder=11, alpha=0.8)
                 ax1.axhline(idx*50, lw=0.5, color=colors_baseline[idx])
             if linear_cor:
                 ax1.axvline(np.nanmean(sg_t, 1)[fitstart], ls='--', color='grey', lw=0.5)
@@ -2456,8 +2541,92 @@ class GravPhaseNight():
         else:
             return fitres
 
+
+
+    def vis_onestar(self, uv, wave, dlambda, sources, alpha=3):
+        mas2rad = 1e-3 / 3600 / 180 * np.pi
+        u = uv[0]
+        v = uv[1]
+        pos, fl = sources
+        vis = np.zeros((6,len(wave))) + 0j
+        for i in range(0,6):
+            s = ((pos[0])*u[i] + (pos[1])*v[i]) * mas2rad * 1e6
+
+            int_s = self.vis_intensity_approx(s, alpha, wave, dlambda)
+            vis[i,:] = fl*int_s
+        return vis
+
     
+    def night_remove_sources(self):
+        
+        fitres = self.fit_night_3src(plot=False, only_sgr=True, ret_flux=False)
+        [_, sg_ra_p1, sg_de_p1, sg_ra_p2, sg_de_p2, _, _] = fitres
 
+        ndit = self.ndit
+        wave = self.wave
+        dlambda = self.dlambda
+        sg_files = self.sg_files
+        s2_files = self.s2_files
+        sg_u_raw = self.sg_u_raw
+        sg_v_raw = self.sg_v_raw
+        s2_u_raw = self.s2_u_raw
+        s2_v_raw = self.s2_v_raw
+        
+        [[sg_t, sg_lst, sg_ang, sg_visphi_p1, sg_visphi_err_p1, sg_visphi_p2, sg_visphi_err_p2],
+         [s2_t, s2_lst, s2_ang, s2_visphi_p1, s2_visphi_err_p1, s2_visphi_p2, s2_visphi_err_p2]] = self.alldata
+        
+        sg_flux = self.sg_flux
+        s2_lpos = self.s2_pos
+        
+        sg_visphi_p1_corr = np.copy(sg_visphi_p1)
+        sg_visphi_p2_corr = np.copy(sg_visphi_p2)
 
+        for fdx, file in enumerate(sg_files):
+            sg_fr = sg_flux[fdx]
+            s2_pos = s2_lpos[fdx]
+            header = self.sg_header[fdx]
+            if np.isnan(sg_fr):
+                if self.verbose:
+                    print('SgrA* flux not available for %s' % sg_files[fdx])
+                continue
+            
+            for dit in range(ndit):
+                u = sg_u_raw[fdx, dit*6:(dit+1)*6]
+                v = sg_v_raw[fdx, dit*6:(dit+1)*6]
+                uv = [u.flatten(),v.flatten()]
+                visphi_p1 = sg_visphi_p1[fdx, dit*6:(dit+1)*6]
+                visphi_p2 = sg_visphi_p2[fdx, dit*6:(dit+1)*6]
+                
+                s2_fr = 1/sg_fr
+                f1_pos = np.array([-18.78, 19.80])
+                f1_fr = 10**(-(18.7-14.1)/2.5)*s2_fr
+                fiber_coup = np.exp(-1*(2*np.pi*np.sqrt(np.sum(s2_pos**2))/280)**2)
+                s2_fr = s2_fr * fiber_coup
+                fiber_coup = np.exp(-1*(2*np.pi*np.sqrt(np.sum(f1_pos**2))/280)**2)
+                f1_fr = f1_fr * fiber_coup
+                
+                sources = [s2_pos, s2_fr, f1_pos, f1_fr]
+                
+                # p1
+                visphi_3src = self.threesource(uv, wave, dlambda, sources,
+                                               sg_ra_p1[fdx,dit], sg_de_p1[fdx,dit], ret_flat=False)
+                visphi_1src = self.pointsource(uv, wave, sg_ra_p1[fdx,dit], sg_de_p1[fdx,dit], flatten=False)
+                visphi_res = visphi_3src - visphi_1src
+                visphi_p1_cor = visphi_p1 - visphi_res
+                visphi_p1_cor = (visphi_p1_cor+180)%360-180
+
+                # p2
+                visphi_3src = self.threesource(uv, wave, dlambda, sources,
+                                               sg_ra_p2[fdx,dit], sg_de_p2[fdx,dit], ret_flat=False)
+                visphi_1src = self.pointsource(uv, wave, sg_ra_p2[fdx,dit], sg_de_p2[fdx,dit], flatten=False)
+                visphi_res = visphi_3src - visphi_1src
+                visphi_p2_cor = visphi_p2 - visphi_res
+                visphi_p2_cor = (visphi_p2_cor+180)%360-180
+                
+                sg_visphi_p1_corr[fdx, dit*6:(dit+1)*6] = visphi_p1_cor
+                sg_visphi_p2_corr[fdx, dit*6:(dit+1)*6] = visphi_p2_cor
+        return sg_visphi_p1_corr, sg_visphi_p2_corr
+                
+                
 
 

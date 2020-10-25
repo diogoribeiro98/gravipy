@@ -2019,7 +2019,6 @@ class GravData():
         
         self.frankwave = False
         
-        
         self.fit_for = fit_for
         self.constant_f = constant_f
         self.use_opds = use_opds
@@ -2084,12 +2083,16 @@ class GravData():
         u = self.u
         v = self.v
         wave = self.wlSC
-            
-        self.fiberOffX = -fits.open(self.name)[0].header["HIERARCH ESO INS SOBJ OFFX"] 
-        self.fiberOffY = -fits.open(self.name)[0].header["HIERARCH ESO INS SOBJ OFFY"] 
+        
+        try:
+            self.fiberOffX = -fits.open(self.name)[0].header["HIERARCH ESO INS SOBJ OFFX"] 
+            self.fiberOffY = -fits.open(self.name)[0].header["HIERARCH ESO INS SOBJ OFFY"]
+        except KeyError:
+            self.fiberOffX = 0
+            self.fiberOffY = 0
         if not bequiet:
             print("fiber center: %.2f, %.2f (mas)" % (self.fiberOffX,
-                                                    self.fiberOffY))
+                                                      self.fiberOffY))
         if dRA == 0 and dDEC == 0:
             if self.fiberOffX != 0 and self.fiberOffY != 0:
                 dRA = self.fiberOffX
@@ -2130,7 +2133,7 @@ class GravData():
         if initial is not None:
             if len(initial) != 16:
                 raise ValueError('Length of initial parameter list is not correct')
-            size = 2
+            size = 4
             dRA_init = np.array([initial[0],initial[0]-size,initial[0]+size])
             dDEC_init = np.array([initial[1],initial[1]-size,initial[1]+size])
 
@@ -2438,7 +2441,10 @@ class GravData():
                     if par in todel:
                         pos[:,par] = theta[par]
                     else:
-                        pos[:,par] = theta[par] + width*np.random.randn(nwalkers)
+                        if par < 2:
+                            pos[:,par] = theta[par] + width*np.random.randn(nwalkers)
+                        else:
+                            pos[:,par] = theta[par] + width*np.random.randn(nwalkers)
                 if not bequiet:
                     if not donotfit:
                         print('Run MCMC for Pol %i' % (idx+1))
