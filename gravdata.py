@@ -1908,7 +1908,7 @@ class GravData():
         check = np.abs(res_visphi_1) < np.abs(res_visphi_2) 
         res_visphi = res_visphi_1*check + res_visphi_2*(1-check)
         res_phi = np.sum(-res_visphi**2./visphi_error**2.*(1-visphi_flag))
-
+        
         ln_prob_res = 0.5 * (res_visamp * self.fit_for[0] + 
                              res_vis2 * self.fit_for[1] + 
                              res_clos * self.fit_for[2] + 
@@ -2408,7 +2408,9 @@ class GravData():
                 visamp_flag = visamp_flag_final
                 visamp = np.nan_to_num(visamp)
                 visamp_error[visamp_flag] = 1.
-            
+                closamp = np.nan_to_num(closamp)
+                closamp_error[closamp_flag] = 1.
+                
                 with np.errstate(invalid='ignore'):
                     vis2_flag1 = (vis2 > 1) | (vis2 < 1.e-5) 
                 vis2_flag2 = np.isnan(vis2)
@@ -2416,6 +2418,13 @@ class GravData():
                 vis2_flag = vis2_flag_final
                 vis2 = np.nan_to_num(vis2)
                 vis2_error[vis2_flag] = 1.
+
+                closure = np.nan_to_num(closure)
+                visphi = np.nan_to_num(visphi)
+                visphi_flag[np.where(visphi_error == 0)] = True
+                visphi_error[np.where(visphi_error == 0)] = 100
+                closure_flag[np.where(closure_error == 0)] = True
+                closure_error[np.where(closure_error == 0)] = 100
 
                 if ((flagtill > 0) and (flagfrom > 0)):
                     p = flagtill
@@ -2457,7 +2466,7 @@ class GravData():
                             closamp, closamp_error, closamp_flag]
                 
                 self.fitstuff = [fitdata, u, v, wave, dlambda, theta]
-
+                
                 if not donotfit:
                     if nthreads == 1:
                         sampler = emcee.EnsembleSampler(nwalkers, ndim, self.lnprob, 
