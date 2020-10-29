@@ -1145,6 +1145,11 @@ class GravData():
             pos = np.array([ra + dra[tel], dec + ddec[tel]])
             if self.tel == 'AT':
                 pos /= 4.4
+            try:
+                pos[0] += self.pm_pos_off[0]
+                pos[1] += self.pm_pos_off[1]
+            except NameError:
+                pass
             pos_rot = np.dot(self.rotation(northangle[tel]), pos) + 100
             pm_pos[tel] = pos_rot
             
