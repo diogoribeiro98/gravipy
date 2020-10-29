@@ -1148,7 +1148,7 @@ class GravData():
             try:
                 pos[0] += self.pm_pos_off[0]
                 pos[1] += self.pm_pos_off[1]
-            except NameError:
+            except NameError, AttributeError:
                 pass
             pos_rot = np.dot(self.rotation(northangle[tel]), pos) + 100
             pm_pos[tel] = pos_rot
