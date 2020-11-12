@@ -12,10 +12,11 @@ from PIL import Image
 from scipy import signal
 from scipy import optimize 
 from scipy import interpolate
+import math
 import mpmath
 from matplotlib import gridspec
 from pkg_resources import resource_filename
-from numba import njit
+from numba import njit, prange
 from astropy.time import Time
 from datetime import timedelta, datetime
 import sys
@@ -52,13 +53,46 @@ def convert_date(date):
     date = datetime.strptime(date, '%Y-%m-%d %H:%M:%S')
     return date_decimal, date
 
-#@njit
+#@njit('float64(float64[:], float64[:])', fastmath=False)
+#def nb_trapz(y, x):
+    #sz = y.shape[0]
+    #res = 0
+    #for i in range(sz-1):
+        #res = res + (y[i+1]+y[i])*(x[i+1]-x[i])*0.5
+    #return res
+
+
+
+#@njit('float64[:](float64[:,:], float64[:,:], int64)', fastmath=False)
+#def nb_trapz2d_ax(z, xy, axis):
+    #sz1, sz2 = z.shape[0], z.shape[1]
+    #if axis == 0:
+        #res = np.empty(sz2)
+        #for j in prange(sz2):
+            #res[j] = nb_trapz(z[:,j], xy[:, j])
+        #return res
+    #elif axis == 1:
+        #res = np.empty(sz1)
+        #for i in prange(sz1):
+            #res[i] = nb_trapz(z[i,:], xy[:, i])
+        #return res
+    #else:
+        #raise ValueError
+    
+    
 def mathfunc_real(values, dt):
     return np.trapz(np.real(values), dx=dt, axis=0)
    
-#@njit
+
 def mathfunc_imag(values, dt):
     return np.trapz(np.imag(values), dx=dt, axis=0)
+
+
+#def mathfunc_real(values, dt):
+    #return nb_trapz2d_ax(np.real(values), dt, axis=0)
+   
+#def mathfunc_imag(values, dt):
+    #return nb_trapz2d_ax(np.imag(values), dt, axis=0)
 
 def complex_quadrature_num(func, a, b, theta, nsteps=int(1e2)):
     t = np.logspace(np.log10(a), np.log10(b), nsteps)
@@ -354,8 +388,8 @@ class GravData():
                 self.t3SC_P1 = fitsdata['OI_T3', 11].data.field('T3PHI')
                 self.t3errSC_P1 = fitsdata['OI_T3', 11].data.field('T3PHIERR')
                 self.t3ampSC_P1 = fitsdata['OI_T3', 11].data.field('T3AMP')
-                self.t3amperrSC_P1 = fitsdata['OI_T3', 11].data.field('T3AMPERR')
-                
+                self.t3amperrSC_P1 = fitsdata['OI_T3', 11].data.field('T3AMPERR')/30.
+                print("WARNING: dividing T3AMPERR by 10!")
                 # P2
                 self.visampSC_P2 = fitsdata['OI_VIS', 12].data.field('VISAMP')
                 self.visamperrSC_P2 = fitsdata['OI_VIS', 12].data.field('VISAMPERR')
@@ -365,8 +399,8 @@ class GravData():
                 self.vis2errSC_P2 = fitsdata['OI_VIS2', 12].data.field('VIS2ERR')
                 self.t3SC_P2 = fitsdata['OI_T3', 12].data.field('T3PHI')
                 self.t3errSC_P2 = fitsdata['OI_T3', 12].data.field('T3PHIERR')
-                self.t3ampSC_P2 = fitsdata['OI_T3', 12].data.field('T3AMP')
-                self.t3amperrSC_P2 = fitsdata['OI_T3', 12].data.field('T3AMPERR')
+                self.t3ampSC_P2 = fitsdata['OI_T3', 12].data.field('T3AMP') 
+                self.t3amperrSC_P2 = fitsdata['OI_T3', 12].data.field('T3AMPERR')/30.
                 
                 # Flags
                 self.visampflagSC_P1 = fitsdata['OI_VIS', 11].data.field('FLAG')
@@ -2083,7 +2117,9 @@ class GravData():
             raise ValueError('Telescope not AT or UT, something wrong with input data')
 
         nwave = self.channel
+
         self.getIntdata(plot=False, flag=False)
+
         MJD = fits.open(self.name)[0].header["MJD-OBS"]
         u = self.u
         v = self.v
@@ -3453,7 +3489,7 @@ class GravData():
             return results
         
         
-    def plotFit(self, theta, fitdata, idx=0, createpdf=False, mode='binary'):
+    def plotFit(self, theta, fitdata, idx=0, createpdf=False, mode='binary', phasemaps=False):
         """
         Calculates the theoretical interferometric data for the given parameters in theta
         and plots them together with the data in fitdata.
@@ -3466,6 +3502,34 @@ class GravData():
          closure, closure_error, closure_flag, 
          visphi, visphi_error, visphi_flag,
          closamp, closamp_error, closamp_flag) = fitdata
+        try:
+            self.fiberOffX = -fits.open(self.name)[0].header["HIERARCH ESO INS SOBJ OFFX"] 
+            self.fiberOffY = -fits.open(self.name)[0].header["HIERARCH ESO INS SOBJ OFFY"]
+        except KeyError:
+            self.fiberOffX = 0
+            self.fiberOffY = 0
+        if phasemaps or self.phasemaps:
+            self.loadPhasemaps(interp=self.interppm)
+            
+            header = fits.open(self.name)[0].header
+            northangle1 = header['ESO QC ACQ FIELD1 NORTH_ANGLE']/180*math.pi
+            northangle2 = header['ESO QC ACQ FIELD2 NORTH_ANGLE']/180*math.pi
+            northangle3 = header['ESO QC ACQ FIELD3 NORTH_ANGLE']/180*math.pi
+            northangle4 = header['ESO QC ACQ FIELD4 NORTH_ANGLE']/180*math.pi
+            self.northangle = [northangle1, northangle2, northangle3, northangle4]
+
+            ddec1 = header['ESO QC MET SOBJ DDEC1']
+            ddec2 = header['ESO QC MET SOBJ DDEC2']
+            ddec3 = header['ESO QC MET SOBJ DDEC3']
+            ddec4 = header['ESO QC MET SOBJ DDEC4']
+            self.ddec = [ddec1, ddec2, ddec3, ddec4]
+
+            dra1 = header['ESO QC MET SOBJ DRA1']
+            dra2 = header['ESO QC MET SOBJ DRA2']
+            dra3 = header['ESO QC MET SOBJ DRA3']
+            dra4 = header['ESO QC MET SOBJ DRA4']
+            self.dra = [dra1, dra2, dra3, dra4]
+            
         wave = self.wlSC
         dlambda = self.dlambda
         if self.phasemaps:
@@ -3499,6 +3563,8 @@ class GravData():
             v_as_model[i,:] = v[i]/(wave_model*1.e-6) / rad2as
         magu_as_model = np.sqrt(u_as_model**2.+v_as_model**2.)
         
+
+            
         # Visamp 
         if self.fit_for[0]:
             for i in range(0,6):
