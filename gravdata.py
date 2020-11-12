@@ -1084,17 +1084,24 @@ class GravData():
         if interp:
             x = np.arange(201)
             y = np.arange(201)
-            self.amp_map_int = np.zeros((len(wave),4), dtype=object)
-            self.pha_map_int = np.zeros((len(wave),4), dtype=object)
-            self.amp_map_denom_int = np.zeros((len(wave),4), dtype=object)
-            for tel in range(4):
-                for wdx in range(len(wave)):
-                    self.amp_map_int[wdx, tel] = interpolate.interp2d(x, y, self.amp_map[wdx, tel])
-                    self.pha_map_int[wdx, tel] = interpolate.interp2d(x, y, self.pha_map[wdx, tel])
-                    self.amp_map_denom_int[wdx, tel] = interpolate.interp2d(x, y, self.amp_map_denom[wdx, tel])
+            itel = np.arange(4)
+            iwave = np.arange(len(wave))
+            points = (iwave, itel, x, y)
+            
+            self.amp_map_int = interpolate.RegularGridInterpolator(points, self.amp_map) 
+            self.pha_map_int = interpolate.RegularGridInterpolator(points, self.pha_map) 
+            self.amp_map_denom_int = interpolate.RegularGridInterpolator(points, self.amp_map_denom) 
+            
+            #self.amp_map_int = np.zeros((len(wave),4), dtype=object)
+            #self.pha_map_int = np.zeros((len(wave),4), dtype=object)
+            #self.amp_map_denom_int = np.zeros((len(wave),4), dtype=object)
+            #for tel in range(4):
+                #for wdx in range(len(wave)):
+                    #self.amp_map_int[wdx, tel] = interpolate.interp2d(x, y, self.amp_map[wdx, tel])
+                    #self.pha_map_int[wdx, tel] = interpolate.interp2d(x, y, self.pha_map[wdx, tel])
+                    #self.amp_map_denom_int[wdx, tel] = interpolate.interp2d(x, y, self.amp_map_denom[wdx, tel])
                 
-        
-        
+
     def readPhasemaps(self, ra, dec, fromFits=True, 
                       northangle=None, dra=None, ddec=None,
                       interp=True, givepos=False):
@@ -1137,10 +1144,10 @@ class GravData():
             northangle = np.zeros_like(np.array(northangle))
             
         pm_pos = np.zeros((4, 2))
-        cor_amp = np.zeros((4, len(wave)))
-        cor_pha = np.zeros((4, len(wave)))
-        cor_int_denom = np.zeros((4, len(wave)))
-        
+        readout_pos = np.zeros((4*len(wave),4))
+        readout_pos[:,0] = np.tile(np.arange(14),4)                                                  
+        readout_pos[:,1] = np.repeat(np.arange(4),14)
+
         for tel in range(4):
             pos = np.array([ra + dra[tel], dec + ddec[tel]])
             if self.tel == 'AT':
@@ -1151,22 +1158,16 @@ class GravData():
             except (NameError, AttributeError):
                 pass
             pos_rot = np.dot(self.rotation(northangle[tel]), pos) + 100
+            readout_pos[readout_pos[:,1]==tel,2] = pos_rot[1]
+            readout_pos[readout_pos[:,1]==tel,3] = pos_rot[0]
             pm_pos[tel] = pos_rot
             
-            if not givepos:
-                for wdx in range(len(wave)):
-                    if interp:
-                        cor_amp[tel, wdx] = self.amp_map_int[wdx, tel](pos_rot[0], pos_rot[1])
-                        cor_pha[tel, wdx] = self.pha_map_int[wdx, tel](pos_rot[0], pos_rot[1])
-                        cor_int_denom[tel, wdx] = self.amp_map_denom_int[wdx, tel](pos_rot[0], pos_rot[1])
-                    else:
-                        pos_int = np.round(pos_rot).astype(int)
-                        cor_amp[tel, wdx] = self.amp_map[wdx,tel][pos_int[1],pos_int[0]]
-                        cor_pha[tel, wdx] = self.pha_map[wdx,tel][pos_int[1],pos_int[0]]
-                        cor_int_denom[tel, wdx] = self.amp_map_denom[wdx,tel][pos_int[1],pos_int[0]]
-
+        cor_amp = self.amp_map_int(readout_pos).reshape(4,14)
+        cor_pha = self.pha_map_int(readout_pos).reshape(4,14)
+        cor_int_denom = self.amp_map_denom_int(readout_pos).reshape(4,14)
+        
         if givepos:
-            return pm_pos
+            return readout_pos
         else:
             return cor_amp, cor_pha, cor_int_denom 
         
