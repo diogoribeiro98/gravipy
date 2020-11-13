@@ -2876,7 +2876,12 @@ class GravData():
         approx = self.approx
         fixS29 = self.fixS29
         donotfit = self.donotfit
-
+        
+        phasemaps = self.phasemaps
+        if phasemaps:
+            northangle = self.northangle
+            ddec = self.ddec
+            dra = self.dra
         if fixpos:
             dRA = self.fiberOffX
             dDEC = self.fiberOffY
@@ -2930,55 +2935,198 @@ class GravData():
             pc_DEC = theta[10]
         alpha_S = 3
         
-        
-        vis = np.zeros((6,len(wave))) + 0j
-        for i in range(0,6):
-            s_SgrA = ((pc_RA)*u[i] + (pc_DEC)*v[i]) * mas2rad * 1e6
-            s_S1 = ((dRA+pc_RA)*u[i] + (dDEC+pc_DEC)*v[i]) * mas2rad * 1e6
-            s_S2 = ((dRA2+pc_RA)*u[i] + (dDEC2+pc_DEC)*v[i]) * mas2rad * 1e6
+        if phasemaps:
+            cor_amp_sgr, cor_pha_sgr, cor_int_sgr = self.readPhasemaps(phaseCenterRA,
+                                                                       phaseCenterDEC,
+                                                                       fromFits=False, 
+                                                                       northangle=northangle,
+                                                                       dra=dra, ddec=ddec,
+                                                                       interp=interppm)
+            cor_amp_s2, cor_pha_s2, cor_int_s2 = self.readPhasemaps(dRA+phaseCenterRA, 
+                                                                    dDEC+phaseCenterDEC,
+                                                                    fromFits=False, 
+                                                                    northangle=northangle,
+                                                                    dra=dra, ddec=ddec,
+                                                                    interp=interppm)
             
-            if approx == "approx":
-                intSgrA = self.vis_intensity_approx(s_SgrA, alpha_SgrA, wave, dlambda[i,:])
-                intSgrA_center = self.vis_intensity_approx(0, alpha_SgrA, wave, dlambda[i,:])
-
-                intS1 = self.vis_intensity_approx(s_S1, alpha_S, wave, dlambda[i,:])
-                intS1_center = self.vis_intensity_approx(0, alpha_S, wave, dlambda[i,:])
-
-                intS2 = self.vis_intensity_approx(s_S2, alpha_S, wave, dlambda[i,:])
-                intS2_center = self.vis_intensity_approx(0, alpha_S, wave, dlambda[i,:])
-
-                intBG = self.vis_intensity_approx(0, alpha_bg, wave, dlambda[i,:])
-                
-            elif approx == "analytic":
-                intSgrA = self.vis_intensity(s_SgrA, alpha_SgrA, wave, dlambda[i,:])
-                intSgrA_center = self.vis_intensity(0, alpha_SgrA, wave, dlambda[i,:])
-
-                intS1 = self.vis_intensity(s_S1, alpha_S, wave, dlambda[i,:])
-                intS1_center = self.vis_intensity(0, alpha_S, wave, dlambda[i,:])
-
-                intS2 = self.vis_intensity(s_S2, alpha_S, wave, dlambda[i,:])
-                intS2_center = self.vis_intensity(0, alpha_S, wave, dlambda[i,:])
-
-                intBG = self.vis_intensity(0, alpha_bg, wave, dlambda[i,:])                
-                
-            elif approx == "numeric":
-                intSgrA = self.vis_intensity_num(s_SgrA, alpha_SgrA, wave, dlambda[i,:])
-                intSgrA_center = self.vis_intensity_num(0, alpha_SgrA, wave, dlambda[i,:])
-
-                intS1 = self.vis_intensity_num(s_S1, alpha_S, wave, dlambda[i,:])
-                intS1_center = self.vis_intensity_num(0, alpha_S, wave, dlambda[i,:])
-
-                intS2 = self.vis_intensity_num(s_S2, alpha_S, wave, dlambda[i,:])
-                intS2_center = self.vis_intensity_num(0, alpha_S, wave, dlambda[i,:])
-
-                intBG = self.vis_intensity_num(0, alpha_bg, wave, dlambda[i,:])                
-                intBG = self.vis_intensity_num(0, alpha_bg, wave, dlambda[i,:])
-
-            else:
-                raise ValueError('approx has to be approx, analytic or numeric')
+            cor_amp_s62, cor_pha_s62, cor_int_s2 = self.readPhasemaps(dRA2+phaseCenterRA, 
+                                                                    dDEC2+phaseCenterDEC,
+                                                                    fromFits=False, 
+                                                                    northangle=northangle,
+                                                                    dra=dra, ddec=ddec,
+                                                                    interp=interppm)
+            ## SgrA
+            pm_amp_sgr = np.array([[cor_amp_sgr[0], cor_amp_sgr[1]],
+                                    [cor_amp_sgr[0], cor_amp_sgr[2]],
+                                    [cor_amp_sgr[0], cor_amp_sgr[3]],
+                                    [cor_amp_sgr[1], cor_amp_sgr[2]],
+                                    [cor_amp_sgr[1], cor_amp_sgr[3]],
+                                    [cor_amp_sgr[2], cor_amp_sgr[3]]])
+            pm_pha_sgr = np.array([[cor_pha_sgr[0], cor_pha_sgr[1]],
+                                    [cor_pha_sgr[0], cor_pha_sgr[2]],
+                                    [cor_pha_sgr[0], cor_pha_sgr[3]],
+                                    [cor_pha_sgr[1], cor_pha_sgr[2]],
+                                    [cor_pha_sgr[1], cor_pha_sgr[3]],
+                                    [cor_pha_sgr[2], cor_pha_sgr[3]]])
+            pm_int_sgr = np.array([[cor_int_sgr[0], cor_int_sgr[1]],
+                                    [cor_int_sgr[0], cor_int_sgr[2]],
+                                    [cor_int_sgr[0], cor_int_sgr[3]],
+                                    [cor_int_sgr[1], cor_int_sgr[2]],
+                                    [cor_int_sgr[1], cor_int_sgr[3]],
+                                    [cor_int_sgr[2], cor_int_sgr[3]]])
+            ## S2
+            pm_amp_s2 = np.array([[cor_amp_s2[0], cor_amp_s2[1]],
+                                    [cor_amp_s2[0], cor_amp_s2[2]],
+                                    [cor_amp_s2[0], cor_amp_s2[3]],
+                                    [cor_amp_s2[1], cor_amp_s2[2]],
+                                    [cor_amp_s2[1], cor_amp_s2[3]],
+                                    [cor_amp_s2[2], cor_amp_s2[3]]])
+            pm_pha_s2 = np.array([[cor_pha_s2[0], cor_pha_s2[1]],
+                                    [cor_pha_s2[0], cor_pha_s2[2]],
+                                    [cor_pha_s2[0], cor_pha_s2[3]],
+                                    [cor_pha_s2[1], cor_pha_s2[2]],
+                                    [cor_pha_s2[1], cor_pha_s2[3]],
+                                    [cor_pha_s2[2], cor_pha_s2[3]]])   
+            pm_int_s2 = np.array([[cor_int_s2[0], cor_int_s2[1]],
+                                    [cor_int_s2[0], cor_int_s2[2]],
+                                    [cor_int_s2[0], cor_int_s2[3]],
+                                    [cor_int_s2[1], cor_int_s2[2]],
+                                    [cor_int_s2[1], cor_int_s2[3]],
+                                    [cor_int_s2[2], cor_int_s2[3]]])   
             
-            vis[i,:] = ((intSgrA + f*intS1 + f2*intS2)/
-                        (intSgrA_center + f*intS1_center + f2*intS2_center + fluxRatioBG*intBG))
+            ## S62
+            pm_amp_s62 = np.array([[cor_amp_s62[0], cor_amp_s62[1]],
+                                    [cor_amp_s62[0], cor_amp_s62[2]],
+                                    [cor_amp_s62[0], cor_amp_s62[3]],
+                                    [cor_amp_s62[1], cor_amp_s62[2]],
+                                    [cor_amp_s62[1], cor_amp_s62[3]],
+                                    [cor_amp_s62[2], cor_amp_s62[3]]])
+            pm_pha_s62 = np.array([[cor_pha_s62[0], cor_pha_s62[1]],
+                                    [cor_pha_s62[0], cor_pha_s62[2]],
+                                    [cor_pha_s62[0], cor_pha_s62[3]],
+                                    [cor_pha_s62[1], cor_pha_s62[2]],
+                                    [cor_pha_s62[1], cor_pha_s62[3]],
+                                    [cor_pha_s62[2], cor_pha_s62[3]]])   
+            pm_int_s62 = np.array([[cor_int_s62[0], cor_int_s62[1]],
+                                    [cor_int_s62[0], cor_int_s62[2]],
+                                    [cor_int_s62[0], cor_int_s62[3]],
+                                    [cor_int_s62[1], cor_int_s62[2]],
+                                    [cor_int_s62[1], cor_int_s62[3]],
+                                    [cor_int_s62[2], cor_int_s62[3]]])  
+            vis = np.zeros((6,len(wave))) + 0j
+            for i in range(0,6):
+                try:
+                    if self.fit_for[3] == 0:
+                        phaseCenterRA = 0
+                        phaseCenterDEC = 0
+                except AttributeError:
+                    pass
+                s_SgrA = ((pc_RA)*u[i] + (pc_DEC)*v[i]) * mas2rad * 1e6
+                s_S1 = ((dRA+pc_RA)*u[i] + (dDEC+pc_DEC)*v[i]) * mas2rad * 1e6
+                s_S2 = ((dRA2+pc_RA)*u[i] + (dDEC2+pc_DEC)*v[i]) * mas2rad * 1e6
+                
+                if use_opds:
+                    s_S2 = s_S2 + opd_bl[i,0] - opd_bl[i,1]
+                if specialfit:
+                    s_SgrA += sp_bl[i]
+                    s_S2 += sp_bl[i]
+                
+                opd_sgr = (pm_pha_sgr[i,0] - pm_pha_sgr[i,1])/360*wave
+                opd_s2 = (pm_pha_s2[i,0] - pm_pha_s2[i,1])/360*wave
+                s_SgrA -= opd_sgr
+                s_S2 -= opd_s2
+                
+                cr1 = (pm_amp_s2[i,0] / pm_amp_sgr[i,0])**2
+                cr2 = (pm_amp_s2[i,1] / pm_amp_sgr[i,1])**2
+                
+                cr_denom1 = (pm_int_s2[i,0] / pm_int_sgr[i,0])
+                cr_denom2 = (pm_int_s2[i,1] / pm_int_sgr[i,1])
+                
+                if approx == "approx":
+                    raise ValueError("Not Implemented yet!")
+                    #intSgrA = self.vis_intensity_approx(s_SgrA, alpha_SgrA, wave, dlambda[i,:])
+                    #intS2 = self.vis_intensity_approx(s_S2, alpha_S2, wave, dlambda[i,:])
+                    #intSgrA_center = self.vis_intensity_approx(0, alpha_SgrA, wave, dlambda[i,:])
+                    #intS2_center = self.vis_intensity_approx(0, alpha_S2, wave, dlambda[i,:])
+                    #intBG = self.vis_intensity_approx(0, alpha_bg, wave, dlambda[i,:])
+                elif approx == "analytic":
+                    raise ValueError("Not Implemented yet!")
+                    #intSgrA = self.vis_intensity(s_SgrA, alpha_SgrA, wave, dlambda[i,:])
+                    #intS2 = self.vis_intensity(s_S2, alpha_S2, wave, dlambda[i,:])
+                    #intSgrA_center = self.vis_intensity(0, alpha_SgrA, wave, dlambda[i,:])
+                    #intS2_center = self.vis_intensity(0, alpha_S2, wave, dlambda[i,:])
+                    #intBG = self.vis_intensity(0, alpha_bg, wave, dlambda[i,:])
+                elif approx == "numeric":
+                    intSgrA = self.vis_intensity_num(s_SgrA, alpha_SgrA, wave, dlambda[i,:])
+                    intSgrA_center = self.vis_intensity_num(0, alpha_SgrA, wave, dlambda[i,:])
+                    
+                    intS1 = self.vis_intensity_num(s_S2, alpha_S2, wave, dlambda[i,:])
+                    intS1_center = self.vis_intensity_num(0, alpha_S2, wave, dlambda[i,:])
+                    
+                    intS2 = self.vis_intensity_num(s_S2, alpha_S, wave, dlambda[i,:])
+                    intS2_center = self.vis_intensity_num(0, alpha_S, wave, dlambda[i,:])
+                    
+                    intBG = self.vis_intensity_num(0, alpha_bg, wave, dlambda[i,:])
+                else:
+                    raise ValueError('approx has to be approx, analytic or numeric')
+                
+                vis[i,:] = ((intSgrA + 
+                            np.sqrt(f_bl[i,0] * f_bl[i,1] * cr1 * cr2) * intS2)/
+                            (np.sqrt(intSgrA_center + f_bl[i,0] * cr_denom1 * intS2_center 
+                                    + fluxRatioBG * intBG) *
+                             np.sqrt(intSgrA_center + f_bl[i,1] * cr_denom2 * intS2_center 
+                                    + fluxRatioBG * intBG)))  
+                             
+                             
+        else:
+            vis = np.zeros((6,len(wave))) + 0j
+            for i in range(0,6):
+                s_SgrA = ((pc_RA)*u[i] + (pc_DEC)*v[i]) * mas2rad * 1e6
+                s_S1 = ((dRA+pc_RA)*u[i] + (dDEC+pc_DEC)*v[i]) * mas2rad * 1e6
+                s_S2 = ((dRA2+pc_RA)*u[i] + (dDEC2+pc_DEC)*v[i]) * mas2rad * 1e6
+                
+                if approx == "approx":
+                    intSgrA = self.vis_intensity_approx(s_SgrA, alpha_SgrA, wave, dlambda[i,:])
+                    intSgrA_center = self.vis_intensity_approx(0, alpha_SgrA, wave, dlambda[i,:])
+
+                    intS1 = self.vis_intensity_approx(s_S1, alpha_S, wave, dlambda[i,:])
+                    intS1_center = self.vis_intensity_approx(0, alpha_S, wave, dlambda[i,:])
+
+                    intS2 = self.vis_intensity_approx(s_S2, alpha_S, wave, dlambda[i,:])
+                    intS2_center = self.vis_intensity_approx(0, alpha_S, wave, dlambda[i,:])
+
+                    intBG = self.vis_intensity_approx(0, alpha_bg, wave, dlambda[i,:])
+                    
+                elif approx == "analytic":
+                    intSgrA = self.vis_intensity(s_SgrA, alpha_SgrA, wave, dlambda[i,:])
+                    intSgrA_center = self.vis_intensity(0, alpha_SgrA, wave, dlambda[i,:])
+
+                    intS1 = self.vis_intensity(s_S1, alpha_S, wave, dlambda[i,:])
+                    intS1_center = self.vis_intensity(0, alpha_S, wave, dlambda[i,:])
+
+                    intS2 = self.vis_intensity(s_S2, alpha_S, wave, dlambda[i,:])
+                    intS2_center = self.vis_intensity(0, alpha_S, wave, dlambda[i,:])
+
+                    intBG = self.vis_intensity(0, alpha_bg, wave, dlambda[i,:])                
+                    
+                elif approx == "numeric":
+                    intSgrA = self.vis_intensity_num(s_SgrA, alpha_SgrA, wave, dlambda[i,:])
+                    intSgrA_center = self.vis_intensity_num(0, alpha_SgrA, wave, dlambda[i,:])
+
+                    intS1 = self.vis_intensity_num(s_S1, alpha_S, wave, dlambda[i,:])
+                    intS1_center = self.vis_intensity_num(0, alpha_S, wave, dlambda[i,:])
+
+                    intS2 = self.vis_intensity_num(s_S2, alpha_S, wave, dlambda[i,:])
+                    intS2_center = self.vis_intensity_num(0, alpha_S, wave, dlambda[i,:])
+
+                    intBG = self.vis_intensity_num(0, alpha_bg, wave, dlambda[i,:])                
+                    intBG = self.vis_intensity_num(0, alpha_bg, wave, dlambda[i,:])
+
+                else:
+                    raise ValueError('approx has to be approx, analytic or numeric')
+                
+                vis[i,:] = ((intSgrA + f*intS1 + f2*intS2)/
+                            (intSgrA_center + f*intS1_center + f2*intS2_center + fluxRatioBG*intBG))
 
         visamp = np.abs(vis)
         visphi = np.angle(vis, deg=True)
@@ -3487,8 +3635,8 @@ class GravData():
             return theta_result
         else:
             return results
-        
-        
+
+
     def plotFit(self, theta, fitdata, idx=0, createpdf=False, mode='binary', phasemaps=False):
         """
         Calculates the theoretical interferometric data for the given parameters in theta
@@ -3623,6 +3771,7 @@ class GravData():
                         color='k', zorder=100)
             plt.xlabel('spatial frequency of largest baseline in triangle (1/arcsec)')
             plt.ylabel('closure phase (deg)')
+            plt.ylim(-100,100)
             plt.legend()
             if createpdf:
                 plt.title('Polarization %i' % (idx + 1))
