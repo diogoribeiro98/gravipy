@@ -2863,7 +2863,7 @@ class GravData():
         return ln_prob_res 
     
     
-    
+    ## SvF 13/11/2020: added parts of the phasemap implementation 
     def calc_vis3(self, theta, u, v, wave, dlambda):
         mas2rad = 1e-3 / 3600 / 180 * np.pi
         rad2mas = 180 / np.pi * 3600 * 1e3
@@ -2876,7 +2876,7 @@ class GravData():
         approx = self.approx
         fixS29 = self.fixS29
         donotfit = self.donotfit
-        
+        interppm = self.interppm
         phasemaps = self.phasemaps
         if phasemaps:
             northangle = self.northangle
@@ -2913,6 +2913,7 @@ class GravData():
             f1_pos = np.array([dRA2, dDEC2])
             fiber_coup_f1 = np.exp(-1*(2*np.pi*np.sqrt(np.sum(f1_pos**2))/280)**2)
             f2 = f1_fr * fiber_coup_f1         # s29/sgra incl. fiber coupling
+            f2 = 10**f2 ## SVF fixed bug, check?
             if donotfit:
                 print('s29/sgra incl. fiber coupling: %.3f' % f2)
         
@@ -2933,28 +2934,46 @@ class GravData():
         else:
             pc_RA = theta[9]
             pc_DEC = theta[10]
-        alpha_S = 3
+            
+        try:
+            alpha_S = self.source2alpha
+            if self.verbose:
+                print('Alpha of second star is %.2f' % alpha_S)
+        except:
+            alpha_S = 3
+        
         
         if phasemaps:
-            cor_amp_sgr, cor_pha_sgr, cor_int_sgr = self.readPhasemaps(phaseCenterRA,
-                                                                       phaseCenterDEC,
+            cor_amp_sgr, cor_pha_sgr, cor_int_sgr = self.readPhasemaps(pc_RA,
+                                                                       pc_DEC,
                                                                        fromFits=False, 
                                                                        northangle=northangle,
                                                                        dra=dra, ddec=ddec,
                                                                        interp=interppm)
-            cor_amp_s2, cor_pha_s2, cor_int_s2 = self.readPhasemaps(dRA+phaseCenterRA, 
-                                                                    dDEC+phaseCenterDEC,
+            cor_amp_s2, cor_pha_s2, cor_int_s2 = self.readPhasemaps(dRA+pc_RA, 
+                                                                    dDEC+pc_DEC,
                                                                     fromFits=False, 
                                                                     northangle=northangle,
                                                                     dra=dra, ddec=ddec,
                                                                     interp=interppm)
-            
-            cor_amp_s62, cor_pha_s62, cor_int_s2 = self.readPhasemaps(dRA2+phaseCenterRA, 
-                                                                    dDEC2+phaseCenterDEC,
-                                                                    fromFits=False, 
-                                                                    northangle=northangle,
-                                                                    dra=dra, ddec=ddec,
-                                                                    interp=interppm)
+            if fixS29:
+                try:
+                    cor_amp_s62, cor_pha_s62, cor_int_s62 = self.cor_amp_s62,self. cor_pha_s62, self.cor_int_s62
+                except AttributeError: 
+                    cor_amp_s62, cor_pha_s62, cor_int_s62 = self.readPhasemaps(dRA2+pc_RA, 
+                                                                        dDEC2+pc_DEC,
+                                                                        fromFits=False, 
+                                                                        northangle=northangle,
+                                                                        dra=dra, ddec=ddec,
+                                                                        interp=interppm)
+                    self.cor_amp_s62,self. cor_pha_s62, self.cor_int_s62 = cor_amp_s62, cor_pha_s62, cor_int_s62
+            else:
+                cor_amp_s62, cor_pha_s62, cor_int_s62 = self.readPhasemaps(dRA2+pc_RA, 
+                                                                        dDEC2+pc_DEC,
+                                                                        fromFits=False, 
+                                                                        northangle=northangle,
+                                                                        dra=dra, ddec=ddec,
+                                                                        interp=interppm)
             ## SgrA
             pm_amp_sgr = np.array([[cor_amp_sgr[0], cor_amp_sgr[1]],
                                     [cor_amp_sgr[0], cor_amp_sgr[2]],
@@ -3024,60 +3043,81 @@ class GravData():
                 s_SgrA = ((pc_RA)*u[i] + (pc_DEC)*v[i]) * mas2rad * 1e6
                 s_S1 = ((dRA+pc_RA)*u[i] + (dDEC+pc_DEC)*v[i]) * mas2rad * 1e6
                 s_S2 = ((dRA2+pc_RA)*u[i] + (dDEC2+pc_DEC)*v[i]) * mas2rad * 1e6
-                
-                if use_opds:
-                    s_S2 = s_S2 + opd_bl[i,0] - opd_bl[i,1]
-                if specialfit:
-                    s_SgrA += sp_bl[i]
-                    s_S2 += sp_bl[i]
+
                 
                 opd_sgr = (pm_pha_sgr[i,0] - pm_pha_sgr[i,1])/360*wave
                 opd_s2 = (pm_pha_s2[i,0] - pm_pha_s2[i,1])/360*wave
+                opd_s62 = (pm_pha_s62[i,0] - pm_pha_s62[i,1])/360*wave
                 s_SgrA -= opd_sgr
-                s_S2 -= opd_s2
+                s_S1 -= opd_s2
+                s_S2 -= opd_s62
                 
                 cr1 = (pm_amp_s2[i,0] / pm_amp_sgr[i,0])**2
                 cr2 = (pm_amp_s2[i,1] / pm_amp_sgr[i,1])**2
+                cr3 = (pm_amp_s62[i,0] / pm_amp_sgr[i,0])**2 
+                cr4 = (pm_amp_s62[i,1] / pm_amp_sgr[i,1])**2 
                 
                 cr_denom1 = (pm_int_s2[i,0] / pm_int_sgr[i,0])
                 cr_denom2 = (pm_int_s2[i,1] / pm_int_sgr[i,1])
+                cr_denom3 = (pm_int_s62[i,0] / pm_int_sgr[i,0])
+                cr_denom4 = (pm_int_s62[i,1] / pm_int_sgr[i,1])
                 
                 if approx == "approx":
-                    raise ValueError("Not Implemented yet!")
-                    #intSgrA = self.vis_intensity_approx(s_SgrA, alpha_SgrA, wave, dlambda[i,:])
-                    #intS2 = self.vis_intensity_approx(s_S2, alpha_S2, wave, dlambda[i,:])
-                    #intSgrA_center = self.vis_intensity_approx(0, alpha_SgrA, wave, dlambda[i,:])
-                    #intS2_center = self.vis_intensity_approx(0, alpha_S2, wave, dlambda[i,:])
-                    #intBG = self.vis_intensity_approx(0, alpha_bg, wave, dlambda[i,:])
+                    intSgrA = self.vis_intensity_approx(s_SgrA, alpha_SgrA, wave, dlambda[i,:])
+                    intSgrA_center = self.vis_intensity_approx(0, alpha_SgrA, wave, dlambda[i,:])
+
+                    intS1 = self.vis_intensity_approx(s_S1, alpha_S, wave, dlambda[i,:])
+                    intS1_center = self.vis_intensity_approx(0, alpha_S, wave, dlambda[i,:])
+
+                    intS2 = self.vis_intensity_approx(s_S2, alpha_S, wave, dlambda[i,:])
+                    intS2_center = self.vis_intensity_approx(0, alpha_S, wave, dlambda[i,:])
+
+                    intBG = self.vis_intensity_approx(0, alpha_bg, wave, dlambda[i,:])
+                    
                 elif approx == "analytic":
-                    raise ValueError("Not Implemented yet!")
-                    #intSgrA = self.vis_intensity(s_SgrA, alpha_SgrA, wave, dlambda[i,:])
-                    #intS2 = self.vis_intensity(s_S2, alpha_S2, wave, dlambda[i,:])
-                    #intSgrA_center = self.vis_intensity(0, alpha_SgrA, wave, dlambda[i,:])
-                    #intS2_center = self.vis_intensity(0, alpha_S2, wave, dlambda[i,:])
-                    #intBG = self.vis_intensity(0, alpha_bg, wave, dlambda[i,:])
+                    intSgrA = self.vis_intensity(s_SgrA, alpha_SgrA, wave, dlambda[i,:])
+                    intSgrA_center = self.vis_intensity(0, alpha_SgrA, wave, dlambda[i,:])
+
+                    intS1 = self.vis_intensity(s_S1, alpha_S, wave, dlambda[i,:])
+                    intS1_center = self.vis_intensity(0, alpha_S, wave, dlambda[i,:])
+
+                    intS2 = self.vis_intensity(s_S2, alpha_S, wave, dlambda[i,:])
+                    intS2_center = self.vis_intensity(0, alpha_S, wave, dlambda[i,:])
+
+                    intBG = self.vis_intensity(0, alpha_bg, wave, dlambda[i,:])                
+                    
                 elif approx == "numeric":
                     intSgrA = self.vis_intensity_num(s_SgrA, alpha_SgrA, wave, dlambda[i,:])
                     intSgrA_center = self.vis_intensity_num(0, alpha_SgrA, wave, dlambda[i,:])
-                    
-                    intS1 = self.vis_intensity_num(s_S2, alpha_S2, wave, dlambda[i,:])
-                    intS1_center = self.vis_intensity_num(0, alpha_S2, wave, dlambda[i,:])
-                    
+
+                    intS1 = self.vis_intensity_num(s_S1, alpha_S, wave, dlambda[i,:])
+                    intS1_center = self.vis_intensity_num(0, alpha_S, wave, dlambda[i,:])
+
                     intS2 = self.vis_intensity_num(s_S2, alpha_S, wave, dlambda[i,:])
                     intS2_center = self.vis_intensity_num(0, alpha_S, wave, dlambda[i,:])
-                    
+
+                    intBG = self.vis_intensity_num(0, alpha_bg, wave, dlambda[i,:])                
                     intBG = self.vis_intensity_num(0, alpha_bg, wave, dlambda[i,:])
+
                 else:
                     raise ValueError('approx has to be approx, analytic or numeric')
                 
                 vis[i,:] = ((intSgrA + 
-                            np.sqrt(f_bl[i,0] * f_bl[i,1] * cr1 * cr2) * intS2)/
-                            (np.sqrt(intSgrA_center + f_bl[i,0] * cr_denom1 * intS2_center 
-                                    + fluxRatioBG * intBG) *
-                             np.sqrt(intSgrA_center + f_bl[i,1] * cr_denom2 * intS2_center 
-                                    + fluxRatioBG * intBG)))  
+                            np.sqrt(f * f * cr1 * cr2) * intS1 +
+                            np.sqrt(f2 * f2 * cr3 * cr4) * intS2)/
+                            (np.sqrt(intSgrA_center + 
+                                     f * cr_denom1 * intS1_center + 
+                                     f2 * cr_denom3 * intS2_center +
+                                     fluxRatioBG * intBG) *
+                             np.sqrt(intSgrA_center + 
+                                     f * cr_denom2 * intS1_center +
+                                     f2 * cr_denom4 * intS2_center +
+                                     fluxRatioBG * intBG)))  
                              
                              
+                #vis[i,:] = ((intSgrA + 
+                             #f*intS1 + f2*intS2)/
+                            #(intSgrA_center + f*intS1_center + f2*intS2_center + fluxRatioBG*intBG))
         else:
             vis = np.zeros((6,len(wave))) + 0j
             for i in range(0,6):
@@ -3170,7 +3210,10 @@ class GravData():
                   plot=True, 
                   plotres=True, 
                   createpdf=True,
-                  redchi2=False):
+                  redchi2=False,
+                  phasemaps=False,
+                  interppm=True,
+                  smoothkernel=15,):
         '''
         Tripple fit to GRAVITY data, reduced version of binary fit
         Parameter:
@@ -3212,6 +3255,31 @@ class GravData():
         self.approx = approx
         self.fixS29 = fixS29
         self.donotfit = donotfit
+        self.phasemaps = phasemaps
+        self.smoothkernel = smoothkernel
+        self.interppm = interppm
+        if phasemaps:
+            self.loadPhasemaps(interp=interppm)
+            
+            header = fits.open(self.name)[0].header
+            northangle1 = header['ESO QC ACQ FIELD1 NORTH_ANGLE']/180*math.pi
+            northangle2 = header['ESO QC ACQ FIELD2 NORTH_ANGLE']/180*math.pi
+            northangle3 = header['ESO QC ACQ FIELD3 NORTH_ANGLE']/180*math.pi
+            northangle4 = header['ESO QC ACQ FIELD4 NORTH_ANGLE']/180*math.pi
+            self.northangle = [northangle1, northangle2, northangle3, northangle4]
+
+            ddec1 = header['ESO QC MET SOBJ DDEC1']
+            ddec2 = header['ESO QC MET SOBJ DDEC2']
+            ddec3 = header['ESO QC MET SOBJ DDEC3']
+            ddec4 = header['ESO QC MET SOBJ DDEC4']
+            self.ddec = [ddec1, ddec2, ddec3, ddec4]
+
+            dra1 = header['ESO QC MET SOBJ DRA1']
+            dra2 = header['ESO QC MET SOBJ DRA2']
+            dra3 = header['ESO QC MET SOBJ DRA3']
+            dra4 = header['ESO QC MET SOBJ DRA4']
+            self.dra = [dra1, dra2, dra3, dra4]
+            
         rad2as = 180 / np.pi * 3600
         
         nwave = self.channel
@@ -3245,7 +3313,7 @@ class GravData():
         self.getDlambda()
         dlambda = self.dlambda
         results = []
-        
+        print(len(initial))
         # Initial guesses
         if initial is not None:
             if len(initial) != 11:
