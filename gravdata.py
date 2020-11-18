@@ -388,8 +388,7 @@ class GravData():
                 self.t3SC_P1 = fitsdata['OI_T3', 11].data.field('T3PHI')
                 self.t3errSC_P1 = fitsdata['OI_T3', 11].data.field('T3PHIERR')
                 self.t3ampSC_P1 = fitsdata['OI_T3', 11].data.field('T3AMP')
-                self.t3amperrSC_P1 = fitsdata['OI_T3', 11].data.field('T3AMPERR')/30.
-                print("WARNING: dividing T3AMPERR by 10!")
+                self.t3amperrSC_P1 = fitsdata['OI_T3', 11].data.field('T3AMPERR')
                 # P2
                 self.visampSC_P2 = fitsdata['OI_VIS', 12].data.field('VISAMP')
                 self.visamperrSC_P2 = fitsdata['OI_VIS', 12].data.field('VISAMPERR')
@@ -400,7 +399,7 @@ class GravData():
                 self.t3SC_P2 = fitsdata['OI_T3', 12].data.field('T3PHI')
                 self.t3errSC_P2 = fitsdata['OI_T3', 12].data.field('T3PHIERR')
                 self.t3ampSC_P2 = fitsdata['OI_T3', 12].data.field('T3AMP') 
-                self.t3amperrSC_P2 = fitsdata['OI_T3', 12].data.field('T3AMPERR')/30.
+                self.t3amperrSC_P2 = fitsdata['OI_T3', 12].data.field('T3AMPERR')
                 
                 # Flags
                 self.visampflagSC_P1 = fitsdata['OI_VIS', 11].data.field('FLAG')
@@ -2893,29 +2892,34 @@ class GravData():
         
         dRA2 = theta[3]
         dDEC2 = theta[4]
-        if not fixS29:
-            fluxRatio2 = theta[5]
-            f2 = 10**fluxRatio2
-        else:
+        if fixS29:
             # Get S29 flux ratio from s2/sgra* flux ratio
             s2_fr = 10**fluxRatio                   # s2/sgra incl. fiber coupling
-            if donotfit:
-                print('s2/sgra incl. fiber coupling: %.3f' % s2_fr)
-            s2_pos = np.array([dRA, dDEC])
-            fiber_coup_s2 = np.exp(-1*(2*np.pi*np.sqrt(np.sum(s2_pos**2))/280)**2)
-            s2_fr = s2_fr / fiber_coup_s2              # s2/sgra w/o fiber coupling
-            if donotfit:
-                print('s2/sgra w/o fiber coupling: %.3f' % s2_fr)
-            
-            f1_fr = 10**(-(18.7-14.1)/2.5)*s2_fr    # s29/sgra w/o fiber coupling
-            if donotfit:
-                print('s29/sgra w/o fiber coupling: %.3f' % f1_fr)
-            f1_pos = np.array([dRA2, dDEC2])
-            fiber_coup_f1 = np.exp(-1*(2*np.pi*np.sqrt(np.sum(f1_pos**2))/280)**2)
-            f2 = f1_fr * fiber_coup_f1         # s29/sgra incl. fiber coupling
-            f2 = 10**f2 ## SVF fixed bug, check?
-            if donotfit:
-                print('s29/sgra incl. fiber coupling: %.3f' % f2)
+            if phasemaps:
+                f1_fr = 10**(-(18.7-14.1)/2.5)*s2_fr    # s29/sgra w/o fiber coupling
+                f2 = f1_fr
+            else:
+                if donotfit:
+                    print('s2/sgra incl. fiber coupling: %.3f' % s2_fr)
+                s2_pos = np.array([dRA, dDEC])
+                fiber_coup_s2 = np.exp(-1*(2*np.pi*np.sqrt(np.sum(s2_pos**2))/280)**2)
+                s2_fr = s2_fr / fiber_coup_s2              # s2/sgra w/o fiber coupling
+                if donotfit:
+                    print('s2/sgra w/o fiber coupling: %.3f' % s2_fr)
+                    
+                f1_fr = 10**(-(18.7-14.1)/2.5)*s2_fr    # s29/sgra w/o fiber coupling
+                if donotfit:
+                    print('s29/sgra w/o fiber coupling: %.3f' % f1_fr)
+                    
+                f1_pos = np.array([dRA2, dDEC2])
+                fiber_coup_f1 = np.exp(-1*(2*np.pi*np.sqrt(np.sum(f1_pos**2))/280)**2)
+                f2 = f1_fr * fiber_coup_f1         # s29/sgra incl. fiber coupling
+                if donotfit:
+                    print('s29/sgra incl. fiber coupling: %.3f' % f2)
+        else:
+            fluxRatio2 = theta[5]
+            f2 = 10**fluxRatio2
+        
         
         if fixedBH:
             alpha_SgrA = -0.5
@@ -3409,8 +3413,8 @@ class GravData():
             if createpdf:
                 raise ValueError('If donotfit is True, createpdf should be False')
             print('Will not fit the data, just print out the results for the given theta')
-            donotfittheta[2] = np.log10(donotfittheta[2])
-            donotfittheta[5] = np.log10(donotfittheta[5])
+            #donotfittheta[2] = np.log10(donotfittheta[2])
+            #donotfittheta[5] = np.log10(donotfittheta[5])
             
         # Get data
         if self.polmode == 'SPLIT':
