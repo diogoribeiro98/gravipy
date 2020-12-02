@@ -851,7 +851,7 @@ def get_phasecorrections(bequiet=False):
 # Correct a full night
 
 class GravPhaseNight():
-    def __init__(self, night, ndit, verbose=True, nopandas=False):
+    def __init__(self, night, ndit, verbose=True, nopandas=False, pandasfile=None):
         """
         Package to do the full phase calibration, poscor, correction and fitting
         
@@ -965,9 +965,16 @@ class GravPhaseNight():
             ################
             # read in flux from pandas
             ################
+            if pandasfile is not None:
+                pand = pandasfile
+                if self.verbose:
+                    print('Use given pandas')
+            else:
+                if self.verbose:
+                    print('Read in pandas')
+                pandasfile = resource_filename('gravipy', 'GRAVITY_DATA_2019_4_frame.object')
+                pand = pd.read_pickle(pandasfile)
                 
-            pandasfile = resource_filename('gravipy', 'GRAVITY_DATA_2019_4_frame.object')
-            pand = pd.read_pickle(pandasfile)
             sg_flux = []
             sg_header = []
             s2_pos = []
@@ -2320,7 +2327,7 @@ class GravPhaseNight():
         
 
 
-    def fit_night_3src(self, plot=True, plotfits=False, phasemaps=False, only_sgr=False, ret_flux=True, fitcut=2,
+    def fit_night_3src(self, plot=True, plotfits=False, phasemaps=False, only_sgr=False, ret_flux=True, cut_low=2, cut_up=2,
                        mcmc=False, nthreads=1):
         """
         Fit a 3 source model to all data from the night
@@ -2355,16 +2362,16 @@ class GravPhaseNight():
                     if np.sum(u==0) > 0:
                         continue
 
-                    visphi = s2_visphi_p1[fdx, dit*6:(dit+1)*6][:,fitcut:-fitcut]
-                    visphierr = s2_visphi_err_p1[fdx, dit*6:(dit+1)*6][:,fitcut:-fitcut]
-                    wcut = np.copy(wave)[fitcut:-fitcut]
+                    visphi = s2_visphi_p1[fdx, dit*6:(dit+1)*6][:,cut_low:-cut_up]
+                    visphierr = s2_visphi_err_p1[fdx, dit*6:(dit+1)*6][:,cut_low:-cut_up]
+                    wcut = np.copy(wave)[cut_low:-cut_up]
                     if np.sum(np.isnan(visphi)) > 10:
                         continue
                     s2_ra_p1[fdx, dit], s2_de_p1[fdx, dit] = self.fit_pointsource(u,v,wcut,visphi,visphierr,plot=plotfits)
 
-                    visphi = s2_visphi_p2[fdx, dit*6:(dit+1)*6][:,fitcut:-fitcut]
-                    visphierr = s2_visphi_err_p2[fdx, dit*6:(dit+1)*6][:,fitcut:-fitcut]
-                    wcut = np.copy(wave)[fitcut:-fitcut]
+                    visphi = s2_visphi_p2[fdx, dit*6:(dit+1)*6][:,cut_low:-cut_up]
+                    visphierr = s2_visphi_err_p2[fdx, dit*6:(dit+1)*6][:,cut_low:-cut_up]
+                    wcut = np.copy(wave)[cut_low:-cut_up]
                     if np.sum(np.isnan(visphi)) > 10:
                         continue
                     s2_ra_p2[fdx, dit], s2_de_p2[fdx, dit] = self.fit_pointsource(u,v,wcut,visphi,visphierr,plot=plotfits)
@@ -2402,20 +2409,20 @@ class GravPhaseNight():
                     if np.sum(u==0) > 0:
                         continue
 
-                    visphi = sg_visphi_p1[fdx, dit*6:(dit+1)*6][:,fitcut:-fitcut]
-                    visphierr = sg_visphi_err_p1[fdx, dit*6:(dit+1)*6][:,fitcut:-fitcut]
-                    wcut = np.copy(wave)[fitcut:-fitcut]
-                    dwcut = np.copy(dlambda)[fitcut:-fitcut]
+                    visphi = sg_visphi_p1[fdx, dit*6:(dit+1)*6][:,cut_low:-cut_up]
+                    visphierr = sg_visphi_err_p1[fdx, dit*6:(dit+1)*6][:,cut_low:-cut_up]
+                    wcut = np.copy(wave)[cut_low:-cut_up]
+                    dwcut = np.copy(dlambda)[cut_low:-cut_up]
                     if np.sum(np.isnan(visphi)) > 10:
                         continue
                     sg_ra_p1[fdx, dit], sg_de_p1[fdx, dit], sg_chi_p1[fdx, dit] = self.fit_threesource(u,v,wcut,dwcut,
                                                                             visphi,visphierr,header, sg_fr, s2_pos, 
                                                                             plot=plotfits, mcmc=mcmc)
                     
-                    visphi = sg_visphi_p2[fdx, dit*6:(dit+1)*6][:,fitcut:-fitcut]
-                    visphierr = sg_visphi_err_p2[fdx, dit*6:(dit+1)*6][:,fitcut:-fitcut]
-                    wcut = np.copy(wave)[fitcut:-fitcut]
-                    dwcut = np.copy(dlambda)[fitcut:-fitcut]
+                    visphi = sg_visphi_p2[fdx, dit*6:(dit+1)*6][:,cut_low:-cut_up]
+                    visphierr = sg_visphi_err_p2[fdx, dit*6:(dit+1)*6][:,cut_low:-cut_up]
+                    wcut = np.copy(wave)[cut_low:-cut_up]
+                    dwcut = np.copy(dlambda)[cut_low:-cut_up]
                     if np.sum(np.isnan(visphi)) > 10:
                         continue
                     sg_ra_p2[fdx, dit], sg_de_p2[fdx, dit], sg_chi_p2[fdx, dit]  = self.fit_threesource(u,v,wcut,dwcut,
@@ -2452,20 +2459,20 @@ class GravPhaseNight():
                     if np.sum(u==0) > 0:
                         continue
 
-                    visphi = sg_visphi_p1[fdx, dit*6:(dit+1)*6][:,fitcut:-fitcut]
-                    visphierr = sg_visphi_err_p1[fdx, dit*6:(dit+1)*6][:,fitcut:-fitcut]
-                    wcut = np.copy(wave)[fitcut:-fitcut]
-                    dwcut = np.copy(dlambda)[fitcut:-fitcut]
+                    visphi = sg_visphi_p1[fdx, dit*6:(dit+1)*6][:,cut_low:-cut_up]
+                    visphierr = sg_visphi_err_p1[fdx, dit*6:(dit+1)*6][:,cut_low:-cut_up]
+                    wcut = np.copy(wave)[cut_low:-cut_up]
+                    dwcut = np.copy(dlambda)[cut_low:-cut_up]
                     if np.sum(np.isnan(visphi)) > 10:
                         continue
                     _ra_p1[dit], _de_p1[dit], _chi_p1[dit] = self.fit_threesource(u,v,wcut,dwcut,
                                                                     visphi,visphierr,header, sg_fr, s2_pos,
                                                                     plot=plotfits, mcmc=mcmc)
                     
-                    visphi = sg_visphi_p2[fdx, dit*6:(dit+1)*6][:,fitcut:-fitcut]
-                    visphierr = sg_visphi_err_p2[fdx, dit*6:(dit+1)*6][:,fitcut:-fitcut]
-                    wcut = np.copy(wave)[fitcut:-fitcut]
-                    dwcut = np.copy(dlambda)[fitcut:-fitcut]
+                    visphi = sg_visphi_p2[fdx, dit*6:(dit+1)*6][:,cut_low:-cut_up]
+                    visphierr = sg_visphi_err_p2[fdx, dit*6:(dit+1)*6][:,cut_low:-cut_up]
+                    wcut = np.copy(wave)[cut_low:-cut_up]
+                    dwcut = np.copy(dlambda)[cut_low:-cut_up]
                     if np.sum(np.isnan(visphi)) > 10:
                         continue
                     _ra_p2[dit], _de_p2[dit], _chi_p2[dit] = self.fit_threesource(u,v,wcut,dwcut,
