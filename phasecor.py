@@ -13,6 +13,7 @@ import os
 import sys
 import emcee
 import corner
+import glob
 
 
 try:
@@ -36,6 +37,10 @@ colors_UT = np.array(['k', 'darkblue', color2, color1])
 
 ########################
 # Auxilary functions
+
+def find_nearest(array, value):
+    idx = (np.abs(array-value)).argmin()
+    return idx
 
 def averaging(x, N):
     if x.ndim == 2:
