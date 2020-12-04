@@ -828,7 +828,6 @@ def get_corrections(bequiet=False):
 def get_phasecorrections(bequiet=False):
     folder = '/data/user/fwidmann/Phase_fit_cor/corrections_phases/'
     corr_ang = sorted(glob.glob(folder + 'phasecorrection*'))
-
     corrections_dict = {} 
     for cor in corr_ang:
         name = cor[cor.find('/phasecorrection_')+17:-4]
@@ -856,7 +855,8 @@ def get_phasecorrections(bequiet=False):
 # Correct a full night
 
 class GravPhaseNight():
-    def __init__(self, night, ndit, verbose=True, nopandas=False, pandasfile=None):
+    def __init__(self, night, ndit, verbose=True, nopandas=False, pandasfile=None,
+                 reddir=None):
         """
         Package to do the full phase calibration, poscor, correction and fitting
         
@@ -927,12 +927,15 @@ class GravPhaseNight():
                 print(nights)
             raise ValueError('Night is not available')
         
-        if ndit == 1:
-            self.folder = '/data/user/forFrank2/' + night + '/reduced_PL20200513'
-        elif ndit == 32:
-            self.folder = '/data/user/forFrank2/' + night + '/reduced_PL20200513_1frame'
+        if reddir is None:
+            if ndit == 1:
+                self.folder = '/data/user/forFrank2/' + night + '/reduced_PL20200513'
+            elif ndit == 32:
+                self.folder = '/data/user/forFrank2/' + night + '/reduced_PL20200513_1frame'
+            else:
+                raise ValueError('Ndit has to be 1 or 32')
         else:
-            raise ValueError('Ndit has to be 1 or 32')
+            self.folder = '/data/user/forFrank2/' + night + '/' + reddir
         if self.verbose:
             print('Use data from: %s' % self.folder)
         self.bl_array = np.array([[0,1],
@@ -943,6 +946,9 @@ class GravPhaseNight():
                             [2,3]])
         
         allfiles = sorted(glob.glob(self.folder + '/GRAVI*dualscivis.fits'))
+        if len(allfiles) == 0:
+            raise ValueError('No files found, most likely something is wrong with the reduction folder')
+        
         sg_files = []
         s2_files = []
         for file in allfiles:
@@ -1549,7 +1555,7 @@ class GravPhaseNight():
 
             s2_visphi_p1 -= np.dot(s2_dB,dS)*360
             s2_visphi_p2 -= np.dot(s2_dB,dS)*360
-
+            
         
         ##########################
         # linear bl fit
@@ -1574,6 +1580,19 @@ class GravPhaseNight():
                 popt, pcov = optimize.curve_fit(linreg, x[valid], y[valid], sigma=yerr[valid], p0=[0,0])
                 for wdx in range(len(wave)):
                     sg_visphi_p2[:,bl::6,wdx] -= linreg(sg_t, *popt)
+                    
+                    
+        
+        ##########################
+        # unwrap phases
+        ##########################
+        
+        sg_visphi_p1 = ((sg_visphi_p1+180)%360)-180
+        sg_visphi_p2 = ((sg_visphi_p2+180)%360)-180
+        s2_visphi_p1 = ((s2_visphi_p1+180)%360)-180
+        s2_visphi_p2 = ((s2_visphi_p2+180)%360)-180
+        
+        
 
         result = [[sg_t, sg_lst, sg_ang, sg_visphi_p1, sg_visphi_err_p1, sg_visphi_p2, sg_visphi_err_p2],
                   [s2_t, s2_lst, s2_ang, s2_visphi_p1, s2_visphi_err_p1, s2_visphi_p2, s2_visphi_err_p2]]
@@ -1831,7 +1850,8 @@ class GravPhaseNight():
                 wcut = np.copy(wave)[fitcut:-fitcut]
                 if np.sum(np.isnan(visphi)) > 10:
                     continue
-                sg_ra_p2[fdx, dit], sg_de_p2[fdx, dit] = self.fit_pointsource(u,v,wcut,visphi,visphierr,plot=plotfits)            
+                sg_ra_p2[fdx, dit], sg_de_p2[fdx, dit] = self.fit_pointsource(u,v,wcut,visphi,visphierr,plot=plotfits)
+                
             
         if plot:
             if ndit == 1:
@@ -2358,9 +2378,6 @@ class GravPhaseNight():
             s2_de_p2 = np.zeros((len(s2_files), ndit))*np.nan
 
             for fdx, file in enumerate(s2_files):
-                if plotfits:
-                    print('S2')
-                    print(s2_files[fdx])
                 for dit in range(ndit):
                     u = s2_u_raw[fdx, dit*6:(dit+1)*6]
                     v = s2_v_raw[fdx, dit*6:(dit+1)*6]
@@ -2373,7 +2390,7 @@ class GravPhaseNight():
                     if np.sum(np.isnan(visphi)) > 10:
                         continue
                     s2_ra_p1[fdx, dit], s2_de_p1[fdx, dit] = self.fit_pointsource(u,v,wcut,visphi,visphierr,plot=plotfits)
-
+                    
                     visphi = s2_visphi_p2[fdx, dit*6:(dit+1)*6][:,cut_low:-cut_up]
                     visphierr = s2_visphi_err_p2[fdx, dit*6:(dit+1)*6][:,cut_low:-cut_up]
                     wcut = np.copy(wave)[cut_low:-cut_up]
@@ -2393,9 +2410,6 @@ class GravPhaseNight():
         
         if nthreads == 1:
             for fdx, file in enumerate(sg_files):
-                if plotfits:
-                    print('SgrA*')
-                    print(sg_t[fdx])
                 sg_fr = sg_flux[fdx]
                 s2_pos = s2_lpos[fdx]
                 header = self.sg_header[fdx]
@@ -2433,6 +2447,7 @@ class GravPhaseNight():
                     sg_ra_p2[fdx, dit], sg_de_p2[fdx, dit], sg_chi_p2[fdx, dit]  = self.fit_threesource(u,v,wcut,dwcut,
                                                                             visphi,visphierr,header, sg_fr, s2_pos, 
                                                                             plot=plotfits, mcmc=mcmc)
+                    
         else:
             def _fit_file(fdx):
                 print(fdx)
