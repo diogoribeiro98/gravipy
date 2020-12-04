@@ -856,7 +856,7 @@ def get_phasecorrections(bequiet=False):
 
 class GravPhaseNight():
     def __init__(self, night, ndit, verbose=True, nopandas=False, pandasfile=None,
-                 reddir=None):
+                 reddir=None, datadir=None):
         """
         Package to do the full phase calibration, poscor, correction and fitting
         
@@ -927,15 +927,18 @@ class GravPhaseNight():
                 print(nights)
             raise ValueError('Night is not available')
         
+        if datadir is None:
+            datadir = '/data/user/forFrank2/'
+        
         if reddir is None:
             if ndit == 1:
-                self.folder = '/data/user/forFrank2/' + night + '/reduced_PL20200513'
+                self.folder = datadir + night + '/reduced_PL20200513'
             elif ndit == 32:
-                self.folder = '/data/user/forFrank2/' + night + '/reduced_PL20200513_1frame'
+                self.folder = datadir + night + '/reduced_PL20200513_1frame'
             else:
                 raise ValueError('Ndit has to be 1 or 32')
         else:
-            self.folder = '/data/user/forFrank2/' + night + '/' + reddir
+            self.folder = datadir + night + '/' + reddir
         if self.verbose:
             print('Use data from: %s' % self.folder)
         self.bl_array = np.array([[0,1],
