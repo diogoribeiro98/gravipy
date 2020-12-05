@@ -774,80 +774,6 @@ def correct_data(files, mode, subspacing=1, plotav=8, plot=False, lstplot=False)
 #####################
 # load all corrections
 
-def get_corrections(bequiet=False):
-    folder = '/data/user/fwidmann/Phase_fit_cor/corrections_data/'
-    corr_ang = sorted(glob.glob(folder + 'correction*'))
-    corr_lst = sorted(glob.glob(folder + 'lst_correction*'))
-    corr_bl = sorted(glob.glob(folder + 'bl_correction*'))
-
-    corrections_dict = {} 
-    for cor in corr_ang:
-        name = cor[cor.find('/correction_')+12:-4]
-        data = np.load(cor)
-        if len(data) == 5:
-            interp = []
-            x = data[0]
-            y = data[1:]
-            for tel in range(4):
-                interp.append(interpolate.interp1d(x, y[tel]))
-            corrections_dict[name] = interp
-        else:
-            raise ValueError('Weird dimension of npy file')
-
-    for cor in corr_lst:
-        name = 'lst_' + cor[cor.find('/lst_correction_')+16:-4]
-        data = np.load(cor)
-        if len(data) == 5:
-            interp = []
-            x = data[0]
-            y = data[1:]
-            for tel in range(4):
-                interp.append(interpolate.interp1d(x, y[tel]))
-            corrections_dict[name] = interp
-        else:
-            raise ValueError('Weird dimension of npy file')
-
-    for cor in corr_bl:
-        name = 'bl_' + cor[cor.find('/bl_correction_')+15:-4]
-        data = np.load(cor)
-        if len(data) == 7:
-            interp = []
-            x = data[0]
-            y = data[1:]
-            for bl in range(6):
-                interp.append(interpolate.interp1d(x, y[bl]))
-            corrections_dict[name] = interp
-        else:
-            raise ValueError('Weird dimension of npy file')
-            
-    if not bequiet:
-        print('Available datasets:')
-        print(corrections_dict.keys())
-    return corrections_dict
-
-def get_phasecorrections(bequiet=False):
-    folder = '/data/user/fwidmann/Phase_fit_cor/corrections_phases/'
-    corr_ang = sorted(glob.glob(folder + 'phasecorrection*'))
-    corrections_dict = {} 
-    for cor in corr_ang:
-        name = cor[cor.find('/phasecorrection_')+17:-4]
-        data = np.load(cor)
-        if len(data) == 7:
-            interp = []
-            x = data[0]
-            y = data[1:]
-            for tel in range(6):
-                interp.append(interpolate.interp1d(x, y[tel]))
-            corrections_dict[name] = interp
-        else:
-            raise ValueError('Weird dimension of npy file')
-           
-    if not bequiet:
-        print('Available datasets:')
-        print(corrections_dict.keys())
-    return corrections_dict
-
-
 
 
 
@@ -856,7 +782,7 @@ def get_phasecorrections(bequiet=False):
 
 class GravPhaseNight():
     def __init__(self, night, ndit, verbose=True, nopandas=False, pandasfile=None,
-                 reddir=None, datadir=None):
+                 reddir=None, datadir='/data/user/forFrank2/'):
         """
         Package to do the full phase calibration, poscor, correction and fitting
         
@@ -926,9 +852,6 @@ class GravPhaseNight():
                 print('Night is not available, try one of those:')
                 print(nights)
             raise ValueError('Night is not available')
-        
-        if datadir is None:
-            datadir = '/data/user/forFrank2/'
         
         if reddir is None:
             if ndit == 1:
@@ -1014,7 +937,82 @@ class GravPhaseNight():
             self.sg_header = sg_header
 
         
+    def get_corrections(self, bequiet=False):
+        folder = resource_filename('gravipy', 'met_corrections/')
+        corr_ang = sorted(glob.glob(folder + 'correction*'))
+        corr_lst = sorted(glob.glob(folder + 'lst_correction*'))
+        corr_bl = sorted(glob.glob(folder + 'bl_correction*'))
+
+        corrections_dict = {} 
+        for cor in corr_ang:
+            name = cor[cor.find('/correction_')+12:-4]
+            data = np.load(cor)
+            if len(data) == 5:
+                interp = []
+                x = data[0]
+                y = data[1:]
+                for tel in range(4):
+                    interp.append(interpolate.interp1d(x, y[tel]))
+                corrections_dict[name] = interp
+            else:
+                raise ValueError('Weird dimension of npy file')
+
+        for cor in corr_lst:
+            name = 'lst_' + cor[cor.find('/lst_correction_')+16:-4]
+            data = np.load(cor)
+            if len(data) == 5:
+                interp = []
+                x = data[0]
+                y = data[1:]
+                for tel in range(4):
+                    interp.append(interpolate.interp1d(x, y[tel]))
+                corrections_dict[name] = interp
+            else:
+                raise ValueError('Weird dimension of npy file')
+
+        for cor in corr_bl:
+            name = 'bl_' + cor[cor.find('/bl_correction_')+15:-4]
+            data = np.load(cor)
+            if len(data) == 7:
+                interp = []
+                x = data[0]
+                y = data[1:]
+                for bl in range(6):
+                    interp.append(interpolate.interp1d(x, y[bl]))
+                corrections_dict[name] = interp
+            else:
+                raise ValueError('Weird dimension of npy file')
+                
+        if not bequiet:
+            print('Available datasets:')
+            print(corrections_dict.keys())
+        return corrections_dict
         
+        
+        
+    def get_phasecorrections(self, bequiet=False):
+        folder = resource_filename('gravipy', 'met_corrections/')
+        corr_ang = sorted(glob.glob(folder + 'phasecorrection*'))
+        corrections_dict = {} 
+        for cor in corr_ang:
+            name = cor[cor.find('/phasecorrection_')+17:-4]
+            data = np.load(cor)
+            if len(data) == 7:
+                interp = []
+                x = data[0]
+                y = data[1:]
+                for tel in range(6):
+                    interp.append(interpolate.interp1d(x, y[tel]))
+                corrections_dict[name] = interp
+            else:
+                raise ValueError('Weird dimension of npy file')
+            
+        if not bequiet:
+            print('Available datasets:')
+            print(corrections_dict.keys())
+        return corrections_dict
+
+
         
         
     def process_night(self, mode,  fluxcut=0.0, subspacing=1,
@@ -1047,7 +1045,7 @@ class GravPhaseNight():
             sg_flux = self.sg_flux
         
         if isinstance(mode, str):
-            corrections_dict = get_corrections(bequiet=True)
+            corrections_dict = self.get_corrections(bequiet=True)
             try:
                 interp_list = corrections_dict[mode]
             except KeyError:
@@ -1081,7 +1079,7 @@ class GravPhaseNight():
             
         if phasecorrection is not None:
             cor_cor = True
-            corrections_dict = get_phasecorrections(bequiet=True)
+            corrections_dict = self.get_phasecorrections(bequiet=True)
             try:
                 interp_list_phase = corrections_dict[phasecorrection]
             except KeyError:
