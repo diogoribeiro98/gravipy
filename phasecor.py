@@ -1051,6 +1051,7 @@ class GravPhaseNight():
             except KeyError:
                 print('mode not avialable, use one of those:')
                 print(corrections_dict.keys())
+                print('More corrections in: /data/user/fwidmann/Phase_fit_cor/corrections_data/')
                 raise KeyError
 
             if 'lst' in mode:
