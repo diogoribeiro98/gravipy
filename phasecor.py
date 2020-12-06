@@ -14,7 +14,7 @@ import sys
 import emcee
 import corner
 import glob
-
+import gc
 
 try:
     from generalFunctions import *
@@ -2268,6 +2268,9 @@ class GravPhaseNight():
                                     truths=mostprop, labels=theta_names)
                 plt.show()
             popt = np.percentile(fl_samples, [50], axis=0).T
+            
+            del sampler, samples
+            gc.collect()
         
         else:
             popt1, pcov = optimize.curve_fit(lambda uv, x, y: self.pointsource(uv, wave, x, y, mask),
