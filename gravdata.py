@@ -778,8 +778,15 @@ class GravData():
     ############################################
     ############################################
     
-    def createPhasemaps(self, nthreads=1, smooth=10, plot=True,
-                        zerfile='phasemap_zernike_20200918_diff_2019data.npy'):
+    def createPhasemaps(self, nthreads=1, smooth=10, plot=True, datayear=2019):
+        
+        if datayear == 2019:
+            zerfile='phasemap_zernike_20200918_diff_2019data.npy'
+        elif datayear == 2020:
+            zerfile='phasemap_zernike_20200922_diff_2020data.npy'
+        else:
+            raise ValueError('Datayear has to be 2019 or 2020')
+        
         print('Used file: %s' % zerfile)
         
         def phase_screen(A00, A1m1, A1p1, A2m2, A2p2, A20, A3m1, A3p1, A3m3, 
@@ -939,7 +946,7 @@ class GravData():
             return complexPsf[cc,cc]/np.abs(complexPsf[cc,cc]).max()
             
         
-        zernikefile = resource_filename('gravipy', zerfile)
+        zernikefile = resource_filename('gravipy', 'Phasemaps/' + zerfile)
         zer = np.load(zernikefile, allow_pickle=True).item()
 
         wave = self.wlSC
@@ -1027,12 +1034,15 @@ class GravData():
             
             all_pm = res[:,0,:,:,:]
             all_pm_denom = res[:,1,:,:,:]
-                
-        savename = 'Phasemap_%s_%s_Smooth%i.npy' % (self.tel, self.resolution, smooth)
+        if datayear == 2019:
+            savename = 'Phasemaps/Phasemap_%s_%s_Smooth%i.npy' % (self.tel, self.resolution, smooth)
+            savename2 = 'Phasemaps/Phasemap_%s_%s_Smooth%i_denom.npy' % (self.tel, self.resolution, smooth)
+        else:
+            savename = 'Phasemaps/Phasemap_%s_%s_Smooth%i_2020data.npy' % (self.tel, self.resolution, smooth)
+            savename2 = 'Phasemaps/Phasemap_%s_%s_Smooth%i_2020data_denom.npy' % (self.tel, self.resolution, smooth)
         savefile = resource_filename('gravipy', savename)
         np.save(savefile, all_pm)
-        savename = 'Phasemap_%s_%s_Smooth%i_denom.npy' % (self.tel, self.resolution, smooth)
-        savefile = resource_filename('gravipy', savename)
+        savefile = resource_filename('gravipy', savename2)
         np.save(savefile, all_pm_denom)
 
 
@@ -1046,8 +1056,14 @@ class GravData():
     
     def loadPhasemaps(self, interp, tofits=False):
         smoothkernel = self.smoothkernel
-        pm1_file = 'Phasemap_%s_%s_Smooth%i.npy' % (self.tel, self.resolution, smoothkernel)
-        pm2_file = 'Phasemap_%s_%s_Smooth%i_denom.npy' % (self.tel, self.resolution, smoothkernel)
+        datayear = self.datayear
+        if datayear == 2019:
+            pm1_file = 'Phasemaps/Phasemap_%s_%s_Smooth%i.npy' % (self.tel, self.resolution, smoothkernel)
+            pm2_file = 'Phasemaps/Phasemap_%s_%s_Smooth%i_denom.npy' % (self.tel, self.resolution, smoothkernel)
+        elif datayear == 2020:
+            pm1_file = 'Phasemaps/Phasemap_%s_%s_Smooth%i_2020data.npy' % (self.tel, self.resolution, smoothkernel)
+            pm2_file = 'Phasemaps/Phasemap_%s_%s_Smooth%i_2020data_denom.npy' % (self.tel, self.resolution, smoothkernel)
+            
         try:
             pm1 = np.load(resource_filename('gravipy', pm1_file))
             pm2 = np.real(np.load(resource_filename('gravipy', pm2_file)))
@@ -1145,8 +1161,8 @@ class GravData():
             
         pm_pos = np.zeros((4, 2))
         readout_pos = np.zeros((4*len(wave),4))
-        readout_pos[:,0] = np.tile(np.arange(14),4)                                                  
-        readout_pos[:,1] = np.repeat(np.arange(4),14)
+        readout_pos[:,0] = np.tile(np.arange(len(wave)),4)                                                  
+        readout_pos[:,1] = np.repeat(np.arange(4),len(wave))
 
         for tel in range(4):
             pos = np.array([ra + dra[tel], dec + ddec[tel]])
@@ -1162,9 +1178,9 @@ class GravData():
             readout_pos[readout_pos[:,1]==tel,3] = pos_rot[0]
             pm_pos[tel] = pos_rot
             
-        cor_amp = self.amp_map_int(readout_pos).reshape(4,14)
-        cor_pha = self.pha_map_int(readout_pos).reshape(4,14)
-        cor_int_denom = self.amp_map_denom_int(readout_pos).reshape(4,14)
+        cor_amp = self.amp_map_int(readout_pos).reshape(4,len(wave))
+        cor_pha = self.pha_map_int(readout_pos).reshape(4,len(wave))
+        cor_int_denom = self.amp_map_denom_int(readout_pos).reshape(4,len(wave))
         
         if givepos:
             return readout_pos
@@ -1960,7 +1976,8 @@ class GravData():
                   phasemaps=False,
                   interppm=True,
                   smoothkernel=10,
-                  simulate_pm=False):
+                  simulate_pm=False,
+                  pmdatayear=2019):
         '''
         Binary fit to GRAVITY data
         Parameter:
@@ -2051,6 +2068,7 @@ class GravData():
         specialfit = self.specialfit
         
         self.phasemaps = phasemaps
+        self.datayear = pmdatayear
         if phasemaps:
             self.loadPhasemaps(interp=interppm)
             
