@@ -2352,13 +2352,14 @@ class GravPhaseNight():
                             color=colors_baseline[i], alpha=0.5)
                 plt.plot(magu_as_model[i,:], model_visphi[i,:],
                         color='k', zorder=100)
-            plt.text(170, -70, 'Red chi2 = %.2f' % redchi)
+                
+            plt.plot([], [], ' ', label='Red chi2 = %.2f' % redchi)
             plt.legend()
             plt.ylabel('visibility phase [deg]')
             plt.xlabel('spatial frequency [1/arcsec]')
             if saveplot is not None:
                 plt.savefig(saveplot)
-                plt.clear()
+                plt.show()
             else:
                 plt.show()
         return popt[0], popt[1], redchi
