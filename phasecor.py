@@ -2131,7 +2131,8 @@ class GravPhaseNight():
         
         
         
-    def fit_threesource(self, u, v, wave, dlambda, visphi, visphierr, header, sg_fr, s2_pos, plot=False, mcmc=False):
+    def fit_threesource(self, u, v, wave, dlambda, visphi, visphierr, header, sg_fr, s2_pos, 
+                        plot=False, mcmc=False, saveplot=None):
         phasemaps = self.fit_phasemaps
         uv = [u.flatten(),v.flatten()]
         visphif = visphi.flatten()
@@ -2289,7 +2290,10 @@ class GravPhaseNight():
         chi = np.sum((visphif[mask] - popt_res)**2/visphierrf[mask]**2)
         ndof = len(popt_res)-2
         redchi = chi/ndof
-
+        
+        if saveplot is not None:
+            plot = True
+        
         if plot:
             rad2as = 180 / np.pi * 3600
             wave_model = np.linspace(wave[0],wave[len(wave)-1],1000)
@@ -2348,17 +2352,21 @@ class GravPhaseNight():
                             color=colors_baseline[i], alpha=0.5)
                 plt.plot(magu_as_model[i,:], model_visphi[i,:],
                         color='k', zorder=100)
+            plt.text(0.1, 0.1, 'Red chi2 = %.2f' % redchi)
             plt.legend()
             plt.ylabel('visibility phase [deg]')
             plt.xlabel('spatial frequency [1/arcsec]')
-            plt.show()
+            if saveplot is not None:
+                plt.savefig(saveplot)
+            else:
+                plt.show()
         return popt[0], popt[1], redchi
         
         
 
 
-    def fit_night_3src(self, plot=True, plotfits=False, phasemaps=False, only_sgr=False, ret_flux=True, cut_low=2, cut_up=2,
-                       mcmc=False, nthreads=1):
+    def fit_night_3src(self, plot=True, plotfits=False, phasemaps=False, only_sgr=False, ret_flux=True, 
+                       cut_low=2, cut_up=2, saveplots=True, mcmc=False, nthreads=1):
         """
         Fit a 3 source model to all data from the night
         """
