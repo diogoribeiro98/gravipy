@@ -909,7 +909,7 @@ class GravPhaseNight():
             else:
                 if self.verbose:
                     print('Read in pandas')
-                pandasfile = resource_filename('gravipy', 'GRAVITY_DATA_2019_4_frame.object')
+                pandasfile = resource_filename('gravipy', 'GRAVITY_DATA_2019_4_frame_simple.object')
                 pand = pd.read_pickle(pandasfile)
                 
             sg_flux = []
