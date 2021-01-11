@@ -1302,17 +1302,71 @@ class GravPhaseNight():
             wave = d['OI_WAVELENGTH',12].data['EFF_WAVE']*1e6
             fullcor = np.zeros((6*ndit, len(wave)))
             
-            try:
-                for base in range(6):
-                    if bl_corr:
-                        if lst_corr:
-                            if subspacing != 1:
-                                lstdif = s2_lst[fdx][-1] - s2_lst[fdx][-2]
-                                lst_s = np.linspace(s2_lst[fdx][0], s2_lst[fdx][-1] + lstdif, len(s2_lst[fdx])*subspacing)
-                                cor = -averaging(interp_list[base](lst_s), subspacing)[:-1]
+            if correction:
+                try:
+                    for base in range(6):
+                        if bl_corr:
+                            if lst_corr:
+                                if subspacing != 1:
+                                    lstdif = s2_lst[fdx][-1] - s2_lst[fdx][-2]
+                                    lst_s = np.linspace(s2_lst[fdx][0], s2_lst[fdx][-1] + lstdif, len(s2_lst[fdx])*subspacing)
+                                    cor = -averaging(interp_list[base](lst_s), subspacing)[:-1]
+                                else:
+                                    cor = -interp_list[base](s2_lst[fdx])
                             else:
-                                cor = -interp_list[base](s2_lst[fdx])
+                                t1 = self.bl_array[base][0]
+                                t2 = self.bl_array[base][1]
+                                ang1 = angle[t1]
+                                ang2 = angle[t2]
+                                mang = (ang1 + ang2)/2
+                                if subspacing != 1:
+                                    mangdif = (mang[-1]-mang[-2])/2
+                                    mang_s = np.linspace(mang[0] - mangdif, mang[-1] + mangdif, len(mang)*subspacing)
+                                    cor = -averaging(interp_list[base](mang_s), subspacing)[:-1]
+                                else:
+                                    cor = -interp_list[base](mang)
+
                         else:
+                            t1 = self.bl_array[base][0]
+                            t2 = self.bl_array[base][1]
+                            if lst_corr:
+                                if subspacing != 1:
+                                    lstdif = s2_lst[fdx][-1] - s2_lst[fdx][-2]
+                                    lst_s = np.linspace(s2_lst[fdx][0], s2_lst[fdx][-1] + lstdif, len(s2_lst[fdx])*subspacing)
+                                    cor1 = averaging(interp_list[t1](lst_s), subspacing)[:-1]
+                                    cor2 = averaging(interp_list[t2](lst_s), subspacing)[:-1]
+                                else:
+                                    cor1 = interp_list[t1](s2_lst[fdx])
+                                    cor2 = interp_list[t2](s2_lst[fdx])  
+                            else:
+                                ang1 = angle[t1]
+                                ang2 = angle[t2]
+                                if subspacing != 1:
+                                    angdif1 = (ang1[-1]-ang1[-2])/2
+                                    angdif2 = (ang2[-1]-ang2[-2])/2
+                                    ang1_s = np.linspace(ang1[0] - angdif1, ang1[-1] + angdif1, len(ang1)*subspacing)
+                                    ang2_s = np.linspace(ang2[0] - angdif2, ang2[-1] + angdif2, len(ang2)*subspacing)
+                                    cor1 = averaging(interp_list[t1](ang1_s), subspacing)[:-1]
+                                    cor2 = averaging(interp_list[t2](ang2_s), subspacing)[:-1]
+                                else:
+                                    cor1 = interp_list[t1](ang1)
+                                    cor2 = interp_list[t2](ang2)
+
+                            cor = cor1-cor2
+                            if mode in ['lst_standard', 'standard']:
+                                cor *= 1e6
+
+                        if ndit == 1:
+                            cor = np.mean(cor)
+
+                        wcor = np.zeros((ndit, len(wave)))
+                        for w in range(len(wave)):
+                            wcor[:,w] = cor/wave[w]*360
+                        fullcor[base::6] = wcor
+                    s2_correction_wo[fdx] = fullcor
+                
+                    if cor_cor:
+                        for base in range(6):
                             t1 = self.bl_array[base][0]
                             t2 = self.bl_array[base][1]
                             ang1 = angle[t1]
@@ -1321,84 +1375,29 @@ class GravPhaseNight():
                             if subspacing != 1:
                                 mangdif = (mang[-1]-mang[-2])/2
                                 mang_s = np.linspace(mang[0] - mangdif, mang[-1] + mangdif, len(mang)*subspacing)
-                                cor = -averaging(interp_list[base](mang_s), subspacing)[:-1]
+                                phasecor = averaging(interp_list_phase[base](mang_s), subspacing)[:-1]
                             else:
-                                cor = -interp_list[base](mang)
+                                phasecor = interp_list_phase[base](mang)
+                            if ndit == 1:
+                                phasecor = np.mean(phasecor)
+                            wphasecor = np.zeros((ndit, len(wave)))
+                            for w in range(len(wave)):
+                                wphasecor[:,w] = phasecor/wave[w]*360
+                            fullcor[base::6] -= wphasecor
 
-                    else:
-                        t1 = self.bl_array[base][0]
-                        t2 = self.bl_array[base][1]
-                        if lst_corr:
-                            if subspacing != 1:
-                                lstdif = s2_lst[fdx][-1] - s2_lst[fdx][-2]
-                                lst_s = np.linspace(s2_lst[fdx][0], s2_lst[fdx][-1] + lstdif, len(s2_lst[fdx])*subspacing)
-                                cor1 = averaging(interp_list[t1](lst_s), subspacing)[:-1]
-                                cor2 = averaging(interp_list[t2](lst_s), subspacing)[:-1]
-                            else:
-                                cor1 = interp_list[t1](s2_lst[fdx])
-                                cor2 = interp_list[t2](s2_lst[fdx])  
-                        else:
-                            ang1 = angle[t1]
-                            ang2 = angle[t2]
-                            if subspacing != 1:
-                                angdif1 = (ang1[-1]-ang1[-2])/2
-                                angdif2 = (ang2[-1]-ang2[-2])/2
-                                ang1_s = np.linspace(ang1[0] - angdif1, ang1[-1] + angdif1, len(ang1)*subspacing)
-                                ang2_s = np.linspace(ang2[0] - angdif2, ang2[-1] + angdif2, len(ang2)*subspacing)
-                                cor1 = averaging(interp_list[t1](ang1_s), subspacing)[:-1]
-                                cor2 = averaging(interp_list[t2](ang2_s), subspacing)[:-1]
-                            else:
-                                cor1 = interp_list[t1](ang1)
-                                cor2 = interp_list[t2](ang2)
-
-                        cor = cor1-cor2
-                        if mode in ['lst_standard', 'standard']:
-                            cor *= 1e6
-
-                    if ndit == 1:
-                        cor = np.mean(cor)
-
-                    wcor = np.zeros((ndit, len(wave)))
-                    for w in range(len(wave)):
-                        wcor[:,w] = cor/wave[w]*360
-                    fullcor[base::6] = wcor
-                s2_correction_wo[fdx] = fullcor
-                
-                if cor_cor:
-                    for base in range(6):
-                        t1 = self.bl_array[base][0]
-                        t2 = self.bl_array[base][1]
-                        ang1 = angle[t1]
-                        ang2 = angle[t2]
-                        mang = (ang1 + ang2)/2
-                        if subspacing != 1:
-                            mangdif = (mang[-1]-mang[-2])/2
-                            mang_s = np.linspace(mang[0] - mangdif, mang[-1] + mangdif, len(mang)*subspacing)
-                            phasecor = averaging(interp_list_phase[base](mang_s), subspacing)[:-1]
-                        else:
-                            phasecor = interp_list_phase[base](mang)
-                        if ndit == 1:
-                            phasecor = np.mean(phasecor)
-                        wphasecor = np.zeros((ndit, len(wave)))
-                        for w in range(len(wave)):
-                            wphasecor[:,w] = phasecor/wave[w]*360
-                        fullcor[base::6] -= wphasecor
-
-                fullcor[np.isnan(fullcor)] = 0
-            except ValueError:
-                fullcor = 0
-            s2_correction[fdx] = fullcor
-
-            flag1 = d['OI_VIS', 11].data['FLAG']
-            flag2 = d['OI_VIS', 12].data['FLAG']
-            
-
-            if correction:
+                    fullcor[np.isnan(fullcor)] = 0
+                except ValueError:
+                    fullcor = 0
                 s2_visphi_p1[fdx] = d['OI_VIS', 11].data['VISPHI'] + fullcor
                 s2_visphi_p2[fdx] = d['OI_VIS', 12].data['VISPHI'] + fullcor
             else:
                 s2_visphi_p1[fdx] = d['OI_VIS', 11].data['VISPHI']
                 s2_visphi_p2[fdx] = d['OI_VIS', 12].data['VISPHI']
+
+            s2_correction[fdx] = fullcor
+
+            flag1 = d['OI_VIS', 11].data['FLAG']
+            flag2 = d['OI_VIS', 12].data['FLAG']
 
             s2_visphi_err_p1[fdx] = d['OI_VIS', 11].data['VISPHIERR']
             s2_visphi_err_p2[fdx] = d['OI_VIS', 12].data['VISPHIERR']
