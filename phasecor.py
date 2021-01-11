@@ -816,7 +816,7 @@ class GravPhaseNight():
                 '2019-08-19',
         #           '2019-09-11',
                 '2019-09-12',
-        #           '2019-09-13',
+                '2019-09-13',
                 '2019-09-15']
         calibrators = ['GRAVI.2019-03-28T08:00:22.802_dualscivis.fits',
                     'GRAVI.2019-03-29T07:35:36.327_dualscivis.fits',
@@ -840,7 +840,7 @@ class GravPhaseNight():
                     'GRAVI.2019-08-20T02:41:24.122_dualscivis.fits',
         #                'GRAVI.2019-09-12T01:26:51.547_dualscivis.fits',
                     'GRAVI.2019-09-12T23:48:18.886_dualscivis.fits',
-        #                'GRAVI.2019-09-14T00:13:24.592_dualscivis.fits',
+                    'GRAVI.2019-09-14T00:13:24.592_dualscivis.fits',
                     'GRAVI.2019-09-16T00:08:07.335_dualscivis.fits'
                     ] 
         try:
@@ -2485,7 +2485,9 @@ class GravPhaseNight():
                     _de_p1 = np.nan
                     _ra_p2 = np.nan
                     _de_p2 = np.nan
-                    _res = np.array([_ra_p1, _de_p1, _ra_p2, _de_p2])
+                    _chi_p1 = np.nan
+                    _chi_p2 = np.nan
+                    _res = np.array([_ra_p1, _de_p1, _ra_p2, _de_p2, _chi_p1, _chi_p2])
                     return _res
                 
                 for dit in range(ndit):
