@@ -1016,16 +1016,16 @@ class GravPhaseNight():
         
         
     def process_night(self, mode,  fluxcut=0.0, subspacing=1,
-                      correction=True, poscor=True, plot=False,
+                      poscor=True, plot=False,
                       fitstart=0, fitstop=-1, linear_cor=False,
                       save=False, ret=False, phasecorrection=None):
         """
         Function to corect, calibrate & poscor data
         mode        : mode for the correction. To see whats available run:
                       get_corrections()
+                      if None, does not use any correction
         fluxcut     : if > 0 only uses the data which is brighter [0]
         subspacing  : spaces the applied corrections more than the data [1]
-        correction  : apply correction [True]
         poscor      : apply poscor [True]
         plot        : Show some plots [False]
         linear_cor  : subtracts a polynom of 1st degree from each baseline [False]    
@@ -1044,38 +1044,44 @@ class GravPhaseNight():
         if fluxcut > 0:
             sg_flux = self.sg_flux
         
-        if isinstance(mode, str):
-            corrections_dict = self.get_corrections(bequiet=True)
-            try:
-                interp_list = corrections_dict[mode]
-            except KeyError:
-                print('mode not avialable, use one of those:')
-                print(corrections_dict.keys())
-                print('More corrections in: /data/user/fwidmann/Phase_fit_cor/corrections_data/')
-                raise KeyError
-
-            if 'lst' in mode:
-                lst_corr = True
-                if ndit == 1:
-                    raise ValueError('Ndit 1 and lst correction is not implemented properly')
-                print('Apply LST correction')
-            else:
-                lst_corr = False
-
-            if 'bl' in mode:
-                bl_corr = True
-                print('Apply BL correction')
-            else:
-                bl_corr = False
+        if mode is None:
+            correction = False
+            if self.verbose:
+                print('No correction for metrology systematics used')
         else:
-            if len(mode) == 4:
-                bl_corr = False
-                lst_corr = False
-                interp_list = mode
-                if self.verbose:
-                    print('using the interpolations given in input')
+            correction = True
+            if isinstance(mode, str):
+                corrections_dict = self.get_corrections(bequiet=True)
+                try:
+                    interp_list = corrections_dict[mode]
+                except KeyError:
+                    print('mode not avialable, use one of those:')
+                    print(corrections_dict.keys())
+                    print('More corrections in: /data/user/fwidmann/Phase_fit_cor/corrections_data/')
+                    raise KeyError
+
+                if 'lst' in mode:
+                    lst_corr = True
+                    if ndit == 1:
+                        raise ValueError('Ndit 1 and lst correction is not implemented properly')
+                    print('Apply LST correction')
+                else:
+                    lst_corr = False
+
+                if 'bl' in mode:
+                    bl_corr = True
+                    print('Apply BL correction')
+                else:
+                    bl_corr = False
             else:
-                raise ValueError('If interpolations are given mode has to be a list of four')
+                if len(mode) == 4:
+                    bl_corr = False
+                    lst_corr = False
+                    interp_list = mode
+                    if self.verbose:
+                        print('using the interpolations given in input')
+                else:
+                    raise ValueError('If interpolations are given mode has to be a list of four')
             
             
         if phasecorrection is not None:
