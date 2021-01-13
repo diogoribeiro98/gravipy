@@ -2049,7 +2049,7 @@ class GravData():
         phasemaps:      Use Phasemaps for fit [False]
         interppm:       Interpolate Phasemaps [True]
         smoothkernel:   Size of smoothing kernel in mas [15]
-        simulate_pm:    Phasemaps for suimulated data, sets ACQ parameter to 0 [False]
+        simulate_pm:    Phasemaps for simulated data, sets ACQ parameter to 0 [False]
         
         For a fit to two components: A (SgrA*) and B (S2)
         The possible fit properties are:
