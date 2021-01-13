@@ -54,30 +54,36 @@ class GravModel():
         self.ditnoise = None
         
         if self.resolution == 'LOW':
-            self.wl = np.array([2e-06, 2.037e-06, 2.074e-06, 2.111e-06, 2.148e-06, 2.185e-06, 
-                            2.222e-06, 2.259e-06, 2.296e-06, 2.333e-06, 2.37e-06, 2.407e-06, 
-                            2.444e-06, 2.481e-06])
+            self.wl = np.array([2e-06, 2.037e-06, 2.074e-06, 2.111e-06, 
+                                2.148e-06, 2.185e-06, 2.222e-06, 2.259e-06, 
+                                2.296e-06, 2.333e-06, 2.37e-06, 2.407e-06, 
+                                2.444e-06, 2.481e-06])
+            
         elif self.resolution == 'MED':
-            filterlistfile = resource_filename('gravipy', 'wavelength_medium')
+            filterlistfile = resource_filename('gravipy', 
+                                               'modeldata/wavelength_medium')
             filterlist = np.genfromtxt(filterlistfile)
             filterpos = np.round(filterlist[:,0],4)*1e-6
             self.wl = filterpos
             
+            
     def _getFlat(self):
         ###############    
         # Atmosphere (only for x_scale)
-        atmospherefile = resource_filename('gravipy', 'atmosphere')
+        atmospherefile = resource_filename('gravipy', 'modeldata/atmosphere')
         atmtrans = np.genfromtxt(atmospherefile)
         steps = int(round((atmtrans[-1,0]-atmtrans[0,0])*10000))
         start = int(round(atmtrans[0,0]*10000))
         #x_scale = np.arange(start,start+steps)/10000
-        x_scale = np.arange(atmtrans[0,0]*1e-6, atmtrans[-1,0]*1e-6, self.specwidth)
+        x_scale = np.arange(atmtrans[0,0]*1e-6, atmtrans[-1,0]*1e-6, 
+                            self.specwidth)
                 
         ###############
         # Bandpass
         if self.resolution == 'LOW':
             num_channels = 14
-            bandpassfile = resource_filename('gravipy', 'LOWRES_bandpass_P1.fits')
+            bandpassfile = resource_filename('gravipy', 
+                                             'modeldata/LOWRES_bandpass_P1.fits')
             bandpass = fits.open(bandpassfile)
             real_wavelength = np.zeros(2048)
             filterlist = np.zeros((num_channels,2048))
@@ -118,7 +124,8 @@ class GravModel():
     
         elif self.resolution == 'MED':
             num_channels = 210
-            filterlistfile = resource_filename('gravipy', 'wavelength_medium')
+            filterlistfile = resource_filename('gravipy', 
+                                               'modeldata/wavelength_medium')
             filterlist = np.genfromtxt(filterlistfile)
             filterpos = np.round(filterlist[:,0],4)*1e-6
             wl = filterpos
@@ -136,12 +143,12 @@ class GravModel():
         # BC throughput
         if self.resolution == 'LOW':
             # from monochromator measurement
-            throughputfile = resource_filename('gravipy', 'throughput')
+            throughputfile = resource_filename('gravipy', 'modeldata/throughput')
             bc_throughput = np.genfromtxt(throughputfile)[:-1,1]
             bc_throughput_wl = np.genfromtxt(throughputfile)[:-1,0]
 
             # Modified TP
-            throughputfile = resource_filename('gravipy', 'throughput_mod')
+            throughputfile = resource_filename('gravipy', 'modeldata/throughput_mod')
             bc_throughput = np.genfromtxt(throughputfile)[:-1,1]
             bc_throughput = np.insert(bc_throughput,0,0)
             bc_throughput_wl = np.insert(bc_throughput_wl,0,x_scale[0])
@@ -151,7 +158,7 @@ class GravModel():
                                                         kind='linear')(x_scale)
 
         elif self.resolution == 'MED':
-            throughputfile = resource_filename('gravipy', 'throughput_med')
+            throughputfile = resource_filename('gravipy', 'modeldata/throughput_med')
             bc_throughput_wl = np.genfromtxt(throughputfile)[:,0][:245]
             bc_throughput = np.genfromtxt(throughputfile)[:,1][:245]
 
@@ -176,7 +183,7 @@ class GravModel():
     
         ###############    
         # Atmosphere
-        atmospherefile = resource_filename('gravipy', 'atmosphere')
+        atmospherefile = resource_filename('gravipy', 'modeldata/atmosphere')
         atmtrans = np.genfromtxt(atmospherefile)
         steps = int(round((atmtrans[-1,0]-atmtrans[0,0])*10000))
         start = int(round(atmtrans[0,0]*10000))
@@ -196,7 +203,7 @@ class GravModel():
         # Bandpass
         if self.resolution == 'LOW':
             num_channels = 14
-            bandpassfile = resource_filename('gravipy', 'LOWRES_bandpass_P1.fits')
+            bandpassfile = resource_filename('gravipy', 'modeldata/LOWRES_bandpass_P1.fits')
             bandpass = fits.open(bandpassfile)
             real_wavelength = np.zeros(2048)
             filterlist = np.zeros((num_channels,2048))
@@ -237,7 +244,7 @@ class GravModel():
     
         elif self.resolution == 'MED':
             num_channels = 210
-            filterlistfile = resource_filename('gravipy', 'wavelength_medium')
+            filterlistfile = resource_filename('gravipy', 'modeldata/wavelength_medium')
             filterlist = np.genfromtxt(filterlistfile)
             filterpos = np.round(filterlist[:,0],4)*1e-6
             wl = filterpos
@@ -256,12 +263,12 @@ class GravModel():
         # BC throughput
         if self.resolution == 'LOW':
             # from monochromator measurement
-            throughputfile = resource_filename('gravipy', 'throughput')
+            throughputfile = resource_filename('gravipy', 'modeldata/throughput')
             bc_throughput = np.genfromtxt(throughputfile)[:-1,1]
             bc_throughput_wl = np.genfromtxt(throughputfile)[:-1,0]
 
             # Modified TP
-            throughputfile = resource_filename('gravipy', 'throughput_mod')
+            throughputfile = resource_filename('gravipy', 'modeldata/throughput_mod')
             bc_throughput = np.genfromtxt(throughputfile)[:-1,1]
             bc_throughput = np.insert(bc_throughput,0,0)
             bc_throughput_wl = np.insert(bc_throughput_wl,0,x_scale[0])
@@ -271,7 +278,7 @@ class GravModel():
                                                         kind='linear')(x_scale)
 
         elif self.resolution == 'MED':
-            throughputfile = resource_filename('gravipy', 'throughput_med')
+            throughputfile = resource_filename('gravipy', 'modeldata/throughput_med')
             bc_throughput_wl = np.genfromtxt(throughputfile)[:,0][:245]
             bc_throughput = np.genfromtxt(throughputfile)[:,1][:245]
 
@@ -320,14 +327,14 @@ class GravModel():
     ## Noise & SNR
     def getDITNoise(self, extSignal=None, ro=None):
         if self.resolution == 'LOW':
-            noisefile = resource_filename('gravipy', 'background_noise_LOW')
+            noisefile = resource_filename('gravipy', 'modeldata/background_noise_LOW')
             background = np.genfromtxt(noisefile)
             #ro_a = 14.683
             #ro_b = 0.389
             ro_a = 12.653 
             ro_b = 4.97
         elif self.resolution == 'MED':
-            noisefile = resource_filename('gravipy', 'background_noise_MED')
+            noisefile = resource_filename('gravipy', 'modeldata/background_noise_MED')
             background = np.genfromtxt(noisefile)
             ro_a = 12.653 
             ro_b = 4.97
@@ -359,11 +366,11 @@ class GravModel():
         detector seems to be always read with fowler 16, should NOT depend on dit!
         """
         if self.resolution == 'LOW':
-            noisefile = resource_filename('gravipy', 'background_noise_LOW_new')
+            noisefile = resource_filename('gravipy', 'modeldata/background_noise_LOW_new')
             background = np.genfromtxt(noisefile)
             self.readout_noise = 12.65
         elif self.resolution == 'MED':
-            noisefile = resource_filename('gravipy', 'background_noise_MED_new')
+            noisefile = resource_filename('gravipy', 'modeldata/background_noise_MED_new')
             background = np.genfromtxt(noisefile)
             self.readout_noise = 9.48
         else:
