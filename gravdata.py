@@ -1747,22 +1747,6 @@ class GravData():
                          [f[1],f[0]]])
         
         
-        if self.frankwave == True:
-            wave2 = np.array([1.99999999e-06, 2.03700006e-06, 2.07399989e-06, 2.11099996e-06,
-                                2.14800002e-06, 2.18500008e-06, 2.22199992e-06, 2.25899998e-06,
-                                2.29600005e-06, 2.33300011e-06, 2.36999995e-06, 2.40700001e-06,
-                                2.44400007e-06, 2.48099991e-06])*1e6
-            dlambda2 = np.array([0.03523 , 0.06215 , 0.0671  , 0.0639  , 0.06275 , 0.06725 ,
-                                 0.07115 , 0.0666  , 0.06175 , 0.05825 , 0.0579  , 0.05785 ,
-                                 0.056   , 0.047985])
-            wave = wave2
-            for ddx in range(6):
-                dlambda[ddx] = dlambda2
-            
-            print('using Franks wavelengths')
-        
-        
-        
         if phasemaps:
             cor_amp_sgr, cor_pha_sgr, cor_int_sgr = self.readPhasemaps(phaseCenterRA,
                                                                        phaseCenterDEC,
@@ -2073,8 +2057,6 @@ class GravData():
         if self.resolution != 'LOW' and flagtill == 3 and flagfrom == 13:
             raise ValueError('Initial values for flagtill and flagfrom have to be changed if not low resolution')
         
-        self.frankwave = False
-        
         self.fit_for = fit_for
         self.constant_f = constant_f
         self.use_opds = use_opds
@@ -2088,6 +2070,7 @@ class GravData():
         self.bequiet = bequiet
         self.smoothkernel = smoothkernel
         rad2as = 180 / np.pi * 3600
+        
         if np.any(specialpar):
             self.specialfit = True
             self.specialfit_bl = specialpar
@@ -2561,10 +2544,6 @@ class GravData():
                     samples = sampler.chain
                     mostprop = sampler.flatchain[np.argmax(sampler.flatlnprobability)]
 
-                    # for debuggin: save the chain
-                    #samples = np.load("samples_MCMC_groupedM_%i.npy" % idx)
-                    #mostprop = np.load("samples_MCMC_groupedM_mostprop_%i.npy" % idx)
-                    
                     clsamples = np.delete(samples, todel, 2)
                     cllabels = np.delete(theta_names, todel)
                     cllabels_raw = np.delete(theta_names_raw, todel)
