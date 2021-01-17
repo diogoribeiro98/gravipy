@@ -1841,6 +1841,8 @@ class GravPhaseNight():
 
         sg_flux = self.sg_flux
         for fdx, file in enumerate(sg_files):
+            if plotfits:
+                print(sg_files[fdx])
             for dit in range(ndit):
                 u = sg_u_raw[fdx, dit*6:(dit+1)*6]
                 v = sg_v_raw[fdx, dit*6:(dit+1)*6]

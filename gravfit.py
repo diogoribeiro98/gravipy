@@ -19,6 +19,7 @@ import multiprocessing
 import sys
 import os 
 
+from .gravdata import *
 
 try:
     from generalFunctions import *
