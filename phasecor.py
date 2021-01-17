@@ -913,6 +913,8 @@ class GravPhaseNight():
                 pand = pd.read_pickle(pandasfile)
                 
             sg_flux = []
+            sg_flux_p1 = []
+            sg_flux_p2 = []
             sg_header = []
             s2_pos = []
             for fdx, file in enumerate(sg_files):
@@ -926,6 +928,8 @@ class GravPhaseNight():
                 if np.isnan(sg_fr):
                     print('%s has no flux value' % file)
                 sg_flux.append(sg_fr)
+                sg_flux_p1.append(p1)
+                sg_flux_p2.append(p2)
                 
                 ddate = convert_date(obsdate)[0]
                 orbitfile = resource_filename('gravipy', 's2_orbit_082020.txt')
@@ -934,6 +938,8 @@ class GravPhaseNight():
                     
             self.s2_pos = s2_pos
             self.sg_flux = sg_flux
+            self.sg_flux_p1 = sg_flux_p1
+            self.sg_flux_p2 = sg_flux_p2
             self.sg_header = sg_header
 
         
