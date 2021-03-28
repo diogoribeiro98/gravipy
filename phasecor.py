@@ -889,9 +889,11 @@ class GravPhaseNight():
                 else:
                     sobjx = h['ESO INS SOBJ X']
                     sobjy = h['ESO INS SOBJ Y']
-                    if -990 > sobjx or sobjx > -950:
+                    if -990 > sobjx or sobjx > -940:
+                        print(sobjx)
                         continue
                     if -640 > sobjy or sobjy > -590:
+                        print(sobjy)
                         continue
                     sg_files.append(file)
         if self.verbose:
