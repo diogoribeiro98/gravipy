@@ -1747,6 +1747,19 @@ class GravPhaseNight():
                         d['OI_VIS', 11].data['VISPHI'] = visphi_p1
                         d['OI_VIS', 12].data['VISPHI'] = visphi_p2
                         d.writeto(folder+fname, overwrite=True)
+
+                for fdx, file in enumerate(s2_files):
+                    fname = file[file.find('GRAVI'):]
+                    visphi_p1 = result[1][3][fdx]
+                    visphi_p2 = result[1][5][fdx]
+                    if np.isnan(visphi_p1).all():
+                        print('%s is all nan' % fname)
+                    else:
+                        d = fits.open(file)
+                        d['OI_VIS', 11].data['VISPHI'] = visphi_p1
+                        d['OI_VIS', 12].data['VISPHI'] = visphi_p2
+                        d.writeto(folder+fname, overwrite=True)
+
                         
         self.alldata = result
         if ret:
