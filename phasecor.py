@@ -2041,7 +2041,7 @@ class GravPhaseNight():
         return (lambda0/2.2)**(-1-alpha)*2*dlambda*sinc*np.exp(-2.j*np.pi*s/lambda0)
 
 
-    def threesource(self, uv, wave, dlambda, sources, x, y, f, mask=1,
+    def threesource(self, uv, wave, dlambda, sources, x, y, mask=1,
                     alpha_SgrA=-0.5,alpha_S=3, alpha_bg=3, 
                     fluxRatioBG=0, ret_flat=True):
         phasemaps = self.fit_phasemaps
@@ -2050,8 +2050,7 @@ class GravPhaseNight():
         v = uv[1]
         
         if phasemaps:
-            s2_pos, _, f1_pos, f1_fr, cor = sources
-            s2_fr = f
+            s2_pos, s2_fr, f1_pos, f1_fr, cor = sources
             
             cor_amp_s2, cor_pha_s2, cor_amp_f1, cor_pha_f1 = cor
             
@@ -2109,8 +2108,7 @@ class GravPhaseNight():
                             cr1_s2*cr2_s2*s2_fr*intS2_center + fluxRatioBG*intBG))
             
         else:
-            s2_pos, _, f1_pos, f1_fr = sources
-            s2_fr = f
+            s2_pos, s2_fr, f1_pos, f1_fr = sources
 
             vis = np.zeros((6,len(wave))) + 0j
             for i in range(0,6):
@@ -2302,13 +2300,12 @@ class GravPhaseNight():
                                             uv, visphif[mask], sigma=visphierrf[mask],
                                             bounds=(-10,10))
             
-            p0 = [popt1[0], popt1[1], s2_pos]
+            p0 = [popt1[0], popt1[1]]
 
-            popt, pcov = optimize.curve_fit(lambda uv, x, y, f: self.threesource(uv, wave, dlambda, sources, x, y, f,
+            popt, pcov = optimize.curve_fit(lambda uv, x, y: self.threesource(uv, wave, dlambda, sources, x, y,
                                                                             mask=mask), 
                                             uv, visphif[mask], sigma=visphierrf[mask], 
                                             bounds=(-10,10), p0=p0)#, method="dogbox",**{"loss":'cauchy'})
-            print(popt)
             
         popt_res = self.threesource(uv, wave, dlambda, sources, *popt, mask=mask)
         
