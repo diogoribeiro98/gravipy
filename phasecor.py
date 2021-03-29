@@ -843,7 +843,7 @@ class GravPhaseNight():
                     'GRAVI.2019-09-12T23:48:18.886_dualscivis.fits',
                     'GRAVI.2019-09-14T00:13:24.592_dualscivis.fits',
                     'GRAVI.2019-09-16T00:08:07.335_dualscivis.fits',
-                    'GRAVI.2021-03-28T09:09:44.486_dualscivis.fits'
+                    'GRAVI.2021-03-28T09:09:44.486_dualscivis.fits'   
                     ] 
         try:
             self.calibrator = calibrators[nights.index(night)]
@@ -889,10 +889,10 @@ class GravPhaseNight():
                 else:
                     sobjx = h['ESO INS SOBJ X']
                     sobjy = h['ESO INS SOBJ Y']
-                    if -990 > sobjx or sobjx > -950:
-                        continue
-                    if -640 > sobjy or sobjy > -590:
-                        continue
+                    #if -990 > sobjx or sobjx > -950:
+                    #    continue
+                    #if -640 > sobjy or sobjy > -590:
+                    #    continue
                     sg_files.append(file)
         if self.verbose:
             print('%i SGRA , %i S2 files found' % (len(sg_files), len(s2_files)))
@@ -1108,7 +1108,6 @@ class GravPhaseNight():
         ################
         # read in al necessary data
         ################
-        
         sg_visphi_p1 = np.zeros((len(sg_files), ndit*6, 14))*np.nan
         sg_visphi_p2 = np.zeros((len(sg_files), ndit*6, 14))*np.nan
         sg_visphi_err_p1 = np.zeros((len(sg_files), ndit*6, 14))*np.nan
@@ -1710,6 +1709,19 @@ class GravPhaseNight():
                         d['OI_VIS', 11].data['VISPHI'] = visphi_p1
                         d['OI_VIS', 12].data['VISPHI'] = visphi_p2
                         d.writeto(folder+fname, overwrite=True)
+                        
+                for fdx, file in enumerate(s2_files):
+                    fname = file[file.find('GRAVI'):]
+                    visphi_p1 = result[1][3][fdx]
+                    visphi_p2 = result[1][5][fdx]
+                    if np.isnan(visphi_p1).all():
+                        print('%s is all nan' % fname)
+                    else:
+                        d = fits.open(file)
+                        d['OI_VIS', 11].data['VISPHI'] = visphi_p1
+                        d['OI_VIS', 12].data['VISPHI'] = visphi_p2
+                        d.writeto(folder+fname, overwrite=True)
+                    
             else:
                 if linear_cor:
                     folder = file[:file.find('GRAVI')] + 'correction_nocor_new/'
