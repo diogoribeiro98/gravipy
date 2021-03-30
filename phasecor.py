@@ -845,7 +845,7 @@ class GravPhaseNight():
                     'GRAVI.2019-09-12T23:48:18.886_dualscivis.fits',
                     'GRAVI.2019-09-14T00:13:24.592_dualscivis.fits',
                     'GRAVI.2019-09-16T00:08:07.335_dualscivis.fits',
-                    'GRAVI.2021-03-28T09:09:44.486_dualscivis.fits'
+                    'GRAVI.2021-03-28T09:09:44.486_dualscivis.fits'   
                     ] 
         try:
             self.calibrator = calibrators[nights.index(night)]
@@ -1717,6 +1717,19 @@ class GravPhaseNight():
                         d['OI_VIS', 11].data['VISPHI'] = visphi_p1
                         d['OI_VIS', 12].data['VISPHI'] = visphi_p2
                         d.writeto(folder+fname, overwrite=True)
+                        
+                for fdx, file in enumerate(s2_files):
+                    fname = file[file.find('GRAVI'):]
+                    visphi_p1 = result[1][3][fdx]
+                    visphi_p2 = result[1][5][fdx]
+                    if np.isnan(visphi_p1).all():
+                        print('%s is all nan' % fname)
+                    else:
+                        d = fits.open(file)
+                        d['OI_VIS', 11].data['VISPHI'] = visphi_p1
+                        d['OI_VIS', 12].data['VISPHI'] = visphi_p2
+                        d.writeto(folder+fname, overwrite=True)
+                    
             else:
                 if linear_cor:
                     folder = file[:file.find('GRAVI')] + 'correction_nocor_new/'
@@ -1736,6 +1749,19 @@ class GravPhaseNight():
                         d['OI_VIS', 11].data['VISPHI'] = visphi_p1
                         d['OI_VIS', 12].data['VISPHI'] = visphi_p2
                         d.writeto(folder+fname, overwrite=True)
+
+                for fdx, file in enumerate(s2_files):
+                    fname = file[file.find('GRAVI'):]
+                    visphi_p1 = result[1][3][fdx]
+                    visphi_p2 = result[1][5][fdx]
+                    if np.isnan(visphi_p1).all():
+                        print('%s is all nan' % fname)
+                    else:
+                        d = fits.open(file)
+                        d['OI_VIS', 11].data['VISPHI'] = visphi_p1
+                        d['OI_VIS', 12].data['VISPHI'] = visphi_p2
+                        d.writeto(folder+fname, overwrite=True)
+
                         
         self.alldata = result
         if ret:
@@ -2043,7 +2069,7 @@ class GravPhaseNight():
         return (lambda0/2.2)**(-1-alpha)*2*dlambda*sinc*np.exp(-2.j*np.pi*s/lambda0)
 
 
-    def threesource(self, uv, wave, dlambda, sources, x, y, mask=1,
+    def threesource(self, uv, wave, dlambda, sources, x, y, f, mask=1,
                     alpha_SgrA=-0.5,alpha_S=3, alpha_bg=3, 
                     fluxRatioBG=0, ret_flat=True):
         phasemaps = self.fit_phasemaps
@@ -2111,7 +2137,6 @@ class GravPhaseNight():
             
         else:
             s2_pos, s2_fr, f1_pos, f1_fr = sources
-
             vis = np.zeros((6,len(wave))) + 0j
             for i in range(0,6):
                 s_SgrA = ((x)*u[i] + (y)*v[i]) * mas2rad * 1e6
@@ -2799,7 +2824,6 @@ class GravPhaseNight():
 
 
 
-
     def fit_night_3src_var(self, plot=True, plotfits=False, phasemaps=False, only_sgr=False, 
                            cut_low=2, cut_up=2, saveplots=True, mcmc=False, nthreads=1, 
                            s2_data=None, s3_data=None, fitonly=None):
@@ -2871,9 +2895,6 @@ class GravPhaseNight():
             thirdsource=True
             s3_flux = s3_data[0]
             s3_lpos = np.array(s3_data[1:])
-            
-            
-        
 
         if nthreads == 1:
             for fdx, file in enumerate(sg_files):
@@ -3045,16 +3066,6 @@ class GravPhaseNight():
         else:
             fitres = [sg_t, sg_ra_p1, sg_de_p1, sg_ra_p2, sg_de_p2, sg_chi_p1, sg_chi_p2]
         return fitres
-
-
-
-
-
-
-
-
-
-
 
 
     def vis_onestar(self, uv, wave, dlambda, sources, alpha=3):
