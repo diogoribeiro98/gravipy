@@ -2069,7 +2069,7 @@ class GravPhaseNight():
         return (lambda0/2.2)**(-1-alpha)*2*dlambda*sinc*np.exp(-2.j*np.pi*s/lambda0)
 
 
-    def threesource(self, uv, wave, dlambda, sources, x, y, f, mask=1,
+    def threesource(self, uv, wave, dlambda, sources, x, y, mask=1,
                     alpha_SgrA=-0.5,alpha_S=3, alpha_bg=3, 
                     fluxRatioBG=0, ret_flat=True):
         phasemaps = self.fit_phasemaps
@@ -2269,33 +2269,7 @@ class GravPhaseNight():
         else:
             return visphi
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        
+       
         
     def lnprob_unary(self, theta, visphif, visphierrf, 
                      mask, uv, wave, dlambda, sources, lower, upper):
@@ -2485,10 +2459,11 @@ class GravPhaseNight():
                 #print(popt)
             else:
                 popt1, pcov = optimize.curve_fit(lambda uv, x, y: self.pointsource(uv, wave, x, y, mask),
-                                                uv, visphif[mask], sigma=visphierrf[mask],
+                                                uv, visphif[mask], sigma=visphierrf[mask], 
                                                 bounds=(-10,10))
                 
                 p0 = [popt1[0], popt1[1]]
+                print(p0)
 
                 popt, pcov = optimize.curve_fit(lambda uv, x, y: self.threesource(uv, wave, dlambda, sources, x, y,
                                                                                 mask=mask), 
@@ -2496,6 +2471,7 @@ class GravPhaseNight():
                                                 bounds=(-10,10), p0=p0)#, method="dogbox",**{"loss":'cauchy'})
                 sources_pl = np.copy(sources)
                 popt_pl = popt
+                print(popt)
             
         popt_res = self.threesource(uv, wave, dlambda, sources_pl, *popt_pl, mask=mask)
         
@@ -2579,8 +2555,7 @@ class GravPhaseNight():
                 plt.clf()
             else:
                 plt.show()
-        #sys.exit()
-        return popt[1], popt[2], redchi
+        return popt[0], popt[1], redchi
         
         
 
@@ -2661,8 +2636,8 @@ class GravPhaseNight():
                 else:
                     f1_fr = 0
                     
-                sources = [s2_pos, s2_fr, f1_pos, f1_fr]
-   
+                sources = [s2_pos, sg_fr, f1_pos, f1_fr]
+                print(sources)
                 header = self.sg_header[fdx]
                 if np.isnan(sg_fr):
                     if self.verbose:
