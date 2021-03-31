@@ -1276,7 +1276,7 @@ class GravFit(GravData):
                   plotres=True, 
                   createpdf=True, 
                   writeresults=True, 
-                  outputdir='./'
+                  outputdir='./',
                   redchi2=False,
                   phasemaps=False,
                   interppm=True,
