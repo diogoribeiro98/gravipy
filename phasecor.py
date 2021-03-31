@@ -820,7 +820,8 @@ class GravPhaseNight():
                 '2019-09-12',
                 '2019-09-13',
                 '2019-09-15',
-                '2021-03-27']
+                '2021-03-27',
+                '2021-03-30']
         calibrators = ['GRAVI.2019-03-28T08:00:22.802_dualscivis.fits',
                     'GRAVI.2019-03-29T07:35:36.327_dualscivis.fits',
                     'GRAVI.2019-04-01T06:53:20.843_dualscivis.fits',
@@ -845,7 +846,8 @@ class GravPhaseNight():
                     'GRAVI.2019-09-12T23:48:18.886_dualscivis.fits',
                     'GRAVI.2019-09-14T00:13:24.592_dualscivis.fits',
                     'GRAVI.2019-09-16T00:08:07.335_dualscivis.fits',
-                    'GRAVI.2021-03-28T09:09:44.486_dualscivis.fits'   
+                    'GRAVI.2021-03-28T09:09:44.486_dualscivis.fits',
+                    'GRAVI.2021-03-31T08:55:06.856_dualscivis.fits'
                     ] 
         try:
             self.calibrator = calibrators[nights.index(night)]
@@ -1698,9 +1700,9 @@ class GravPhaseNight():
         if save:
             if correction:
                 if linear_cor:
-                    folder = file[:file.find('GRAVI')] + 'correction_' + mode +'_new/'
+                    folder = file[:file.find('GRAVI')] + 'correction_' + mode +'_lincor/'
                 else:
-                    folder = file[:file.find('GRAVI')] + 'correction_' + mode +'_nolin/'
+                    folder = file[:file.find('GRAVI')] + 'correction_' + mode +'/'
                 if not os.path.isdir(folder):
                     os.mkdir(folder)
                 if self.verbose:
@@ -1734,7 +1736,7 @@ class GravPhaseNight():
                 if linear_cor:
                     folder = file[:file.find('GRAVI')] + 'correction_nocor_new/'
                 else:
-                    folder = file[:file.find('GRAVI')] + 'correction_nocor_nolin/'
+                    folder = file[:file.find('GRAVI')] + 'correction_nocor/'
                 if not os.path.isdir(folder):
                     os.mkdir(folder)
                 for fdx, file in enumerate(sg_files):
