@@ -691,6 +691,7 @@ class GravData():
                 elif nwave==233:
                     dlambda[i,:] = wave/500/2
                 else:
+                    print('High mode, or weird mode')
                     dlambda[i,:] = 0.03817
         else:
             nwave = self.channel
