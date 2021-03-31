@@ -1240,7 +1240,6 @@ class GravFit(GravData):
                              res_clos * self.fit_for[2] + 
                              res_phi * self.fit_for[3] + 
                              res_closamp * self.fit_for[4])
-        
         return ln_prob_res 
     
     
@@ -1256,7 +1255,7 @@ class GravFit(GravData):
                   approx='approx', 
                   donotfit=False, 
                   donotfittheta=None, 
-                  onlypol1=False, 
+                  onlypol=None, 
                   initial=None, 
                   dRA=0., 
                   dDEC=0., 
@@ -1269,6 +1268,7 @@ class GravFit(GravData):
                   noS2=True, 
                   fixpos=False, 
                   onlypos=False,
+                  onlyPC=False,
                   fixedBH=False, 
                   constant_f=True,
                   specialpar=np.array([0,0,0,0,0,0]), 
@@ -1296,7 +1296,7 @@ class GravFit(GravData):
         approx:         Kind of integration for visibilities (approx, numeric, analytic)
         donotfit:       Only gives fitting results for parameters from donotfittheta [False]
         donotfittheta:  has to be given for donotfit [None]
-        onlypol1:       Only fits polarization 1 for split mode [False]
+        onlypol:        Only fits one polarization for split mode, either 0 or 1 [None]
         initial:        Initial guess for fit [None]
         dRA:            Initial guess for dRA (taken from SOFFX if 0) [0]
         dDEC:           Initial guess for dDEC (taken from SOFFY if 0) [0]
@@ -1309,6 +1309,7 @@ class GravFit(GravData):
         noS2:           Does not do anything if OFFX and OFFY=0
         fixpos:         Does nto fit the distance between the sources [False]
         onlypos:        Fixes everything except pos [False]
+        onlyPC:         Fits only the phase center to the phases [False]
         fixedBH:        Fit for black hole power law [False]
         constant_f:     Constant coupling [True]
         specialpar:     Allows OPD for individual baseline [0,0,0,0,0,0]
@@ -1471,9 +1472,9 @@ class GravFit(GravData):
             flux_ratio_3_init = np.array([np.log10(initial[4]), np.log10(0.001), np.log10(100.)])
             flux_ratio_4_init = np.array([np.log10(initial[5]), np.log10(0.001), np.log10(100.)])
 
-            alpha_SgrA_init = np.array([initial[6],-5.,7.])
+            alpha_SgrA_init = np.array([initial[6],-10.,10.])
             flux_ratio_bg_init = np.array([initial[7],0.,20.])
-            color_bg_init = np.array([initial[8],-5.,7.])
+            color_bg_init = np.array([initial[8],-10.,10.])
 
             size = 2
             phase_center_RA_init = np.array([initial[9],initial[9]-size,initial[9]+size])
@@ -1541,7 +1542,15 @@ class GravFit(GravData):
 
         ndim = len(theta)
         todel = []
-        if onlypos:
+        if onlyPC:
+            fit_for = np.array([0,0,0,1,0])
+            self.fit_for = fit_for
+            for tdx in range(ndim):
+                if tdx in [9,10]:
+                    pass
+                else:
+                    todel.append(tdx)
+        elif onlypos:
             for tdx in range(2,ndim):
                 todel.append(tdx)
         else:
@@ -1606,7 +1615,11 @@ class GravFit(GravData):
             ndit = np.shape(self.visampSC_P1)[0]//6
             if not bequiet:
                 print('NDIT = %i' % ndit)
-            polnom = 2
+            if onlypol is not None:
+                polnom = [onlypol]
+            else:
+                polnom = [0,1]
+                
         elif self.polmode == 'COMBINED':
             visamp_P = [self.visampSC]
             visamp_error_P = [self.visamperrSC]
@@ -1631,7 +1644,7 @@ class GravFit(GravData):
             ndit = np.shape(self.visampSC)[0]//6
             if not bequiet:
                 print('NDIT = %i' % ndit)
-            polnom = 1
+            polnom = [0]
 
         for dit in range(ndit):
             if writeresults and ndit > 1:
@@ -1710,9 +1723,7 @@ class GravFit(GravData):
             t3ditstart = dit*4
             t3ditstop = t3ditstart + 4
             
-            if onlypol1:
-                polnom = 1
-            for idx in range(polnom):
+            for idx in polnom:
                 visamp = visamp_P[idx][ditstart:ditstop]
                 visamp_error = visamp_error_P[idx][ditstart:ditstop]
                 visamp_flag = visamp_flag_P[idx][ditstart:ditstop]
@@ -2078,14 +2089,17 @@ class GravFit(GravData):
         if writeresults:
             txtfile.close()
         if not bequiet:
-            fitted = 1-(np.array(self.fit_for)==0)
-            redchi0_f = np.sum(redchi0*fitted)
-            if polnom < 2:
-                redchi1 = np.zeros_like(redchi0)
-            redchi1_f = np.sum(redchi1*fitted)
-            redchi_f = redchi0_f + redchi1_f
-            print('Combined %s of fitted data: %.3f' % (chi2string, redchi_f))
-        if onlypol1 and ndit == 1:
+            try:
+                fitted = 1-(np.array(self.fit_for)==0)
+                redchi0_f = np.sum(redchi0*fitted)
+                if onlypol == 0:
+                    redchi1 = np.zeros_like(redchi0)
+                redchi1_f = np.sum(redchi1*fitted)
+                redchi_f = redchi0_f + redchi1_f
+                print('Combined %s of fitted data: %.3f' % (chi2string, redchi_f))
+            except UnboundLocalError:
+                pass
+        if onlypol is not None and ndit == 1:
             return theta_result
         else:
             return results
@@ -2121,7 +2135,7 @@ class GravFit(GravData):
          closure, closure_error, closure_flag,
          visphi, visphi_error, visphi_flag,
          closamp, closamp_error, closamp_flag) = fitdata
-        
+
         res_visamp = np.sum(-(model_visamp-visamp)**2/visamp_error**2*(1-visamp_flag))
         res_vis2 = np.sum(-(model_vis2-vis2)**2./vis2_error**2.*(1-vis2_flag))
         res_closamp = np.sum(-(model_closamp-closamp)**2/closamp_error**2*(1-closamp_flag))
@@ -2132,18 +2146,18 @@ class GravFit(GravData):
         res_closure = res_closure_1*check + res_closure_2*(1-check)
         res_clos = np.sum(-res_closure**2./closure_error**2.*(1-closure_flag))
  
+        visphi[np.isnan(visphi)] = 0
         res_visphi_1 = np.abs(model_visphi-visphi)
         res_visphi_2 = 360-np.abs(model_visphi-visphi)
         check = np.abs(res_visphi_1) < np.abs(res_visphi_2) 
         res_visphi = res_visphi_1*check + res_visphi_2*(1-check)
         res_phi = np.sum(-res_visphi**2./visphi_error**2.*(1-visphi_flag))
-
+        
         ln_prob_res = 0.5 * (res_visamp * self.fit_for[0] + 
                              res_vis2 * self.fit_for[1] + 
                              res_clos * self.fit_for[2] + 
                              res_phi * self.fit_for[3] + 
                              res_closamp * self.fit_for[4])
-        
         return ln_prob_res 
     
     
@@ -2158,52 +2172,50 @@ class GravFit(GravData):
         fixpos = self.fixpos
         fixedBH = self.fixedBH
         approx = self.approx
-        fixS29 = self.fixS29
         donotfit = self.donotfit
         interppm = self.interppm
         phasemaps = self.phasemaps
+        
         if phasemaps:
             northangle = self.northangle
             ddec = self.ddec
             dra = self.dra
-        if fixpos:
-            dRA = self.fiberOffX
-            dDEC = self.fiberOffY
-        else:
-            dRA = theta[0]
-            dDEC = theta[1]
+            
+        dRA = theta[0]
+        dDEC = theta[1]
         fluxRatio = theta[2]
         f = 10**fluxRatio
         
         dRA2 = theta[3]
         dDEC2 = theta[4]
-        if fixS29:
-            # Get S29 flux ratio from s2/sgra* flux ratio
-            s2_fr = 10**fluxRatio                   # s2/sgra incl. fiber coupling
-            if phasemaps:
-                f1_fr = 10**(-(18.7-14.1)/2.5)*s2_fr    # s29/sgra w/o fiber coupling
-                f2 = f1_fr
-            else:
-                if donotfit:
-                    print('s2/sgra incl. fiber coupling: %.3f' % s2_fr)
-                s2_pos = np.array([dRA, dDEC])
-                fiber_coup_s2 = np.exp(-1*(2*np.pi*np.sqrt(np.sum(s2_pos**2))/280)**2)
-                s2_fr = s2_fr / fiber_coup_s2              # s2/sgra w/o fiber coupling
-                if donotfit:
-                    print('s2/sgra w/o fiber coupling: %.3f' % s2_fr)
+        fluxRatio2 = theta[5]
+        f2 = 10**fluxRatio2
+        
+        #if fixS29:
+            ## Get S29 flux ratio from s2/sgra* flux ratio
+            #s2_fr = 10**fluxRatio                   # s2/sgra incl. fiber coupling
+            #if phasemaps:
+                #f1_fr = 10**(-(18.7-14.1)/2.5)*s2_fr    # s29/sgra w/o fiber coupling
+                #f2 = f1_fr
+            #else:
+                #if donotfit:
+                    #print('s2/sgra incl. fiber coupling: %.3f' % s2_fr)
+                #s2_pos = np.array([dRA, dDEC])
+                #fiber_coup_s2 = np.exp(-1*(2*np.pi*np.sqrt(np.sum(s2_pos**2))/280)**2)
+                #s2_fr = s2_fr / fiber_coup_s2              # s2/sgra w/o fiber coupling
+                #if donotfit:
+                    #print('s2/sgra w/o fiber coupling: %.3f' % s2_fr)
                     
-                f1_fr = 10**(-(18.7-14.1)/2.5)*s2_fr    # s29/sgra w/o fiber coupling
-                if donotfit:
-                    print('s29/sgra w/o fiber coupling: %.3f' % f1_fr)
+                #f1_fr = 10**(-(18.7-14.1)/2.5)*s2_fr    # s29/sgra w/o fiber coupling
+                #if donotfit:
+                    #print('s29/sgra w/o fiber coupling: %.3f' % f1_fr)
                     
-                f1_pos = np.array([dRA2, dDEC2])
-                fiber_coup_f1 = np.exp(-1*(2*np.pi*np.sqrt(np.sum(f1_pos**2))/280)**2)
-                f2 = f1_fr * fiber_coup_f1         # s29/sgra incl. fiber coupling
-                if donotfit:
-                    print('s29/sgra incl. fiber coupling: %.3f' % f2)
-        else:
-            fluxRatio2 = theta[5]
-            f2 = 10**fluxRatio2
+                #f1_pos = np.array([dRA2, dDEC2])
+                #fiber_coup_f1 = np.exp(-1*(2*np.pi*np.sqrt(np.sum(f1_pos**2))/280)**2)
+                #f2 = f1_fr * fiber_coup_f1         # s29/sgra incl. fiber coupling
+                #if donotfit:
+                    #print('s29/sgra incl. fiber coupling: %.3f' % f2)
+        #else:
         
         
         if fixedBH:
@@ -2230,8 +2242,7 @@ class GravFit(GravData):
                 print('Alpha of second star is %.2f' % alpha_S)
         except:
             alpha_S = 3
-        
-        
+            
         if phasemaps:
             cor_amp_sgr, cor_pha_sgr, cor_int_sgr = self.readPhasemaps(pc_RA,
                                                                        pc_DEC,
@@ -2245,24 +2256,25 @@ class GravFit(GravData):
                                                                     northangle=northangle,
                                                                     dra=dra, ddec=ddec,
                                                                     interp=interppm)
-            if fixS29:
-                try:
-                    cor_amp_s62, cor_pha_s62, cor_int_s62 = self.cor_amp_s62,self. cor_pha_s62, self.cor_int_s62
-                except AttributeError: 
-                    cor_amp_s62, cor_pha_s62, cor_int_s62 = self.readPhasemaps(dRA2+pc_RA, 
-                                                                        dDEC2+pc_DEC,
-                                                                        fromFits=False, 
-                                                                        northangle=northangle,
-                                                                        dra=dra, ddec=ddec,
-                                                                        interp=interppm)
-                    self.cor_amp_s62,self. cor_pha_s62, self.cor_int_s62 = cor_amp_s62, cor_pha_s62, cor_int_s62
-            else:
-                cor_amp_s62, cor_pha_s62, cor_int_s62 = self.readPhasemaps(dRA2+pc_RA, 
-                                                                        dDEC2+pc_DEC,
-                                                                        fromFits=False, 
-                                                                        northangle=northangle,
-                                                                        dra=dra, ddec=ddec,
-                                                                        interp=interppm)
+            cor_amp_s62, cor_pha_s62, cor_int_s62 = self.readPhasemaps(dRA2+pc_RA, 
+                                                                    dDEC2+pc_DEC,
+                                                                    fromFits=False, 
+                                                                    northangle=northangle,
+                                                                    dra=dra, ddec=ddec,
+                                                                    interp=interppm)
+            
+            #if fixS29:
+                #try:
+                    #cor_amp_s62, cor_pha_s62, cor_int_s62 = self.cor_amp_s62,self. cor_pha_s62, self.cor_int_s62
+                #except AttributeError: 
+                    #cor_amp_s62, cor_pha_s62, cor_int_s62 = self.readPhasemaps(dRA2+pc_RA, 
+                                                                        #dDEC2+pc_DEC,
+                                                                        #fromFits=False, 
+                                                                        #northangle=northangle,
+                                                                        #dra=dra, ddec=ddec,
+                                                                        #interp=interppm)
+                    #self.cor_amp_s62,self. cor_pha_s62, self.cor_int_s62 = cor_amp_s62, cor_pha_s62, cor_int_s62
+            #else:
             ## SgrA
             pm_amp_sgr = np.array([[cor_amp_sgr[0], cor_amp_sgr[1]],
                                     [cor_amp_sgr[0], cor_amp_sgr[2]],
@@ -2403,10 +2415,6 @@ class GravFit(GravData):
                                      f2 * cr_denom4 * intS2_center +
                                      fluxRatioBG * intBG)))  
                              
-                             
-                #vis[i,:] = ((intSgrA + 
-                             #f*intS1 + f2*intS2)/
-                            #(intSgrA_center + f*intS1_center + f2*intS2_center + fluxRatioBG*intBG))
         else:
             vis = np.zeros((6,len(wave))) + 0j
             for i in range(0,6):
@@ -2472,8 +2480,7 @@ class GravFit(GravData):
 
 
     def fitTriple(self, 
-                  dRA2, 
-                  dDEC2, 
+                  initial, 
                   nthreads=4, 
                   nwalkers=500, 
                   nruns=500,
@@ -2483,31 +2490,25 @@ class GravFit(GravData):
                   approx='approx',
                   donotfit=False, 
                   donotfittheta=None, 
-                  onlypol1=False, 
-                  initial=None,
-                  fixS29=False,
-                  dRA=0., 
-                  dDEC=0., 
-                  dphRA=0.1, 
-                  dphDec=0.1,
+                  onlypol=None, 
+                  fixS2pos=False, 
+                  fixS3pos=False,
                   flagtill=3, 
                   flagfrom=13, 
                   fixedBG=True, 
-                  noS2=True, 
-                  fixpos=False, 
                   fixedBH=False, 
+                  noS2=True, 
                   plot=True, 
                   plotres=True, 
                   createpdf=True,
                   redchi2=False,
                   phasemaps=False,
                   interppm=True,
-                  smoothkernel=15,):
+                  smoothkernel=15):
         '''
         Tripple fit to GRAVITY data, reduced version of binary fit
         Parameter:
-        dRA2:           Initial guess for position of 3rd source
-        dDEC2:          Initial guess for position of 3rd source 
+        initial:        Initial guess for fit
         
         nthreads:       number of cores [4] 
         nwalkers:       number of walkers [500] 
@@ -2518,8 +2519,7 @@ class GravFit(GravData):
         approx:         Kind of integration for visibilities (approx, numeric, analytic)
         donotfit:       Only gives fitting results for parameters from donotfittheta [False]
         donotfittheta:  has to be given for donotfit [None]
-        onlypol1:       Only fits polarization 1 for split mode [False]
-        initial:        Initial guess for fit [None]
+        onlypol:        Only fits one polarization for split mode, either 0 or 1 [None]
         dRA:            Initial guess for dRA (taken from SOFFX if 0) [0]
         dDEC:           Initial guess for dDEC (taken from SOFFY if 0) [0]
         dphRA:          Initial guess for phase center RA [0]
@@ -2539,14 +2539,15 @@ class GravFit(GravData):
             raise ValueError('Initial values for flagtill and flagfrom have to be changed if not low resolution')
         self.fit_for = fit_for
         self.fixedBG = fixedBG
-        self.fixpos = fixpos
         self.fixedBH = fixedBH
         self.approx = approx
-        self.fixS29 = fixS29
+        self.fixS2pos = fixS2pos
+        self.fixS3pos = fixS3pos
         self.donotfit = donotfit
         self.phasemaps = phasemaps
         self.smoothkernel = smoothkernel
         self.interppm = interppm
+        
         if phasemaps:
             self.loadPhasemaps(interp=interppm)
             
@@ -2573,6 +2574,7 @@ class GravFit(GravData):
         
         nwave = self.channel
         self.getIntdata(plot=False, flag=False)
+        
         MJD = fits.open(self.name)[0].header["MJD-OBS"]
         u = self.u
         v = self.v
@@ -2580,71 +2582,41 @@ class GravFit(GravData):
             
         self.fiberOffX = -fits.open(self.name)[0].header["HIERARCH ESO INS SOBJ OFFX"] 
         self.fiberOffY = -fits.open(self.name)[0].header["HIERARCH ESO INS SOBJ OFFY"] 
-        if not bequiet:
-            print("fiber center: %.2f, %.2f (mas)" % (self.fiberOffX,
-                                                    self.fiberOffY))
-        if dRA == 0 and dDEC == 0:
-            if self.fiberOffX != 0 and self.fiberOffY != 0:
-                dRA = self.fiberOffX
-                dDEC = self.fiberOffY
-            if self.fiberOffX == 0 and self.fiberOffY == 0:
-                if noS2:
-                    if not bequiet:
-                        print('No Fiber offset, if you want to fit this file use noS2=False')
-                    return 0
-            if dRA == 0 and dDEC == 0:
+        
+        if self.fiberOffX == 0 and self.fiberOffY == 0:
+            if noS2:
                 if not bequiet:
-                    print('Fiber offset is zero, guess for dRA & dDEC should be given with function')
-        else:
-            print('Guess for RA & DEC from function as: %.2f, %.2f' % (dRA, dDEC))
+                    print('No Fiber offset, if you want to fit this file use noS2=False')
+                return 0
             
         self.wave = wave
         self.getDlambda()
         dlambda = self.dlambda
         results = []
+        
         print(len(initial))
         # Initial guesses
-        if initial is not None:
-            if len(initial) != 11:
-                raise ValueError('Length of initial parameter list is not correct')
-            size = 2
-            dRA_init = np.array([initial[0],initial[0]-size,initial[0]+size])
-            dDEC_init = np.array([initial[1],initial[1]-size,initial[1]+size])
-            flux_ratio_init = np.array([np.log10(initial[2]), np.log10(0.01), np.log10(100.)])
 
-            dRA2_init = np.array([initial[3],initial[3]-size,initial[3]+size])
-            dDEC2_init = np.array([initial[4],initial[4]-size,initial[4]+size])
-            flux_ratio2_init = np.array([np.log10(initial[5]), np.log10(0.01), np.log10(100.)])
+        if len(initial) != 11:
+            raise ValueError('Length of initial parameter list is not correct. It should be [ra1, de1, fr1, ra2, de2, fr2, color1, fr_bg, color_bg, pc_ra, pc_de]')
 
-            alpha_SgrA_init = np.array([initial[6],-5.,7.])
-            flux_ratio_bg_init = np.array([initial[7],0.,20.])
-            color_bg_init = np.array([initial[8],-5.,7.])
+        size = 2
+        dRA_init = np.array([initial[0],initial[0]-size,initial[0]+size])
+        dDEC_init = np.array([initial[1],initial[1]-size,initial[1]+size])
+        flux_ratio_init = np.array([np.log10(initial[2]), np.log10(0.01), np.log10(100.)])
+        
+        dRA2_init = np.array([initial[3],initial[3]-size,initial[3]+size])
+        dDEC2_init = np.array([initial[4],initial[4]-size,initial[4]+size])
+        flux_ratio2_init = np.array([np.log10(initial[5]), np.log10(0.01), np.log10(100.)])
 
-            size = 2
-            phase_center_RA_init = np.array([initial[9],initial[9]-size,initial[9]+size])
-            phase_center_DEC_init = np.array([initial[10],initial[10]-size,initial[10]+size])
+        alpha_SgrA_init = np.array([initial[6],-5.,7.])
+        flux_ratio_bg_init = np.array([initial[7],0.,20.])
+        color_bg_init = np.array([initial[8],-5.,7.])
 
-        else:
-            size = 4
-            dRA_init = np.array([dRA,dRA-size,dRA+size])
-            dDEC_init = np.array([dDEC,dDEC-size,dDEC+size])
+        size = 2
+        phase_center_RA_init = np.array([initial[9],initial[9]-size,initial[9]+size])
+        phase_center_DEC_init = np.array([initial[10],initial[10]-size,initial[10]+size])
 
-            dRA2_init = np.array([dRA2,dRA2-size,dRA2+size])
-            dDEC2_init = np.array([dDEC2,dDEC2-size,dDEC2+size])
-
-            fr_start = np.log10(0.1)
-            flux_ratio_init = np.array([fr_start, np.log10(0.01), np.log10(100.)])
-            fr2_start = np.log10(0.1)
-            flux_ratio2_init = np.array([fr2_start, np.log10(0.01), np.log10(100.)])
-
-            alpha_SgrA_init = np.array([-1.,-10.,10.])
-            flux_ratio_bg_init = np.array([0.1,0.,20.])
-            color_bg_init = np.array([3.,-10.,10.])
-
-            size = 5
-            phase_center_RA_init = np.array([dphRA,dphRA-size,dphRA+size])
-            phase_center_DEC_init = np.array([dphDec,dphDec-size,dphDec+size])
-            
         # initial fit parameters 
         theta = np.array([dRA_init[0], dDEC_init[0], flux_ratio_init[0],
                           dRA2_init[0], dDEC2_init[0], flux_ratio2_init[0],
@@ -2671,13 +2643,12 @@ class GravFit(GravData):
         
         ndim = len(theta)
         todel = []
-        if fixpos:
+        if fixS2pos:
             todel.append(0)
             todel.append(1)
-        if fixS29:
+        if fixS3pos:
             todel.append(3)
             todel.append(4)
-            todel.append(5)
         if fixedBH:
             todel.append(6)
         if fixedBG:
@@ -2726,7 +2697,12 @@ class GravFit(GravData):
             ndit = np.shape(self.visampSC_P1)[0]//6
             if not bequiet:
                 print('NDIT = %i' % ndit)
-            polnom = 2
+                
+            if onlypol is not None:
+                polnom = [onlypol]
+            else:
+                polnom = [0,1]
+                
         elif self.polmode == 'COMBINED':
             visamp_P = [self.visampSC]
             visamp_error_P = [self.visamperrSC]
@@ -2751,7 +2727,7 @@ class GravFit(GravData):
             ndit = np.shape(self.visampSC)[0]//6
             if not bequiet:
                 print('NDIT = %i' % ndit)
-            polnom = 1
+            polnom = [0]
 
         for dit in range(ndit):
             if not bequiet and not donotfit:
@@ -2760,11 +2736,8 @@ class GravFit(GravData):
             ditstop = ditstart + 6
             t3ditstart = dit*4
             t3ditstop = t3ditstart + 4
-            
-            if onlypol1:
-                polnom = 1
                 
-            for idx in range(polnom):
+            for idx in polnom:
                 visamp = visamp_P[idx][ditstart:ditstop]
                 visamp_error = visamp_error_P[idx][ditstart:ditstop]
                 visamp_flag = visamp_flag_P[idx][ditstart:ditstop]
@@ -2981,14 +2954,17 @@ class GravFit(GravData):
                     self.plotFit(theta_result, fitdata, idx, createpdf=False, mode='triple')
 
         if not bequiet:
-            fitted = 1-(np.array(self.fit_for)==0)
-            redchi0_f = np.sum(redchi0*fitted)
-            if polnom < 2:
-                redchi1 = np.zeros_like(redchi0)
-            redchi1_f = np.sum(redchi1*fitted)
-            redchi_f = redchi0_f + redchi1_f
-            print('Combined %s of fitted data: %.3f' % (chi2string, redchi_f))
-        if onlypol1 and ndit == 1:
+            try:
+                fitted = 1-(np.array(self.fit_for)==0)
+                redchi0_f = np.sum(redchi0*fitted)
+                if onlypol == 0:
+                    redchi1 = np.zeros_like(redchi0)
+                redchi1_f = np.sum(redchi1*fitted)
+                redchi_f = redchi0_f + redchi1_f
+                print('Combined %s of fitted data: %.3f' % (chi2string, redchi_f))
+            except UnboundLocalError:
+                pass
+        if onlypol is not None and ndit == 1:
             return theta_result
         else:
             return results
@@ -3128,7 +3104,7 @@ class GravFit(GravData):
                         color='k', zorder=100)
             plt.xlabel('spatial frequency of largest baseline in triangle (1/arcsec)')
             plt.ylabel('closure phase (deg)')
-            plt.ylim(-100,100)
+            plt.ylim(-180,180)
             plt.legend()
             if createpdf:
                 plt.title('Polarization %i' % (idx + 1))
@@ -3431,11 +3407,12 @@ class GravFit(GravData):
                  bequiet=False, 
                  michistyle=False,
                  approx='approx', 
-                 onlypol1=False, 
+                 onlypol=None, 
                  mindatapoints=3,
                  flagtill=2,
                  flagfrom=12,
                  initpos=None,
+                 fitsize=2,
                  dontfit=None,
                  dontfitbl=None,
                  noS2=False,
@@ -3463,7 +3440,7 @@ class GravFit(GravData):
                         visibility calculation [False]
         approx:         Kind of integration for visibilities (approx, numeric, analytic)
         mindatapoints:  if less valid datapoints in one baseline, file is rejected [3]
-        onlypol1:       Only fits polarization 1 for split mode [False]
+        onlypol:        Only fits one polarization for split mode, either 0 or 1 [None]
         flagtill:       Flag blue channels [2] 
         flagfrom:       Flag red channels [12]
         dontfit:        Number of telescope to flag
@@ -3555,7 +3532,7 @@ class GravFit(GravData):
         dlambda = self.dlambda
 
         # Initial guesses
-        size = 5
+        size = fitsize
         phase_center_RA = 0.01
         phase_center_DEC = 0.01
 
@@ -3631,7 +3608,11 @@ class GravFit(GravData):
             ndit = np.shape(self.visampSC_P1)[0]//6
             if not bequiet:
                 print('NDIT = %i' % ndit)
-            polnom = 2
+            if onlypol is not None:
+                polnom = [onlypol]
+            else:
+                polnom = [0,1]
+                
         elif self.polmode == 'COMBINED':
             visphi_P = [self.visphiSC]
             visphi_error_P = [self.visphierrSC]
@@ -3640,7 +3621,7 @@ class GravFit(GravData):
             ndit = np.shape(self.visampSC)[0]//6
             if not bequiet:
                 print('NDIT = %i' % ndit)
-            polnom = 1
+            polnom = [0]
             
         for dit in range(ndit):
             savetime = str(datetime.now()).replace('-', '')
@@ -3702,11 +3683,8 @@ class GravFit(GravData):
             ditstart = dit*6
             ditstop = ditstart + 6
 
-
-            if onlypol1:
-                polnom = 1
-            bothdofit = np.ones(polnom)            
-            for idx in range(polnom):
+            bothdofit = np.ones(len(polnom))            
+            for idx in polnom:
                 visphi = visphi_P[idx][ditstart:ditstop]
                 visphi_error = visphi_error_P[idx][ditstart:ditstop]
                 visphi_flag = visphi_flag_P[idx][ditstart:ditstop]
@@ -3741,7 +3719,7 @@ class GravFit(GravData):
                         if not bequiet:
                             print('Baseline %i is has to few non flagged values' % bl)
                         dofit = False
-                bothdofit[idx] = dofit
+                #bothdofit[idx] = dofit
                 
                 if dontfit is not None:
                     if not bequiet:
@@ -3782,7 +3760,7 @@ class GravFit(GravData):
                         if par in todel:
                             pos[:,par] = theta[par]
                         else:
-                            pos[:,par] = theta[par] + width*np.random.randn(nwalkers)
+                            pos[:,par] = theta[par] + size*np.random.randn(nwalkers)
                     if not bequiet:
                         print('Run MCMC for Pol %i' % (idx+1))
                     fitdata = [visphi, visphi_error, visphi_flag]
