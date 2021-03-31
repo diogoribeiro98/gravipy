@@ -1276,6 +1276,7 @@ class GravFit(GravData):
                   plotres=True, 
                   createpdf=True, 
                   writeresults=True, 
+                  outputdir='./'
                   redchi2=False,
                   phasemaps=False,
                   interppm=True,
@@ -1317,6 +1318,7 @@ class GravFit(GravData):
         plotres:        plot fit result [True]
         createpdf:      Creates a pdf with fit results and all plots [True] 
         writeresults:   Write fit results in file [True]
+        outputdir:      Directory where pdf & txt files are saved [./]
         redchi2:        Gives redchi2 instead of chi2 [False]
         phasemaps:      Use Phasemaps for fit [False]
         interppm:       Interpolate Phasemaps [True]
@@ -1441,9 +1443,9 @@ class GravFit(GravData):
         
         stname = self.name.find('GRAVI')
         if phasemaps:
-            txtfilename = 'pm_binaryfit_' + self.name[stname:-5] + '.txt'
+            txtfilename = outputdir + 'pm_binaryfit_' + self.name[stname:-5] + '.txt'
         else:
-            txtfilename = 'binaryfit_' + self.name[stname:-5] + '.txt'
+            txtfilename = outputdir + 'binaryfit_' + self.name[stname:-5] + '.txt'
         if writeresults:
             txtfile = open(txtfilename, 'w')
             txtfile.write('# Results of binary fit for %s \n' % self.name[stname:])
@@ -1656,14 +1658,14 @@ class GravFit(GravData):
                 self.savetime = savetime
                 if phasemaps:
                     if ndit == 1:
-                        pdffilename = 'pm_binaryfit_' + self.name[stname:-5] + '.pdf'
+                        pdffilename = outputdir + 'pm_binaryfit_' + self.name[stname:-5] + '.pdf'
                     else:
-                        pdffilename = 'pm_binaryfit_' + self.name[stname:-5] + '_DIT' + str(dit) + '.pdf'
+                        pdffilename = outputdir + 'pm_binaryfit_' + self.name[stname:-5] + '_DIT' + str(dit) + '.pdf'
                 else:
                     if ndit == 1:
-                        pdffilename = 'binaryfit_' + self.name[stname:-5] + '.pdf'
+                        pdffilename = outputdir + 'binaryfit_' + self.name[stname:-5] + '.pdf'
                     else:
-                        pdffilename = 'binaryfit_' + self.name[stname:-5] + '_DIT' + str(dit) + '.pdf'
+                        pdffilename = outputdir + 'binaryfit_' + self.name[stname:-5] + '_DIT' + str(dit) + '.pdf'
                 pdf = FPDF(orientation='P', unit='mm', format='A4')
                 pdf.add_page()
                 pdf.set_font("Helvetica", size=12)
