@@ -351,27 +351,27 @@ class GravData():
                         
                     axis = plt.subplot(gs[0,0])
                     for idx in range(len(self.vis2SC_P1)):
-                        plt.errorbar(self.spFrequAS[idx,:], self.visampSC_P1[idx,:], self.visamperrSC_P1[idx,:], ls='', marker='o',color=self.colors_baseline[idx%6])
+                        plt.errorbar(self.spFrequAS[idx,:], self.visampSC_P1[idx,:], self.visamperrSC_P1[idx,:], alpha=0.7, ms=4, lw=0.5, capsize=0, ls='', marker='o',color=self.colors_baseline[idx%6])
                     for idx in range(len(self.vis2SC_P2)):
-                        plt.errorbar(self.spFrequAS[idx,:], self.visampSC_P2[idx,:], self.visamperrSC_P2[idx,:], ls='', marker='p',color=self.colors_baseline[idx%6])
+                        plt.errorbar(self.spFrequAS[idx,:], self.visampSC_P2[idx,:], self.visamperrSC_P2[idx,:], alpha=0.7, ms=4, lw=0.5, capsize=0, ls='', marker='D',color=self.colors_baseline[idx%6])
                     plt.axhline(1, ls='--', lw=0.5)
                     plt.ylim(-0.0,1.1)
                     plt.ylabel('visibility amplitude')
 
                     axis = plt.subplot(gs[0,1])
                     for idx in range(len(self.vis2SC_P1)):
-                        plt.errorbar(self.spFrequAS[idx,:], self.vis2SC_P1[idx,:], self.vis2errSC_P1[idx,:], ls='', marker='o',color=self.colors_baseline[idx%6])
+                        plt.errorbar(self.spFrequAS[idx,:], self.vis2SC_P1[idx,:], self.vis2errSC_P1[idx,:], alpha=0.7, ms=4, lw=0.5, capsize=0,  ls='', marker='o',color=self.colors_baseline[idx%6])
                     for idx in range(len(self.vis2SC_P2)):
-                        plt.errorbar(self.spFrequAS[idx,:], self.vis2SC_P2[idx,:], self.vis2errSC_P2[idx,:], ls='', marker='p',color=self.colors_baseline[idx%6])
+                        plt.errorbar(self.spFrequAS[idx,:], self.vis2SC_P2[idx,:], self.vis2errSC_P2[idx,:], alpha=0.7, ms=4, lw=0.5, capsize=0, ls='', marker='D',color=self.colors_baseline[idx%6])
                     plt.axhline(1, ls='--', lw=0.5)
                     plt.ylim(-0.0,1.1)
                     plt.ylabel('visibility squared')
 
                     axis = plt.subplot(gs[1,0])
                     for idx in range(len(self.t3SC_P2)):
-                        plt.errorbar(self.spFrequAS_T3[idx,:], self.t3SC_P2[idx,:], self.t3errSC_P2[idx,:], marker='o',color=self.colors_closure[idx%4],linestyle='')
+                        plt.errorbar(self.spFrequAS_T3[idx,:], self.t3SC_P2[idx,:], self.t3errSC_P2[idx,:], alpha=0.7, ms=4, lw=0.5, capsize=0, marker='o',color=self.colors_closure[idx%4],linestyle='')
                     for idx in range(len(self.t3SC_P2)):
-                        plt.errorbar(self.spFrequAS_T3[idx,:], self.t3SC_P1[idx,:], self.t3errSC_P1[idx,:], marker='p',color=self.colors_closure[idx%4],linestyle='')
+                        plt.errorbar(self.spFrequAS_T3[idx,:], self.t3SC_P1[idx,:], self.t3errSC_P1[idx,:], alpha=0.7, ms=4, lw=0.5, capsize=0, marker='D',color=self.colors_closure[idx%4],linestyle='')
                     plt.axhline(0, ls='--', lw=0.5)
                     plt.xlabel('spatial frequency (1/arcsec)')
                     plt.ylabel('closure phase (deg)')
@@ -390,9 +390,9 @@ class GravData():
                         axis = plt.subplot(gs[2,1])
                         
                     for idx in range(len(self.vis2SC_P1)):
-                        plt.errorbar(self.spFrequAS[idx,:], self.visphiSC_P1[idx,:],self.visphierrSC_P1[idx,:], ls='', marker='o',color=self.colors_baseline[idx%6])
+                        plt.errorbar(self.spFrequAS[idx,:], self.visphiSC_P1[idx,:],self.visphierrSC_P1[idx,:], alpha=0.7, ms=4, lw=0.5, capsize=0, ls='', marker='o',color=self.colors_baseline[idx%6])
                     for idx in range(len(self.vis2SC_P2)):
-                        plt.errorbar(self.spFrequAS[idx,:], self.visphiSC_P2[idx,:],self.visphierrSC_P2[idx,:], ls='', marker='p',color=self.colors_baseline[idx%6])
+                        plt.errorbar(self.spFrequAS[idx,:], self.visphiSC_P2[idx,:],self.visphierrSC_P2[idx,:], alpha=0.7, ms=4, lw=0.5, capsize=0, ls='', marker='p',color=self.colors_baseline[idx%6])
                     plt.axhline(0, ls='--', lw=0.5)
                     plt.xlabel('spatial frequency (1/arcsec)')
                     plt.ylabel('visibility phase')
