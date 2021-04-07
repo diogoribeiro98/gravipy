@@ -3159,7 +3159,88 @@ class GravFit(GravData):
                 plt.show()
 
         
+    def fitBinaryBoth(self, *args, **kwargs):
+        res0 = self.fitBinary(onlypol=0, createpdf=False, writeresults=False, *args, **kwargs)
+        res1 = self.fitBinary(onlypol=1, createpdf=False, writeresults=False, *args, **kwargs)
+        rad2as = 180 / np.pi * 3600
+        wave = self.wlSC
+        dlambda = self.dlambda
+        wave_model = np.linspace(wave[0],wave[len(wave)-1],1000)
+        dlambda_model = np.zeros((6,len(wave_model)))
+        for i in range(0,6):
+            dlambda_model[i,:] = np.interp(wave_model, wave, dlambda[i,:])
+
+        # Fit
+        u = self.u
+        v = self.v
+        magu = np.sqrt(u**2.+v**2.)
+        (model_visamp_full0, model_visphi_full0,
+         model_closure_full0, model_closamp_full0)  = self.calc_vis(res0, u, v, wave_model, dlambda_model)
+        model_vis2_full0 = model_visamp_full0**2.
+        (model_visamp_full1, model_visphi_full1,
+         model_closure_full1, model_closamp_full1)  = self.calc_vis(res1, u, v, wave_model, dlambda_model)
+        model_vis2_full1 = model_visamp_full1**2.
+
+        magu_as = self.spFrequAS
+        u_as_model = np.zeros((len(u),len(wave_model)))
+        v_as_model = np.zeros((len(v),len(wave_model)))
+        for i in range(0,len(u)):
+            u_as_model[i,:] = u[i]/(wave_model*1.e-6) / rad2as
+            v_as_model[i,:] = v[i]/(wave_model*1.e-6) / rad2as
+        magu_as_model = np.sqrt(u_as_model**2.+v_as_model**2.)
+
+        gs = gridspec.GridSpec(2,2)
+        plt.figure(figsize=(15,12))
+
+        axis = plt.subplot(gs[0,0])
+        for idx in range(len(self.vis2SC_P1)):
+            plt.errorbar(self.spFrequAS[idx,:], self.visampSC_P1[idx,:], self.visamperrSC_P1[idx,:], alpha=0.7, ms=4, lw=0.5, capsize=0, ls='', marker='o',color=self.colors_baseline[idx%6])
+        for idx in range(len(self.vis2SC_P2)):
+            plt.errorbar(self.spFrequAS[idx,:], self.visampSC_P2[idx,:], self.visamperrSC_P2[idx,:], alpha=0.7, ms=4, lw=0.5, capsize=0, ls='', marker='D',color=self.colors_baseline[idx%6])
+            plt.plot(magu_as_model[idx,:], model_visamp_full0[idx,:], lw=1.5, color='k', zorder=100)
+            plt.plot(magu_as_model[idx,:], model_visamp_full1[idx,:], lw=1.5, ls='--', color='k', zorder=100)
+        plt.axhline(1, ls='--', lw=0.5)
+        plt.ylim(-0.0,1.1)
+        plt.ylabel('visibility amplitude')
+
+        axis = plt.subplot(gs[0,1])
+        for idx in range(len(self.vis2SC_P1)):
+            plt.errorbar(self.spFrequAS[idx,:], self.vis2SC_P1[idx,:], self.vis2errSC_P1[idx,:], alpha=0.7, ms=4, lw=0.5, capsize=0,  ls='', marker='o',color=self.colors_baseline[idx%6])
+        for idx in range(len(self.vis2SC_P2)):
+            plt.errorbar(self.spFrequAS[idx,:], self.vis2SC_P2[idx,:], self.vis2errSC_P2[idx,:], alpha=0.7, ms=4, lw=0.5, capsize=0, ls='', marker='D',color=self.colors_baseline[idx%6])
+            plt.plot(magu_as_model[idx,:], model_vis2_full0[idx,:], lw=1.5, color='k', zorder=100)
+            plt.plot(magu_as_model[idx,:], model_vis2_full1[idx,:], lw=1.5, ls='--', color='k', zorder=100)
+        plt.axhline(1, ls='--', lw=0.5)
+        plt.ylim(-0.0,1.1)
+        plt.ylabel('visibility squared')
+
+        axis = plt.subplot(gs[1,0])
+        for idx in range(len(self.t3SC_P2)):
+            plt.errorbar(self.spFrequAS_T3[idx,:], self.t3SC_P2[idx,:], self.t3errSC_P2[idx,:], alpha=0.7, ms=4, lw=0.5, capsize=0, marker='o',color=self.colors_closure[idx%4],linestyle='')
+        for idx in range(len(self.t3SC_P2)):
+            plt.errorbar(self.spFrequAS_T3[idx,:], self.t3SC_P1[idx,:], self.t3errSC_P1[idx,:], alpha=0.7, ms=4, lw=0.5, capsize=0, marker='D',color=self.colors_closure[idx%4],linestyle='')
+            max_u_as_model = self.max_spf[idx]/(wave_model*1.e-6) / rad2as
+            plt.plot(max_u_as_model, model_closure_full0[idx,:], lw=1.5, color='k', zorder=100)
+            plt.plot(max_u_as_model, model_closure_full1[idx,:], lw=1.5, ls='--', color='k', zorder=100)
+        plt.axhline(0, ls='--', lw=0.5)
+        plt.xlabel('spatial frequency (1/arcsec)')
+        plt.ylabel('closure phase (deg)')
+
+        axis = plt.subplot(gs[1,1])
+        for idx in range(len(self.vis2SC_P1)):
+            plt.errorbar(self.spFrequAS[idx,:], self.visphiSC_P1[idx,:],self.visphierrSC_P1[idx,:], alpha=0.7, ms=4, lw=0.5, capsize=0, ls='', marker='o',color=self.colors_baseline[idx%6])
+        for idx in range(len(self.vis2SC_P2)):
+            plt.errorbar(self.spFrequAS[idx,:], self.visphiSC_P2[idx,:],self.visphierrSC_P2[idx,:], alpha=0.7, ms=4, lw=0.5, capsize=0, ls='', marker='p',color=self.colors_baseline[idx%6])
+            plt.plot(magu_as_model[idx,:], model_visphi_full0[idx,:], lw=1.5, color='k', zorder=100)
+            plt.plot(magu_as_model[idx,:], model_visphi_full1[idx,:], lw=1.5, ls='--', color='k', zorder=100)
+        plt.axhline(0, ls='--', lw=0.5)
+        plt.xlabel('spatial frequency (1/arcsec)')
+        plt.ylabel('visibility phase')
+        plt.show()
         
+        return res0, res1
+
+
         
         
         
