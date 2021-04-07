@@ -1269,6 +1269,7 @@ class GravFit(GravData):
                   fixpos=False, 
                   onlypos=False,
                   onlyPC=False,
+                  onlyflux=False,
                   fixedBH=False, 
                   constant_f=True,
                   specialpar=np.array([0,0,0,0,0,0]), 
@@ -1555,6 +1556,12 @@ class GravFit(GravData):
         elif onlypos:
             for tdx in range(2,ndim):
                 todel.append(tdx)
+        elif onlyflux:
+            for tdx in range(ndim):
+                if tdx in [2,7]:
+                    pass
+                else:
+                    todel.append(tdx)            
         else:
             if fixpos:
                 todel.append(0)
@@ -2090,17 +2097,19 @@ class GravFit(GravData):
                     os.remove(file)
         if writeresults:
             txtfile.close()
-        if not bequiet:
-            try:
-                fitted = 1-(np.array(self.fit_for)==0)
-                redchi0_f = np.sum(redchi0*fitted)
-                if onlypol == 0:
-                    redchi1 = np.zeros_like(redchi0)
-                redchi1_f = np.sum(redchi1*fitted)
-                redchi_f = redchi0_f + redchi1_f
+        try:
+            fitted = 1-(np.array(self.fit_for)==0)
+            redchi0_f = np.sum(redchi0*fitted)
+            if onlypol == 0:
+                redchi1 = np.zeros_like(redchi0)
+            redchi1_f = np.sum(redchi1*fitted)
+            redchi_f = redchi0_f + redchi1_f
+            if not bequiet:
                 print('Combined %s of fitted data: %.3f' % (chi2string, redchi_f))
-            except UnboundLocalError:
-                pass
+        except UnboundLocalError:
+            pass
+        if onlyflux:
+            return redchi_f, results
         if onlypol is not None and ndit == 1:
             return theta_result
         else:
