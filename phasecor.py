@@ -784,7 +784,7 @@ def correct_data(files, mode, subspacing=1, plotav=8, plot=False, lstplot=False)
 
 class GravPhaseNight():
     def __init__(self, night, ndit, verbose=True, nopandas=False, pandasfile=None,
-                 reddir=None, datadir='/data/user/forFrank2/'):
+                 reddir=None, datadir='/data/user/forFrank2/', onlysgra=True):
         """
         Package to do the full phase calibration, poscor, correction and fitting
         
@@ -821,7 +821,8 @@ class GravPhaseNight():
                 '2019-09-13',
                 '2019-09-15',
                 '2021-03-27',
-                '2021-03-30']
+                '2021-03-30',
+                '2021-03-31']
         calibrators = ['GRAVI.2019-03-28T08:00:22.802_dualscivis.fits',
                     'GRAVI.2019-03-29T07:35:36.327_dualscivis.fits',
                     'GRAVI.2019-04-01T06:53:20.843_dualscivis.fits',
@@ -847,7 +848,8 @@ class GravPhaseNight():
                     'GRAVI.2019-09-14T00:13:24.592_dualscivis.fits',
                     'GRAVI.2019-09-16T00:08:07.335_dualscivis.fits',
                     'GRAVI.2021-03-28T09:09:44.486_dualscivis.fits',
-                    'GRAVI.2021-03-31T08:55:06.856_dualscivis.fits'
+                    'GRAVI.2021-03-31T08:55:06.856_dualscivis.fits',
+                    'GRAVI.2021-04-01T08:35:49.986_dualscivis.fits'
                     ] 
         try:
             self.calibrator = calibrators[nights.index(night)]
@@ -893,12 +895,13 @@ class GravPhaseNight():
                 else:
                     sobjx = h['ESO INS SOBJ X']
                     sobjy = h['ESO INS SOBJ Y']
-                    if -990 > sobjx or sobjx > -940:
-                        print(sobjx)
-                        continue
-                    if -640 > sobjy or sobjy > -590:
-                        print(sobjy)
-                        continue
+                    if onlysgra:
+                        if -990 > sobjx or sobjx > -940:
+                           print(sobjx)
+                           continue
+                        if -640 > sobjy or sobjy > -590:
+                           print(sobjy)
+                           continue
                     sg_files.append(file)
         if self.verbose:
             print('%i SGRA , %i S2 files found' % (len(sg_files), len(s2_files)))
