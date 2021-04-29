@@ -2063,7 +2063,7 @@ class GravFit(GravData):
                     pdf.image(pdfimages0[0], h=he, w=wi)
                     pdf.image(pdfimages0[1], h=115)
                     
-                    if polnom == 2:
+                    if 1 in polnom:
                         pdf.add_page()
                         pdf.cell(0, 10, txt="Polarization  2", ln=1, align="C", border='B')
                         pdf.ln()
@@ -2079,14 +2079,14 @@ class GravFit(GravData):
                         if pa == 4 and not self.fit_for[pa]:
                             continue
                         pdf.add_page()
-                        if polnom == 2:
+                        if 1 in polnom:
                             text = '%s, %s: %.2f (P1), %.2f (P2)' % (titles[pa], chi2string, redchi0[pa], redchi1[pa])
                         else:
                             text = '%s, %s: %.2f' % (titles[pa], chi2string, redchi0[pa])
                         pdf.cell(0, 10, txt=text, ln=1, align="C", border='B')
                         pdf.ln()
                         pdf.image(pdfimages0[pdfcout+pa], w=150)
-                        if polnom == 2:
+                        if 1 in polnom:
                             pdf.image(pdfimages1[pdfcout+pa], w=150)
                 
                 if not bequiet:
