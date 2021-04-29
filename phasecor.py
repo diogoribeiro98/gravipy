@@ -821,6 +821,8 @@ class GravPhaseNight():
                 '2019-09-13',
                 '2019-09-15',
                 '2021-03-27',
+                '2021-03-28',
+                '2021-03-29',
                 '2021-03-30',
                 '2021-03-31']
         calibrators = ['GRAVI.2019-03-28T08:00:22.802_dualscivis.fits',
@@ -848,6 +850,8 @@ class GravPhaseNight():
                     'GRAVI.2019-09-14T00:13:24.592_dualscivis.fits',
                     'GRAVI.2019-09-16T00:08:07.335_dualscivis.fits',
                     'GRAVI.2021-03-28T09:09:44.486_dualscivis.fits',
+                    'GRAVI.2021-03-29T07:36:04.166_dualscivis.fits',
+                    'GRAVI.2021-03-30T07:32:41.730_dualscivis.fits',
                     'GRAVI.2021-03-31T08:55:06.856_dualscivis.fits',
                     'GRAVI.2021-04-01T08:35:49.986_dualscivis.fits'
                     ] 
@@ -2468,7 +2472,6 @@ class GravPhaseNight():
                                                 bounds=(-10,10))
                 
                 p0 = [popt1[0], popt1[1]]
-                print(p0)
 
                 popt, pcov = optimize.curve_fit(lambda uv, x, y: self.threesource(uv, wave, dlambda, sources, x, y,
                                                                                 mask=mask), 
@@ -2476,7 +2479,6 @@ class GravPhaseNight():
                                                 bounds=(-10,10), p0=p0)#, method="dogbox",**{"loss":'cauchy'})
                 sources_pl = np.copy(sources)
                 popt_pl = popt
-                print(popt)
             
         popt_res = self.threesource(uv, wave, dlambda, sources_pl, *popt_pl, mask=mask)
         
@@ -2642,7 +2644,6 @@ class GravPhaseNight():
                     f1_fr = 0
                     
                 sources = [s2_pos, sg_fr, f1_pos, f1_fr]
-                print(sources)
                 header = self.sg_header[fdx]
                 if np.isnan(sg_fr):
                     if self.verbose:
