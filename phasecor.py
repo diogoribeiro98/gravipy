@@ -824,7 +824,10 @@ class GravPhaseNight():
                 '2021-03-28',
                 '2021-03-29',
                 '2021-03-30',
-                '2021-03-31']
+                '2021-03-31',
+                '2021-05-22',
+                '2021-05-23',
+                '2021-05-24']
         calibrators = ['GRAVI.2019-03-28T08:00:22.802_dualscivis.fits',
                     'GRAVI.2019-03-29T07:35:36.327_dualscivis.fits',
                     'GRAVI.2019-04-01T06:53:20.843_dualscivis.fits',
@@ -853,7 +856,10 @@ class GravPhaseNight():
                     'GRAVI.2021-03-29T07:36:04.166_dualscivis.fits',
                     'GRAVI.2021-03-30T07:32:41.730_dualscivis.fits',
                     'GRAVI.2021-03-31T08:55:06.856_dualscivis.fits',
-                    'GRAVI.2021-04-01T08:35:49.986_dualscivis.fits'
+                    'GRAVI.2021-04-01T08:35:49.986_dualscivis.fits',
+                    'GRAVI.2021-05-23T04:20:48.130_dualscivis.fits',
+                    'GRAVI.2021-05-24T07:20:05.866_dualscivis.fits',
+                    'GRAVI.2021-05-25T08:14:27.208_dualscivis.fits'
                     ] 
         try:
             self.calibrator = calibrators[nights.index(night)]
