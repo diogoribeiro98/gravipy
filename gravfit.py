@@ -2492,6 +2492,7 @@ class GravFit(GravData):
 
     def fitTriple(self, 
                   initial, 
+                  size=2,
                   nthreads=4, 
                   nwalkers=500, 
                   nruns=500,
@@ -2519,8 +2520,8 @@ class GravFit(GravData):
         '''
         Tripple fit to GRAVITY data, reduced version of binary fit
         Parameter:
-        initial:        Initial guess for fit
-        
+        initial:        Initial guess for fit, 
+        size            search box size around source1 and source2, if size is list list[0] referes to source1 list[1] to source2.
         nthreads:       number of cores [4] 
         nwalkers:       number of walkers [500] 
         nruns:          number of MCMC runs [500] 
@@ -2605,19 +2606,21 @@ class GravFit(GravData):
         dlambda = self.dlambda
         results = []
         
-        print(len(initial))
         # Initial guesses
 
         if len(initial) != 11:
             raise ValueError('Length of initial parameter list is not correct. It should be [ra1, de1, fr1, ra2, de2, fr2, color1, fr_bg, color_bg, pc_ra, pc_de]')
-
-        size = 2
-        dRA_init = np.array([initial[0],initial[0]-size,initial[0]+size])
-        dDEC_init = np.array([initial[1],initial[1]-size,initial[1]+size])
+        
+        if type(size) == list:
+            size1, size2 = size[0], size[1]
+        else:
+            size1, size2 = size, size
+        dRA_init = np.array([initial[0],initial[0]-size1,initial[0]+size1])
+        dDEC_init = np.array([initial[1],initial[1]-size1,initial[1]+size1])
         flux_ratio_init = np.array([np.log10(initial[2]), np.log10(0.01), np.log10(100.)])
         
-        dRA2_init = np.array([initial[3],initial[3]-size,initial[3]+size])
-        dDEC2_init = np.array([initial[4],initial[4]-size,initial[4]+size])
+        dRA2_init = np.array([initial[3],initial[3]-size2,initial[3]+size2])
+        dDEC2_init = np.array([initial[4],initial[4]-size2,initial[4]+size2])
         flux_ratio2_init = np.array([np.log10(initial[5]), np.log10(0.01), np.log10(100.)])
 
         alpha_SgrA_init = np.array([initial[6],-5.,7.])
@@ -2633,7 +2636,7 @@ class GravFit(GravData):
                           dRA2_init[0], dDEC2_init[0], flux_ratio2_init[0],
                           alpha_SgrA_init[0], flux_ratio_bg_init[0], color_bg_init[0], 
                           phase_center_RA_init[0], phase_center_DEC_init[0]])
-
+        
         # lower limit on fit parameters 
         theta_lower = np.array([dRA_init[1], dDEC_init[1], flux_ratio_init[1],
                                 dRA2_init[1], dDEC2_init[1], flux_ratio2_init[1],
@@ -2975,6 +2978,8 @@ class GravFit(GravData):
                 print('Combined %s of fitted data: %.3f' % (chi2string, redchi_f))
             except UnboundLocalError:
                 pass
+            except ValueError:
+                print("Value Error in computing redchi^2")
         if onlypol is not None and ndit == 1:
             return theta_result
         else:
