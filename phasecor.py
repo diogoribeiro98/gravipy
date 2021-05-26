@@ -858,7 +858,7 @@ class GravPhaseNight():
         try:
             self.calibrator = calibrators[nights.index(night)]
             if self.verbose:
-                print('Night: %s, Calibrator: %s' % (night, self.calibrator))
+                print('Night:      %s \nCalibrator: %s' % (night, self.calibrator))
         except ValueError:
             if self.verbose:
                 print('Night is not available, try one of those:')
@@ -875,7 +875,7 @@ class GravPhaseNight():
         else:
             self.folder = datadir + night + '/' + reddir
         if self.verbose:
-            print('Use data from: %s' % self.folder)
+            print('Data from:  %s' % self.folder)
         self.bl_array = np.array([[0,1],
                             [0,2],
                             [0,3],
@@ -901,17 +901,23 @@ class GravPhaseNight():
                     sobjy = h['ESO INS SOBJ Y']
                     if onlysgra:
                         if -990 > sobjx or sobjx > -940:
-                           print(sobjx)
-                           continue
+                            print('File with separation (%i,%i) not on S2 orbit, will be ignored' % (sobjx, sobjy))
+                            continue
                         if -640 > sobjy or sobjy > -590:
-                           print(sobjy)
-                           continue
+                            print('File with separation (%i,%i) not on S2 orbit, will be ignored' % (sobjx, sobjy))
+                            continue
                     sg_files.append(file)
         if self.verbose:
-            print('%i SGRA , %i S2 files found' % (len(sg_files), len(s2_files)))
+            print('            %i SGRA files \n            %i S2 files' % (len(sg_files), len(s2_files)))
         self.s2_files = s2_files
         self.sg_files = sg_files
         
+        
+        year = int(night[:4])
+        if year > 2019 and not nopandas:
+            if self.verbose:
+                print('No flux data in pandas for %i' % year)
+            nopandas=True
         
         if not nopandas:
             ################
@@ -956,6 +962,8 @@ class GravPhaseNight():
             self.sg_flux_p1 = sg_flux_p1
             self.sg_flux_p2 = sg_flux_p2
             self.sg_header = sg_header
+        if self.verbose:
+            print('\n\n')
 
         
     def get_corrections(self, bequiet=False):
@@ -1889,7 +1897,10 @@ class GravPhaseNight():
         sg_ra_p2 = np.zeros((len(sg_files), ndit))*np.nan
         sg_de_p2 = np.zeros((len(sg_files), ndit))*np.nan
 
-        sg_flux = self.sg_flux
+        try:
+            sg_flux = self.sg_flux
+        except AttributeError:
+            sg_flux = np.ones(len(sg_files))
         for fdx, file in enumerate(sg_files):
             if plotfits:
                 print(sg_files[fdx])
