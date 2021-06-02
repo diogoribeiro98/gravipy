@@ -641,13 +641,6 @@ class GravMFit(GravData, GravPhaseMaps):
             ddec = self.ddec
             dra = self.dra
         
-        pos_RA = []
-        pos_DEC = []
-        fr = []
-        for ndx in range(nsource):
-            pos_RA.append(theta[ndx*3])
-            pos_DEC.append(theta[ndx*3+1])
-            fr.append(10.**(theta[ndx*3+2]))
         th_rest = nsource*3
         
         if fixedBHalpha:
@@ -673,8 +666,8 @@ class GravMFit(GravData, GravPhaseMaps):
             pm_amp_c, pm_pha_c, pm_int_c = self.phasemap_source(pc_RA, pc_DEC, 
                                                         northA, dra, ddec)
             for ndx in range(nsource):
-                pm_amp, pm_pha, pm_int = self.phasemap_source(pc_RA + pos_RA[ndx], 
-                                                         pc_DEC + pos_DEC[ndx], 
+                pm_amp, pm_pha, pm_int = self.phasemap_source(pc_RA + theta[ndx*3], 
+                                                         pc_DEC + theta[ndx*3+1], 
                                                          northA, dra, ddec)
                 pm_sources.append([pm_amp, pm_pha, pm_int])
             
@@ -694,8 +687,8 @@ class GravMFit(GravData, GravPhaseMaps):
             
             s_stars = []
             for ndx in range(nsource):
-                s_s = ((pos_RA[ndx] + pc_RA)*u[i] + 
-                       (pos_DEC[ndx] + pc_DEC)*v[i]) * mas2rad * 1e6
+                s_s = ((theta[ndx*3] + pc_RA)*u[i] + 
+                       (theta[ndx*3+1] + pc_DEC)*v[i]) * mas2rad * 1e6
                 
                 if phasemaps:
                     _, pm_pha, _ = pm_sources[ndx]
@@ -720,15 +713,15 @@ class GravMFit(GravData, GravPhaseMaps):
                     cr_denom1 = (pm_int[i,0] / pm_int_c[i,0])
                     cr_denom2 = (pm_int[i,1] / pm_int_c[i,1])
                     
-                    nom += (fr[ndx] * np.sqrt(cr1*cr2) * int_star)
-                    denom1 += (fr[ndx] * cr_denom1 * int_star_center)
-                    denom2 += (fr[ndx] * cr_denom2 * int_star_center)
+                    nom += (10.**(theta[ndx*3+2]) * np.sqrt(cr1*cr2) * int_star)
+                    denom1 += (10.**(theta[ndx*3+2]) * cr_denom1 * int_star_center)
+                    denom2 += (10.**(theta[ndx*3+2]) * cr_denom2 * int_star_center)
             else:
                 for ndx in range(nsource):
                     int_star = self.ind_visibility(s_stars[ndx], alpha_stars, wave, dlambda[i,:])
-                    nom += (fr[ndx] * int_star)
-                    denom1 += (fr[ndx] * int_star_center)
-                    denom2 += (fr[ndx] * int_star_center)
+                    nom += (10.**(theta[ndx*3+2]) * int_star)
+                    denom1 += (10.**(theta[ndx*3+2]) * int_star_center)
+                    denom2 += (10.**(theta[ndx*3+2]) * int_star_center)
                 
             intBG = self.ind_visibility(0, alpha_bg, wave, dlambda[i,:])
             denom1 += (fluxRatioBG * intBG)
