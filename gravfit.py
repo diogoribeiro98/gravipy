@@ -946,7 +946,6 @@ class GravFit(GravData):
         constant_f = self.constant_f
         fixedBG = self.fixedBG
         use_opds = self.use_opds
-        fixpos = self.fixpos
         fixedBH = self.fixedBH
         specialfit = self.specialfit
         interppm = self.interppm
@@ -958,12 +957,8 @@ class GravFit(GravData):
             ddec = self.ddec
             dra = self.dra
         
-        if fixpos:
-            dRA = self.fiberOffX
-            dDEC = self.fiberOffY
-        else:
-            dRA = theta[0]
-            dDEC = theta[1]
+        dRA = theta[0]
+        dDEC = theta[1]
         if constant_f:
             fluxRatio = theta[2]
         else:
@@ -1351,7 +1346,6 @@ class GravFit(GravData):
         self.constant_f = constant_f
         self.use_opds = use_opds
         self.fixedBG = fixedBG
-        self.fixpos = fixpos
         self.fixedBH = fixedBH
         self.interppm = interppm
         self.approx = approx
@@ -2177,9 +2171,6 @@ class GravFit(GravData):
         rad2mas = 180 / np.pi * 3600 * 1e3
         
         fixedBG = self.fixedBG
-        fiberOffX = self.fiberOffX
-        fiberOffY = self.fiberOffY
-        fixpos = self.fixpos
         fixedBH = self.fixedBH
         approx = self.approx
         donotfit = self.donotfit
@@ -2538,7 +2529,6 @@ class GravFit(GravData):
         flagtill:       Flag blue channels, has to be changed for not LOW [3] 
         flagfrom:       Flag red channels, has to be changed for not LOW [13]
         fixedBG:        Fir for background power law [False]
-        fixpos:         Does not fit the distance between the sources [False]
         fixedBH:        Fit for black hole power law [False]
         plot:           plot MCMC results [True]
         plotres:        plot fit result [True]
@@ -2590,10 +2580,6 @@ class GravFit(GravData):
         v = self.v
         wave = self.wlSC
         
-        self.fiberOffX = -fits.open(self.name)[0].header["HIERARCH ESO INS SOBJ OFFX"] 
-        self.fiberOffY = -fits.open(self.name)[0].header["HIERARCH ESO INS SOBJ OFFY"]
-
-            
         self.wave = wave
         self.getDlambda()
         dlambda = self.dlambda
