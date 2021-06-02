@@ -946,8 +946,6 @@ class GravFit(GravData):
         constant_f = self.constant_f
         fixedBG = self.fixedBG
         use_opds = self.use_opds
-        fiberOffX = self.fiberOffX
-        fiberOffY = self.fiberOffY
         fixpos = self.fixpos
         fixedBH = self.fixedBH
         specialfit = self.specialfit
@@ -2591,6 +2589,10 @@ class GravFit(GravData):
         u = self.u
         v = self.v
         wave = self.wlSC
+        
+        self.fiberOffX = -fits.open(self.name)[0].header["HIERARCH ESO INS SOBJ OFFX"] 
+        self.fiberOffY = -fits.open(self.name)[0].header["HIERARCH ESO INS SOBJ OFFY"]
+
             
         self.wave = wave
         self.getDlambda()
