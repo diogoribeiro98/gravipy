@@ -1373,7 +1373,7 @@ class GravMFit(GravData, GravPhaseMaps):
                     redchi0 = [redchi_visamp, redchi_vis2, redchi_closure, redchi_visphi]
                 elif idx == 1:
                     redchi1 = [redchi_visamp, redchi_vis2, redchi_closure, redchi_visphi]
-                    
+                self.redchi0, redchi1 = redchi0, redchi1
                 if not bequiet:
                     print('\n')
                     print('ndof: %i' % (vis2.size-np.sum(vis2_flag)-ndof))
