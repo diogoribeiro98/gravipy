@@ -927,11 +927,11 @@ class GravMFit(GravData, GravPhaseMaps):
             raise ValueError('Telescope not AT or UT, something wrong with input data')
 
         try:
-            self.fiberOffX = -fits.open(self.name)[0].header["HIERARCH ESO INS SOBJ OFFX"] 
-            self.fiberOffY = -fits.open(self.name)[0].header["HIERARCH ESO INS SOBJ OFFY"]
+            fiberOffX = -fits.open(self.name)[0].header["HIERARCH ESO INS SOBJ OFFX"] 
+            fiberOffY = -fits.open(self.name)[0].header["HIERARCH ESO INS SOBJ OFFY"]
         except KeyError:
-            self.fiberOffX = 0
-            self.fiberOffY = 0
+            fiberOffX = 0
+            fiberOffY = 0
 
         nwave = self.channel
 
@@ -957,8 +957,8 @@ class GravMFit(GravData, GravPhaseMaps):
             txtfile.write('# Rows are: dRA, dDEC, f1, f2, f3, f4, alpha flare, f BG, alpha BG, PC RA, PC DEC, OPD1, OPD2, OPD3, OPD4 \n')
             txtfile.write('# Parameter which are not fitted have 0.0 as error \n')
             txtfile.write('# MJD: %f \n' % MJD)
-            txtfile.write('# OFFX: %f \n' % self.fiberOffX)
-            txtfile.write('# OFFY: %f \n\n' % self.fiberOffY)
+            txtfile.write('# OFFX: %f \n' % fiberOffX)
+            txtfile.write('# OFFY: %f \n\n' % fiberOffY)
 
         results = []
 
