@@ -907,9 +907,8 @@ class GravMFit(GravData, GravPhaseMaps):
         if fit_size is None:
             fit_size = np.ones(nsource)*5
         if fit_pos is None:
-            print('test')
             fit_pos = np.ones(nsource)
-        if fit_size is None:
+        if fit_fr is None:
             fit_fr = np.ones(nsource)
         
         if len(de_list) != nsource or len(fr_list) != nsource or len(fit_size) != nsource:
