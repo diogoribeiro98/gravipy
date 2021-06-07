@@ -653,6 +653,13 @@ class GravMFit(GravData, GravPhaseMaps):
         
         pc_RA = theta[th_rest+2]
         pc_DEC = theta[th_rest+3]
+        
+        try:
+            if self.fit_for[3] == 0:
+                pc_RA = 0
+                pc_DEC = 0
+        except AttributeError:
+            pass
 
         try:
             alpha_stars = self.alpha_stars
@@ -674,12 +681,6 @@ class GravMFit(GravData, GravPhaseMaps):
 
         vis = np.zeros((6,len(wave))) + 0j
         for i in range(0,6):
-            try:
-                if self.fit_for[3] == 0:
-                    pc_RA = 0
-                    pc_DEC = 0
-            except AttributeError:
-                pass
             
             s_SgrA = ((pc_RA)*u[i] + (pc_DEC)*v[i]) * mas2rad * 1e6
             if phasemaps:
