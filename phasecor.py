@@ -784,12 +784,13 @@ def correct_data(files, mode, subspacing=1, plotav=8, plot=False, lstplot=False)
 
 class GravPhaseNight():
     def __init__(self, night, ndit, verbose=True, nopandas=False, pandasfile=None,
-                 reddir=None, datadir='/data/user/forFrank2/', onlysgra=True):
+                 reddir=None, datadir='/data/user/forFrank2/', onlysgra=True, calibrator=None):
         """
         Package to do the full phase calibration, poscor, correction and fitting
         
         night       : night which shall be used
         ndit        : 1 to use the 5-min files or 32 for the 1frame reduction [1]
+        calibrator  : the calibrator to use, if None use defaults - give filename 
         
         """
         self.night = night
@@ -862,7 +863,10 @@ class GravPhaseNight():
                     'GRAVI.2021-05-25T08:14:27.208_dualscivis.fits'
                     ] 
         try:
-            self.calibrator = calibrators[nights.index(night)]
+            if calibrator is not None:
+                self.calibrator = calibrators[nights.index(night)]
+            else:
+                self.calibrator = calibrator
             if self.verbose:
                 print('Night:      %s \nCalibrator: %s' % (night, self.calibrator))
         except ValueError:
@@ -1070,6 +1074,8 @@ class GravPhaseNight():
                       (depending on the options)
                       /data/user/forFrank2/ + night + /reduced_PL20200513/correction_ + mode + _new/
                       /data/user/forFrank2/ + night + /reduced_PL20200513_1frame/correction_ + mode + _new/ 
+                      if save is a string, save files will be save to string value
+                      
         ret         : Returns list with all results
         """
         ndit = self.ndit
@@ -1720,10 +1726,13 @@ class GravPhaseNight():
         ##########################
         if save:
             if correction:
-                if linear_cor:
-                    folder = file[:file.find('GRAVI')] + 'correction_' + mode +'_lincor/'
+                if type(save) ==str:
+                    folder = save
                 else:
-                    folder = file[:file.find('GRAVI')] + 'correction_' + mode +'/'
+                    if linear_cor:
+                        folder = file[:file.find('GRAVI')] + 'correction_' + mode +'_lincor/'
+                    else:
+                        folder = file[:file.find('GRAVI')] + 'correction_' + mode +'/'
                 if not os.path.isdir(folder):
                     os.mkdir(folder)
                 if self.verbose:
