@@ -1362,9 +1362,10 @@ class GravMFit(GravData, GravPhaseMaps):
                 redchi = [redchi_visamp, redchi_vis2, redchi_closure, redchi_visphi]
                 if idx == 0:
                     redchi0 = [redchi_visamp, redchi_vis2, redchi_closure, redchi_visphi]
+                    self.redchi0 = redchi0
                 elif idx == 1:
                     redchi1 = [redchi_visamp, redchi_vis2, redchi_closure, redchi_visphi]
-                self.redchi0, self.redchi1 = redchi0, redchi1
+                    self.redchi1 = redchi1
                 
                 if not bequiet:
                     print('\n')
