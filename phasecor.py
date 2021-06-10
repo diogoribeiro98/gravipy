@@ -863,9 +863,13 @@ class GravPhaseNight():
                     'GRAVI.2021-05-25T08:14:27.208_dualscivis.fits'
                     ] 
         try:
-            if calibrator is not None:
+            if calibrator is None:
+                if self.verbose:
+                    print("using default calibrator")
                 self.calibrator = calibrators[nights.index(night)]
             else:
+                if self.verbose:
+                    print("using custom calibrator")
                 self.calibrator = calibrator
             if self.verbose:
                 print('Night:      %s \nCalibrator: %s' % (night, self.calibrator))
@@ -1468,7 +1472,7 @@ class GravPhaseNight():
             print(calib_file)
             raise ValueError('Something wrong with calib file')
         calib_file = calib_file[0]
-
+        print(calib_file, self.calibrator)
         c_p1 = s2_visphi_p1[calib_file]
         c_p2 = s2_visphi_p2[calib_file]
 
@@ -1727,8 +1731,12 @@ class GravPhaseNight():
         if save:
             if correction:
                 if type(save) ==str:
+                    if self.verbose:
+                        print("saving string")
                     folder = save
                 else:
+                    if self.verbose:
+                        print("saving to default location")
                     if linear_cor:
                         folder = file[:file.find('GRAVI')] + 'correction_' + mode +'_lincor/'
                     else:
@@ -1763,10 +1771,17 @@ class GravPhaseNight():
                         d.writeto(folder+fname, overwrite=True)
                     
             else:
-                if linear_cor:
-                    folder = file[:file.find('GRAVI')] + 'correction_nocor_new/'
+                if type(save) ==str:
+                    if self.verbose:
+                        print("saving string")
+                    folder = save
                 else:
-                    folder = file[:file.find('GRAVI')] + 'correction_nocor/'
+                    if self.verbose:
+                        print("saving to default location")
+                    if linear_cor:
+                        folder = file[:file.find('GRAVI')] + 'correction_nocor_new/'
+                    else:
+                        folder = file[:file.find('GRAVI')] + 'correction_nocor/'
                 if not os.path.isdir(folder):
                     os.mkdir(folder)
                 for fdx, file in enumerate(sg_files):
