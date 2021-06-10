@@ -1522,6 +1522,8 @@ class GravMFit(GravData, GravPhaseMaps):
                 print('Combined %s of fitted data: %.3f' % (chi2string, redchi_f))
         except UnboundLocalError:
             pass
+        except:
+            print("could not compute reduced chi2")
         if onlypol is not None and ndit == 1:
             return theta_result
         else:
