@@ -575,7 +575,7 @@ class GravMFit(GravData, GravPhaseMaps):
         dlambda:size of channels 
         """
         if np.all(s == 0.) and alpha != 0:
-            return -2.2**(1 + alpha)/alpha*(lambda0+dlambda)**(-alpha) - (-2.2**(1 + alpha)/alpha*(lambda0-dlambda)**(-alpha))
+            return np.complex128(-2.2**(1 + alpha)/alpha*(lambda0+dlambda)**(-alpha) - (-2.2**(1 + alpha)/alpha*(lambda0-dlambda)**(-alpha)))
         else:
             return complex_quadrature_num(self.visibility_integrator, lambda0-dlambda, lambda0+dlambda, (s, alpha))
         
@@ -700,6 +700,7 @@ class GravMFit(GravData, GravPhaseMaps):
             intSgrA_center = self.ind_visibility(0, alpha_SgrA, wave, dlambda[i,:])
 
             nom = intSgrA
+            
             denom1 = np.copy(intSgrA_center)
             denom2 = np.copy(intSgrA_center)
             
