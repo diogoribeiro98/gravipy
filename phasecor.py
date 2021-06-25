@@ -828,7 +828,14 @@ class GravPhaseNight():
                 '2021-03-31',
                 '2021-05-22',
                 '2021-05-23',
-                '2021-05-24']
+                '2021-05-24',
+                '2021-05-25'
+                '2021-05-28',
+                '2021-05-29',
+                '2021-05-30',
+                '2021-06-19',
+                '2021-06-20'
+                ]
         calibrators = ['GRAVI.2019-03-28T08:00:22.802_dualscivis.fits',
                     'GRAVI.2019-03-29T07:35:36.327_dualscivis.fits',
                     'GRAVI.2019-04-01T06:53:20.843_dualscivis.fits',
@@ -860,7 +867,13 @@ class GravPhaseNight():
                     'GRAVI.2021-04-01T08:35:49.986_dualscivis.fits',
                     'GRAVI.2021-05-23T04:20:48.130_dualscivis.fits',
                     'GRAVI.2021-05-24T07:20:05.866_dualscivis.fits',
-                    'GRAVI.2021-05-25T08:14:27.208_dualscivis.fits'
+                    'GRAVI.2021-05-25T08:14:27.208_dualscivis.fits',
+                    'GRAVI.2021-05-26T07:35:57.734_dualscivis.fits',
+                    'GRAVI.2021-05-29T06:53:52.614_dualscivis.fits',
+                    'GRAVI.2021-05-30T06:27:50.478_dualscivis.fits',
+                    'GRAVI.2021-05-31T04:49:19.787_dualscivis.fits',
+                    'GRAVI.2021-06-20T03:27:36.544_dualscivis.fits',
+                    'GRAVI.2021-06-21T05:44:52.682_dualscivis.fits'
                     ] 
         try:
             if calibrator is None:
