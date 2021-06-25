@@ -893,10 +893,15 @@ class GravPhaseNight():
             raise ValueError('Night is not available')
         
         if reddir is None:
+            if int(night[:4]) > 2020:
+                pl_dir = '/reduced_PL20210429'
+            else:
+                pl_dir = '/reduced_PL20200513'
+            
             if ndit == 1:
-                self.folder = datadir + night + '/reduced_PL20200513'
+                self.folder = datadir + night + pl_dir
             elif ndit == 32:
-                self.folder = datadir + night + '/reduced_PL20200513_1frame'
+                self.folder = datadir + night + pl_dir + '_1frame'
             else:
                 raise ValueError('Ndit has to be 1 or 32')
         else:
