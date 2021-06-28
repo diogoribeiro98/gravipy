@@ -829,12 +829,14 @@ class GravPhaseNight():
                 '2021-05-22',
                 '2021-05-23',
                 '2021-05-24',
-                '2021-05-25'
+                '2021-05-25',
                 '2021-05-28',
                 '2021-05-29',
                 '2021-05-30',
                 '2021-06-19',
-                '2021-06-20'
+                '2021-06-20',
+                '2021-06-24',
+                '2021-06-25'
                 ]
         calibrators = ['GRAVI.2019-03-28T08:00:22.802_dualscivis.fits',
                     'GRAVI.2019-03-29T07:35:36.327_dualscivis.fits',
@@ -873,8 +875,11 @@ class GravPhaseNight():
                     'GRAVI.2021-05-30T06:27:50.478_dualscivis.fits',
                     'GRAVI.2021-05-31T04:49:19.787_dualscivis.fits',
                     'GRAVI.2021-06-20T03:27:36.544_dualscivis.fits',
-                    'GRAVI.2021-06-21T05:44:52.682_dualscivis.fits'
+                    'GRAVI.2021-06-21T05:44:52.682_dualscivis.fits',
+                    'GRAVI.2021-06-25T04:17:48.414_dualscivis.fits',
+                    'GRAVI.2021-06-26T02:08:16.758_dualscivis.fits'
                     ] 
+
         try:
             if calibrator is None:
                 if self.verbose:
@@ -1827,12 +1832,18 @@ class GravPhaseNight():
                         d['OI_VIS', 12].data['VISPHI'] = visphi_p2
                         d.writeto(folder+fname, overwrite=True)
 
-                        
+        self.savefolder = folder
         self.alldata = result
         if ret:
             return self.alldata
         
+    def calibrate_all(self, mode, *args, **kwargs):
+        self.process_night(mode, save=True, *args, **kwargs)
         
+        sf = self.savefolder
+        cf = self.savefolder + 'calibrated_oneS2'
+        os.system('run_gravi_recalibrate.py %s %s -c=%s -s=S2 -s=SGRA' 
+                % (sf, cf, self.calibrator))
 
 
     #########################
