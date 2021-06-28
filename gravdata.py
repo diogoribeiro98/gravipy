@@ -711,7 +711,19 @@ class GravData():
         self.dlambda = dlambda 
     
        
-    
+class GravNight():
+    def __init__(self, file_list, verbose=True):
+        self.file_list = file_list
+        
+        self.get_files()
+        
+    def get_files(self):
+        self.gravData_list = []
+        for fi in self.file_list:
+            self.gravData_list.append(GravData(fi, verbose=self.verbose))
+            
+            
+        
     
     
 
