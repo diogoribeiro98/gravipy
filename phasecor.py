@@ -876,7 +876,7 @@ class GravPhaseNight():
                     'GRAVI.2021-05-31T04:49:19.787_dualscivis.fits',
                     'GRAVI.2021-06-20T03:27:36.544_dualscivis.fits',
                     'GRAVI.2021-06-21T05:44:52.682_dualscivis.fits',
-                    'GRAVI.2021-06-25T04:17:48.414_dualscivis.fits',
+                    'GRAVI.2021-06-25T02:33:30.152_dualscivis.fits',
                     'GRAVI.2021-06-26T02:08:16.758_dualscivis.fits'
                     ] 
 
