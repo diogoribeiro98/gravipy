@@ -360,7 +360,10 @@ class GravData():
 
                     axis = plt.subplot(gs[0,1])
                     for idx in range(len(self.vis2SC_P1)):
-                        plt.errorbar(self.spFrequAS[idx,:], self.vis2SC_P1[idx,:], self.vis2errSC_P1[idx,:], alpha=0.7, ms=4, lw=0.5, capsize=0,  ls='', marker='o',color=self.colors_baseline[idx%6])
+                        plt.errorbar(self.spFrequAS[idx,:], self.vis2SC_P1[idx,:], self.vis2errSC_P1[idx,:], alpha=0.7, ms=4, lw=0.5, capsize=0,  ls='', marker='o',color=self.colors_baseline[idx%6],
+                                     label=self.baseline_labels[idx%6])
+                        if idx == 5:
+                            plt.legend(frameon=True)
                     for idx in range(len(self.vis2SC_P2)):
                         plt.errorbar(self.spFrequAS[idx,:], self.vis2SC_P2[idx,:], self.vis2errSC_P2[idx,:], alpha=0.7, ms=4, lw=0.5, capsize=0, ls='', marker='D',color=self.colors_baseline[idx%6])
                     plt.axhline(1, ls='--', lw=0.5)
@@ -369,7 +372,10 @@ class GravData():
 
                     axis = plt.subplot(gs[1,0])
                     for idx in range(len(self.t3SC_P2)):
-                        plt.errorbar(self.spFrequAS_T3[idx,:], self.t3SC_P2[idx,:], self.t3errSC_P2[idx,:], alpha=0.7, ms=4, lw=0.5, capsize=0, marker='o',color=self.colors_closure[idx%4],linestyle='')
+                        plt.errorbar(self.spFrequAS_T3[idx,:], self.t3SC_P2[idx,:], self.t3errSC_P2[idx,:], alpha=0.7, ms=4, lw=0.5, capsize=0, marker='o',color=self.colors_closure[idx%4],linestyle='',
+                                     label=self.closure_labels[idx%6])
+                        if idx == 3:
+                            plt.legend(frameon=True)
                     for idx in range(len(self.t3SC_P2)):
                         plt.errorbar(self.spFrequAS_T3[idx,:], self.t3SC_P1[idx,:], self.t3errSC_P1[idx,:], alpha=0.7, ms=4, lw=0.5, capsize=0, marker='D',color=self.colors_closure[idx%4],linestyle='')
                     plt.axhline(0, ls='--', lw=0.5)
