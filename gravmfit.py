@@ -2409,9 +2409,12 @@ class GravMNightFit(GravNight, GravPhaseMaps):
                     if bequiet:
                         self.sampler.run_mcmc(pos, nruns, progress=False) 
                     else:
-                        self.sampler.run_mcmc(pos, nruns, progress=True)     
+                        self.sampler.run_mcmc(pos, nruns, progress=True)   
                             
-    
+        self.fitdata = fitdata
+        self.fithelp = fithelp
+        self.fitarg = fitarg
+        
 
         #return results
         
@@ -2459,6 +2462,75 @@ class GravMNightFit(GravNight, GravPhaseMaps):
             
         self.fitres = fitres
         
+    def plot_fit(self, fitres, fitarg, fithelp, axes=None):
+        if axes is None:
+            fig, axes = plt.subplots(2, 2, gridspec_kw={})
+            
+        for num in range(len(self.gravData_list)):
+            visamp, visphi, closure = _calc_vis(fitres, fitarg, fithelp)
         
+        
+    
+    def plot_data(self, fitdata, fitarg, axes=None):
+        if axes is None:
+            fig, axes = plt.subplots(2, 2, gridspec_kw={})
+        (visamp, visamp_error, visamp_flag, 
+            vis2, vis2_error, vis2_flag, 
+            closure, closure_error, closure_flag, 
+            visphi, visphi_error, visphi_flag) = fitdata
+        (u, v) = fitarg
+        for num, obj in enumerate(self.gravData_list):
+            magu_as = obj.spFrequAS
+            for i in range(0,6):
+                ## visamp
+                axes[0,0].errorbar(magu_as[i,:], visamp[num][i,:]*(1-visamp_flag[num])[i],
+                            visamp_error[num][i,:]*(1-visamp_flag[num])[i],
+                            color=obj.colors_baseline[i],ls='', lw=1, alpha=0.5, capsize=0)
+                if num == 0:
+                    axes[0,0].scatter(magu_as[i,:], visamp[num][i,:]*(1-visamp_flag[num])[i],
+                                color=obj.colors_baseline[i], alpha=0.5, label=obj.baseline_labels[i])
+                else:
+                    axes[0,0].scatter(magu_as[i,:], visamp[num][i,:]*(1-visamp_flag[num])[i],
+                                color=obj.colors_baseline[i], alpha=0.5)
+               
+                ## vis2
+                axes[0,1].errorbar(magu_as[i,:], vis2[num][i,:]*(1-vis2_flag[num])[i], 
+                            vis2_error[num][i,:]*(1-vis2_flag[num])[i], 
+                            color=obj.colors_baseline[i],ls='', lw=1, alpha=0.5, capsize=0)
+                axes[0,1].scatter(magu_as[i,:], vis2[num][i,:]*(1-vis2_flag[num])[i],
+                            color=obj.colors_baseline[i],alpha=0.5)
                 
+     
+                ## visphi
+                
+                axes[1,1].errorbar(magu_as[i,:], visphi[num][i,:]*(1-visphi_flag[num])[i], 
+                            visphi_error[num][i,:]*(1-visphi_flag[num])[i],
+                            color=obj.colors_baseline[i], ls='', lw=1, alpha=0.5, capsize=0)
+                axes[1,1].scatter(magu_as[i,:], visphi[num][i,:]*(1-visphi_flag[num])[i],
+                            color=obj.colors_baseline[i], alpha=0.5)
+                
+            for i in range(4):
+                ## t3visphi
+                axes[1,0].errorbar(obj.spFrequAS_T3[i,:], closure[num][i,:]*(1-closure_flag[num])[i],
+                            closure_error[num][i,:]*(1-closure_flag[num])[i],
+                            color=obj.colors_closure[i],ls='', lw=1, alpha=0.5, capsize=0)
+                axes[1,0].scatter(obj.spFrequAS_T3[i,:], closure[num][i,:]*(1-closure_flag[num])[i], label=obj.closure_labels[i])
+                                             
+        axes[0,0].set_ylabel('visibility modulus')
+        axes[0,0].set_ylim(-0.1,1.1)
+        axes[0,0].set_xlabel('spatial frequency (1/arcsec)')
+        axes[0,0].legend(fontsize=12)
         
+        axes[0,1].set_xlabel('spatial frequency (1/arcsec)')
+        axes[0,1].set_ylabel('visibility squared')
+        axes[0,1].set_ylim(-0.1,1.1)
+
+        
+        axes[1,0].set_xlabel('spatial frequency of largest baseline in triangle (1/arcsec)')
+        axes[1,0].set_ylabel('closure phase (deg)')
+        axes[1,0].set_ylim(-180,180)
+        axes[1,0].legend(fontsize=12)
+        
+        axes[1,1].set_ylabel('visibility phase')
+        axes[1,0].set_ylim(-180,180)
+        axes[1,1].set_xlabel('spatial frequency (1/arcsec)')
