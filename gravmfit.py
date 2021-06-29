@@ -2212,6 +2212,7 @@ class GravMNightFit(GravNight, GravPhaseMaps):
             if not fit_pos[ndx]:
                 todel.append(ndx*2)
                 todel.append(ndx*2+1)
+        for ndx in range(len(fit_fr)):
             if not fit_fr[ndx]:
                 print("Sorry, currently we have to fit all flux ratios!")
                 #todel.append(ndx*3+2)
