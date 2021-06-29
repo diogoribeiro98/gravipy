@@ -1803,16 +1803,15 @@ def _calc_vis(theta, fitarg, fithelp):
     u = fitarg[0]
     v = fitarg[1]
 
+    # theta_ = [ra1, dec1, ra2, dec2, ..., alpha BH, f BG, pc RA, pc DEC, fr fileN, fr2, fr3, ...        
     
-
-
     if phasemaps:
         raise ValueError("Phase maps not implemented yet!")
         #northA = self.northangle
         #ddec = self.ddec
         #dra = self.dra
     
-    th_rest = nsource*3
+    th_rest = nsource*2
     
     if fixedBHalpha:
         alpha_SgrA = -0.5
@@ -1847,6 +1846,7 @@ def _calc_vis(theta, fitarg, fithelp):
             #pm_sources.append([pm_amp, pm_pha, pm_int])
         
 
+    # theta_ = [ra1, dec1, ra2, dec2, ..., alpha BH, f BG, pc RA, pc DEC, fr fileN, fr2, fr3, ...        
     vis = np.zeros((6,len(wave))) + 0j
     for i in range(0,6):
         
@@ -1856,8 +1856,8 @@ def _calc_vis(theta, fitarg, fithelp):
         
         s_stars = []
         for ndx in range(nsource):
-            s_s = ((theta[ndx*3] + pc_RA)*u[i] + 
-                    (theta[ndx*3+1] + pc_DEC)*v[i]) * mas2rad * 1e6
+            s_s = ((theta[ndx*2] + pc_RA)*u[i] + 
+                    (theta[ndx*2+1] + pc_DEC)*v[i]) * mas2rad * 1e6
             
             if phasemaps:
                 _, pm_pha, _ = pm_sources[ndx]
@@ -1866,15 +1866,15 @@ def _calc_vis(theta, fitarg, fithelp):
 
         intSgrA = _ind_visibility(s_SgrA, alpha_SgrA, wave, dlambda[i,:], fit_mode)
         intSgrA_center = _ind_visibility(0, alpha_SgrA, wave, dlambda[i,:], fit_mode)
-
-        nom = intSgrA
         
-        denom1 = np.copy(intSgrA_center)
-        denom2 = np.copy(intSgrA_center)
+        f_sgra = theta[th_rest+4]
+        nom = 10.**(f_sgra)*intSgrA
+        
+        denom1 = 10.**(f_sgra)*np.copy(intSgrA_center)
+        denom2 = 10.**(f_sgra)*np.copy(intSgrA_center)
         
         int_star_center = _ind_visibility(0, alpha_stars, wave, dlambda[i,:], fit_mode)
         
-        # theta = [ra1, dec1, ra2, dec2, ..., alpha BH, f BG, pc RA, pc DEC, fr file1, fr file2, ...., fr fileN, fr2, fr3, ...
         if phasemaps:
             for ndx in range(nsource):
                 int_star = _ind_visibility(s_stars[ndx], alpha_stars, wave, dlambda[i,:], fit_mode)
@@ -1890,10 +1890,14 @@ def _calc_vis(theta, fitarg, fithelp):
                 denom2 += (10.**(theta[ndx*3+2]) * cr_denom2 * int_star_center)
         else:
             for ndx in range(nsource):
+                if ndx == 0:
+                    f_star = 1
+                else:
+                    f_star = theta[th_rest+4+ndx]
                 int_star = _ind_visibility(s_stars[ndx], alpha_stars, wave, dlambda[i,:], fit_mode)
-                nom += (10.**(theta[ndx*3+2]) * int_star)
-                denom1 += (10.**(theta[ndx*3+2]) * int_star_center)
-                denom2 += (10.**(theta[ndx*3+2]) * int_star_center)
+                nom += (10.**(f_star) * int_star)
+                denom1 += (10.**(f_star) * int_star_center)
+                denom2 += (10.**(f_star) * int_star_center)
             
         intBG = _ind_visibility(0, alpha_bg, wave, dlambda[i,:], fit_mode)
         denom1 += (fluxRatioBG * intBG)
@@ -1925,10 +1929,12 @@ def _lnlike_night(theta, fitdata, fitarg, fithelp):
         visphi, visphi_error, visphi_flag) = fitdata
     for num in range(len_lightcurve):
         # Model
+        # theta = [ra1, dec1, ra2, dec2, ..., alpha BH, f BG, pc RA, pc DEC, fr file1, fr file2, ...., fr fileN, fr2, fr3, ...
         theta_ = theta[:nsource*2 + 4]
+        # theta_ = [ra1, dec1, ra2, dec2, ..., alpha BH, f BG, pc RA, pc DEC
         theta_ = np.append(theta_,  theta[num +len(theta_)])
-        for num in np.arange(-1*nsource-1, -1):
-            theta_ = np.append(theta_,  theta[num])
+        theta_ = np.append(theta_,  theta[-nsource+1:])
+            # theta_ = [ra1, dec1, ra2, dec2, ..., alpha BH, f BG, pc RA, pc DEC, fr fileN, fr2, fr3, ...
         model_visamp, model_visphi, model_closure = _calc_vis(theta_, fitarg[:, num], fithelp)
         model_vis2 = model_visamp**2.
         
