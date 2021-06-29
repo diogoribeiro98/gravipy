@@ -712,8 +712,14 @@ class GravData():
     
        
 class GravNight():
-    def __init__(self, file_list, verbose=True):
+    def __init__(self, night_name, file_list, verbose=True):
+        """
+        GravNight - the long awaited full night fit class
+        
+        """
+        self.night_name = night_name
         self.file_list = file_list
+        self.verbose = verbose
         
         self.get_files()
         
@@ -725,6 +731,7 @@ class GravNight():
             if num == 0:
                 type1_ = fits.getheader(fi)["ESO INS SOBJ X"]
                 type2_ = fits.getheader(fi)["ESO INS SOBJ OFFX"]
+                self.gravData_list.append(GravData(fi, verbose=self.verbose))
             else:
                 if type1_ != fits.getheader(fi)["ESO INS SOBJ X"]:
                     raise ValueError("all files need to be the same, but ", fits.getheader(fi)["ESO INS SOBJ X"], " is different from first file: ", type1_)
