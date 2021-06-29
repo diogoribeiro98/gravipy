@@ -18,6 +18,8 @@ from datetime import timedelta, datetime
 import multiprocessing
 import sys
 import os 
+import pandas as pd
+
 try:
     from numba import jit 
 except ModuleNotFoundError:
@@ -1781,7 +1783,6 @@ def _vis_intensity_num(s, alpha, lambda0, dlambda):
     else:
         return complex_quadrature_num(_visibility_integrator, lambda0-dlambda, lambda0+dlambda, (s, alpha))
     
-    
 def _ind_visibility(s, alpha, wave, dlambda, fit_mode):
     mode = fit_mode
     if mode == "approx":
@@ -1794,7 +1795,6 @@ def _ind_visibility(s, alpha, wave, dlambda, fit_mode):
         raise ValueError('approx has to be approx, analytic or numeric')
     return ind_vis
     
-
 def _calc_vis(theta, fitarg, fithelp):
     len_lightcurve, nsource, fit_for, bispec_ind, fit_mode, wave, dlambda, fixedBHalpha, phasemaps = fithelp
     mas2rad = 1e-3 / 3600 / 180 * np.pi
@@ -1873,6 +1873,8 @@ def _calc_vis(theta, fitarg, fithelp):
         denom2 = np.copy(intSgrA_center)
         
         int_star_center = _ind_visibility(0, alpha_stars, wave, dlambda[i,:], fit_mode)
+        
+        # theta = [ra1, dec1, ra2, dec2, ..., alpha BH, f BG, pc RA, pc DEC, fr file1, fr file2, ...., fr fileN, fr2, fr3, ...
         if phasemaps:
             for ndx in range(nsource):
                 int_star = _ind_visibility(s_stars[ndx], alpha_stars, wave, dlambda[i,:], fit_mode)
@@ -1909,7 +1911,6 @@ def _calc_vis(theta, fitarg, fithelp):
     closure = closure + 360.*(closure<-180.) - 360.*(closure>180.)
     return visamp, visphi, closure
     
-
 def _lnprob_night(theta, fitdata, lower, upper, fitarg, fithelp):
     if np.any(theta < lower) or np.any(theta > upper):
         return -np.inf
@@ -1987,10 +1988,6 @@ class GravMNightFit(GravNight, GravPhaseMaps):
         return pm_amp, pm_pha, pm_int
                    
                
-
-    
-
-
     def fitStars(self, 
                  ra_list, 
                  de_list,
@@ -2075,6 +2072,7 @@ class GravMNightFit(GravNight, GravPhaseMaps):
         self.interppm = interppm
         self.fit_mode = fit_mode
         self.bequiet = bequiet
+        self.nruns = nruns
         rad2as = 180 / np.pi * 3600
         
         
@@ -2258,7 +2256,6 @@ class GravMNightFit(GravNight, GravPhaseMaps):
         theta_names.append('f BG')
         theta_names.append('pc RA')
         theta_names.append('pc Dec')
-        theta_names.append('fr%i' % (ndx + 1))
         
         for num in range(th_rest + 3, nsource*2+4 + len(self.gravData_list)):
             theta_names.append("fr_lightcurve " + str(num-th_rest+3))
@@ -2375,7 +2372,9 @@ class GravMNightFit(GravNight, GravPhaseMaps):
                 if par > th_rest+3:
                     width =1e-2
                 pos[:, par] = theta[par] + width*np.random.randn(nwalkers)
-                
+        
+        self.todel = todel
+        self.ndim = ndim
         fitdata = [visamp_P, visamp_error_P, visamp_flag_P,
                     vis2_P, vis2_error_P, vis2_flag_P,
                     closure_P, closure_error_P, closure_flag_P,
@@ -2408,6 +2407,50 @@ class GravMNightFit(GravNight, GravPhaseMaps):
     
 
         #return results
+        
+    def get_pdf_report(self):
+        raise ValueError("PDF reports not implemented yet!")
+    
+    def get_txt_report(self):
+        raise ValueError("Txt report not implemented yet!")
+    
+    def get_fit_result(self):
+        samples = self.sampler.chain
+        self.mostprop = self.sampler.flatchain[np.argmax(self.sampler.flatlnprobability)]
+
+        clsamples = np.delete(samples, self.todel, 2)
+        cllabels = np.delete(self.theta_names, self.todel)
+        clmostprop = np.delete(self.mostprop, self.todel)
+        cldim = len(clmostprop)
+        
+
+
+        
+        if self.nruns > 300:
+            fl_samples = samples[:, -200:, :].reshape((-1, self.ndim))
+            fl_clsamples = clsamples[:, -200:, :].reshape((-1, cldim))                
+        elif self.nruns > 200:
+            fl_samples = samples[:, -100:, :].reshape((-1, self.ndim))
+            fl_clsamples = clsamples[:, -100:, :].reshape((-1, cldim))   
+        else:
+            fl_samples = samples.reshape((-1, self.ndim))
+            fl_clsamples = clsamples.reshape((-1, cldim))
+        
+                                       
+                                       
+        
+        percentiles = np.percentile(fl_clsamples, [16, 50, 84],axis=0).T
+        percentiles[:,0] = percentiles[:,1] - percentiles[:,0] 
+        percentiles[:,2] = percentiles[:,2] - percentiles[:,1] 
+
+            
+        fitres = pd.DataFrame()
+        fitres["column"] = ["M.L.", "M.P.", "$-\sigma$", "$+\sigma$"]
+        for num, name, mostprop in zip(range(len(cllabels)), cllabels, clmostprop):
+            fitres[name] = pd.Series([mostprop, percentiles[num, 1], percentiles[num, 0], percentiles[num, 2]])
+            
+            
+        self.fitres = fitres
         
         
                 
