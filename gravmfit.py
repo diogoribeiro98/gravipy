@@ -2102,25 +2102,25 @@ class GravMNightFit(GravNight):
             phasemaps = GravPhaseMaps()
             phasemaps.loadPhasemaps(interp=interppm)
             
-            header = fits.open(self.gravData_list[0].name)[0].header
-            northangle1 = header['ESO QC ACQ FIELD1 NORTH_ANGLE']/180*math.pi
-            northangle2 = header['ESO QC ACQ FIELD2 NORTH_ANGLE']/180*math.pi
-            northangle3 = header['ESO QC ACQ FIELD3 NORTH_ANGLE']/180*math.pi
-            northangle4 = header['ESO QC ACQ FIELD4 NORTH_ANGLE']/180*math.pi
-            self.northangle = [northangle1, northangle2, northangle3, northangle4]
-            
-            ### for simplicty assume 0 alignment!
-            ddec1 = 0 # header['ESO QC MET SOBJ DDEC1']
-            ddec2 = 0 # header['ESO QC MET SOBJ DDEC2']
-            ddec3 = 0 # header['ESO QC MET SOBJ DDEC3']
-            ddec4 = 0 # header['ESO QC MET SOBJ DDEC4']
-            self.ddec = [ddec1, ddec2, ddec3, ddec4]
+        header = fits.open(self.gravData_list[0].name)[0].header
+        northangle1 = header['ESO QC ACQ FIELD1 NORTH_ANGLE']/180*math.pi
+        northangle2 = header['ESO QC ACQ FIELD2 NORTH_ANGLE']/180*math.pi
+        northangle3 = header['ESO QC ACQ FIELD3 NORTH_ANGLE']/180*math.pi
+        northangle4 = header['ESO QC ACQ FIELD4 NORTH_ANGLE']/180*math.pi
+        self.northangle = [northangle1, northangle2, northangle3, northangle4]
+        
+        ### for simplicty assume 0 alignment!
+        ddec1 = 0 # header['ESO QC MET SOBJ DDEC1']
+        ddec2 = 0 # header['ESO QC MET SOBJ DDEC2']
+        ddec3 = 0 # header['ESO QC MET SOBJ DDEC3']
+        ddec4 = 0 # header['ESO QC MET SOBJ DDEC4']
+        self.ddec = [ddec1, ddec2, ddec3, ddec4]
 
-            dra1 = 0 # header['ESO QC MET SOBJ DRA1']
-            dra2 = 0 # header['ESO QC MET SOBJ DRA2']
-            dra3 = 0 # header['ESO QC MET SOBJ DRA3']
-            dra4 = 0 # header['ESO QC MET SOBJ DRA4']
-            self.dra = [dra1, dra2, dra3, dra4]
+        dra1 = 0 # header['ESO QC MET SOBJ DRA1']
+        dra2 = 0 # header['ESO QC MET SOBJ DRA2']
+        dra3 = 0 # header['ESO QC MET SOBJ DRA3']
+        dra4 = 0 # header['ESO QC MET SOBJ DRA4']
+        self.dra = [dra1, dra2, dra3, dra4]
 
         nsource = len(ra_list)
         if fit_size is None:
