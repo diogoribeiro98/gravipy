@@ -2587,7 +2587,7 @@ class GravMNightFit(GravNight):
         axes[1,1].set_xlabel('spatial frequency (1/arcsec)')
         
     def plot_residual(self, fitdata, fitarg, fitres, fithelp, axes=None):
-        len_lightcurve, nsource, fit_for, bispec_ind, fit_mode, wave, dlambda, fixedBHalpha, phasemaps = fithelp
+        len_lightcurve, nsource, fit_for, bispec_ind, fit_mode, wave, dlambda, fixedBHalpha, phasemaps, northA = fithelp
         if axes is None:
             #fig, axes = plt.subplots(2, 2, gridspec_kw={})
             fig, axes0 = plt.subplots()
