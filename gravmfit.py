@@ -2477,7 +2477,7 @@ class GravMNightFit(GravNight):
         self.fittab = fittab
         
     def plot_fit(self, fitres, fitarg, fithelp, axes=None):
-        len_lightcurve, nsource, fit_for, bispec_ind, fit_mode, wave, dlambda, fixedBHalpha, phasemaps = fithelp
+        len_lightcurve, nsource, fit_for, bispec_ind, fit_mode, wave, dlambda, fixedBHalpha, phasemaps, northA = fithelp
         if axes is None:
             #fig, axes = plt.subplots(2, 2, gridspec_kw={})
             fig, axes0 = plt.subplots()
