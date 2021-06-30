@@ -34,6 +34,17 @@ try:
 except (NameError, ModuleNotFoundError):
     pass
 
+import colorsys
+import matplotlib.colors as mc
+def lighten_color(color, amount=0.5):
+    try:
+        c = mc.cnames[color]
+    except:
+        c = color
+    c = colorsys.rgb_to_hls(*mc.to_rgb(c))
+    return colorsys.hls_to_rgb(c[0], 1 - amount * (1 - c[1]), c[2])
+
+
 color1 = '#C02F1D'
 color2 = '#348ABD'
 color3 = '#F26D21'
@@ -2454,67 +2465,105 @@ class GravMNightFit(GravNight, GravPhaseMaps):
         percentiles[:,2] = percentiles[:,2] - percentiles[:,1] 
 
             
-        fitres = pd.DataFrame()
-        fitres["column"] = ["M.L.", "M.P.", "$-\sigma$", "$+\sigma$"]
+        fittab = pd.DataFrame()
+        fittab["column"] = ["M.L.", "M.P.", "$-\sigma$", "$+\sigma$"]
         for num, name, mostprop in zip(range(len(cllabels)), cllabels, clmostprop):
-            fitres[name] = pd.Series([mostprop, percentiles[num, 1], percentiles[num, 0], percentiles[num, 2]])
+            fittab[name] = pd.Series([mostprop, percentiles[num, 1], percentiles[num, 0], percentiles[num, 2]])
             
             
-        self.fitres = fitres
+        self.fitres = clmostprop
+        self.fittab = fittab
         
     def plot_fit(self, fitres, fitarg, fithelp, axes=None):
+        len_lightcurve, nsource, fit_for, bispec_ind, fit_mode, wave, dlambda, fixedBHalpha, phasemaps = fithelp
         if axes is None:
-            fig, axes = plt.subplots(2, 2, gridspec_kw={})
+            #fig, axes = plt.subplots(2, 2, gridspec_kw={})
+            fig, axes0 = plt.subplots()
+            fig, axes1 = plt.subplots()
+            fig, axes2 = plt.subplots()
+            fig, axes3 = plt.subplots()
+            axes = np.ones((2,2), dtype=object)
+
+            axes[0,0] = axes0
+            axes[0,1] = axes1
+            axes[1,0] = axes2
+            axes[1,1] = axes3
             
-        for num in range(len(self.gravData_list)):
-            visamp, visphi, closure = _calc_vis(fitres, fitarg, fithelp)
-        
-        
+        for num, obj in enumerate(self.gravData_list):
+            theta_ = np.copy(fitres[:nsource*2 + 4])
+            theta_ = np.append(theta_, fitres[num + len(theta_)])
+            theta_ = np.append(theta_, fitres[-nsource+1:])
+            visamp, visphi, closure = _calc_vis(theta_, fitarg[:, num], fithelp)
+            visamp2 = visamp**2
+            magu_as = obj.spFrequAS
+            for i in range(6):
+                axes[0,0].plot(magu_as[i, :], visamp[i, :], color='k', zorder=100)
+                axes[0,1].plot(magu_as[i, :], visamp2[i, :], color='k', zorder=100)
+                axes[1,1].plot(magu_as[i, :], visphi[i, :], color='k', zorder=100)
+            for i in range(4):
+                axes[1,0].plot(obj.spFrequAS_T3[i,:], closure[i, :], color='k', zorder=100)
     
     def plot_data(self, fitdata, fitarg, axes=None):
+        len_lightcurve = len(self.gravData_list)
         if axes is None:
-            fig, axes = plt.subplots(2, 2, gridspec_kw={})
+            #fig, axes = plt.subplots(2, 2, gridspec_kw={})
+            fig, axes0 = plt.subplots()
+            fig, axes1 = plt.subplots()
+            fig, axes2 = plt.subplots()
+            fig, axes3 = plt.subplots()
+            axes = np.ones((2,2), dtype=object)
+
+            axes[0,0] = axes0
+            axes[0,1] = axes1
+            axes[1,0] = axes2
+            axes[1,1] = axes3
         (visamp, visamp_error, visamp_flag, 
             vis2, vis2_error, vis2_flag, 
             closure, closure_error, closure_flag, 
             visphi, visphi_error, visphi_flag) = fitdata
         (u, v) = fitarg
         for num, obj in enumerate(self.gravData_list):
-            magu_as = obj.spFrequAS
+            magu_as = obj.spFrequAS            
             for i in range(0,6):
                 ## visamp
                 axes[0,0].errorbar(magu_as[i,:], visamp[num][i,:]*(1-visamp_flag[num])[i],
                             visamp_error[num][i,:]*(1-visamp_flag[num])[i],
-                            color=obj.colors_baseline[i],ls='', lw=1, alpha=0.5, capsize=0)
+                            color=lighten_color(obj.colors_baseline[i], (num+1)/len_lightcurve), ls='', lw=1, alpha=0.5, capsize=0)
                 if num == 0:
                     axes[0,0].scatter(magu_as[i,:], visamp[num][i,:]*(1-visamp_flag[num])[i],
-                                color=obj.colors_baseline[i], alpha=0.5, label=obj.baseline_labels[i])
+                                color=lighten_color(obj.colors_baseline[i], (num+1)/len_lightcurve), alpha=0.5, label=obj.baseline_labels[i])
                 else:
                     axes[0,0].scatter(magu_as[i,:], visamp[num][i,:]*(1-visamp_flag[num])[i],
-                                color=obj.colors_baseline[i], alpha=0.5)
+                                color=lighten_color(obj.colors_baseline[i], (num+1)/len_lightcurve), alpha=0.5)
                
                 ## vis2
                 axes[0,1].errorbar(magu_as[i,:], vis2[num][i,:]*(1-vis2_flag[num])[i], 
                             vis2_error[num][i,:]*(1-vis2_flag[num])[i], 
-                            color=obj.colors_baseline[i],ls='', lw=1, alpha=0.5, capsize=0)
+                            color=lighten_color(obj.colors_baseline[i], (num+1)/len_lightcurve),ls='', lw=1, alpha=0.5, capsize=0)
+                
                 axes[0,1].scatter(magu_as[i,:], vis2[num][i,:]*(1-vis2_flag[num])[i],
-                            color=obj.colors_baseline[i],alpha=0.5)
+                            color=lighten_color(obj.colors_baseline[i], (num+1)/len_lightcurve),alpha=0.5)
                 
      
                 ## visphi
                 
                 axes[1,1].errorbar(magu_as[i,:], visphi[num][i,:]*(1-visphi_flag[num])[i], 
                             visphi_error[num][i,:]*(1-visphi_flag[num])[i],
-                            color=obj.colors_baseline[i], ls='', lw=1, alpha=0.5, capsize=0)
+                            color=lighten_color(obj.colors_baseline[i], (num+1)/len_lightcurve), ls='', lw=1, alpha=0.5, capsize=0)
                 axes[1,1].scatter(magu_as[i,:], visphi[num][i,:]*(1-visphi_flag[num])[i],
-                            color=obj.colors_baseline[i], alpha=0.5)
+                            color=lighten_color(obj.colors_baseline[i], (num+1)/len_lightcurve), alpha=0.5)
                 
             for i in range(4):
                 ## t3visphi
                 axes[1,0].errorbar(obj.spFrequAS_T3[i,:], closure[num][i,:]*(1-closure_flag[num])[i],
                             closure_error[num][i,:]*(1-closure_flag[num])[i],
-                            color=obj.colors_closure[i],ls='', lw=1, alpha=0.5, capsize=0)
-                axes[1,0].scatter(obj.spFrequAS_T3[i,:], closure[num][i,:]*(1-closure_flag[num])[i], label=obj.closure_labels[i])
+                            color=lighten_color(obj.colors_closure[i], (num+1)/len_lightcurve),ls='', lw=1, alpha=0.5, capsize=0)
+                if num == 0:
+                    axes[1,0].scatter(obj.spFrequAS_T3[i,:], closure[num][i,:]*(1-closure_flag[num])[i], 
+                                      label=obj.closure_labels[i], color=lighten_color(obj.colors_closure[i], (num+1)/len_lightcurve))
+                else:
+                    axes[1,0].scatter(obj.spFrequAS_T3[i,:], closure[num][i,:]*(1-closure_flag[num])[i], 
+                                      color=lighten_color(obj.colors_closure[i], (num+1)/len_lightcurve))
                                              
         axes[0,0].set_ylabel('visibility modulus')
         axes[0,0].set_ylim(-0.1,1.1)
@@ -2534,3 +2583,92 @@ class GravMNightFit(GravNight, GravPhaseMaps):
         axes[1,1].set_ylabel('visibility phase')
         axes[1,0].set_ylim(-180,180)
         axes[1,1].set_xlabel('spatial frequency (1/arcsec)')
+        
+        
+    def plot_residual(self, fitdata, fitarg, fitres, fithelp, axes=None):
+        len_lightcurve, nsource, fit_for, bispec_ind, fit_mode, wave, dlambda, fixedBHalpha, phasemaps = fithelp
+        if axes is None:
+            #fig, axes = plt.subplots(2, 2, gridspec_kw={})
+            fig, axes0 = plt.subplots()
+            fig, axes1 = plt.subplots()
+            fig, axes2 = plt.subplots()
+            fig, axes3 = plt.subplots()
+            axes = np.ones((2,2), dtype=object)
+
+            axes[0,0] = axes0
+            axes[0,1] = axes1
+            axes[1,0] = axes2
+            axes[1,1] = axes3
+        (visamp, visamp_error, visamp_flag, 
+            vis2, vis2_error, vis2_flag, 
+            closure, closure_error, closure_flag, 
+            visphi, visphi_error, visphi_flag) = fitdata
+        (u, v) = fitarg
+        for num, obj in enumerate(self.gravData_list):
+            magu_as = obj.spFrequAS
+            theta_ = np.copy(fitres[:nsource*2 + 4])
+            theta_ = np.append(theta_, fitres[num + len(theta_)])
+            theta_ = np.append(theta_, fitres[-nsource+1:])
+            model_visamp, model_visphi, model_closure = _calc_vis(theta_, fitarg[:, num], fithelp)
+            model_visamp2 = model_visamp**2
+            
+            for i in range(0,6):
+                ## visamp
+                axes[0,0].errorbar(magu_as[i,:], (visamp-model_visamp)[num][i,:]*(1-visamp_flag[num])[i],
+                            visamp_error[num][i,:]*(1-visamp_flag[num])[i],
+                            color=lighten_color(obj.colors_baseline[i], (num+1)/len_lightcurve), ls='', lw=1, alpha=0.5, capsize=0)
+                if num == 0:
+                    axes[0,0].scatter(magu_as[i,:], (visamp-model_visamp)[num][i,:]*(1-visamp_flag[num])[i],
+                                color=lighten_color(obj.colors_baseline[i], (num+1)/len_lightcurve), alpha=0.5, label=obj.baseline_labels[i])
+                else:
+                    axes[0,0].scatter(magu_as[i,:], (visamp-model_visamp)[num][i,:]*(1-visamp_flag[num])[i],
+                                color=lighten_color(obj.colors_baseline[i], (num+1)/len_lightcurve), alpha=0.5)
+               
+                ## vis2
+                axes[0,1].errorbar(magu_as[i,:], (vis2-model_visamp2)[num][i,:]*(1-vis2_flag[num])[i], 
+                            vis2_error[num][i,:]*(1-vis2_flag[num])[i], 
+                            color=lighten_color(obj.colors_baseline[i], (num+1)/len_lightcurve),ls='', lw=1, alpha=0.5, capsize=0)
+                
+                axes[0,1].scatter(magu_as[i,:], (vis2-model_visamp2)[num][i,:]*(1-vis2_flag[num])[i],
+                            color=lighten_color(obj.colors_baseline[i], (num+1)/len_lightcurve),alpha=0.5)
+                
+     
+                ## visphi
+                
+                axes[1,1].errorbar(magu_as[i,:], (visphi-model_visphi)[num][i,:]*(1-visphi_flag[num])[i], 
+                            visphi_error[num][i,:]*(1-visphi_flag[num])[i],
+                            color=lighten_color(obj.colors_baseline[i], (num+1)/len_lightcurve), ls='', lw=1, alpha=0.5, capsize=0)
+                axes[1,1].scatter(magu_as[i,:], (visphi-model_visphi)[num][i,:]*(1-visphi_flag[num])[i],
+                            color=lighten_color(obj.colors_baseline[i], (num+1)/len_lightcurve), alpha=0.5)
+                
+            for i in range(4):
+                ## t3visphi
+                axes[1,0].errorbar(obj.spFrequAS_T3[i,:], (closure-model_closure)[num][i,:]*(1-closure_flag[num])[i],
+                            closure_error[num][i,:]*(1-closure_flag[num])[i],
+                            color=lighten_color(obj.colors_closure[i], (num+1)/len_lightcurve),ls='', lw=1, alpha=0.5, capsize=0)
+                if num == 0:
+                    axes[1,0].scatter(obj.spFrequAS_T3[i,:], (closure-model_closure)[num][i,:]*(1-closure_flag[num])[i], 
+                                      label=obj.closure_labels[i], color=lighten_color(obj.colors_closure[i], (num+1)/len_lightcurve))
+                else:
+                    axes[1,0].scatter(obj.spFrequAS_T3[i,:], (closure-model_closure)[num][i,:]*(1-closure_flag[num])[i], 
+                                      color=lighten_color(obj.colors_closure[i], (num+1)/len_lightcurve))
+                                             
+        axes[0,0].set_ylabel('visibility modulus')
+        axes[0,0].set_ylim(-0.2,0.2)
+        axes[0,0].set_xlabel('spatial frequency (1/arcsec)')
+        axes[0,0].legend(fontsize=12)
+        
+        axes[0,1].set_xlabel('spatial frequency (1/arcsec)')
+        axes[0,1].set_ylabel('visibility squared')
+        axes[0,1].set_ylim(-0.2,0.2)
+
+        
+        axes[1,0].set_xlabel('spatial frequency of largest baseline in triangle (1/arcsec)')
+        axes[1,0].set_ylabel('closure phase (deg)')
+        axes[1,0].set_ylim(-20,20)
+        axes[1,0].legend(fontsize=12)
+        
+        axes[1,1].set_ylabel('visibility phase')
+        axes[1,1].set_ylim(-20,20)
+        axes[1,1].set_xlabel('spatial frequency (1/arcsec)')
+        
