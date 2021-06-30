@@ -538,6 +538,31 @@ class GravPhaseMaps():
             return cor_amp, cor_pha, cor_int_denom 
 
 
+    def phasemap_source(self, x, y, northA, dra, ddec):
+        amp, pha, inten = self.readPhasemaps(x, y, fromFits=False, 
+                                           northangle=northA, dra=dra, ddec=ddec,
+                                           interp=self.interppm)
+        pm_amp = np.array([[amp[0], amp[1]],
+                            [amp[0], amp[2]],
+                            [amp[0], amp[3]],
+                            [amp[1], amp[2]],
+                            [amp[1], amp[3]],
+                            [amp[2], amp[3]]])
+        pm_pha = np.array([[pha[0], pha[1]],
+                            [pha[0], pha[2]],
+                            [pha[0], pha[3]],
+                            [pha[1], pha[2]],
+                            [pha[1], pha[3]],
+                            [pha[2], pha[3]]])
+        pm_int = np.array([[inten[0], inten[1]],
+                            [inten[0], inten[2]],
+                            [inten[0], inten[3]],
+                            [inten[1], inten[2]],
+                            [inten[1], inten[3]],
+                            [inten[2], inten[3]]])
+        return pm_amp, pm_pha, pm_int
+
+
 class GravMFit(GravData, GravPhaseMaps):
     def vis_intensity_approx(self, s, alpha, lambda0, dlambda):
         """
@@ -1807,7 +1832,7 @@ def _ind_visibility(s, alpha, wave, dlambda, fit_mode):
     return ind_vis
     
 def _calc_vis(theta, fitarg, fithelp):
-    len_lightcurve, nsource, fit_for, bispec_ind, fit_mode, wave, dlambda, fixedBHalpha, phasemaps = fithelp
+    len_lightcurve, nsource, fit_for, bispec_ind, fit_mode, wave, dlambda, fixedBHalpha, phasemaps, northA = fithelp
     mas2rad = 1e-3 / 3600 / 180 * np.pi
     rad2mas = 180 / np.pi * 3600 * 1e3
 
@@ -1818,9 +1843,8 @@ def _calc_vis(theta, fitarg, fithelp):
     
     if phasemaps:
         raise ValueError("Phase maps not implemented yet!")
-        #northA = self.northangle
-        #ddec = self.ddec
-        #dra = self.dra
+        ddec = 0
+        dra = 0
     
     th_rest = nsource*2
     
@@ -1847,14 +1871,14 @@ def _calc_vis(theta, fitarg, fithelp):
     
     if phasemaps:
         raise ValueError("Phase maps not implemented yet!")
-        #pm_sources = []
-        #pm_amp_c, pm_pha_c, pm_int_c = self.phasemap_source(pc_RA, pc_DEC, 
-                                                    #northA, dra, ddec)
-        #for ndx in range(nsource):
-            #pm_amp, pm_pha, pm_int = self.phasemap_source(pc_RA + theta[ndx*3], 
-                                                        #pc_DEC + theta[ndx*3+1], 
-                                                        #northA, dra, ddec)
-            #pm_sources.append([pm_amp, pm_pha, pm_int])
+        pm_sources = []
+        pm_amp_c, pm_pha_c, pm_int_c = phasemaps.phasemap_source(pc_RA, pc_DEC, 
+                                                    northA, dra, ddec)
+        for ndx in range(nsource):
+            pm_amp, pm_pha, pm_int = phasemaps.phasemap_source(pc_RA + theta[ndx*2], 
+                                                        pc_DEC + theta[ndx*2+1], 
+                                                        northA, dra, ddec)
+            pm_sources.append([pm_amp, pm_pha, pm_int])
         
 
     # theta_ = [ra1, dec1, ra2, dec2, ..., alpha BH, f BG, pc RA, pc DEC, fr fileN, fr2, fr3, ...        
@@ -1888,6 +1912,10 @@ def _calc_vis(theta, fitarg, fithelp):
         
         if phasemaps:
             for ndx in range(nsource):
+                if ndx == 0:
+                    f_star = 1
+                else:
+                    f_star = theta[th_rest+4+ndx]
                 int_star = _ind_visibility(s_stars[ndx], alpha_stars, wave, dlambda[i,:], fit_mode)
                 
                 pm_amp, _, pm_int = pm_sources[ndx]
@@ -1896,9 +1924,9 @@ def _calc_vis(theta, fitarg, fithelp):
                 cr_denom1 = (pm_int[i,0] / pm_int_c[i,0])
                 cr_denom2 = (pm_int[i,1] / pm_int_c[i,1])
                 
-                nom += (10.**(theta[ndx*3+2]) * np.sqrt(cr1*cr2) * int_star)
-                denom1 += (10.**(theta[ndx*3+2]) * cr_denom1 * int_star_center)
-                denom2 += (10.**(theta[ndx*3+2]) * cr_denom2 * int_star_center)
+                nom += (10.**(f_star) * np.sqrt(cr1*cr2) * int_star)
+                denom1 += (10.**(f_star) * cr_denom1 * int_star_center)
+                denom2 += (10.**(f_star) * cr_denom2 * int_star_center)
         else:
             for ndx in range(nsource):
                 if ndx == 0:
@@ -1932,7 +1960,7 @@ def _lnprob_night(theta, fitdata, lower, upper, fitarg, fithelp):
     return _lnlike_night(theta, fitdata, fitarg, fithelp)
     
 def _lnlike_night(theta, fitdata, fitarg, fithelp):
-    len_lightcurve, nsource, fit_for, bispec_ind, fit_mode, wave, dlambda, fixedBHalpha, phasemaps = fithelp
+    len_lightcurve, nsource, fit_for, bispec_ind, fit_mode, wave, dlambda, fixedBHalpha, phasemaps, northA = fithelp
     ln_prob_res = 0
     (visamp, visamp_error, visamp_flag,
         vis2, vis2_error, vis2_flag,
@@ -1974,36 +2002,9 @@ def _lnlike_night(theta, fitdata, fitarg, fithelp):
     return ln_prob_res 
     
     
-class GravMNightFit(GravNight, GravPhaseMaps):
+class GravMNightFit(GravNight):
     def __init__(self, night_name, file_list, verbose=False):
-        super().__init__(night_name, file_list, verbose=verbose)
-        
-
-    
-    def phasemap_source(self, x, y, northA, dra, ddec):
-        amp, pha, inten = self.readPhasemaps(x, y, fromFits=False, 
-                                           northangle=northA, dra=dra, ddec=ddec,
-                                           interp=self.interppm)
-        pm_amp = np.array([[amp[0], amp[1]],
-                            [amp[0], amp[2]],
-                            [amp[0], amp[3]],
-                            [amp[1], amp[2]],
-                            [amp[1], amp[3]],
-                            [amp[2], amp[3]]])
-        pm_pha = np.array([[pha[0], pha[1]],
-                            [pha[0], pha[2]],
-                            [pha[0], pha[3]],
-                            [pha[1], pha[2]],
-                            [pha[1], pha[3]],
-                            [pha[2], pha[3]]])
-        pm_int = np.array([[inten[0], inten[1]],
-                            [inten[0], inten[2]],
-                            [inten[0], inten[3]],
-                            [inten[1], inten[2]],
-                            [inten[1], inten[3]],
-                            [inten[2], inten[3]]])
-        return pm_amp, pm_pha, pm_int
-                   
+        super().__init__(night_name, file_list, verbose=verbose)           
                
     def fitStars(self, 
                  ra_list, 
@@ -2097,8 +2098,9 @@ class GravMNightFit(GravNight, GravPhaseMaps):
         self.datayear = pmdatayear
         self.smoothkernel = smoothkernel
         
-        if phasemaps:
-            self.loadPhasemaps(interp=interppm)
+        if self.phasemaps:
+            phasemaps = GravPhaseMaps()
+            phasemaps.loadPhasemaps(interp=interppm)
             
             header = fits.open(self.gravData_list[0].name)[0].header
             northangle1 = header['ESO QC ACQ FIELD1 NORTH_ANGLE']/180*math.pi
@@ -2177,7 +2179,7 @@ class GravMNightFit(GravNight, GravPhaseMaps):
             self.dlambda = obj.dlambda
             self.bispec_ind = obj.bispec_ind
         
-        if phasemaps:
+        if self.phasemaps:
             txtfilename = outputdir + 'pm_sourcefit_fn_' + self.night_name + '.txt'
         else:
             txtfilename = outputdir + 'sourcefit_fn_' + self.night_name + '.txt'
@@ -2261,10 +2263,6 @@ class GravMNightFit(GravNight, GravPhaseMaps):
             lower[num] = np.log10(0.001) # 
             upper[num] = np.log10(100.)
          
-        #print(theta[30:40])
-        #print(lower[30:40])
-        #print(upper[30:40])
-
         theta_names = []
         for ndx in range(nsource):
             theta_names.append('dRA%i' % (ndx + 1))
@@ -2401,7 +2399,7 @@ class GravMNightFit(GravNight, GravPhaseMaps):
         fitarg = np.array([u, v])
         
         fithelp = [len(self.gravData_list), self.nsource, self.fit_for, self.bispec_ind, self.fit_mode,
-                   self.wave, self.dlambda, self.fixedBHalpha, self.phasemaps]
+                   self.wave, self.dlambda, self.fixedBHalpha, phasemaps, self.northangle]
         if not no_fit:
             if nthreads == 1:
                 self.sampler = emcee.EnsembleSampler(nwalkers, ndim, _lnprob_night, 
@@ -2425,6 +2423,7 @@ class GravMNightFit(GravNight, GravPhaseMaps):
         self.fitdata = fitdata
         self.fithelp = fithelp
         self.fitarg = fitarg
+        self.MJD = MJD
         
 
         #return results
@@ -2471,6 +2470,9 @@ class GravMNightFit(GravNight, GravPhaseMaps):
             fittab[name] = pd.Series([mostprop, percentiles[num, 1], percentiles[num, 0], percentiles[num, 2]])
             
             
+            
+        len_lightcurve = len(self.gravData_list)
+        self.lightcurve = clmostprop[-(len_lightcurve+self.nsource-1):-(self.nsource-1)]
         self.fitres = clmostprop
         self.fittab = fittab
         
@@ -2584,7 +2586,6 @@ class GravMNightFit(GravNight, GravPhaseMaps):
         axes[1,0].set_ylim(-180,180)
         axes[1,1].set_xlabel('spatial frequency (1/arcsec)')
         
-        
     def plot_residual(self, fitdata, fitarg, fitres, fithelp, axes=None):
         len_lightcurve, nsource, fit_for, bispec_ind, fit_mode, wave, dlambda, fixedBHalpha, phasemaps = fithelp
         if axes is None:
@@ -2671,4 +2672,26 @@ class GravMNightFit(GravNight, GravPhaseMaps):
         axes[1,1].set_ylabel('visibility phase')
         axes[1,1].set_ylim(-20,20)
         axes[1,1].set_xlabel('spatial frequency (1/arcsec)')
-        
+            
+    def plotFit(self):
+        fig, axes0 = plt.subplots()
+        fig, axes1 = plt.subplots()
+        fig, axes2 = plt.subplots()
+        fig, axes3 = plt.subplots()
+        axes = np.ones((2,2), dtype=object)
+
+        axes[0,0] = axes0
+        axes[0,1] = axes1
+        axes[1,0] = axes2
+        axes[1,1] = axes3
+        try:
+            self.mostprop
+            self.fitarg
+            self.fithelp
+            self.fitdata
+            self.fitarg
+        except NameError:
+            print("mostprop, fitarg, fithelp and fitarg are not attributes. need to run the fit first!")
+        fullnight.plot_fit(self.mostprop, self.fitarg, self.fithelp, axes=axes)
+        fullnight.plot_data(self.fitdata, self.fitarg, axes=axes)
+                
