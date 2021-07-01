@@ -429,22 +429,22 @@ class GravPhaseMaps():
         if pm1.shape[0] != len(wave):
             raise ValueError('Phasemap and data have different numbers of channels')
 
-        self.amp_map = np.abs(pm1)
-        self.pha_map = np.angle(pm1, deg=True)
-        self.amp_map_denom = pm2
+        amp_map = np.abs(pm1)
+        pha_map = np.angle(pm1, deg=True)
+        amp_map_denom = pm2
 
         for wdx in range(len(wave)):
             for tel in range(4):
-                self.amp_map[wdx,tel] /= np.max(self.amp_map[wdx,tel])
-                self.amp_map_denom[wdx,tel] /= np.max(self.amp_map_denom[wdx,tel])
+                amp_map[wdx,tel] /= np.max(amp_map[wdx,tel])
+                amp_map_denom[wdx,tel] /= np.max(amp_map_denom[wdx,tel])
                 
         if tofits:
             primary_hdu = fits.PrimaryHDU()
             hlist = [primary_hdu]
             for tel in range(4):
-                hlist.append(fits.ImageHDU(self.amp_map[:,tel], 
+                hlist.append(fits.ImageHDU(amp_map[:,tel], 
                                            name='SC_AMP UT%i' % (4-tel)))
-                hlist.append(fits.ImageHDU(self.pha_map[:,tel], 
+                hlist.append(fits.ImageHDU(pha_map[:,tel], 
                                            name='SC_PHA UT%i' % (4-tel)))
             hdul = fits.HDUList(hlist)
             hdul.writeto(resource_filename('gravipy', 'testfits.fits'),
@@ -459,9 +459,9 @@ class GravPhaseMaps():
             iwave = np.arange(len(wave))
             points = (iwave, itel, x, y)
             
-            self.amp_map_int = interpolate.RegularGridInterpolator(points, self.amp_map) 
-            self.pha_map_int = interpolate.RegularGridInterpolator(points, self.pha_map) 
-            self.amp_map_denom_int = interpolate.RegularGridInterpolator(points, self.amp_map_denom) 
+            self.amp_map_int = interpolate.RegularGridInterpolator(points, amp_map) 
+            self.pha_map_int = interpolate.RegularGridInterpolator(points, pha_map) 
+            self.amp_map_denom_int = interpolate.RegularGridInterpolator(points, amp_map_denom) 
             
             #self.amp_map_int = np.zeros((len(wave),4), dtype=object)
             #self.pha_map_int = np.zeros((len(wave),4), dtype=object)
@@ -471,7 +471,10 @@ class GravPhaseMaps():
                     #self.amp_map_int[wdx, tel] = interpolate.interp2d(x, y, self.amp_map[wdx, tel])
                     #self.pha_map_int[wdx, tel] = interpolate.interp2d(x, y, self.pha_map[wdx, tel])
                     #self.amp_map_denom_int[wdx, tel] = interpolate.interp2d(x, y, self.amp_map_denom[wdx, tel])
-                
+        else:
+            self.amp_map = amp_map
+            self.pha_map = pha_map
+            self.amp_map_denom = amp_map_denom
 
     def readPhasemaps(self, ra, dec, fromFits=True, 
                       northangle=None, dra=None, ddec=None,
