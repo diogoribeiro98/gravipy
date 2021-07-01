@@ -2443,21 +2443,6 @@ class GravMNightFit(GravNight):
         clmostprop = np.delete(self.mostprop, self.todel)
         cldim = len(clmostprop)
         
-        if plot:
-            fig, axes = plt.subplots(cldim, figsize=(8, cldim/1.5),
-                                    sharex=True)
-            for i in range(cldim):
-                ax = axes[i]
-                ax.plot(clsamples[:, :, i].T, "k", alpha=0.3)
-                ax.axhline(clmostprop[i], color='C0', alpha=0.5)
-                ax.set_ylabel(cllabels[i], rotation=0)
-                ax.yaxis.set_label_coords(-0.1, 0.5)
-            axes[-1].set_xlabel("step number")
-            plt.show()
-
-            plt.show()
-
-        
         if self.nruns > 300:
             fl_samples = samples[:, -200:, :].reshape((-1, self.ndim))
             fl_clsamples = clsamples[:, -200:, :].reshape((-1, cldim))                
@@ -2467,12 +2452,7 @@ class GravMNightFit(GravNight):
         else:
             fl_samples = samples.reshape((-1, self.ndim))
             fl_clsamples = clsamples.reshape((-1, cldim))
-            
-        if plot:
-            ranges = np.percentile(fl_clsamples, [3, 97], axis=0).T
-            fig = corner.corner(fl_clsamples, quantiles=[0.16, 0.5, 0.84],
-                                truths=clmostprop, labels=cllabels)
-            plt.show()
+        self.fl_clsamples = fl_clsamples
         
         percentiles = np.percentile(fl_clsamples, [16, 50, 84],axis=0).T
         percentiles[:,0] = percentiles[:,1] - percentiles[:,0] 
@@ -2491,8 +2471,34 @@ class GravMNightFit(GravNight):
         self.fitres = clmostprop
         self.fittab = fittab
         
+        if plot:
+            self.plot_MCMC()
+        
         if ret:
             return self.mostprop
+        
+    def plot_MCMC(self):
+        clsamples = np.delete(self.sampler.chain, self.todel, 2)
+        cllabels = np.delete(self.theta_names, self.todel)
+        clmostprop = np.delete(self.mostprop, self.todel)
+        cldim = len(clmostprop)
+        
+        fig, axes = plt.subplots(cldim, figsize=(8, cldim/1.5),
+                                sharex=True)
+        for i in range(cldim):
+            ax = axes[i]
+            ax.plot(clsamples[:, :, i].T, "k", alpha=0.3)
+            ax.axhline(clmostprop[i], color='C0', alpha=0.5)
+            ax.set_ylabel(cllabels[i], rotation=0)
+            ax.yaxis.set_label_coords(-0.1, 0.5)
+        axes[-1].set_xlabel("step number")
+        plt.show()
+        
+        ranges = np.percentile(self.fl_clsamples, [3, 97], axis=0).T
+        fig = corner.corner(self.fl_clsamples, quantiles=[0.16, 0.5, 0.84],
+                            truths=clmostprop, labels=cllabels)
+        plt.show()
+
         
     def plot_fit(self, fitres, fitarg, fithelp, axes=None):
         len_lightcurve, nsource, fit_for, bispec_ind, fit_mode, wave, dlambda, fixedBHalpha, phasemaps, northA = fithelp
