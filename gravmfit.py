@@ -1835,15 +1835,14 @@ def _ind_visibility(s, alpha, wave, dlambda, fit_mode):
     return ind_vis
     
 def _calc_vis(theta, fitarg, fithelp):
-    len_lightcurve, nsource, fit_for, bispec_ind, fit_mode, wave, dlambda, fixedBHalpha, phasemaps, northA = fithelp
+    (len_lightcurve, nsource, fit_for, bispec_ind, fit_mode, 
+     wave, dlambda, fixedBHalpha, phasemaps, northA) = fithelp
     mas2rad = 1e-3 / 3600 / 180 * np.pi
     rad2mas = 180 / np.pi * 3600 * 1e3
 
     u = fitarg[0]
     v = fitarg[1]
 
-    # theta_ = [ra1, dec1, ra2, dec2, ..., alpha BH, f BG, pc RA, pc DEC, fr fileN, fr2, fr3, ...        
-    
     if phasemaps:
         raise ValueError("Phase maps not implemented yet!")
         ddec = 0
@@ -1933,7 +1932,7 @@ def _calc_vis(theta, fitarg, fithelp):
         else:
             for ndx in range(nsource):
                 if ndx == 0:
-                    f_star = 1
+                    f_star = 0
                 else:
                     f_star = theta[th_rest+4+ndx]
                 int_star = _ind_visibility(s_stars[ndx], alpha_stars, wave, dlambda[i,:], fit_mode)
@@ -1963,26 +1962,23 @@ def _lnprob_night(theta, fitdata, lower, upper, fitarg, fithelp):
     return _lnlike_night(theta, fitdata, fitarg, fithelp)
     
 def _lnlike_night(theta, fitdata, fitarg, fithelp):
-    len_lightcurve, nsource, fit_for, bispec_ind, fit_mode, wave, dlambda, fixedBHalpha, phasemaps, northA = fithelp
-    ln_prob_res = 0
+    (len_lightcurve, nsource, fit_for, bispec_ind, fit_mode, 
+     wave, dlambda, fixedBHalpha, phasemaps, northA) = fithelp
     (visamp, visamp_error, visamp_flag,
         vis2, vis2_error, vis2_flag,
         closure, closure_error, closure_flag,
         visphi, visphi_error, visphi_flag) = fitdata
+    
+    ln_prob_res = 0
     for num in range(len_lightcurve):
         # Model
-        # theta = [ra1, dec1, ra2, dec2, ..., alpha BH, f BG, pc RA, pc DEC, fr file1, fr file2, ...., fr fileN, fr2, fr3, ...
         theta_ = theta[:nsource*2 + 4]
-        # theta_ = [ra1, dec1, ra2, dec2, ..., alpha BH, f BG, pc RA, pc DEC
-        theta_ = np.append(theta_,  theta[num +len(theta_)])
+        theta_ = np.append(theta_,  theta[num + nsource*2 + 4])
         theta_ = np.append(theta_,  theta[-nsource+1:])
-            # theta_ = [ra1, dec1, ra2, dec2, ..., alpha BH, f BG, pc RA, pc DEC, fr fileN, fr2, fr3, ...
         model_visamp, model_visphi, model_closure = _calc_vis(theta_, fitarg[:, num], fithelp)
         model_vis2 = model_visamp**2.
         
         #Data
-
-        
         res_visamp = np.sum(-(model_visamp-visamp[num])**2/visamp_error[num]**2*(1-visamp_flag[num]))
         res_vis2 = np.sum(-(model_vis2-vis2[num])**2./vis2_error[num]**2.*(1-vis2_flag[num]))
         
@@ -2030,11 +2026,8 @@ class GravMNightFit(GravNight):
                  flagtill=3, 
                  flagfrom=13,
                  fixedBHalpha=False, 
-                 plotCorner=True, 
                  plotScience=True, 
                  createpdf=False, 
-                 writeresults=False, 
-                 outputdir='./',
                  redchi2=False,
                  phasemaps=False,
                  interppm=True,
@@ -2158,18 +2151,9 @@ class GravMNightFit(GravNight):
         else:
             raise ValueError('Telescope not AT or UT, something wrong with input data')
 
-        # ATTENTION fiberOffX/Y is from old idel fitting days, can we get rid of this?
-        try:
-            fiberOffX = -fits.open(self.gravData_list[0].name)[0].header["HIERARCH ESO INS SOBJ OFFX"] 
-            fiberOffY = -fits.open(self.gravData_list[0].name)[0].header["HIERARCH ESO INS SOBJ OFFY"]
-        except KeyError:
-            fiberOffX = 0
-            fiberOffY = 0
-
         nwave = self.gravData_list[0].channel
         for num, obj in enumerate(self.gravData_list):
             if obj.channel != nwave: raise ValueError("File number ", num, " has different amount of channels: ", obj.channel, " different from ", nwave)
-        
         
         MJD = []
         u, v = [], []
@@ -2185,22 +2169,7 @@ class GravMNightFit(GravNight):
             self.dlambda = obj.dlambda
             self.bispec_ind = obj.bispec_ind
         
-        #if self.phasemaps:
-            #txtfilename = outputdir + 'pm_sourcefit_fn_' + self.night_name + '.txt'
-        #else:
-            #txtfilename = outputdir + 'sourcefit_fn_' + self.night_name + '.txt'
-        #if writeresults and not no_fit:
-            #txtfile = open(txtfilename, 'w')
-            #txtfile.write('# Results of full night source fit for %s \n' % self.night_name)
-            #txtfile.write('# Lines are: Best chi2, MCMC result, MCMC error -, MCMC error + \n')
-            #txtfile.write('# Rows are: dRA, dDEC, f1, f2, f3, f4, alpha flare, f BG, alpha BG, PC RA, PC DEC, OPD1, OPD2, OPD3, OPD4 \n')
-            #txtfile.write('# Parameter which are not fitted have 0.0 as error \n')
-            #txtfile.write('# MJD: %f \n' % str(MJD[0]) + " - " + str(MJD)[-1])
-            #txtfile.write('# OFFX: %f \n' % fiberOffX)
-            #txtfile.write('# OFFY: %f \n\n' % fiberOffY)
-
         results = []
-        # Initial guesses
         if initial is not None:
             if len(initial) != 4:
                 raise ValueError('Length of initial parameter list is not correct')
@@ -2210,7 +2179,6 @@ class GravMNightFit(GravNight):
             flux_ratio_bg_in = 0.1
             pc_RA_in = 0
             pc_DEC_in = 0
-            
             
         ## nsource*2 positions + 4 fit parameters + len(files) flux ratios +  nsource - 1 source flux ratios
         theta = np.zeros(nsource*2 + 4 + nfiles + nsource - 1) 
@@ -2383,7 +2351,7 @@ class GravMNightFit(GravNight):
                 pos[:, par] = theta[par]
             else:
                 if par > th_rest+4:
-                    width =1e-2
+                    width = 1e-2
                 pos[:, par] = theta[par] + width*np.random.randn(nwalkers)
         
         self.todel = todel
@@ -2418,23 +2386,15 @@ class GravMNightFit(GravNight):
                     else:
                         self.sampler.run_mcmc(pos, nruns, progress=True)
             
-            
-                            
         self.fitdata = fitdata
         self.fithelp = fithelp
         self.fitarg = fitarg
         self.MJD = MJD
         
-
-        #return results
-        
     def get_pdf_report(self):
         raise ValueError("PDF reports not implemented yet!")
     
-    def get_txt_report(self):
-        raise ValueError("Txt report not implemented yet!")
-    
-    def get_fit_result(self, plot=True, ret=False):
+    def get_fit_result(self, plot=True, plotcorner=False, ret=False):
         samples = self.sampler.chain
         self.mostprop = self.sampler.flatchain[np.argmax(self.sampler.flatlnprobability)]
 
@@ -2453,31 +2413,29 @@ class GravMNightFit(GravNight):
             fl_samples = samples.reshape((-1, self.ndim))
             fl_clsamples = clsamples.reshape((-1, cldim))
         self.fl_clsamples = fl_clsamples
+        self.medianprop = np.percentile(fl_samples, [50],axis=0)[0]
         
         percentiles = np.percentile(fl_clsamples, [16, 50, 84],axis=0).T
         percentiles[:,0] = percentiles[:,1] - percentiles[:,0] 
         percentiles[:,2] = percentiles[:,2] - percentiles[:,1] 
 
-            
         fittab = pd.DataFrame()
         fittab["column"] = ["M.L.", "M.P.", "$-\sigma$", "$+\sigma$"]
         for num, name, mostprop in zip(range(len(cllabels)), cllabels, clmostprop):
             fittab[name] = pd.Series([mostprop, percentiles[num, 1], percentiles[num, 0], percentiles[num, 2]])
             
-            
-            
         len_lightcurve = len(self.gravData_list)
-        self.lightcurve = clmostprop[-(len_lightcurve+self.nsource-1):-(self.nsource-1)]
+        self.lightcurve = 10**(clmostprop[-(len_lightcurve+self.nsource-1):-(self.nsource-1)])
         self.fitres = clmostprop
         self.fittab = fittab
         
         if plot:
-            self.plot_MCMC()
+            self.plot_MCMC(plotcorner)
         
         if ret:
-            return self.mostprop
+            return self.medianprop
         
-    def plot_MCMC(self):
+    def plot_MCMC(self, plotcorner=False):
         clsamples = np.delete(self.sampler.chain, self.todel, 2)
         cllabels = np.delete(self.theta_names, self.todel)
         clmostprop = np.delete(self.mostprop, self.todel)
@@ -2494,10 +2452,11 @@ class GravMNightFit(GravNight):
         axes[-1].set_xlabel("step number")
         plt.show()
         
-        ranges = np.percentile(self.fl_clsamples, [3, 97], axis=0).T
-        fig = corner.corner(self.fl_clsamples, quantiles=[0.16, 0.5, 0.84],
-                            truths=clmostprop, labels=cllabels)
-        plt.show()
+        if plotcorner:
+            ranges = np.percentile(self.fl_clsamples, [3, 97], axis=0).T
+            fig = corner.corner(self.fl_clsamples, quantiles=[0.16, 0.5, 0.84],
+                                truths=clmostprop, labels=cllabels)
+            plt.show()
 
         
     def plot_fit(self, fitres, fitarg, fithelp, axes=None):
@@ -2528,6 +2487,7 @@ class GravMNightFit(GravNight):
                 axes[1,1].plot(magu_as[i, :], visphi[i, :], color='k', zorder=100)
             for i in range(4):
                 axes[1,0].plot(obj.spFrequAS_T3[i,:], closure[i, :], color='k', zorder=100)
+    
     
     def plot_data(self, fitdata, fitarg, axes=None):
         len_lightcurve = len(self.gravData_list)
@@ -2610,7 +2570,7 @@ class GravMNightFit(GravNight):
         axes[1,0].set_ylim(-180,180)
         axes[1,1].set_xlabel('spatial frequency (1/arcsec)')
         
-    def plot_residual(self, fitdata, fitarg, fitres, fithelp, axes=None):
+    def plot_residual(self, fitdata, fitarg, fitres, fithelp, axes=None, show=False):
         len_lightcurve, nsource, fit_for, bispec_ind, fit_mode, wave, dlambda, fixedBHalpha, phasemaps, northA = fithelp
         if axes is None:
             #fig, axes = plt.subplots(2, 2, gridspec_kw={})
@@ -2631,9 +2591,11 @@ class GravMNightFit(GravNight):
         (u, v) = fitarg
         for num, obj in enumerate(self.gravData_list):
             magu_as = obj.spFrequAS
+            
             theta_ = np.copy(fitres[:nsource*2 + 4])
-            theta_ = np.append(theta_, fitres[num + len(theta_)])
-            theta_ = np.append(theta_, fitres[-nsource+1:])
+            theta_ = np.append(theta_,  fitres[num + nsource*2 + 4])
+            theta_ = np.append(theta_,  fitres[-nsource+1:])
+            
             model_visamp, model_visphi, model_closure = _calc_vis(theta_, fitarg[:, num], fithelp)
             model_visamp2 = model_visamp**2
             
@@ -2679,23 +2641,25 @@ class GravMNightFit(GravNight):
                                       color=lighten_color(obj.colors_closure[i], (num+1)/len_lightcurve))
                                              
         axes[0,0].set_ylabel('visibility modulus')
-        axes[0,0].set_ylim(-0.2,0.2)
+        axes[0,0].set_ylim(-0.4,0.4)
         axes[0,0].set_xlabel('spatial frequency (1/arcsec)')
         axes[0,0].legend(fontsize=12)
         
         axes[0,1].set_xlabel('spatial frequency (1/arcsec)')
         axes[0,1].set_ylabel('visibility squared')
-        axes[0,1].set_ylim(-0.2,0.2)
+        axes[0,1].set_ylim(-0.4,0.4)
 
         
         axes[1,0].set_xlabel('spatial frequency of largest baseline in triangle (1/arcsec)')
         axes[1,0].set_ylabel('closure phase (deg)')
-        axes[1,0].set_ylim(-20,20)
+        axes[1,0].set_ylim(-40,40)
         axes[1,0].legend(fontsize=12)
         
         axes[1,1].set_ylabel('visibility phase')
-        axes[1,1].set_ylim(-20,20)
+        axes[1,1].set_ylim(-40,40)
         axes[1,1].set_xlabel('spatial frequency (1/arcsec)')
+        if show:
+            plt.show()
             
     def plotFit(self):
         fig, axes0 = plt.subplots()
