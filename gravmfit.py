@@ -2604,7 +2604,7 @@ class GravMNightFit(GravNight):
                 axes[0,0].errorbar(magu_as[i,:], (visamp-model_visamp)[num][i,:]*(1-visamp_flag[num])[i],
                             visamp_error[num][i,:]*(1-visamp_flag[num])[i],
                             color=lighten_color(obj.colors_baseline[i], (num+1)/len_lightcurve), ls='', lw=1, alpha=0.5, capsize=0)
-                if num == 0:
+                if num == len_lightcurve-1:
                     axes[0,0].scatter(magu_as[i,:], (visamp-model_visamp)[num][i,:]*(1-visamp_flag[num])[i],
                                 color=lighten_color(obj.colors_baseline[i], (num+1)/len_lightcurve), alpha=0.5, label=obj.baseline_labels[i])
                 else:
@@ -2633,7 +2633,7 @@ class GravMNightFit(GravNight):
                 axes[1,0].errorbar(obj.spFrequAS_T3[i,:], (closure-model_closure)[num][i,:]*(1-closure_flag[num])[i],
                             closure_error[num][i,:]*(1-closure_flag[num])[i],
                             color=lighten_color(obj.colors_closure[i], (num+1)/len_lightcurve),ls='', lw=1, alpha=0.5, capsize=0)
-                if num == 0:
+                if num == len_lightcurve-1:
                     axes[1,0].scatter(obj.spFrequAS_T3[i,:], (closure-model_closure)[num][i,:]*(1-closure_flag[num])[i], 
                                       label=obj.closure_labels[i], color=lighten_color(obj.colors_closure[i], (num+1)/len_lightcurve))
                 else:
