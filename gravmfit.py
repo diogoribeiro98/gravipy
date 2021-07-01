@@ -2506,6 +2506,98 @@ class GravMNightFit(GravNight):
                                 truths=clmostprop, labels=cllabels)
             plt.show()
 
+    def plot_fit_better(self, fitdata, fitres, fitarg, fithelp):
+        (len_lightcurve, nsource, fit_for, bispec_ind, fit_mode, 
+         wave, dlambda, fixedBHalpha, phasemaps, northA) = fithelp
+        
+        (visamp_d, visamp_error_d, visamp_flag_d, 
+         vis2_d, vis2_error_d, vis2_flag_d, 
+         closure_d, closure_error_d, closure_flag_d, 
+         visphi_d, visphi_error_d, visphi_flag_d) = fitdata
+
+        plt.figure(figsize=(7,len_lightcurve*0.7))
+        gs = gridspec.GridSpec(len_lightcurve//2, 3, hspace=0.05)
+        for idx in range(len_lightcurve//2):
+            num = idx*2
+            obj = self.gravData_list[idx]
+            
+            theta_ = np.copy(fitres[:nsource*2 + 4])
+            theta_ = np.append(theta_, fitres[num + len(theta_)])
+            theta_ = np.append(theta_, fitres[-nsource+1:])
+            visamp, visphi, closure = _calc_vis(theta_, fitarg[:, num], fithelp)
+
+            theta_ = np.copy(fitres[:nsource*2 + 4])
+            theta_ = np.append(theta_, fitres[num+1 + len(theta_)])
+            theta_ = np.append(theta_, fitres[-nsource+1:])
+            visamp2, visphi2, closure2 = _calc_vis(theta_, fitarg[:, num+1], fithelp)
+            
+            
+            vis2 = visamp**2
+            vis22 = visamp2**2
+            magu_as = obj.spFrequAS
+
+            ax = plt.subplot(gs[idx,0])
+            for i in range(6):
+                plt.errorbar(magu_as[i,:], visamp_d[num][i,:]*(1-visamp_flag_d[num])[i],
+                            visamp_error_d[num][i,:]*(1-visamp_flag_d[num])[i],
+                            color=obj.colors_baseline[i], ls='', marker='o', markersize=2,
+                            lw=1, alpha=1, capsize=0)
+
+                plt.errorbar(magu_as[i,:], visamp_d[num+1][i,:]*(1-visamp_flag_d[num+1])[i],
+                            visamp_error_d[num+1][i,:]*(1-visamp_flag_d[num+1])[i],
+                            color=obj.colors_baseline[i], ls='', marker='o', markersize=2,
+                            lw=1, alpha=1, capsize=0)
+                
+                plt.plot(magu_as[i, :], visamp[i, :], color='k', zorder=100)
+                plt.plot(magu_as[i, :], visamp2[i, :], ls='--', color='k', zorder=100)
+            plt.ylim(0,1.1)
+            ax.set_xticklabels([])
+            if idx == 0:
+                plt.title('Visamp')
+            plt.ylabel('File %i' % (idx+1))
+                
+            ax = plt.subplot(gs[idx,1])
+            for i in range(6):
+                plt.errorbar(magu_as[i,:], vis2_d[num][i,:]*(1-vis2_flag_d[num])[i],
+                            vis2_error_d[num][i,:]*(1-vis2_flag_d[num])[i],
+                            color=obj.colors_baseline[i], ls='', marker='o', markersize=2,
+                            lw=1, alpha=1, capsize=0)
+
+                plt.errorbar(magu_as[i,:], vis2_d[num+1][i,:]*(1-vis2_flag_d[num+1])[i],
+                            vis2_error_d[num+1][i,:]*(1-vis2_flag_d[num+1])[i],
+                            color=obj.colors_baseline[i], ls='', marker='o', markersize=2,
+                            lw=1, alpha=1, capsize=0)
+
+                plt.plot(magu_as[i, :], vis2[i, :], color='k', zorder=100)
+                plt.plot(magu_as[i, :], vis22[i, :], ls='--', color='k', zorder=100)
+            plt.ylim(0,1.1)
+            ax.set_xticklabels([])
+            if idx == 0:
+                plt.title('Vis2')
+
+            ax = plt.subplot(gs[idx,2])
+            for i in range(4):
+                plt.errorbar(obj.spFrequAS_T3[i,:], closure_d[num][i,:]*(1-closure_flag_d[num])[i],
+                            closure_error_d[num][i,:]*(1-closure_flag_d[num])[i],
+                            color=obj.colors_closure[i], ls='', marker='o', markersize=2,
+                            lw=1, alpha=1, capsize=0)
+
+                plt.errorbar(obj.spFrequAS_T3[i,:], closure_d[num+1][i,:]*(1-closure_flag_d[num+1])[i],
+                            closure_error_d[num+1][i,:]*(1-closure_flag_d[num+1])[i],
+                            color=obj.colors_closure[i], ls='', marker='o', markersize=2,
+                            lw=1, alpha=1, capsize=0)
+
+                plt.plot(obj.spFrequAS_T3[i,:], closure[i, :], color='k', zorder=100)
+                plt.plot(obj.spFrequAS_T3[i,:], closure2[i, :], ls='--', color='k', zorder=100)
+            plt.ylim(-180,180)
+            ax.set_xticklabels([])
+            if idx == 0:
+                plt.title('Closure Phase')
+        plt.show()
+
+
+
+        
         
     def plot_fit(self, fitres, fitarg, fithelp, axes=None):
         (len_lightcurve, nsource, fit_for, bispec_ind, fit_mode, 
@@ -2523,7 +2615,8 @@ class GravMNightFit(GravNight):
             axes[1,0] = axes2
             axes[1,1] = axes3
             
-        for num, obj in enumerate(self.gravData_list):
+        for num in range(len_lightcurve):
+            obj = self.gravData_list[num//2]
             theta_ = np.copy(fitres[:nsource*2 + 4])
             theta_ = np.append(theta_, fitres[num + len(theta_)])
             theta_ = np.append(theta_, fitres[-nsource+1:])
@@ -2557,7 +2650,8 @@ class GravMNightFit(GravNight):
             closure, closure_error, closure_flag, 
             visphi, visphi_error, visphi_flag) = fitdata
         (u, v) = fitarg
-        for num, obj in enumerate(self.gravData_list):
+        for num in range(len_lightcurve):
+            obj = self.gravData_list[num//2]
             magu_as = obj.spFrequAS            
             for i in range(0,6):
                 ## visamp
@@ -2639,7 +2733,8 @@ class GravMNightFit(GravNight):
             closure, closure_error, closure_flag, 
             visphi, visphi_error, visphi_flag) = fitdata
         (u, v) = fitarg
-        for num, obj in enumerate(self.gravData_list):
+        for num in range(len_lightcurve):
+            obj = self.gravData_list[num//2]
             magu_as = obj.spFrequAS
             
             theta_ = np.copy(fitres[:nsource*2 + 4])
