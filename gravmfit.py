@@ -2112,6 +2112,7 @@ class GravMNightFit(GravNight):
         northangle4 = header['ESO QC ACQ FIELD4 NORTH_ANGLE']/180*math.pi
         self.northangle = [northangle1, northangle2, northangle3, northangle4]
         
+        # ATTENTION probably best to read in and raise warning if big
         ### for simplicty assume 0 alignment!
         ddec1 = 0 # header['ESO QC MET SOBJ DDEC1']
         ddec2 = 0 # header['ESO QC MET SOBJ DDEC2']
@@ -2126,24 +2127,27 @@ class GravMNightFit(GravNight):
         self.dra = [dra1, dra2, dra3, dra4]
 
         nsource = len(ra_list)
+        nfiles = len(self.gravData_list)
         if fit_size is None:
             fit_size = np.ones(nsource)*5
         if fit_pos is None:
             fit_pos = np.ones(nsource)
         if fit_fr is None:
-            fit_fr = np.ones(len(self.gravData_list))
+            fit_fr = np.ones(nsource-1)
         
         if len(de_list) != nsource  or len(fit_size) != nsource:
             raise ValueError('list of input parameters have different lengths')
         if len(fit_pos) != nsource:
             raise ValueError('list of input parameters have different lengths')
         if fr_list is None:
-            fr_list = np.ones(len(self.gravData_list))*0
+            fr_list = np.ones(nsource-1)*0
         else:
-            if len(fr_list) != len(self.gravData_list):
-                raise ValueError('list of fr_list has to be the same number of files, i.e. the initial guess for the light curve')
+            if len(fr_list) != (nsource-1):
+                raise ValueError('list of fr_list has to be the same number of sources -1')
+        lightcurve_list = np.ones(nfiles)*0
         
         self.nsource = nsource
+        self.nfiles = nfiles
         
         # Get data from file
         tel = fits.open(self.gravData_list[0].name)[0].header["TELESCOP"]
@@ -2154,6 +2158,7 @@ class GravMNightFit(GravNight):
         else:
             raise ValueError('Telescope not AT or UT, something wrong with input data')
 
+        # ATTENTION fiberOffX/Y is from old idel fitting days, can we get rid of this?
         try:
             fiberOffX = -fits.open(self.gravData_list[0].name)[0].header["HIERARCH ESO INS SOBJ OFFX"] 
             fiberOffY = -fits.open(self.gravData_list[0].name)[0].header["HIERARCH ESO INS SOBJ OFFY"]
@@ -2168,8 +2173,6 @@ class GravMNightFit(GravNight):
         
         MJD = []
         u, v = [], []
-
-            
         for obj in self.gravData_list:
             obj.getIntdata(plot=False, flag=False)
             obj.getDlambda()
@@ -2182,22 +2185,21 @@ class GravMNightFit(GravNight):
             self.dlambda = obj.dlambda
             self.bispec_ind = obj.bispec_ind
         
-        if self.phasemaps:
-            txtfilename = outputdir + 'pm_sourcefit_fn_' + self.night_name + '.txt'
-        else:
-            txtfilename = outputdir + 'sourcefit_fn_' + self.night_name + '.txt'
-        if writeresults and not no_fit:
-            txtfile = open(txtfilename, 'w')
-            txtfile.write('# Results of full night source fit for %s \n' % self.night_name)
-            txtfile.write('# Lines are: Best chi2, MCMC result, MCMC error -, MCMC error + \n')
-            txtfile.write('# Rows are: dRA, dDEC, f1, f2, f3, f4, alpha flare, f BG, alpha BG, PC RA, PC DEC, OPD1, OPD2, OPD3, OPD4 \n')
-            txtfile.write('# Parameter which are not fitted have 0.0 as error \n')
-            txtfile.write('# MJD: %f \n' % str(MJD[0]) + " - " + str(MJD)[-1])
-            txtfile.write('# OFFX: %f \n' % fiberOffX)
-            txtfile.write('# OFFY: %f \n\n' % fiberOffY)
+        #if self.phasemaps:
+            #txtfilename = outputdir + 'pm_sourcefit_fn_' + self.night_name + '.txt'
+        #else:
+            #txtfilename = outputdir + 'sourcefit_fn_' + self.night_name + '.txt'
+        #if writeresults and not no_fit:
+            #txtfile = open(txtfilename, 'w')
+            #txtfile.write('# Results of full night source fit for %s \n' % self.night_name)
+            #txtfile.write('# Lines are: Best chi2, MCMC result, MCMC error -, MCMC error + \n')
+            #txtfile.write('# Rows are: dRA, dDEC, f1, f2, f3, f4, alpha flare, f BG, alpha BG, PC RA, PC DEC, OPD1, OPD2, OPD3, OPD4 \n')
+            #txtfile.write('# Parameter which are not fitted have 0.0 as error \n')
+            #txtfile.write('# MJD: %f \n' % str(MJD[0]) + " - " + str(MJD)[-1])
+            #txtfile.write('# OFFX: %f \n' % fiberOffX)
+            #txtfile.write('# OFFY: %f \n\n' % fiberOffY)
 
         results = []
-
         # Initial guesses
         if initial is not None:
             if len(initial) != 4:
@@ -2210,9 +2212,10 @@ class GravMNightFit(GravNight):
             pc_DEC_in = 0
             
             
-        theta = np.zeros(nsource*2+4 + len(self.gravData_list) + nsource -1) ## nsource*2 positions + 4 fit parameters + len(files) flux ratios +  nsource - 1 source flux ratios
-        lower = np.zeros(nsource*2+4 + len(self.gravData_list) + nsource -1)
-        upper = np.zeros(nsource*2+4 + len(self.gravData_list) + nsource -1)
+        ## nsource*2 positions + 4 fit parameters + len(files) flux ratios +  nsource - 1 source flux ratios
+        theta = np.zeros(nsource*2 + 4 + nfiles + nsource - 1) 
+        lower = np.zeros(nsource*2 + 4 + nfiles + nsource - 1)
+        upper = np.zeros(nsource*2 + 4 + nfiles + nsource - 1)
         todel = []
         
         for ndx in range(nsource):
@@ -2230,11 +2233,9 @@ class GravMNightFit(GravNight):
                 todel.append(ndx*2+1)
         for ndx in range(len(fit_fr)):
             if not fit_fr[ndx]:
-                print("Sorry, currently we have to fit all flux ratios!")
-                #todel.append(ndx*3+2)
+                todel.append(nsource*2 + 4 + nfiles + ndx)
 
         th_rest = nsource*2
-        
         theta[th_rest] = alpha_SgrA_in
         theta[th_rest+1] = flux_ratio_bg_in
         theta[th_rest+2] = pc_RA_in
@@ -2250,22 +2251,13 @@ class GravMNightFit(GravNight):
         upper[th_rest+1] = 20
         upper[th_rest+2] = pc_RA_in + pc_size
         upper[th_rest+3] = pc_DEC_in + pc_size
-        for num in range(th_rest + 3, th_rest + 3 + len(self.gravData_list)):
-            theta[num] = fr_list[num - th_rest - 3]
-            if num == 0:
-                print("==== WARNING ====")
-                print("assuming lower of log10(0.001) and upper of log10(10), this likely has to be adapted")
-            lower[num] = np.log10(0.001) # 
-            upper[num] = np.log10(100.)
-            
-        for num in range(th_rest + 3 + len(self.gravData_list),  th_rest + 3 + len(self.gravData_list) + nsource):
-            theta[num] = np.log10(1)
-            if num == 0:
-                print("==== WARNING ====")
-                print("assuming lower of log10(0.001) and upper of log10(10), this likely has to be adapted")
-            lower[num] = np.log10(0.001) # 
-            upper[num] = np.log10(100.)
-         
+        
+        theta[th_rest + 4 : th_rest + 4 + nfiles] = lightcurve_list
+        theta[th_rest + 4 + nfiles : ] - fr_list
+
+        lower[th_rest + 4 : ] = np.log10(0.001)
+        upper[th_rest + 4 : ] = np.log10(100)
+        
         theta_names = []
         for ndx in range(nsource):
             theta_names.append('dRA%i' % (ndx + 1))
@@ -2276,12 +2268,14 @@ class GravMNightFit(GravNight):
         theta_names.append('pc RA')
         theta_names.append('pc Dec')
         
-        for num in range(th_rest + 3, nsource*2+4 + len(self.gravData_list)):
-            theta_names.append("fr_lightcurve " + str(num-th_rest+3))
+        for num in range(nfiles):
+            theta_names.append("fr_BH" + str(num+1))
         
-        for num in range(nsource*2+4 + len(self.gravData_list), nsource*2+4 + len(self.gravData_list) + nsource - 1):
-            theta_names.append("fr_source " +str(num - nsource*2+4 + len(self.gravData_list)))
+        for num in range(nsource-1):
+            theta_names.append("fr_source " + str(num+2))
+         
         self.theta_names = theta_names 
+        
         ndim = len(theta)
         if fixedBHalpha:
             todel.append(th_rest)
@@ -2363,7 +2357,7 @@ class GravMNightFit(GravNight):
         closure_flag_P = np.array(closure_flag_P)
         closamp_flag_P = np.array(closamp_flag_P)
         
-        for num in range(len(self.gravData_list)):
+        for num in range(nfiles):
             if ((flagtill > 0) and (flagfrom > 0)):
                 p = flagtill
                 t = flagfrom
@@ -2388,12 +2382,13 @@ class GravMNightFit(GravNight):
             if par in todel:
                 pos[:, par] = theta[par]
             else:
-                if par > th_rest+3:
+                if par > th_rest+4:
                     width =1e-2
                 pos[:, par] = theta[par] + width*np.random.randn(nwalkers)
         
         self.todel = todel
         self.ndim = ndim
+        
         fitdata = [visamp_P, visamp_error_P, visamp_flag_P,
                     vis2_P, vis2_error_P, vis2_flag_P,
                     closure_P, closure_error_P, closure_flag_P,
@@ -2401,7 +2396,7 @@ class GravMNightFit(GravNight):
             
         fitarg = np.array([u, v])
         
-        fithelp = [len(self.gravData_list), self.nsource, self.fit_for, self.bispec_ind, self.fit_mode,
+        fithelp = [self.nfiles, self.nsource, self.fit_for, self.bispec_ind, self.fit_mode,
                    self.wave, self.dlambda, self.fixedBHalpha, phasemaps, self.northangle]
         if not no_fit:
             if nthreads == 1:
@@ -2421,7 +2416,9 @@ class GravMNightFit(GravNight):
                     if bequiet:
                         self.sampler.run_mcmc(pos, nruns, progress=False) 
                     else:
-                        self.sampler.run_mcmc(pos, nruns, progress=True)   
+                        self.sampler.run_mcmc(pos, nruns, progress=True)
+            
+            
                             
         self.fitdata = fitdata
         self.fithelp = fithelp
@@ -2437,7 +2434,7 @@ class GravMNightFit(GravNight):
     def get_txt_report(self):
         raise ValueError("Txt report not implemented yet!")
     
-    def get_fit_result(self):
+    def get_fit_result(self, plot=True, ret=False):
         samples = self.sampler.chain
         self.mostprop = self.sampler.flatchain[np.argmax(self.sampler.flatlnprobability)]
 
@@ -2446,7 +2443,19 @@ class GravMNightFit(GravNight):
         clmostprop = np.delete(self.mostprop, self.todel)
         cldim = len(clmostprop)
         
+        if plot:
+            fig, axes = plt.subplots(cldim, figsize=(8, cldim/1.5),
+                                    sharex=True)
+            for i in range(cldim):
+                ax = axes[i]
+                ax.plot(clsamples[:, :, i].T, "k", alpha=0.3)
+                ax.axhline(clmostprop[i], color='C0', alpha=0.5)
+                ax.set_ylabel(cllabels[i], rotation=0)
+                ax.yaxis.set_label_coords(-0.1, 0.5)
+            axes[-1].set_xlabel("step number")
+            plt.show()
 
+            plt.show()
 
         
         if self.nruns > 300:
@@ -2458,9 +2467,12 @@ class GravMNightFit(GravNight):
         else:
             fl_samples = samples.reshape((-1, self.ndim))
             fl_clsamples = clsamples.reshape((-1, cldim))
-        
-                                       
-                                       
+            
+        if plot:
+            ranges = np.percentile(fl_clsamples, [3, 97], axis=0).T
+            fig = corner.corner(fl_clsamples, quantiles=[0.16, 0.5, 0.84],
+                                truths=clmostprop, labels=cllabels)
+            plt.show()
         
         percentiles = np.percentile(fl_clsamples, [16, 50, 84],axis=0).T
         percentiles[:,0] = percentiles[:,1] - percentiles[:,0] 
@@ -2478,6 +2490,9 @@ class GravMNightFit(GravNight):
         self.lightcurve = clmostprop[-(len_lightcurve+self.nsource-1):-(self.nsource-1)]
         self.fitres = clmostprop
         self.fittab = fittab
+        
+        if ret:
+            return self.mostprop
         
     def plot_fit(self, fitres, fitarg, fithelp, axes=None):
         len_lightcurve, nsource, fit_for, bispec_ind, fit_mode, wave, dlambda, fixedBHalpha, phasemaps, northA = fithelp
