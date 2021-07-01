@@ -2120,7 +2120,7 @@ class GravMNightFit(GravNight):
         self.dra = [dra1, dra2, dra3, dra4]
 
         nsource = len(ra_list)
-        nfiles = len(self.gravData_list)
+        nfiles = len(self.gravData_list)*2
         if fit_size is None:
             fit_size = np.ones(nsource)*5
         if fit_pos is None:
@@ -2164,6 +2164,11 @@ class GravMNightFit(GravNight):
             MJD.append(fits.open(obj.name)[0].header["MJD-OBS"])
             u.append(obj.u)
             v.append(obj.v)
+
+            if self.gravData_list[0].polmode == 'SPLIT':
+                MJD.append(fits.open(obj.name)[0].header["MJD-OBS"])
+                u.append(obj.u)
+                v.append(obj.v)
         
             self.wave = obj.wlSC
             self.dlambda = obj.dlambda
@@ -2236,8 +2241,9 @@ class GravMNightFit(GravNight):
         theta_names.append('pc RA')
         theta_names.append('pc Dec')
         
-        for num in range(nfiles):
-            theta_names.append("fr_BH" + str(num+1))
+        for num in range(nfiles//2):
+            theta_names.append("fr_BH" + str(num+1) + '_P1')
+            theta_names.append("fr_BH" + str(num+1) + '_P2')
         
         for num in range(nsource-1):
             theta_names.append("fr_source " + str(num+2))
@@ -2282,32 +2288,40 @@ class GravMNightFit(GravNight):
             visphi_error_P = []
             visphi_flag_P = []
 
-            closamp_P = []
-            closamp_error_P = []
-            closamp_flag_P = []
+            #closamp_P = []
+            #closamp_error_P = []
+            #closamp_flag_P = []
 
             ndit = []
             
             for obj in self.gravData_list:
-                visamp_P.append(np.nanmean([obj.visampSC_P1, obj.visampSC_P2], axis=0))
-                visamp_error_P.append(np.nanmean([obj.visamperrSC_P1, obj.visamperrSC_P2], axis=0))
-                visamp_flag_P.append(obj.visampflagSC_P1 & obj.visampflagSC_P2)
-                
-                vis2_P.append(np.nanmean([obj.vis2SC_P1, obj.vis2SC_P2], axis=0))
-                vis2_error_P.append(np.nanmean([obj.vis2errSC_P1, obj.vis2errSC_P2], axis=0))
-                vis2_flag_P.append(obj.vis2flagSC_P1 & obj.vis2flagSC_P2)
+                visamp_P.append(obj.visampSC_P1)
+                visamp_error_P.append(obj.visamperrSC_P1)
+                visamp_flag_P.append(obj.visampflagSC_P1)
+                visamp_P.append(obj.visampSC_P2)
+                visamp_error_P.append(obj.visamperrSC_P2)
+                visamp_flag_P.append(obj.visampflagSC_P2)
 
-                closure_P.append(np.nanmean([obj.t3SC_P1, obj.t3SC_P2], axis=0))
-                closure_error_P.append(np.nanmean([obj.t3errSC_P1, obj.t3errSC_P2], axis=0))
-                closure_flag_P.append(obj.t3flagSC_P1 & obj.t3flagSC_P2)
-                
-                visphi_P.append(np.nanmean([obj.visphiSC_P1, obj.visphiSC_P2], axis=0))
-                visphi_error_P.append(np.nanmean([obj.visphierrSC_P1, obj.visphierrSC_P2], axis=0))
-                visphi_flag_P.append(obj.visampflagSC_P1 & obj.visampflagSC_P2)
+                vis2_P.append(obj.vis2SC_P1)
+                vis2_error_P.append(obj.vis2errSC_P1)
+                vis2_flag_P.append(obj.vis2flagSC_P1)
+                vis2_P.append(obj.vis2SC_P2)
+                vis2_error_P.append(obj.vis2errSC_P2)
+                vis2_flag_P.append(obj.vis2flagSC_P2)
 
-                closamp_P.append(np.nanmean([obj.t3ampSC_P1, obj.t3ampSC_P2], axis=0))
-                closamp_error_P.append(np.nanmean([obj.t3amperrSC_P1, obj.t3amperrSC_P2], axis=0))
-                closamp_flag_P.append(obj.t3ampflagSC_P1 & obj.t3ampflagSC_P2)
+                closure_P.append(obj.t3SC_P1)
+                closure_error_P.append(obj.t3errSC_P1)
+                closure_flag_P.append(obj.t3flagSC_P1)
+                closure_P.append(obj.t3SC_P2)
+                closure_error_P.append(obj.t3errSC_P2)
+                closure_flag_P.append(obj.t3flagSC_P2)
+                
+                visphi_P.append(obj.visphiSC_P1)
+                visphi_error_P.append(obj.visphierrSC_P1)
+                visphi_flag_P.append(obj.visampflagSC_P1)
+                visphi_P.append(obj.visphiSC_P2)
+                visphi_error_P.append(obj.visphierrSC_P2)
+                visphi_flag_P.append(obj.visampflagSC_P2)
 
                 ndit.append(np.shape(obj.visampSC_P1)[0]//6)
                 if ndit[-1] != 1:
@@ -2318,13 +2332,46 @@ class GravMNightFit(GravNight):
                 
         elif self.gravData_list[0].polmode == 'COMBINED':
            raise ValueError("Sorry, only SPLIT is implemented at the moment")
-
+    
+        visamp_P = np.array(visamp_P)
+        visamp_error_P = np.array(visamp_error_P)
         visamp_flag_P = np.array(visamp_flag_P)
-        vis2_flag_P = np.array(vis2_flag_P)
-        visphi_flag_P = np.array(visphi_flag_P)
-        closure_flag_P = np.array(closure_flag_P)
-        closamp_flag_P = np.array(closamp_flag_P)
         
+        vis2_P = np.array(vis2_P)
+        vis2_error_P = np.array(vis2_error_P)
+        vis2_flag_P = np.array(vis2_flag_P)
+        
+        closure_P = np.array(closure_P)
+        closure_error_P = np.array(closure_error_P)
+        visphi_flag_P = np.array(visphi_flag_P)
+        
+        visphi_P = np.array(visphi_P)
+        visphi_error_P = np.array(visphi_error_P)
+        closure_flag_P = np.array(closure_flag_P)
+
+        with np.errstate(invalid='ignore'):
+            visamp_flag1 = (visamp_P > 1) | (visamp_P < 1.e-5)
+        visamp_flag2 = np.isnan(visamp_P)
+        visamp_flag_final = ((visamp_flag_P) | (visamp_flag1) | (visamp_flag2))
+        visamp_flag_P = visamp_flag_final
+        visamp_P = np.nan_to_num(visamp_P)
+        visamp_error_P[visamp_flag_P] = 1.
+        
+        with np.errstate(invalid='ignore'):
+            vis2_flag1 = (vis2_P > 1) | (vis2_P < 1.e-5) 
+        vis2_flag2 = np.isnan(vis2_P)
+        vis2_flag_final = ((vis2_flag_P) | (vis2_flag1) | (vis2_flag2))
+        vis2_flag_P = vis2_flag_final
+        vis2_P = np.nan_to_num(vis2_P)
+        vis2_error_P[vis2_flag_P] = 1.
+
+        closure_P = np.nan_to_num(closure_P)
+        visphi_P = np.nan_to_num(visphi_P)
+        visphi_flag_P[np.where(visphi_error_P == 0)] = True
+        visphi_error_P[np.where(visphi_error_P == 0)] = 100
+        closure_flag_P[np.where(closure_error_P == 0)] = True
+        closure_error_P[np.where(closure_error_P == 0)] = 100
+
         for num in range(nfiles):
             if ((flagtill > 0) and (flagfrom > 0)):
                 p = flagtill
@@ -2336,13 +2383,13 @@ class GravMNightFit(GravNight):
                 vis2_flag_P[num, :,0:p] = True
                 visphi_flag_P[num, :,0:p] = True
                 closure_flag_P[num, :,0:p] = True
-                closamp_flag_P[num, :,0:p] = True
+#                closamp_flag_P[num, :,0:p] = True
 
                 visamp_flag_P[num, :,t:] = True
                 vis2_flag_P[num, :,t:] = True
                 visphi_flag_P[num, :,t:] = True
                 closure_flag_P[num, :,t:] = True
-                closamp_flag_P[num, :,t:] = True
+#                closamp_flag_P[num, :,t:] = True
                                     
         width = 1e-1
         pos = np.ones((nwalkers,ndim))
@@ -2424,8 +2471,9 @@ class GravMNightFit(GravNight):
         for num, name, mostprop in zip(range(len(cllabels)), cllabels, clmostprop):
             fittab[name] = pd.Series([mostprop, percentiles[num, 1], percentiles[num, 0], percentiles[num, 2]])
             
-        len_lightcurve = len(self.gravData_list)
-        self.lightcurve = 10**(clmostprop[-(len_lightcurve+self.nsource-1):-(self.nsource-1)])
+        len_lightcurve = self.nfiles
+        _lightcurve_all = 10**(clmostprop[-(len_lightcurve+self.nsource-1):-(self.nsource-1)])
+        self.lightcurve = np.array([_lightcurve_all[::2],_lightcurve_all[1::2]])
         self.fitres = clmostprop
         self.fittab = fittab
         
@@ -2460,7 +2508,8 @@ class GravMNightFit(GravNight):
 
         
     def plot_fit(self, fitres, fitarg, fithelp, axes=None):
-        len_lightcurve, nsource, fit_for, bispec_ind, fit_mode, wave, dlambda, fixedBHalpha, phasemaps, northA = fithelp
+        (len_lightcurve, nsource, fit_for, bispec_ind, fit_mode, 
+         wave, dlambda, fixedBHalpha, phasemaps, northA) = fithelp
         if axes is None:
             #fig, axes = plt.subplots(2, 2, gridspec_kw={})
             fig, axes0 = plt.subplots()
@@ -2490,7 +2539,7 @@ class GravMNightFit(GravNight):
     
     
     def plot_data(self, fitdata, fitarg, axes=None):
-        len_lightcurve = len(self.gravData_list)
+        len_lightcurve = self.nfiles
         if axes is None:
             #fig, axes = plt.subplots(2, 2, gridspec_kw={})
             fig, axes0 = plt.subplots()
@@ -2571,7 +2620,8 @@ class GravMNightFit(GravNight):
         axes[1,1].set_xlabel('spatial frequency (1/arcsec)')
         
     def plot_residual(self, fitdata, fitarg, fitres, fithelp, axes=None, show=False):
-        len_lightcurve, nsource, fit_for, bispec_ind, fit_mode, wave, dlambda, fixedBHalpha, phasemaps, northA = fithelp
+        (len_lightcurve, nsource, fit_for, bispec_ind, fit_mode, 
+         wave, dlambda, fixedBHalpha, phasemaps, northA) = fithelp
         if axes is None:
             #fig, axes = plt.subplots(2, 2, gridspec_kw={})
             fig, axes0 = plt.subplots()
