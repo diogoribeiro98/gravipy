@@ -1836,7 +1836,7 @@ def _ind_visibility(s, alpha, wave, dlambda, fit_mode):
     
 def _calc_vis(theta, fitarg, fithelp):
     (len_lightcurve, nsource, fit_for, bispec_ind, fit_mode, 
-     wave, dlambda, fixedBHalpha, phasemaps, northA) = fithelp
+     wave, dlambda, fixedBHalpha, phasemaps, northangle, amp_map_int, pha_map_int, amp_map_denom_int, wave) = fithelp
     mas2rad = 1e-3 / 3600 / 180 * np.pi
     rad2mas = 180 / np.pi * 3600 * 1e3
 
@@ -1844,9 +1844,8 @@ def _calc_vis(theta, fitarg, fithelp):
     v = fitarg[1]
 
     if phasemaps:
-        raise ValueError("Phase maps not implemented yet!")
-        ddec = 0
-        dra = 0
+        ddec = [0,0,0,0]
+        dra = [0,0,0,0]
     
     th_rest = nsource*2
     
@@ -1872,14 +1871,13 @@ def _calc_vis(theta, fitarg, fithelp):
     alpha_stars = 3
     
     if phasemaps:
-        raise ValueError("Phase maps not implemented yet!")
         pm_sources = []
-        pm_amp_c, pm_pha_c, pm_int_c = phasemaps.phasemap_source(pc_RA, pc_DEC, 
-                                                    northA, dra, ddec)
+        pm_amp_c, pm_pha_c, pm_int_c = _readPhasemaps(pc_RA, pc_DEC, 
+                                                    northangle, amp_map_int, pha_map_int, amp_map_denom_int, wave)
         for ndx in range(nsource):
-            pm_amp, pm_pha, pm_int = phasemaps.phasemap_source(pc_RA + theta[ndx*2], 
+            pm_amp, pm_pha, pm_int = _readPhasemaps(pc_RA + theta[ndx*2], 
                                                         pc_DEC + theta[ndx*2+1], 
-                                                        northA, dra, ddec)
+                                                        northangle, amp_map_int, pha_map_int, amp_map_denom_int, wave)
             pm_sources.append([pm_amp, pm_pha, pm_int])
         
 
@@ -1963,7 +1961,7 @@ def _lnprob_night(theta, fitdata, lower, upper, fitarg, fithelp):
     
 def _lnlike_night(theta, fitdata, fitarg, fithelp):
     (len_lightcurve, nsource, fit_for, bispec_ind, fit_mode, 
-     wave, dlambda, fixedBHalpha, phasemaps, northA) = fithelp
+     wave, dlambda, fixedBHalpha, phasemaps, northangle, amp_map_int, pha_map_int, amp_map_denom_int, wave) = fithelp
     (visamp, visamp_error, visamp_flag,
         vis2, vis2_error, vis2_flag,
         closure, closure_error, closure_flag,
@@ -2000,7 +1998,73 @@ def _lnlike_night(theta, fitdata, fitarg, fithelp):
                             res_phi * fit_for[3])
     return ln_prob_res 
     
+@jit(nopython=True)
+def _rotation(ang):
+    """
+    Rotation matrix, needed for phasemaps
+    """
+    return np.array([[np.cos(ang), np.sin(ang)],
+                        [-np.sin(ang), np.cos(ang)]])
+
     
+    
+def _readPhasemaps(ra, dec, northangle, amp_map_int, pha_map_int, amp_map_denom_int, wave):
+    """
+    Calculates coupling amplitude / phase for given coordinates
+    ra,dec: RA, DEC position on sky relative to nominal field center = SOBJ [mas]
+    dra,ddec: ESO QC MET SOBJ DRA / DDEC: 
+        location of science object (= desired science fiber position, = field center) 
+        given by INS.SOBJ relative to *actual* fiber position measured by the laser metrology [mas]
+        mis-pointing = actual - desired fiber position = -(DRA,DDEC)
+    north_angle: north direction on acqcam in degree
+    if fromFits is true, northangle & dra,ddec are taken from fits file
+    """
+    pm_pos = np.zeros((4, 2))
+    readout_pos = np.zeros((4*len(wave),4))
+    readout_pos[:,0] = np.tile(np.arange(len(wave)),4)                                                  
+    readout_pos[:,1] = np.repeat(np.arange(4),len(wave))
+
+    for tel in range(4):
+        pos = np.array([ra, dec])
+        try:
+            pos[0] += self.pm_pos_off[0]
+            pos[1] += self.pm_pos_off[1]
+        except (NameError, AttributeError):
+            pass
+        pos_rot = np.dot(_rotation(northangle[tel]), pos) + 100
+        readout_pos[readout_pos[:,1]==tel,2] = pos_rot[1]
+        readout_pos[readout_pos[:,1]==tel,3] = pos_rot[0]
+        pm_pos[tel] = pos_rot
+        
+    amp = amp_map_int(readout_pos).reshape(4,len(wave))
+    pha = pha_map_int(readout_pos).reshape(4,len(wave))
+    inten = amp_map_denom_int(readout_pos).reshape(4,len(wave))
+    
+    
+    cor_amp = np.array([[amp[0], amp[1]],
+                            [amp[0], amp[2]],
+                            [amp[0], amp[3]],
+                            [amp[1], amp[2]],
+                            [amp[1], amp[3]],
+                            [amp[2], amp[3]]])
+    cor_pha = np.array([[pha[0], pha[1]],
+                            [pha[0], pha[2]],
+                            [pha[0], pha[3]],
+                            [pha[1], pha[2]],
+                            [pha[1], pha[3]],
+                            [pha[2], pha[3]]])
+    cor_int_denom = np.array([[inten[0], inten[1]],
+                            [inten[0], inten[2]],
+                            [inten[0], inten[3]],
+                            [inten[1], inten[2]],
+                            [inten[1], inten[3]],
+                            [inten[2], inten[3]]])
+        
+        
+    return cor_amp, cor_pha, cor_int_denom 
+        
+        
+        
 class GravMNightFit(GravNight):
     def __init__(self, night_name, file_list, verbose=False):
         super().__init__(night_name, file_list, verbose=verbose)           
@@ -2093,10 +2157,26 @@ class GravMNightFit(GravNight):
         self.phasemaps = phasemaps
         self.datayear = pmdatayear
         self.smoothkernel = smoothkernel
-        
+        # Get data from file
+        self.tel = fits.open(self.gravData_list[0].name)[0].header["TELESCOP"]
+        if self.tel == 'ESO-VLTI-U1234':
+            self.tel = 'UT'
+        elif tel == 'ESO-VLTI-A1234':
+            self.tel = 'AT'
+        else:
+            raise ValueError('Telescope not AT or UT, something wrong with input data')
+
+
         if self.phasemaps:
             phasemaps = GravPhaseMaps()
+            phasemaps.tel=self.tel
+            phasemaps.resolution=self.gravData_list[0].resolution
+            phasemaps.smoothkernel=self.smoothkernel
+            phasemaps.datayear=self.datayear
+            phasemaps.wlSC=self.gravData_list[0].wlSC
+            phasemaps.interppm=interppm
             phasemaps.loadPhasemaps(interp=interppm)
+
             
         header = fits.open(self.gravData_list[0].name)[0].header
         northangle1 = header['ESO QC ACQ FIELD1 NORTH_ANGLE']/180*math.pi
@@ -2142,14 +2222,6 @@ class GravMNightFit(GravNight):
         self.nsource = nsource
         self.nfiles = nfiles
         
-        # Get data from file
-        tel = fits.open(self.gravData_list[0].name)[0].header["TELESCOP"]
-        if tel == 'ESO-VLTI-U1234':
-            self.tel = 'UT'
-        elif tel == 'ESO-VLTI-A1234':
-            self.tel = 'AT'
-        else:
-            raise ValueError('Telescope not AT or UT, something wrong with input data')
 
         nwave = self.gravData_list[0].channel
         for num, obj in enumerate(self.gravData_list):
@@ -2410,9 +2482,13 @@ class GravMNightFit(GravNight):
                     visphi_P, visphi_error_P, visphi_flag_P]
             
         fitarg = np.array([u, v])
-        
-        fithelp = [self.nfiles, self.nsource, self.fit_for, self.bispec_ind, self.fit_mode,
-                   self.wave, self.dlambda, self.fixedBHalpha, phasemaps, self.northangle]
+        if self.phasemaps:
+            fithelp = [self.nfiles, self.nsource, self.fit_for, self.bispec_ind, self.fit_mode,
+                    self.wave, self.dlambda, self.fixedBHalpha, self.phasemaps, self.northangle, phasemaps.amp_map_int, phasemaps.pha_map_int, phasemaps.amp_map_denom_int, self.wave]
+        else:
+            fithelp = [self.nfiles, self.nsource, self.fit_for, self.bispec_ind, self.fit_mode,
+                    self.wave, self.dlambda, self.fixedBHalpha, self.phasemaps, self.northangle, None, None, None, self.wave]
+
         if not no_fit:
             if nthreads == 1:
                 self.sampler = emcee.EnsembleSampler(nwalkers, ndim, _lnprob_night, 
@@ -2508,7 +2584,7 @@ class GravMNightFit(GravNight):
 
     def plot_fit_better(self, fitdata, fitres, fitarg, fithelp):
         (len_lightcurve, nsource, fit_for, bispec_ind, fit_mode, 
-         wave, dlambda, fixedBHalpha, phasemaps, northA) = fithelp
+        wave, dlambda, fixedBHalpha, phasemaps, northA, amp_map_int, pha_map_int, amp_map_denom_int, wave) = fithelp
         
         (visamp_d, visamp_error_d, visamp_flag_d, 
          vis2_d, vis2_error_d, vis2_flag_d, 
@@ -2601,7 +2677,7 @@ class GravMNightFit(GravNight):
         
     def plot_fit(self, fitres, fitarg, fithelp, axes=None):
         (len_lightcurve, nsource, fit_for, bispec_ind, fit_mode, 
-         wave, dlambda, fixedBHalpha, phasemaps, northA) = fithelp
+        wave, dlambda, fixedBHalpha, phasemaps, northA, amp_map_int, pha_map_int, amp_map_denom_int, wave) = fithelp
         if axes is None:
             #fig, axes = plt.subplots(2, 2, gridspec_kw={})
             fig, axes0 = plt.subplots()
@@ -2629,7 +2705,6 @@ class GravMNightFit(GravNight):
                 axes[1,1].plot(magu_as[i, :], visphi[i, :], color='k', zorder=100)
             for i in range(4):
                 axes[1,0].plot(obj.spFrequAS_T3[i,:], closure[i, :], color='k', zorder=100)
-    
     
     def plot_data(self, fitdata, fitarg, axes=None):
         len_lightcurve = self.nfiles
@@ -2715,7 +2790,7 @@ class GravMNightFit(GravNight):
         
     def plot_residual(self, fitdata, fitarg, fitres, fithelp, axes=None, show=False):
         (len_lightcurve, nsource, fit_for, bispec_ind, fit_mode, 
-         wave, dlambda, fixedBHalpha, phasemaps, northA) = fithelp
+     wave, dlambda, fixedBHalpha, phasemaps, northA, amp_map_int, pha_map_int, amp_map_denom_int, wave) = fithelp
         if axes is None:
             #fig, axes = plt.subplots(2, 2, gridspec_kw={})
             fig, axes0 = plt.subplots()
