@@ -2582,7 +2582,7 @@ class GravMNightFit(GravNight):
                                 truths=clmostprop, labels=cllabels)
             plt.show()
 
-    def plot_fit_better(self, fitdata, fitres, fitarg, fithelp):
+    def plot_fit_better(self, fitdata, fitres, fitarg, fithelp, figsize=None):
         (len_lightcurve, nsource, fit_for, bispec_ind, fit_mode, 
         wave, dlambda, fixedBHalpha, phasemaps, northA, amp_map_int, pha_map_int, amp_map_denom_int, wave) = fithelp
         
@@ -2590,8 +2590,10 @@ class GravMNightFit(GravNight):
          vis2_d, vis2_error_d, vis2_flag_d, 
          closure_d, closure_error_d, closure_flag_d, 
          visphi_d, visphi_error_d, visphi_flag_d) = fitdata
-
-        plt.figure(figsize=(7,len_lightcurve*0.7))
+        if figsize is None:
+            plt.figure(figsize=(7,len_lightcurve*0.7))
+        else:
+            plt.figure(figsize=figsize)
         gs = gridspec.GridSpec(len_lightcurve//2, 3, hspace=0.05)
         for idx in range(len_lightcurve//2):
             num = idx*2
