@@ -149,7 +149,7 @@ def read_correction(mcor_files, xscale, list_dim=1, fancy=True, wrap=False, lst=
     """
     
     if list_dim == 1:
-        if len(mcor_files) < 10 and not not_fancy:
+        if len(mcor_files) < 10 and fancy:
             print('Very short list of input.')
             print('If you want to use several lists, use list_dim != 1.')
             print('Else not_fancy=True shoule be better...')
