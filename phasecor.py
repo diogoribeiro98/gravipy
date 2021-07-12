@@ -784,7 +784,8 @@ def correct_data(files, mode, subspacing=1, plotav=8, plot=False, lstplot=False)
 
 class GravPhaseNight():
     def __init__(self, night, ndit, verbose=True, nopandas=False, pandasfile=None,
-                 reddir=None, datadir='/data/user/forFrank2/', onlysgra=True, calibrator=None):
+                 reddir=None, datadir='/data/user/forFrank2/', onlysgra=True, calibrator=None,
+                 full_folder=False):
         """
         Package to do the full phase calibration, poscor, correction and fitting
         
@@ -880,37 +881,45 @@ class GravPhaseNight():
                     'GRAVI.2021-06-26T02:08:16.758_dualscivis.fits'
                     ] 
 
-        try:
+        if full_folder:
+            nopandas = True
+            self.folder = night
             if calibrator is None:
-                if self.verbose:
-                    print("using default calibrator")
-                self.calibrator = calibrators[nights.index(night)]
-            else:
-                if self.verbose:
-                    print("using custom calibrator")
-                self.calibrator = calibrator
-            if self.verbose:
-                print('Night:      %s \nCalibrator: %s' % (night, self.calibrator))
-        except ValueError:
-            if self.verbose:
-                print('Night is not available, try one of those:')
-                print(nights)
-            raise ValueError('Night is not available')
-        
-        if reddir is None:
-            if int(night[:4]) > 2020:
-                pl_dir = '/reduced_PL20210429'
-            else:
-                pl_dir = '/reduced_PL20200513'
+                raise ValueError('For full_folder you need to give a calibrator')
+            self.calibrator = calibrator
             
-            if ndit == 1:
-                self.folder = datadir + night + pl_dir
-            elif ndit == 32:
-                self.folder = datadir + night + pl_dir + '_1frame'
-            else:
-                raise ValueError('Ndit has to be 1 or 32')
         else:
-            self.folder = datadir + night + '/' + reddir
+            try:
+                if calibrator is None:
+                    if self.verbose:
+                        print("using default calibrator")
+                    self.calibrator = calibrators[nights.index(night)]
+                else:
+                    if self.verbose:
+                        print("using custom calibrator")
+                    self.calibrator = calibrator
+                if self.verbose:
+                    print('Night:      %s \nCalibrator: %s' % (night, self.calibrator))
+            except ValueError:
+                if self.verbose:
+                    print('Night is not available, try one of those:')
+                    print(nights)
+                raise ValueError('Night is not available')
+            
+            if reddir is None:
+                if int(night[:4]) > 2020:
+                    pl_dir = '/reduced_PL20210429'
+                else:
+                    pl_dir = '/reduced_PL20200513'
+                
+                if ndit == 1:
+                    self.folder = datadir + night + pl_dir
+                elif ndit == 32:
+                    self.folder = datadir + night + pl_dir + '_1frame'
+                else:
+                    raise ValueError('Ndit has to be 1 or 32')
+            else:
+                self.folder = datadir + night + '/' + reddir
         if self.verbose:
             print('Data from:  %s' % self.folder)
         self.bl_array = np.array([[0,1],
@@ -924,37 +933,44 @@ class GravPhaseNight():
         if len(allfiles) == 0:
             raise ValueError('No files found, most likely something is wrong with the reduction folder')
         
-        sg_files = []
-        s2_files = []
-        for file in allfiles:
-            h = fits.open(file)[0].header
-            if h['ESO FT ROBJ NAME'] != 'IRS16C':
-                continue
-            if h['ESO INS SOBJ NAME'] == 'S2':
-                if h['ESO INS SOBJ OFFX'] == 0:
-                    s2_files.append(file)
-                else:
-                    sobjx = h['ESO INS SOBJ X']
-                    sobjy = h['ESO INS SOBJ Y']
-                    if onlysgra:
-                        if -990 > sobjx or sobjx > -940:
-                            print('File with separation (%i,%i) not on S2 orbit, will be ignored' % (sobjx, sobjy))
-                            continue
-                        if -640 > sobjy or sobjy > -590:
-                            print('File with separation (%i,%i) not on S2 orbit, will be ignored' % (sobjx, sobjy))
-                            continue
-                    sg_files.append(file)
+        if full_folder:
+            sg_files = allfiles
+            s2_files = allfiles
+        else:
+            sg_files = []
+            s2_files = []
+            for file in allfiles:
+                h = fits.open(file)[0].header
+                if h['ESO FT ROBJ NAME'] != 'IRS16C':
+                    continue
+                if h['ESO INS SOBJ NAME'] == 'S2':
+                    if h['ESO INS SOBJ OFFX'] == 0:
+                        s2_files.append(file)
+                    else:
+                        sobjx = h['ESO INS SOBJ X']
+                        sobjy = h['ESO INS SOBJ Y']
+                        if onlysgra:
+                            if -990 > sobjx or sobjx > -940:
+                                print('File with separation (%i,%i) not on S2 orbit, will be ignored' % (sobjx, sobjy))
+                                continue
+                            if -640 > sobjy or sobjy > -590:
+                                print('File with separation (%i,%i) not on S2 orbit, will be ignored' % (sobjx, sobjy))
+                                continue
+                        sg_files.append(file)
         if self.verbose:
             print('            %i SGRA files \n            %i S2 files' % (len(sg_files), len(s2_files)))
         self.s2_files = s2_files
         self.sg_files = sg_files
         
         
-        year = int(night[:4])
-        if year > 2019 and not nopandas:
-            if self.verbose:
-                print('No flux data in pandas for %i' % year)
-            nopandas=True
+        try:
+            year = int(night[:4])
+            if year > 2019 and not nopandas:
+                if self.verbose:
+                    print('No flux data in pandas for %i' % year)
+                nopandas=True
+        except ValueError:
+            pass
         
         if not nopandas:
             ################
@@ -1168,7 +1184,10 @@ class GravPhaseNight():
         ################
         # read in al necessary data
         ################
-        d = fits.open(sg_files[0])
+        try:
+            d = fits.open(sg_files[0])
+        except IndexError:
+            d = fits.open(s2_files[0])
         wave = d['OI_WAVELENGTH',11].data['EFF_WAVE']
         self.wave = wave
         nchannel = len(wave)
@@ -1832,7 +1851,7 @@ class GravPhaseNight():
                         d['OI_VIS', 12].data['VISPHI'] = visphi_p2
                         d.writeto(folder+fname, overwrite=True)
 
-        self.savefolder = folder
+            self.savefolder = folder
         self.alldata = result
         if ret:
             return self.alldata
