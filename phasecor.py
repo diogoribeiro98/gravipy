@@ -81,7 +81,7 @@ def get_angle_header_all(header, tel, length):
     posangle = np.arctan2(dx, dy) * 180 / np.pi;
     fangle = - posangle - drottoff + 270
     angle = fangle + parang + 45.
-    return (angle-180)%360
+    return angle%360
 
 def get_angle_header_start(header, tel):
     pa1 = header["ESO ISS PARANG START"]
@@ -92,7 +92,7 @@ def get_angle_header_start(header, tel):
     posangle = np.arctan2(dx, dy) * 180 / np.pi;
     fangle = - posangle - drottoff + 270
     angle = fangle + parang + 45.
-    return (angle-180)%360
+    return angle%360
 
 def get_angle_header_mean(header, tel):
     pa1 = header["ESO ISS PARANG START"]
@@ -104,7 +104,7 @@ def get_angle_header_mean(header, tel):
     posangle = np.arctan2(dx, dy) * 180 / np.pi;
     fangle = - posangle - drottoff + 270
     angle = fangle + parang + 45.
-    return (angle-180)%360
+    return angle%360
 
 def rotation(ang):
     return np.array([[np.cos(ang), np.sin(ang)],
@@ -1514,7 +1514,6 @@ class GravPhaseNight():
             print(calib_file)
             raise ValueError('Something wrong with calib file')
         calib_file = calib_file[0]
-        print(calib_file, self.calibrator)
         c_p1 = s2_visphi_p1[calib_file]
         c_p2 = s2_visphi_p2[calib_file]
 
