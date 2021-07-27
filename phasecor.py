@@ -1856,7 +1856,7 @@ class GravPhaseNight():
             return self.alldata
         
     def calibrate_all(self, mode, *args, **kwargs):
-        self.process_night(mode, save=True, *args, **kwargs)
+        self.process_night(mode, *args, **kwargs)
         
         sf = self.savefolder
         cf = self.savefolder + 'calibrated_oneS2'
