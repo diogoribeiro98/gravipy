@@ -1859,13 +1859,17 @@ class GravPhaseNight():
         if ret:
             return self.alldata
         
-    def calibrate_all(self, mode, *args, **kwargs):
+    def calibrate_all(self, mode, allS2=False, *args, **kwargs):
         self.process_night(mode, *args, **kwargs)
         
         sf = self.savefolder
         cf = self.savefolder + 'calibrated_oneS2'
-        os.system('run_gravi_recalibrate.py %s %s -c=%s -s=S2 -s=SGRA' 
-                % (sf, cf, self.calibrator))
+        if allS2:
+            os.system('run_gravi_recalibrate.py %s %s -c=S2 -s=S2 -s=SGRA' 
+                    % (sf, cf))
+        else:
+            os.system('run_gravi_recalibrate.py %s %s -c=%s -s=S2 -s=SGRA' 
+                    % (sf, cf, self.calibrator))
 
 
     #########################
