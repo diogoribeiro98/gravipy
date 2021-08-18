@@ -1239,9 +1239,9 @@ class GravFit(GravData):
     
     
     def fitBinary(self, 
-                  nthreads=4, 
-                  nwalkers=500, 
-                  nruns=500, 
+                  nthreads=1, 
+                  nwalkers=301, 
+                  nruns=301, 
                   bestchi=True,
                   bequiet=False,
                   fit_for=np.array([0.5,0.5,1.0,0.0,0.0]), 
@@ -1269,8 +1269,8 @@ class GravFit(GravData):
                   specialpar=np.array([0,0,0,0,0,0]), 
                   plot=True, 
                   plotres=True, 
-                  createpdf=True, 
-                  writeresults=True, 
+                  createpdf=False, 
+                  writeresults=False, 
                   outputdir='./',
                   redchi2=False,
                   phasemaps=False,
@@ -2483,9 +2483,9 @@ class GravFit(GravData):
     def fitTriple(self, 
                   initial, 
                   size=2,
-                  nthreads=4, 
-                  nwalkers=500, 
-                  nruns=500,
+                  nthreads=1, 
+                  nwalkers=301, 
+                  nruns=301,
                   bestchi=True, 
                   bequiet=False, 
                   fit_for=np.array([0.5,0.5,1.0,0.0,0.0]),
@@ -2502,7 +2502,7 @@ class GravFit(GravData):
                   noS2=True, 
                   plot=True, 
                   plotres=True, 
-                  createpdf=True,
+                  createpdf=False,
                   redchi2=False,
                   phasemaps=False,
                   interppm=True,
@@ -3476,13 +3476,12 @@ class GravFit(GravData):
         
 
     def fitUnary(self, 
-                 nthreads=4, 
-                 nwalkers=500, 
-                 nruns=500, 
+                 nthreads=1, 
+                 nwalkers=301, 
+                 nruns=301, 
                  bestchi=True,
                  bequiet=False, 
-                 michistyle=False,
-                 approx='approx', 
+                 approx='fast', 
                  onlypol=None, 
                  mindatapoints=3,
                  flagtill=2,
@@ -3499,8 +3498,8 @@ class GravFit(GravData):
                  specialpar=np.array([0,0,0,0,0,0]), 
                  plot=True, 
                  plotres=True, 
-                 writeresults=True,
-                 createpdf=True, 
+                 writeresults=False,
+                 createpdf=False, 
                  writefitdiff=False,
                  returnPos=False,
                  phaseinput=None):
@@ -3514,7 +3513,7 @@ class GravFit(GravData):
         bequiet:        Suppresses ALL outputs [False]
         michistyle:     Uses a simple exponential fit instead of full 
                         visibility calculation [False]
-        approx:         Kind of integration for visibilities (approx, numeric, analytic)
+        approx:         Kind of integration for visibilities (fast, approx, numeric, analytic)
         mindatapoints:  if less valid datapoints in one baseline, file is rejected [3]
         onlypol:        Only fits one polarization for split mode, either 0 or 1 [None]
         flagtill:       Flag blue channels [2] 
@@ -3535,8 +3534,18 @@ class GravFit(GravData):
         writefitdiff:   Writes the difference of the mean fit vs data instead of redchi2
         returnPos:      Retuns fitted position
         """
-        if self.resolution != 'LOW' and flagtill == 2 and flagfrom == 12:
+        if self.resolution == 'MEDIUM' and flagtill == 2 and flagfrom == 12:
+            flagtill = 30 
+            flagfrom = 190
+            print('Flagging was set to default for MEDIUM: channels 30-190 are used\n')
+        elif self.resolution == 'HIGH' and flagtill == 2 and flagfrom == 12:
             raise ValueError('Initial values for flagtill and flagfrom have to be changed if not low resolution')
+        
+        if approx == 'fast':
+            michistyle = True
+        else:
+            michistyle=False
+
         rad2as = 180 / np.pi * 3600
         self.fixedBG = fixedBG
         self.fixedBH = fixedBH
@@ -3571,9 +3580,7 @@ class GravFit(GravData):
         
         self.fiberOffX = -fits.open(self.name)[0].header["HIERARCH ESO INS SOBJ OFFX"] 
         self.fiberOffY = -fits.open(self.name)[0].header["HIERARCH ESO INS SOBJ OFFY"] 
-        if not bequiet:
-            print("fiber center: %.2f, %.2f (mas)" % (self.fiberOffX,
-                                                    self.fiberOffY))
+
         if self.fiberOffX == 0 and self.fiberOffY == 0:
             if noS2:
                 if not bequiet:
@@ -3682,14 +3689,14 @@ class GravFit(GravData):
             visphi_flag_P = [self.visampflagSC_P1, self.visampflagSC_P2]
             
             ndit = np.shape(self.visampSC_P1)[0]//6
-            if not bequiet:
+            if not bequiet and ndit>1:
                 print('NDIT = %i' % ndit)
             if onlypol is not None:
                 polnom = [onlypol]
             else:
                 polnom = [0,1]
                 
-        elif self.polmode == 'COMBINED':
+        elif self.polmode == 'COMBINED' and ndit>1:
             visphi_P = [self.visphiSC]
             visphi_error_P = [self.visphierrSC]
             visphi_flag_P = [self.visampflagSC]
@@ -3754,7 +3761,7 @@ class GravFit(GravData):
                 pdf.cell(40, 6, txt=str(specialpar), ln=1, align="L", border=0)
                 pdf.ln()
 
-            if not bequiet:
+            if not bequiet and ndit > 1:
                 print('Run MCMC for DIT %i' % (dit+1))
             ditstart = dit*6
             ditstop = ditstart + 6
