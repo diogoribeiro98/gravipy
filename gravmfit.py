@@ -747,7 +747,6 @@ class GravMFit(GravData, GravPhaseMaps):
 
         vis = np.zeros((6,len(wave))) + 0j
         for i in range(0,6):
-            
             s_SgrA = ((pc_RA)*u[i] + (pc_DEC)*v[i]) * mas2rad * 1e6
             if phasemaps:
                 s_SgrA -= ((pm_pha_c[i,0] - pm_pha_c[i,1])/360*wave)
