@@ -1031,6 +1031,7 @@ class GravMFit(GravData, GravPhaseMaps):
         upper = np.zeros(nsource*3+4)
         todel = []
         
+        fr_list = [np.log10(i) for i in fr_list]
         for ndx in range(nsource):
             theta[ndx*3] = ra_list[ndx]
             theta[ndx*3+1] = de_list[ndx]
