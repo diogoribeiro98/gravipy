@@ -735,22 +735,26 @@ class GravMFit(GravData, GravPhaseMaps):
             alpha_stars = 3
         
         if phasemaps:
-            pm_sources = []
-            pm_amp_c, pm_pha_c, pm_int_c = self.phasemap_source(pc_RA, pc_DEC, 
-                                                        northA, dra, ddec)
-            for ndx in range(nsource):
-                pm_amp, pm_pha, pm_int = self.phasemap_source(pc_RA + theta[ndx*3], 
-                                                         pc_DEC + theta[ndx*3+1], 
-                                                         northA, dra, ddec)
-                pm_sources.append([pm_amp, pm_pha, pm_int])
-            
-
+            if self.fit_phasemaps:
+                pm_sources = []
+                pm_amp_c, pm_pha_c, pm_int_c = self.phasemap_source(pc_RA, pc_DEC, 
+                                                            northA, dra, ddec)
+                for ndx in range(nsource):
+                    pm_amp, pm_pha, pm_int = self.phasemap_source(pc_RA + theta[ndx*3], 
+                                                             pc_DEC + theta[ndx*3+1], 
+                                                            northA, dra, ddec)
+                    pm_sources.append([pm_amp, pm_pha, pm_int])
+            else:
+                pm_sources = self.pm_sources
+                pm_amp_c, pm_pha_c, pm_int_c = self.pm_amp_c, self.pm_pha_c, self.pm_int_c
+                
         vis = np.zeros((6,len(wave))) + 0j
         for i in range(0,6):
             s_SgrA = ((pc_RA)*u[i] + (pc_DEC)*v[i]) * mas2rad * 1e6
+
             if phasemaps:
                 s_SgrA -= ((pm_pha_c[i,0] - pm_pha_c[i,1])/360*wave)
-            
+                
             s_stars = []
             for ndx in range(nsource):
                 s_s = ((theta[ndx*3] + pc_RA)*u[i] + 
@@ -825,16 +829,21 @@ class GravMFit(GravData, GravPhaseMaps):
         res_visamp = np.sum(-(model_visamp-visamp)**2/visamp_error**2*(1-visamp_flag))
         res_vis2 = np.sum(-(model_vis2-vis2)**2./vis2_error**2.*(1-vis2_flag))
         
-        res_closure_1 = np.abs(model_closure-closure)
-        res_closure_2 = 360-np.abs(model_closure-closure)
-        check = np.abs(res_closure_1) < np.abs(res_closure_2)
-        res_closure = res_closure_1*check + res_closure_2*(1-check)
+        #res_closure_1 = np.abs(model_closure-closure)
+        #res_closure_2 = 360-np.abs(model_closure-closure)
+        #check = np.abs(res_closure_1) < np.abs(res_closure_2)
+        #res_closure = res_closure_1*check + res_closure_2*(1-check)
+        
+        res_closure = np.degrees(np.abs(np.exp(1j*np.radians(model_closure)) - np.exp(1j*np.radians(closure))))
         res_clos = np.sum(-res_closure**2./closure_error**2.*(1-closure_flag))
  
-        res_visphi_1 = np.abs(model_visphi-visphi)
-        res_visphi_2 = 360-np.abs(model_visphi-visphi)
-        check = np.abs(res_visphi_1) < np.abs(res_visphi_2) 
-        res_visphi = res_visphi_1*check + res_visphi_2*(1-check)
+        #res_visphi_1 = np.abs(model_visphi-visphi)
+        #res_visphi_2 = 360-np.abs(model_visphi-visphi)
+        #check = np.abs(res_visphi_1) < np.abs(res_visphi_2) 
+        #res_visphi = res_visphi_1*check + res_visphi_2*(1-check)
+        
+        
+        res_visphi = np.degrees(np.abs(np.exp(1j*np.radians(model_visphi)) - np.exp(1j*np.radians(visphi))))
         res_phi = np.sum(-res_visphi**2./visphi_error**2.*(1-visphi_flag))
         
         ln_prob_res = 0.5 * (res_visamp * self.fit_for[0] + 
@@ -863,7 +872,8 @@ class GravMFit(GravData, GravPhaseMaps):
                  initial=None, 
                  flagtill=3, 
                  flagfrom=13,
-                 fixedBHalpha=False, 
+                 fixedBHalpha=False,
+                 fixedBG=False,                    
                  plotCorner=True, 
                  plotScience=True, 
                  createpdf=False, 
@@ -871,6 +881,7 @@ class GravMFit(GravData, GravPhaseMaps):
                  outputdir='./',
                  redchi2=False,
                  phasemaps=False,
+                 fit_phasemaps=True,
                  interppm=True,
                  smoothkernel=15,
                  pmdatayear=2019):
@@ -914,6 +925,7 @@ class GravMFit(GravData, GravPhaseMaps):
         outputdir:      Directory where pdf & txt files are saved [./]
         redchi2:        Gives redchi2 instead of chi2 [False]
         phasemaps:      Use Phasemaps for fit [False]
+        fit_phasemaps:  Uses the inital guess to evalute a fixed phasemap correction for the fit, and does not compute it all times.
         interppm:       Interpolate Phasemaps [True]
         smoothkernel:   Size of smoothing kernel in mas [15]
         simulate_pm:    Phasemaps for simulated data, sets ACQ parameter to 0 [False]
@@ -924,6 +936,7 @@ class GravMFit(GravData, GravPhaseMaps):
         
         self.fit_for = fit_for
         self.fixedBHalpha = fixedBHalpha
+        self.fixedBG = fixedBG
         self.interppm = interppm
         self.fit_mode = fit_mode
         self.bequiet = bequiet
@@ -931,6 +944,7 @@ class GravMFit(GravData, GravPhaseMaps):
         
         
         self.phasemaps = phasemaps
+        self.fit_phasemaps = fit_phasemaps
         self.datayear = pmdatayear
         self.smoothkernel = smoothkernel
         if phasemaps:
@@ -984,6 +998,8 @@ class GravMFit(GravData, GravPhaseMaps):
         except KeyError:
             fiberOffX = 0
             fiberOffY = 0
+
+
 
         nwave = self.channel
 
@@ -1082,10 +1098,24 @@ class GravMFit(GravData, GravPhaseMaps):
         ndim = len(theta)
         if fixedBHalpha:
             todel.append(th_rest)
+        if fixedBG:
+            todel.append(th_rest+1)
         if fit_for[3] == 0:
             todel.append(th_rest+2)
             todel.append(th_rest+3)
         ndof = ndim - len(todel)
+        
+        if phasemaps:
+            if not self.fit_phasemaps:
+                self.pm_sources = []
+                self.pm_amp_c, self.pm_pha_c, self.pm_int_c = self.phasemap_source(0, 0, 
+                                                                        self.northangle, self.dra, self.ddec)
+                for ndx in range(nsource):
+                    pm_amp, pm_pha, pm_int = self.phasemap_source(0 + theta[ndx*3], 
+                                                                0 + theta[ndx*3+1], 
+                                                                self.northangle, self.dra, self.ddec)
+                    self.pm_sources.append([pm_amp, pm_pha, pm_int])
+        
         
         if no_fit:
             if no_fit_values is None:
@@ -1305,6 +1335,8 @@ class GravMFit(GravData, GravPhaseMaps):
                             closure, closure_error, closure_flag,
                             visphi, visphi_error, visphi_flag]
                 
+                self.fitdata = fitdata
+
                 if not no_fit:
                     if nthreads == 1:
                         sampler = emcee.EnsembleSampler(nwalkers, ndim, self.lnprob, 
@@ -1382,28 +1414,45 @@ class GravMFit(GravData, GravPhaseMaps):
                             plt.show()
                         
                     # get the actual fit
-                    theta_fit = np.percentile(fl_samples, [50], axis=0).T
+                    theta_fit = np.percentile(fl_samples, [50], axis=0).T.flatten()
                     if bestchi:
                         theta_result = mostprop
                     else:
                         theta_result = theta_fit
                 else:
                     theta_result = theta
-                    
+                
+                self.theta_result = theta_result
+                
                 results.append(theta_result)
                 fit_visamp, fit_visphi, fit_closure = self.calc_vis(theta_result)
                 fit_vis2 = fit_visamp**2.
+                
+                self.result_fit_visamp = fit_visamp
+                self.result_fit_vis2 = fit_vis2
+                self.result_visphi = fit_visphi
+                self.result_closure = fit_closure
+                
                         
                 res_visamp = fit_visamp-visamp
                 res_vis2 = fit_vis2-vis2
-                res_closure_1 = np.abs(fit_closure-closure)
-                res_closure_2 = 360-np.abs(fit_closure-closure)
-                check = np.abs(res_closure_1) < np.abs(res_closure_2) 
-                res_closure = res_closure_1*check + res_closure_2*(1-check)
-                res_visphi_1 = np.abs(fit_visphi-visphi)
-                res_visphi_2 = 360-np.abs(fit_visphi-visphi)
-                check = np.abs(res_visphi_1) < np.abs(res_visphi_2) 
-                res_visphi = res_visphi_1*check + res_visphi_2*(1-check)
+                
+                #res_closure_1 = np.abs(model_closure-closure)
+                #res_closure_2 = 360-np.abs(model_closure-closure)
+                #check = np.abs(res_closure_1) < np.abs(res_closure_2)
+                #res_closure = res_closure_1*check + res_closure_2*(1-check)
+                
+                res_closure = np.degrees(np.abs(np.exp(1j*np.radians(fit_closure)) - np.exp(1j*np.radians(closure))))
+                res_closure = np.sum(-res_closure**2./closure_error**2.*(1-closure_flag))
+        
+                #res_visphi_1 = np.abs(model_visphi-visphi)
+                #res_visphi_2 = 360-np.abs(model_visphi-visphi)
+                #check = np.abs(res_visphi_1) < np.abs(res_visphi_2) 
+                #res_visphi = res_visphi_1*check + res_visphi_2*(1-check)
+                
+                
+                res_visphi = np.degrees(np.abs(np.exp(1j*np.radians(fit_visphi)) - np.exp(1j*np.radians(visphi))))
+                res_visphi = np.sum(-res_visphi**2./visphi_error**2.*(1-visphi_flag))
 
                 redchi_visamp = np.sum(res_visamp**2./visamp_error**2.*(1-visamp_flag))
                 redchi_vis2 = np.sum(res_vis2**2./vis2_error**2.*(1-vis2_flag))
