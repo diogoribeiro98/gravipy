@@ -36,7 +36,11 @@ def convert_date(date):
 
 
 class GravData():
-    def __init__(self, data, verbose=True):
+    def __init__(self, data, verbose=True, plot=False):
+        """
+        verbose (True)
+        plot (False) if True runs the plotting utilty of self.getIntdata (plots data ect.)
+        """
         self.name = data
         self.verbose = verbose
         self.colors_baseline = np.array(['k', 'darkblue', color4, 
