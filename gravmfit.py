@@ -707,7 +707,7 @@ class GravMFit(GravData, GravPhaseMaps):
             ddec = self.ddec
             dra = self.dra
         
-        th_rest = nsource*3
+        th_rest = nsource*3-1
         
         if fixedBHalpha:
             alpha_SgrA = -0.5
@@ -719,6 +719,7 @@ class GravMFit(GravData, GravPhaseMaps):
         
         pc_RA = theta[th_rest+2]
         pc_DEC = theta[th_rest+3]
+        fr_BH = theta[th_rest+4]
         
         try:
             if self.fit_for[3] == 0:
@@ -739,15 +740,20 @@ class GravMFit(GravData, GravPhaseMaps):
                 pm_sources = []
                 pm_amp_c, pm_pha_c, pm_int_c = self.phasemap_source(pc_RA, pc_DEC, 
                                                             northA, dra, ddec)
-                for ndx in range(nsource):
-                    pm_amp, pm_pha, pm_int = self.phasemap_source(pc_RA + theta[ndx*3], 
-                                                             pc_DEC + theta[ndx*3+1], 
+                pm_amp, pm_pha, pm_int = self.phasemap_source(pc_RA + theta[0], 
+                                                            pc_DEC + theta[1], 
+                                                        northA, dra, ddec)
+                pm_sources.append([pm_amp, pm_pha, pm_int])
+                for ndx in range(1,nsource):
+                    pm_amp, pm_pha, pm_int = self.phasemap_source(pc_RA + theta[ndx*3-1], 
+                                                             pc_DEC + theta[ndx*3], 
                                                             northA, dra, ddec)
                     pm_sources.append([pm_amp, pm_pha, pm_int])
             else:
                 pm_sources = self.pm_sources
                 pm_amp_c, pm_pha_c, pm_int_c = self.pm_amp_c, self.pm_pha_c, self.pm_int_c
-                
+
+        
         vis = np.zeros((6,len(wave))) + 0j
         for i in range(0,6):
             s_SgrA = ((pc_RA)*u[i] + (pc_DEC)*v[i]) * mas2rad * 1e6
@@ -768,31 +774,55 @@ class GravMFit(GravData, GravPhaseMaps):
             intSgrA = self.ind_visibility(s_SgrA, alpha_SgrA, wave, dlambda[i,:])
             intSgrA_center = self.ind_visibility(0, alpha_SgrA, wave, dlambda[i,:])
 
-            nom = intSgrA
             
-            denom1 = np.copy(intSgrA_center)
-            denom2 = np.copy(intSgrA_center)
+            nom = intSgrA * fr_BH
+            
+            denom1 = np.copy(intSgrA_center) * fr_BH
+            denom2 = np.copy(intSgrA_center) * fr_BH
             
             int_star_center = self.ind_visibility(0, alpha_stars, wave, dlambda[i,:])
             if phasemaps:
+                pm_amp_norm, _, pm_int_norm = pm_sources[0]
+
+                cr1 = (pm_amp_c[i,0] / pm_amp_norm[i,0])**2
+                cr2 = (pm_amp_c[i,1] / pm_amp_norm[i,1])**2
+                cr_denom1 = (pm_int_c[i,0] / pm_int_norm[i,0])
+                cr_denom2 = (pm_int_c[i,1] / pm_int_norm[i,1])
+                
+                nom *= np.sqrt(cr1*cr2)
+                denom1 *= cr_denom1
+                denom2 *= cr_denom2
+                
                 for ndx in range(nsource):
                     int_star = self.ind_visibility(s_stars[ndx], alpha_stars, wave, dlambda[i,:])
                     
                     pm_amp, _, pm_int = pm_sources[ndx]
-                    cr1 = (pm_amp[i,0] / pm_amp_c[i,0])**2
-                    cr2 = (pm_amp[i,1] / pm_amp_c[i,1])**2
-                    cr_denom1 = (pm_int[i,0] / pm_int_c[i,0])
-                    cr_denom2 = (pm_int[i,1] / pm_int_c[i,1])
+                    cr1 = (pm_amp[i,0] / pm_amp_norm[i,0])**2
+                    cr2 = (pm_amp[i,1] / pm_amp_norm[i,1])**2
+                    cr_denom1 = (pm_int[i,0] / pm_int_norm[i,0])
+                    cr_denom2 = (pm_int[i,1] / pm_int_norm[i,1])
                     
-                    nom += (10.**(theta[ndx*3+2]) * np.sqrt(cr1*cr2) * int_star)
-                    denom1 += (10.**(theta[ndx*3+2]) * cr_denom1 * int_star_center)
-                    denom2 += (10.**(theta[ndx*3+2]) * cr_denom2 * int_star_center)
+                    if nsource != 0:
+                        nom += (10.**(theta[ndx*3+1]) * np.sqrt(cr1*cr2) * int_star)
+                        denom1 += (10.**(theta[ndx*3+1]) * cr_denom1 * int_star_center)
+                        denom2 += (10.**(theta[ndx*3+1]) * cr_denom2 * int_star_center)
+                    else:
+                        nom += (int_star)
+                        denom1 += (int_star_center)
+                        denom2 += (int_star_center)
+                        
             else:
                 for ndx in range(nsource):
                     int_star = self.ind_visibility(s_stars[ndx], alpha_stars, wave, dlambda[i,:])
-                    nom += (10.**(theta[ndx*3+2]) * int_star)
-                    denom1 += (10.**(theta[ndx*3+2]) * int_star_center)
-                    denom2 += (10.**(theta[ndx*3+2]) * int_star_center)
+                    if nsource != 0:
+                        nom += (10.**(theta[ndx*3+2]) * int_star)
+                        denom1 += (10.**(theta[ndx*3+2]) * int_star_center)
+                        denom2 += (10.**(theta[ndx*3+2]) * int_star_center)
+                    else:
+                        nom += (int_star)
+                        denom1 += (int_star_center)
+                        denom2 += (int_star_center)
+                        
                 
             intBG = self.ind_visibility(0, alpha_bg, wave, dlambda[i,:])
             denom1 += (fluxRatioBG * intBG)
@@ -975,12 +1005,12 @@ class GravMFit(GravData, GravPhaseMaps):
         if fit_pos is None:
             fit_pos = np.ones(nsource)
         if fit_fr is None:
-            fit_fr = np.ones(nsource)
+            fit_fr = np.ones(nsource-1)
         
-        if len(de_list) != nsource or len(fr_list) != nsource or len(fit_size) != nsource:
+        if len(de_list) != nsource or len(fit_pos) != nsource or len(fit_size) != nsource:
             raise ValueError('list of input parameters have different lengths')
-        if len(fit_pos) != nsource or len(fit_fr) != nsource:
-            raise ValueError('list of input parameters have different lengths')
+        if len(fr_list) != (nsource-1) or len(fit_fr) != (nsource-1):
+            raise ValueError('list of input parameters have different lengths, fr list should be nsource-1')
         self.nsource = nsource
         
         # Get data from file
@@ -1032,15 +1062,15 @@ class GravMFit(GravData, GravPhaseMaps):
 
         # Initial guesses
         if initial is not None:
-            if len(initial) != 4:
+            if len(initial) != 5:
                 raise ValueError('Length of initial parameter list is not correct')
-            alpha_SgrA_in, flux_ratio_bg_in, pc_RA_in, pc_DEC_in = initial
+            alpha_SgrA_in, flux_ratio_bg_in, pc_RA_in, pc_DEC_in, flux_ratio_bh = initial
         else:
             alpha_SgrA_in = -0.5
             flux_ratio_bg_in = 0.1
             pc_RA_in = 0
             pc_DEC_in = 0
-            
+            flux_ratio_bh = 1
             
         theta = np.zeros(nsource*3+4)
         lower = np.zeros(nsource*3+4)
@@ -1048,45 +1078,63 @@ class GravMFit(GravData, GravPhaseMaps):
         todel = []
         
         fr_list = [np.log10(i) for i in fr_list]
-        for ndx in range(nsource):
-            theta[ndx*3] = ra_list[ndx]
-            theta[ndx*3+1] = de_list[ndx]
-            theta[ndx*3+2] = fr_list[ndx]
+        
+        # first star (no flux ratio)
+        theta[0] = ra_list[0]
+        theta[1] = de_list[0]
+        lower[0] = ra_list[0] - fit_size[0]
+        lower[1] = de_list[0] - fit_size[0]
+        upper[0] = ra_list[0] + fit_size[0]
+        upper[1] = de_list[0] + fit_size[0]
+        if not fit_pos[0]:
+            todel.append(0)
+            todel.append(1)
+        
+        # every other star
+        for ndx in range(1,nsource):
+            theta[ndx*3-1] = ra_list[ndx]
+            theta[ndx*3] = de_list[ndx]
+            theta[ndx*3+1] = fr_list[ndx-1]
 
-            lower[ndx*3] = ra_list[ndx] - fit_size[ndx]
-            lower[ndx*3+1] = de_list[ndx] - fit_size[ndx]
-            lower[ndx*3+2] = np.log10(0.001)
+            lower[ndx*3-1] = ra_list[ndx] - fit_size[ndx]
+            lower[ndx*3] = de_list[ndx] - fit_size[ndx]
+            lower[ndx*3+1] = np.log10(0.001)
 
-            upper[ndx*3] = ra_list[ndx] + fit_size[ndx]
-            upper[ndx*3+1] = de_list[ndx] + fit_size[ndx]
-            upper[ndx*3+2] = np.log10(10.)
+            upper[ndx*3-1] = ra_list[ndx] + fit_size[ndx]
+            upper[ndx*3] = de_list[ndx] + fit_size[ndx]
+            upper[ndx*3+1] = np.log10(10.)
             
             if not fit_pos[ndx]:
+                todel.append(ndx*3-1)
                 todel.append(ndx*3)
+            if not fit_fr[ndx-1]:
                 todel.append(ndx*3+1)
-            if not fit_fr[ndx]:
-                todel.append(ndx*3+2)
 
-        th_rest = nsource*3
+        th_rest = nsource*3-1
         
         theta[th_rest] = alpha_SgrA_in
         theta[th_rest+1] = flux_ratio_bg_in
         theta[th_rest+2] = pc_RA_in
         theta[th_rest+3] = pc_DEC_in
+        theta[th_rest+4] = flux_ratio_bh
 
         pc_size = 5
         lower[th_rest] = -10
         lower[th_rest+1] = 0.1
         lower[th_rest+2] = pc_RA_in - pc_size
         lower[th_rest+3] = pc_DEC_in - pc_size
+        lower[th_rest+4] = np.log10(0.001)
 
         upper[th_rest] = 10
         upper[th_rest+1] = 20
         upper[th_rest+2] = pc_RA_in + pc_size
         upper[th_rest+3] = pc_DEC_in + pc_size
+        upper[th_rest+4] = np.log10(10.)
         
         theta_names = []
-        for ndx in range(nsource):
+        theta_names.append('dRA1')
+        theta_names.append('dDEC1')
+        for ndx in range(1,nsource):
             theta_names.append('dRA%i' % (ndx + 1))
             theta_names.append('dDEC%i' % (ndx + 1))
             theta_names.append('fr%i' % (ndx + 1))
@@ -1094,6 +1142,7 @@ class GravMFit(GravData, GravPhaseMaps):
         theta_names.append('f BG')
         theta_names.append('pc RA')
         theta_names.append('pc Dec')
+        theta_names.append('fr BH')
         
 
         ndim = len(theta)
@@ -1111,9 +1160,14 @@ class GravMFit(GravData, GravPhaseMaps):
                 self.pm_sources = []
                 self.pm_amp_c, self.pm_pha_c, self.pm_int_c = self.phasemap_source(0, 0, 
                                                                         self.northangle, self.dra, self.ddec)
-                for ndx in range(nsource):
-                    pm_amp, pm_pha, pm_int = self.phasemap_source(0 + theta[ndx*3], 
-                                                                0 + theta[ndx*3+1], 
+                
+                pm_amp, pm_pha, pm_int = self.phasemap_source(0 + theta[0], 
+                                                            0 + theta[1], 
+                                                            self.northangle, self.dra, self.ddec)
+                self.pm_sources.append([pm_amp, pm_pha, pm_int])
+                for ndx in range(1,nsource):
+                    pm_amp, pm_pha, pm_int = self.phasemap_source(0 + theta[ndx*3-1], 
+                                                                0 + theta[ndx*3], 
                                                                 self.northangle, self.dra, self.ddec)
                     self.pm_sources.append([pm_amp, pm_pha, pm_int])
         
