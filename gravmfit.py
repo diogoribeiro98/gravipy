@@ -583,10 +583,7 @@ def _lnprob_mstars(theta, fitdata, lower, upper, fitarg, fithelp):
 
 def _lnlike_mstars(theta, fitdata, fitarg, fithelp):
     
-    (nsource, fit_for, bispec_ind, fit_mode, wave, dlambda, 
-     fixedBHalpha, phasemaps, northA, dra, ddec, amp_map_int, 
-     pha_map_int, amp_map_denom_int, fit_phasemaps, fix_pm_sources,
-     fix_pm_amp_c, fix_pm_pha_c, fix_pm_int_c) = fithelp
+    fit_for = fithelp[1]
     
     model_visamp, model_visphi, model_closure = _calc_vis_mstars(theta, fitarg, fithelp)
     model_vis2 = model_visamp**2.
@@ -657,13 +654,13 @@ def _calc_vis_mstars(theta, fitarg, fithelp):
             for ndx in range(nsource):
                 if ndx == 0:
                     pm_amp, pm_pha, pm_int = _readPhasemaps(pc_RA + theta[0], 
-                                                            pc_DEC + theta[1], 
+                                                            pc_DEC + theta[1], northA, 
                                                             amp_map_int, pha_map_int, amp_map_denom_int, 
                                                             wave, dra, ddec)
                     pm_sources.append([pm_amp, pm_pha, pm_int])
                 else:
                     pm_amp, pm_pha, pm_int = _readPhasemaps(pc_RA + theta[ndx*3-1], 
-                                                            pc_DEC + theta[ndx*3], 
+                                                            pc_DEC + theta[ndx*3], northA,
                                                             amp_map_int, pha_map_int, amp_map_denom_int, 
                                                             wave, dra, ddec)
                     pm_sources.append([pm_amp, pm_pha, pm_int])
@@ -799,7 +796,7 @@ class GravMFit(GravData, GravPhaseMaps):
                  outputdir='./',
                  redchi2=False,
                  phasemaps=False,
-                 fit_phasemaps=True,
+                 fit_phasemaps=False,
                  interppm=True,
                  smoothkernel=15,
                  pmdatayear=2019):
