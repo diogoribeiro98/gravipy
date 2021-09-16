@@ -144,7 +144,6 @@ class GravData():
                 if not datacatg == 'ASTROREDUCED':
                     self.wlFT = fits.open(self.name)['OI_WAVELENGTH', 20].data['EFF_WAVE']*1e6
         
-        self.getIntdata(plot=False, flag=False)
     
     def getValue(self, ext1, ext2=None, ext1num=None):
         """
