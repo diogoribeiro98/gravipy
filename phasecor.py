@@ -81,7 +81,7 @@ def get_angle_header_all(header, tel, length):
     posangle = np.arctan2(dx, dy) * 180 / np.pi;
     fangle = - posangle - drottoff + 270
     angle = fangle + parang + 45.
-    return angle%360
+    return (angle)%360
 
 def get_angle_header_start(header, tel):
     pa1 = header["ESO ISS PARANG START"]
@@ -92,7 +92,7 @@ def get_angle_header_start(header, tel):
     posangle = np.arctan2(dx, dy) * 180 / np.pi;
     fangle = - posangle - drottoff + 270
     angle = fangle + parang + 45.
-    return angle%360
+    return (angle)%360
 
 def get_angle_header_mean(header, tel):
     pa1 = header["ESO ISS PARANG START"]
@@ -104,7 +104,7 @@ def get_angle_header_mean(header, tel):
     posangle = np.arctan2(dx, dy) * 180 / np.pi;
     fangle = - posangle - drottoff + 270
     angle = fangle + parang + 45.
-    return angle%360
+    return (angle)%360
 
 def rotation(ang):
     return np.array([[np.cos(ang), np.sin(ang)],
@@ -2528,7 +2528,8 @@ class GravPhaseNight():
                                     truths=mostprop, labels=theta_names)
                 plt.show()
             popt = np.percentile(fl_samples, [50], axis=0).T
-            
+            popt_pl = popt
+            sources_pl = np.copy(sources)
             del sampler, samples
             gc.collect()
         
