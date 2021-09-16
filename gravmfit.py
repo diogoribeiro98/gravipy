@@ -1002,8 +1002,8 @@ class GravMFit(GravData, GravPhaseMaps):
 
 
         nwave = self.channel
-
-        self.getIntdata(plot=False, flag=False)
+        print("no data set in function")
+        #self.getIntdata(plot=False, flag=False)
 
         MJD = fits.open(self.name)[0].header["MJD-OBS"]
         u = self.u
