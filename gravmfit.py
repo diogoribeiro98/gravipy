@@ -762,8 +762,8 @@ def _calc_vis_mstars(theta, fitarg, fithelp):
 
 
 class GravMFit(GravData, GravPhaseMaps):
-    def __init__(self, data, verbose=True):
-        super().__init__(data, verbose=True)
+    def __init__(self, data, verbose=False):
+        super().__init__(data, verbose=verbose)
         self.getIntdata()
         
         
@@ -806,6 +806,8 @@ class GravMFit(GravData, GravPhaseMaps):
         All flux ratios are with respect to centra source
         
         The length of the input lists defines number of companions!
+        Flux input lists is number of companions - 1
+        (Flux of first companion is set to 1)
         
         Mandatory argumens:
         ra_list:        Initial guess for ra separation of companions
@@ -840,7 +842,7 @@ class GravMFit(GravData, GravPhaseMaps):
         outputdir:      Directory where pdf & txt files are saved [./]
         redchi2:        Gives redchi2 instead of chi2 [False]
         phasemaps:      Use Phasemaps for fit [False]
-        fit_phasemaps:  Uses the inital guess to evalute a fixed phasemap correction for the fit, and does not compute it all times.
+        fit_phasemaps:  Fit phasemaps at each step, otherwise jsut takes the initial guess value [False]
         interppm:       Interpolate Phasemaps [True]
         smoothkernel:   Size of smoothing kernel in mas [15]
         simulate_pm:    Phasemaps for simulated data, sets ACQ parameter to 0 [False]
