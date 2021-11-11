@@ -1626,6 +1626,10 @@ class GravMFit(GravData, GravPhaseMaps):
         magu = np.sqrt(u**2.+v**2.)
         self.wave = wave_model
         self.dlambda = dlambda_model
+        
+        fithelp[4] = wave_model
+        fithelp[5] = dlambda_model
+        
         (model_visamp_full, model_visphi_full, 
         model_closure_full)  = _calc_vis_mstars(theta, fitarg, fithelp)
         self.wave = wave
