@@ -785,7 +785,7 @@ class GravMFit(GravData, GravPhaseMaps):
                  bequiet=False,
                  fit_for=np.array([0.5,0.5,1.0,0.0]),
                  fit_mode='analytic',
-                 coh_loss=False,
+                 coh_loss=None,
                  no_fit=False,
                  no_fit_values=None,
                  onlypol=None,
@@ -834,7 +834,8 @@ class GravMFit(GravData, GravPhaseMaps):
         fit_for:        weight of VA, V2, T3, VP [[0.5,0.5,1.0,0.0]]
         fit_mode:       Kind of integration for visibilities (approx, numeric, 
                         analytic) [analytic]
-        coh_loss:       Fit for a coherence loss per Basline [False]
+        coh_loss:       If not None, fit for a coherence loss per Basline 
+                        Value is initial guess (0-1) [None]
         no_fit  :       Only gives fitting results for parameters from no_fit_values [False]
         no_fit_values:  has to be given for donotfit [None]
         onlypol:        Only fits one polarization for split mode, either 0 or 1 [None]
@@ -865,6 +866,12 @@ class GravMFit(GravData, GravPhaseMaps):
         self.interppm = interppm
         self.fit_mode = fit_mode
         self.bequiet = bequiet
+        if coh_loss is not None:
+            coh_loss_in = coh_loss
+            coh_loss = True
+        else:
+            coh_loss = False
+
         self.coh_loss = coh_loss
         rad2as = 180 / np.pi * 3600
 
@@ -1039,7 +1046,7 @@ class GravMFit(GravData, GravPhaseMaps):
         upper[th_rest+4] = np.log10(10.)
     
         if coh_loss:
-            theta[th_rest+5:] = 0.6
+            theta[th_rest+5:] = coh_loss_in
             upper[th_rest+5:] = 1
             lower[th_rest+5:] = 0.1
 
