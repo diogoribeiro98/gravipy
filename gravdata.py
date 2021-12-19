@@ -477,6 +477,17 @@ class GravData():
                 self.t3ampflagSC = fitsdata['OI_T3', 10].data.field('FLAG')
                 self.visphiflagSC = fitsdata['OI_VIS', 10].data.field('FLAG')
                 
+                for t in ignore_tel:
+                    for cdx, cl in enumerate(self.closure_labels):
+                        if str(t) in cl:
+                            self.t3flagSC[cdx] = True
+                            self.t3ampflagSC[cdx] = True
+                    for vdx, vi in enumerate(self.baseline_labels):
+                        if str(t) in vi:
+                            self.visampflagSC[vdx] = True
+                            self.vis2flagSC[vdx] = True
+                            self.visphiflagSC[vdx] = True
+                
                 if flag:
                     self.visampSC[self.visampflagSC] = np.nan
                     self.visamperrSC[self.visampflagSC] = np.nan
