@@ -766,9 +766,9 @@ def _calc_vis_mstars(theta, fitarg, fithelp):
 
 
 class GravMFit(GravData, GravPhaseMaps):
-    def __init__(self, data, verbose=False):
+    def __init__(self, data, verbose=False, ignore_tel=[]):
         super().__init__(data, verbose=verbose)
-        self.getIntdata()
+        self.getIntdata(ignore_tel=ignore_tel)
 
 
     def fitStars(self,

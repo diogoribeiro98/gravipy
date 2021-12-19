@@ -240,7 +240,8 @@ class GravData():
 
 
 
-    def getIntdata(self, mode='SC', plot=False, plotTAmp=False, flag=False):
+    def getIntdata(self, mode='SC', plot=False, plotTAmp=False, flag=False,
+                   ignore_tel=[]):
         """
         Reads out all interferometric data and saves it into the class:
         visamp, visphi, visphi2, closure amplitude and phase
@@ -318,6 +319,22 @@ class GravData():
                 self.t3ampflagSC_P2 = fitsdata['OI_T3', 12].data.field('FLAG')
                 self.visphiflagSC_P1 = fitsdata['OI_VIS', 11].data.field('FLAG')
                 self.visphiflagSC_P2 = fitsdata['OI_VIS', 12].data.field('FLAG')
+                
+                for t in ignore_tel:
+                    for cdx, cl in enumerate(self.closure_labels):
+                        if str(t) in cl:
+                            self.t3flagSC_P1[cdx] = True
+                            self.t3flagSC_P2[cdx] = True
+                            self.t3ampflagSC_P1[cdx] = True
+                            self.t3ampflagSC_P2[cdx] = True
+                    for vdx, vi in enumerate(self.baseline_labels):
+                        if str(t) in vi:
+                            self.visampflagSC_P1[vdx] = True
+                            self.visampflagSC_P2[vdx] = True
+                            self.vis2flagSC_P1[vdx] = True
+                            self.vis2flagSC_P2[vdx] = True
+                            self.visphiflagSC_P1[vdx] = True
+                            self.visphiflagSC_P2[vdx] = True
                 
                 if flag:
                     self.visampSC_P1[self.visampflagSC_P1] = np.nan
