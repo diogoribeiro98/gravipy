@@ -1039,7 +1039,7 @@ class GravMFit(GravData, GravPhaseMaps):
         upper[th_rest+4] = np.log10(10.)
     
         if coh_loss:
-            theta[th_rest+5:] = 0.8
+            theta[th_rest+5:] = 0.6
             upper[th_rest+5:] = 1
             lower[th_rest+5:] = 0.1
 
