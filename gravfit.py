@@ -3795,9 +3795,12 @@ class GravFit(GravData):
                     dofit = False
                 for bl in range(6):
                     if (visphi_flag[bl] == True).all():
-                        if not bequiet:
-                            print('Baseline %i is completely flagged, something wrong with the data' % bl)
-                        dofit = False
+                        if dontfitbl is not None and bl in dontfitbl:
+                            continue
+                        else:
+                            if not bequiet:
+                                print('Baseline %i is completely flagged, something wrong with the data' % bl)
+                            dofit = False
                     elif (np.size(visphi_flag[bl])-np.count_nonzero(visphi_flag[bl])) < mindatapoints:
                         if not bequiet:
                             print('Baseline %i is has to few non flagged values' % bl)
@@ -3821,7 +3824,7 @@ class GravFit(GravData):
                             raise ValueError('Dontfit has to be one of the UTs: 1,2,3,4,5,6')
                         if dontfit is not None:
                             raise ValueError('Use either dontfit or dontfitbl, not both')
-                        visphi_flag[dontfitbl-1,:] = True
+                        visphi_flag[dontfitbl,:] = True
                     elif isinstance(dontfitbl, list):
                         for bl in dontfitbl:
                             if not bequiet:
@@ -3830,12 +3833,8 @@ class GravFit(GravData):
                                 raise ValueError('Dontfit has to be one of the UTs: 1,2,3,4,5,6')
                             if dontfit is not None:
                                 raise ValueError('Use either dontfit or dontfitbl, not both')
-                            visphi_flag[bl-1,:] = True
+                            visphi_flag[bl,:] = True
                             
-                        
-                    
-                        
-                        
                 if dofit == True:
                     width = 1e-1
                     pos = np.ones((nwalkers,ndim))
