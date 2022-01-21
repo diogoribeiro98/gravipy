@@ -271,14 +271,23 @@ class GravData():
 
                 # spatial frequency T3
                 magu = np.sqrt(self.u**2.+self.v**2.)
-                max_spf = np.zeros((4))
-                max_spf[0] = np.max(np.array([magu[0],magu[3],magu[1]]))
-                max_spf[1] = np.max(np.array([magu[0],magu[4],magu[2]]))
-                max_spf[2] = np.max(np.array([magu[1],magu[5],magu[2]]))
-                max_spf[3] = np.max(np.array([magu[3],magu[5],magu[4]]))
+                max_spf = np.zeros((len(magu)))
+                for idx in range(len(magu)//6):
+                    max_spf[0 + idx*6] = np.max(np.array([magu[0 + idx*6],
+                                                          magu[3 + idx*6],
+                                                          magu[1 + idx*6]]))
+                    max_spf[1 + idx*6] = np.max(np.array([magu[0 + idx*6],
+                                                          magu[4 + idx*6],
+                                                          magu[2 + idx*6]]))
+                    max_spf[2 + idx*6] = np.max(np.array([magu[1 + idx*6],
+                                                          magu[5 + idx*6],
+                                                          magu[2 + idx*6]]))
+                    max_spf[3 + idx*6] = np.max(np.array([magu[3 + idx*6],
+                                                          magu[5 + idx*6],
+                                                          magu[4 + idx*6]]))
                 self.max_spf = max_spf
                 spFrequAS_T3 = np.zeros((len(max_spf),len(wave)))
-                for idx in range(4):
+                for idx in range(len(max_spf)):
                     spFrequAS_T3[idx] = (max_spf[idx]/(wave*1.e-6)
                                          * np.pi / 180. / 3600.)  # 1/as
                 self.spFrequAS_T3 = spFrequAS_T3
@@ -494,14 +503,23 @@ class GravData():
 
                 # spatial frequency T3
                 magu = np.sqrt(self.u**2.+self.v**2.)
-                max_spf = np.zeros((4))
-                max_spf[0] = np.max(np.array([magu[0],magu[3],magu[1]]))
-                max_spf[1] = np.max(np.array([magu[0],magu[4],magu[2]]))
-                max_spf[2] = np.max(np.array([magu[1],magu[5],magu[2]]))
-                max_spf[3] = np.max(np.array([magu[3],magu[5],magu[4]]))
+                max_spf = np.zeros((len(magu)))
+                for idx in range(len(magu)//6):
+                    max_spf[0 + idx*6] = np.max(np.array([magu[0 + idx*6],
+                                                          magu[3 + idx*6],
+                                                          magu[1 + idx*6]]))
+                    max_spf[1 + idx*6] = np.max(np.array([magu[0 + idx*6],
+                                                          magu[4 + idx*6],
+                                                          magu[2 + idx*6]]))
+                    max_spf[2 + idx*6] = np.max(np.array([magu[1 + idx*6],
+                                                          magu[5 + idx*6],
+                                                          magu[2 + idx*6]]))
+                    max_spf[3 + idx*6] = np.max(np.array([magu[3 + idx*6],
+                                                          magu[5 + idx*6],
+                                                          magu[4 + idx*6]]))
                 self.max_spf = max_spf
                 spFrequAS_T3 = np.zeros((len(max_spf),len(wave)))
-                for idx in range(4):
+                for idx in range(len(max_spf)):
                     spFrequAS_T3[idx] = (max_spf[idx]/(wave*1.e-6)
                                          * np.pi / 180. / 3600.)  # 1/as
                 self.spFrequAS_T3 = spFrequAS_T3
@@ -509,6 +527,7 @@ class GravData():
                                             [0, 4, 2],
                                             [1, 5, 2],
                                             [3, 5, 4]])
+
                 # Data
                 # P1
                 self.visampSC = fitsdata['OI_VIS', 10].data.field('VISAMP')
@@ -605,7 +624,7 @@ class GravData():
                         plt.xlabel('spatial frequency (1/arcsec)')
                         plt.ylabel('closure amplitude')
 
-                    axis = plt.subplot(gs[2, 1])
+                        axis = plt.subplot(gs[2, 1])
                     for idx in range(len(self.vis2SC)):
                         plt.errorbar(self.spFrequAS[idx],
                                      self.visphiSC[idx],
