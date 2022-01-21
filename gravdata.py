@@ -238,25 +238,24 @@ class GravData():
                     plt.show()
                 return self.fluxtime, self.fluxFT, self.fluxerrFT
 
-
-
     def getIntdata(self, mode='SC', plot=False, plotTAmp=False, flag=False,
                    ignore_tel=[]):
         """
         Reads out all interferometric data and saves it into the class:
         visamp, visphi, visphi2, closure amplitude and phase
         if plot it plots all data
-        
+
         """
         if self.raw:
-            raise ValueError('Input is a RAW file, not usable for this function')
-        
+            raise ValueError('Input is a RAW file,',
+                             'not usable for this function')
+
         fitsdata = fits.open(self.name)
         if self.polmode == 'SPLIT':
             if mode =='SC':
                 self.u = fitsdata['OI_VIS', 11].data.field('UCOORD')
                 self.v = fitsdata['OI_VIS', 11].data.field('VCOORD')
-                
+
                 # spatial frequency
                 spFrequ = np.sqrt(self.u**2.+self.v**2.)
                 wave = self.wlSC_P1
@@ -264,8 +263,10 @@ class GravData():
                 u_as = np.zeros((len(self.u),len(wave)))
                 v_as = np.zeros((len(self.v),len(wave)))
                 for i in range(0,len(self.u)):
-                    u_as[i,:] = self.u[i]/(wave*1.e-6) * np.pi / 180. / 3600. # 1/as
-                    v_as[i,:] = self.v[i]/(wave*1.e-6) * np.pi / 180. / 3600. # 1/as
+                    u_as[i, :] = (self.u[i] / (wave * 1.e-6)
+                                  * np.pi / 180. / 3600.)  # 1/as
+                    v_as[i, :] = (self.v[i] / (wave * 1.e-6)
+                                  * np.pi / 180. / 3600.)  # 1/as
                 self.spFrequAS = np.sqrt(u_as**2.+v_as**2.)
 
                 # spatial frequency T3
@@ -278,7 +279,8 @@ class GravData():
                 self.max_spf = max_spf
                 spFrequAS_T3 = np.zeros((len(max_spf),len(wave)))
                 for idx in range(4):
-                    spFrequAS_T3[idx] = max_spf[idx]/(wave*1.e-6) * np.pi / 180. / 3600. # 1/as
+                    spFrequAS_T3[idx] = (max_spf[idx]/(wave*1.e-6)
+                                         * np.pi / 180. / 3600.)  # 1/as
                 self.spFrequAS_T3 = spFrequAS_T3
                 self.bispec_ind = np.array([[0,3,1],
                                             [0,4,2],
@@ -307,7 +309,7 @@ class GravData():
                 self.t3errSC_P2 = fitsdata['OI_T3', 12].data.field('T3PHIERR')
                 self.t3ampSC_P2 = fitsdata['OI_T3', 12].data.field('T3AMP') 
                 self.t3amperrSC_P2 = fitsdata['OI_T3', 12].data.field('T3AMPERR')
-                
+
                 # Flags
                 self.visampflagSC_P1 = fitsdata['OI_VIS', 11].data.field('FLAG')
                 self.visampflagSC_P2 = fitsdata['OI_VIS', 12].data.field('FLAG')
@@ -319,7 +321,7 @@ class GravData():
                 self.t3ampflagSC_P2 = fitsdata['OI_T3', 12].data.field('FLAG')
                 self.visphiflagSC_P1 = fitsdata['OI_VIS', 11].data.field('FLAG')
                 self.visphiflagSC_P2 = fitsdata['OI_VIS', 12].data.field('FLAG')
-                
+
                 for t in ignore_tel:
                     for cdx, cl in enumerate(self.closure_labels):
                         if str(t) in cl:
@@ -335,18 +337,18 @@ class GravData():
                             self.vis2flagSC_P2[vdx] = True
                             self.visphiflagSC_P1[vdx] = True
                             self.visphiflagSC_P2[vdx] = True
-                
+
                 if flag:
                     self.visampSC_P1[self.visampflagSC_P1] = np.nan
                     self.visamperrSC_P1[self.visampflagSC_P1] = np.nan
                     self.visampSC_P2[self.visampflagSC_P2] = np.nan
                     self.visamperrSC_P2[self.visampflagSC_P2] = np.nan
-                    
+
                     self.vis2SC_P1[self.vis2flagSC_P1] = np.nan
                     self.vis2errSC_P1[self.vis2flagSC_P1] = np.nan
                     self.vis2SC_P2[self.vis2flagSC_P2] = np.nan
                     self.vis2errSC_P2[self.vis2flagSC_P2] = np.nan
-                    
+
                     self.t3SC_P1[self.t3flagSC_P1] = np.nan
                     self.t3errSC_P1[self.t3flagSC_P1] = np.nan
                     self.t3SC_P2[self.t3flagSC_P2] = np.nan
@@ -369,76 +371,125 @@ class GravData():
                     else:
                         gs = gridspec.GridSpec(2,2)
                         plt.figure(figsize=(15,12))
-                        
+
                     axis = plt.subplot(gs[0,0])
                     for idx in range(len(self.vis2SC_P1)):
-                        plt.errorbar(self.spFrequAS[idx,:], self.visampSC_P1[idx,:], self.visamperrSC_P1[idx,:], alpha=0.7, ms=4, lw=0.5, capsize=0, ls='', marker='o',color=self.colors_baseline[idx%6])
+                        plt.errorbar(self.spFrequAS[idx,:],
+                                     self.visampSC_P1[idx,:],
+                                     self.visamperrSC_P1[idx,:],
+                                     alpha=0.7, ms=4, lw=0.5, capsize=0,
+                                     ls='', marker='o',
+                                     color=self.colors_baseline[idx % 6])
                     for idx in range(len(self.vis2SC_P2)):
-                        plt.errorbar(self.spFrequAS[idx,:], self.visampSC_P2[idx,:], self.visamperrSC_P2[idx,:], alpha=0.7, ms=4, lw=0.5, capsize=0, ls='', marker='D',color=self.colors_baseline[idx%6])
+                        plt.errorbar(self.spFrequAS[idx,:],
+                                     self.visampSC_P2[idx,:],
+                                     self.visamperrSC_P2[idx,:],
+                                     alpha=0.7, ms=4, lw=0.5, capsize=0,
+                                     ls='', marker='D',
+                                     color=self.colors_baseline[idx % 6])
                     plt.axhline(1, ls='--', lw=0.5)
                     plt.ylim(-0.0,1.1)
                     plt.ylabel('visibility amplitude')
 
                     axis = plt.subplot(gs[0,1])
                     for idx in range(len(self.vis2SC_P1)):
-                        plt.errorbar(self.spFrequAS[idx,:], self.vis2SC_P1[idx,:], self.vis2errSC_P1[idx,:], alpha=0.7, ms=4, lw=0.5, capsize=0,  ls='', marker='o',color=self.colors_baseline[idx%6],
-                                     label=self.baseline_labels[idx%6])
+                        plt.errorbar(self.spFrequAS[idx,:],
+                                     self.vis2SC_P1[idx,:],
+                                     self.vis2errSC_P1[idx,:],
+                                     alpha=0.7, ms=4, lw=0.5, capsize=0,
+                                     ls='', marker='o',
+                                     color=self.colors_baseline[idx % 6],
+                                     label=self.baseline_labels[idx % 6])
                         if idx == 5:
                             plt.legend(frameon=True)
                     for idx in range(len(self.vis2SC_P2)):
-                        plt.errorbar(self.spFrequAS[idx,:], self.vis2SC_P2[idx,:], self.vis2errSC_P2[idx,:], alpha=0.7, ms=4, lw=0.5, capsize=0, ls='', marker='D',color=self.colors_baseline[idx%6])
+                        plt.errorbar(self.spFrequAS[idx,:],
+                                     self.vis2SC_P2[idx,:],
+                                     self.vis2errSC_P2[idx,:],
+                                     alpha=0.7, ms=4, lw=0.5, capsize=0,
+                                     ls='', marker='D',
+                                     color=self.colors_baseline[idx % 6])
                     plt.axhline(1, ls='--', lw=0.5)
                     plt.ylim(-0.0,1.1)
                     plt.ylabel('visibility squared')
 
                     axis = plt.subplot(gs[1,0])
                     for idx in range(len(self.t3SC_P2)):
-                        plt.errorbar(self.spFrequAS_T3[idx,:], self.t3SC_P2[idx,:], self.t3errSC_P2[idx,:], alpha=0.7, ms=4, lw=0.5, capsize=0, marker='o',color=self.colors_closure[idx%4],linestyle='',
-                                     label=self.closure_labels[idx%6])
+                        plt.errorbar(self.spFrequAS_T3[idx,:],
+                                     self.t3SC_P2[idx,:],
+                                     self.t3errSC_P2[idx,:],
+                                     alpha=0.7, ms=4, lw=0.5,
+                                     capsize=0, marker='o', ls='',
+                                     color=self.colors_closure[idx % 4],
+                                     label=self.closure_labels[idx % 4])
                         if idx == 3:
                             plt.legend(frameon=True)
                     for idx in range(len(self.t3SC_P2)):
-                        plt.errorbar(self.spFrequAS_T3[idx,:], self.t3SC_P1[idx,:], self.t3errSC_P1[idx,:], alpha=0.7, ms=4, lw=0.5, capsize=0, marker='D',color=self.colors_closure[idx%4],linestyle='')
+                        plt.errorbar(self.spFrequAS_T3[idx,:],
+                                     self.t3SC_P1[idx,:],
+                                     self.t3errSC_P1[idx,:],
+                                     alpha=0.7, ms=4, lw=0.5, capsize=0,
+                                     marker='D', ls='',
+                                     color=self.colors_closure[idx % 4])
                     plt.axhline(0, ls='--', lw=0.5)
                     plt.xlabel('spatial frequency (1/arcsec)')
                     plt.ylabel('closure phase (deg)')
-                    
-                    axis = plt.subplot(gs[1,1])
+
+                    axis = plt.subplot(gs[1, 1])
                     if plotTAmp:
                         for idx in range(len(self.t3SC_P2)):
-                            plt.errorbar(self.spFrequAS_T3[idx,:], self.t3ampSC_P2[idx,:], self.t3amperrSC_P2[idx,:], marker='o',color=self.colors_closure[idx%4],linestyle='')
+                            plt.errorbar(self.spFrequAS_T3[idx,:],
+                                         self.t3ampSC_P2[idx,:],
+                                         self.t3amperrSC_P2[idx,:],
+                                         marker='o', ls='', 
+                                         color=self.colors_closure[idx % 4])
                         for idx in range(len(self.t3SC_P2)):
-                            plt.errorbar(self.spFrequAS_T3[idx,:], self.t3ampSC_P1[idx,:], self.t3amperrSC_P1[idx,:], marker='p',color=self.colors_closure[idx%4],linestyle='')
+                            plt.errorbar(self.spFrequAS_T3[idx,:],
+                                         self.t3ampSC_P1[idx,:],
+                                         self.t3amperrSC_P1[idx,:],
+                                         marker='p', ls='', 
+                                         color=self.colors_closure[idx % 4])
                         plt.axhline(1, ls='--', lw=0.5)
-                        plt.ylim(-0.0,1.1)
+                        plt.ylim(-0.0, 1.1)
                         plt.xlabel('spatial frequency (1/arcsec)')
                         plt.ylabel('closure amplitude')
 
-                        axis = plt.subplot(gs[2,1])
-                        
+                        axis = plt.subplot(gs[2, 1])
+
                     for idx in range(len(self.vis2SC_P1)):
-                        plt.errorbar(self.spFrequAS[idx,:], self.visphiSC_P1[idx,:],self.visphierrSC_P1[idx,:], alpha=0.7, ms=4, lw=0.5, capsize=0, ls='', marker='o',color=self.colors_baseline[idx%6])
+                        plt.errorbar(self.spFrequAS[idx,:],
+                                     self.visphiSC_P1[idx,:],
+                                     self.visphierrSC_P1[idx,:],
+                                     alpha=0.7, ms=4, lw=0.5, capsize=0,
+                                     ls='', marker='o',
+                                     color=self.colors_baseline[idx % 6])
                     for idx in range(len(self.vis2SC_P2)):
-                        plt.errorbar(self.spFrequAS[idx,:], self.visphiSC_P2[idx,:],self.visphierrSC_P2[idx,:], alpha=0.7, ms=4, lw=0.5, capsize=0, ls='', marker='p',color=self.colors_baseline[idx%6])
+                        plt.errorbar(self.spFrequAS[idx,:],
+                                     self.visphiSC_P2[idx,:],
+                                     self.visphierrSC_P2[idx,:],
+                                     alpha=0.7, ms=4, lw=0.5, capsize=0,
+                                     ls='', marker='p',
+                                     color=self.colors_baseline[idx % 6])
                     plt.axhline(0, ls='--', lw=0.5)
                     plt.xlabel('spatial frequency (1/arcsec)')
                     plt.ylabel('visibility phase')
-
                     plt.show()
+
         if self.polmode =='COMBINED':
             if mode =='SC':
                 self.u = fitsdata['OI_VIS', 10].data.field('UCOORD')
                 self.v = fitsdata['OI_VIS', 10].data.field('VCOORD')
-                
+
                 # spatial frequency
-                spFrequ = np.sqrt(self.u**2.+self.v**2.)
                 wave = self.wlSC
                 self.wave = wave
                 u_as = np.zeros((len(self.u),len(wave)))
                 v_as = np.zeros((len(self.v),len(wave)))
-                for i in range(0,len(self.u)):
-                    u_as[i,:] = self.u[i]/(wave*1.e-6) * np.pi / 180. / 3600. # 1/as
-                    v_as[i,:] = self.v[i]/(wave*1.e-6) * np.pi / 180. / 3600. # 1/as
+                for i in range(0, len(self.u)):
+                    u_as[i, :] = (self.u[i]/(wave*1.e-6)
+                                  * np.pi / 180. / 3600.)  # 1/as
+                    v_as[i, :] = (self.v[i]/(wave*1.e-6)
+                                  * np.pi / 180. / 3600.)  # 1/as
                 self.spFrequAS = np.sqrt(u_as**2.+v_as**2.)
 
                 # spatial frequency T3
@@ -451,12 +502,13 @@ class GravData():
                 self.max_spf = max_spf
                 spFrequAS_T3 = np.zeros((len(max_spf),len(wave)))
                 for idx in range(4):
-                    spFrequAS_T3[idx] = max_spf[idx]/(wave*1.e-6) * np.pi / 180. / 3600. # 1/as
+                    spFrequAS_T3[idx] = (max_spf[idx]/(wave*1.e-6)
+                                         * np.pi / 180. / 3600.)  # 1/as
                 self.spFrequAS_T3 = spFrequAS_T3
-                self.bispec_ind = np.array([[0,3,1],
-                                            [0,4,2],
-                                            [1,5,2],
-                                            [3,5,4]])
+                self.bispec_ind = np.array([[0, 3, 1],
+                                            [0, 4, 2],
+                                            [1, 5, 2],
+                                            [3, 5, 4]])
                 # Data
                 # P1
                 self.visampSC = fitsdata['OI_VIS', 10].data.field('VISAMP')
@@ -469,14 +521,14 @@ class GravData():
                 self.t3errSC = fitsdata['OI_T3', 10].data.field('T3PHIERR')
                 self.t3ampSC = fitsdata['OI_T3', 10].data.field('T3AMP')
                 self.t3amperrSC = fitsdata['OI_T3', 10].data.field('T3AMPERR')
-                
+
                 # Flags
                 self.visampflagSC = fitsdata['OI_VIS', 10].data.field('FLAG')
                 self.vis2flagSC = fitsdata['OI_VIS2', 10].data.field('FLAG')
                 self.t3flagSC = fitsdata['OI_T3', 10].data.field('FLAG')
                 self.t3ampflagSC = fitsdata['OI_T3', 10].data.field('FLAG')
                 self.visphiflagSC = fitsdata['OI_VIS', 10].data.field('FLAG')
-                
+
                 for t in ignore_tel:
                     for cdx, cl in enumerate(self.closure_labels):
                         if str(t) in cl:
@@ -487,71 +539,86 @@ class GravData():
                             self.visampflagSC[vdx] = True
                             self.vis2flagSC[vdx] = True
                             self.visphiflagSC[vdx] = True
-                
+
                 if flag:
                     self.visampSC[self.visampflagSC] = np.nan
                     self.visamperrSC[self.visampflagSC] = np.nan
-                    
                     self.vis2SC[self.vis2flagSC] = np.nan
                     self.vis2errSC[self.vis2flagSC] = np.nan
-                    
                     self.t3SC[self.t3flagSC] = np.nan
                     self.t3errSC[self.t3flagSC] = np.nan
-
                     self.t3ampSC[self.t3ampflagSC] = np.nan
                     self.t3amperrSC[self.t3ampflagSC] = np.nan
-
                     self.visphiSC[self.visphiflagSC] = np.nan
                     self.visphierrSC[self.visphiflagSC] = np.nan
 
                 if plot:
                     if plotTAmp:
-                        gs = gridspec.GridSpec(3,2)
-                        plt.figure(figsize=(15,15))
+                        gs = gridspec.GridSpec(3, 2)
+                        plt.figure(figsize=(15, 15))
                     else:
-                        gs = gridspec.GridSpec(2,2)
-                        plt.figure(figsize=(15,12))
-                    axis = plt.subplot(gs[0,0])
+                        gs = gridspec.GridSpec(2, 2)
+                        plt.figure(figsize=(15, 12))
+                    axis = plt.subplot(gs[0, 0])
                     for idx in range(len(self.vis2SC)):
-                        plt.errorbar(self.spFrequAS[idx,:], self.visampSC[idx,:], self.visamperrSC[idx,:], ls='', marker='o',color=self.colors_baseline[idx%6])
+                        plt.errorbar(self.spFrequAS[idx],
+                                     self.visampSC[idx],
+                                     self.visamperrSC[idx],
+                                     ls='', marker='o',
+                                     color=self.colors_baseline[idx % 6])
                     plt.axhline(1, ls='--', lw=0.5)
-                    plt.ylim(-0.0,1.1)
+                    plt.ylim(-0.0, 1.1)
                     plt.ylabel('visibility amplitude')
 
                     axis = plt.subplot(gs[0,1])
                     for idx in range(len(self.vis2SC)):
-                        plt.errorbar(self.spFrequAS[idx,:], self.vis2SC[idx,:], self.vis2errSC[idx,:], ls='', marker='o',color=self.colors_baseline[idx%6])
+                        plt.errorbar(self.spFrequAS[idx],
+                                     self.vis2SC[idx],
+                                     self.vis2errSC[idx],
+                                     ls='', marker='o',
+                                     color=self.colors_baseline[idx % 6])
                     plt.axhline(1, ls='--', lw=0.5)
-                    plt.ylim(-0.0,1.1)
+                    plt.ylim(-0.0, 1.1)
                     plt.ylabel('visibility squared')
 
                     axis = plt.subplot(gs[1,0])
                     for idx in range(len(self.t3SC)):
-                        plt.errorbar(self.spFrequAS_T3[idx,:], self.t3SC[idx,:], self.t3errSC[idx,:], marker='o',color=self.colors_closure[idx%4],linestyle='')
+                        plt.errorbar(self.spFrequAS_T3[idx],
+                                     self.t3SC[idx],
+                                     self.t3errSC[idx,:],
+                                     marker='o', ls='',
+                                     color=self.colors_closure[idx % 4])
                     plt.axhline(0, ls='--', lw=0.5)
                     plt.xlabel('spatial frequency (1/arcsec)')
                     plt.ylabel('closure phase (deg)')
-                    
-                    axis = plt.subplot(gs[1,1])
+
+                    axis = plt.subplot(gs[1, 1])
                     if plotTAmp:
                         for idx in range(len(self.t3SC)):
-                            plt.errorbar(self.spFrequAS_T3[idx,:], self.t3ampSC[idx,:], self.t3amperrSC[idx,:], marker='o',color=self.colors_closure[idx%4],linestyle='')
+                            plt.errorbar(self.spFrequAS_T3[idx],
+                                         self.t3ampSC[idx],
+                                         self.t3amperrSC[idx],
+                                         marker='o', ls='',
+                                         color=self.colors_closure[idx%4])
                         plt.axhline(1, ls='--', lw=0.5)
-                        plt.ylim(-0.0,1.1)
+                        plt.ylim(-0.0, 1.1)
                         plt.xlabel('spatial frequency (1/arcsec)')
                         plt.ylabel('closure amplitude')
-                    
-                        axis = plt.subplot(gs[2,1])
+
+                    axis = plt.subplot(gs[2, 1])
                     for idx in range(len(self.vis2SC)):
-                        plt.errorbar(self.spFrequAS[idx,:], self.visphiSC[idx,:],self.visphierrSC[idx,:], ls='', marker='o',color=self.colors_baseline[idx%6])
+                        plt.errorbar(self.spFrequAS[idx],
+                                     self.visphiSC[idx],
+                                     self.visphierrSC[idx],
+                                     ls='', marker='o',
+                                     color=self.colors_baseline[idx % 6])
                     plt.axhline(0, ls='--', lw=0.5)
                     plt.xlabel('spatial frequency (1/arcsec)')
                     plt.ylabel('visibility phase')
-
                     plt.show()
         fitsdata.close()
-                
-                
+
+
     def getFluxfromRAW(self, flatfile, method, skyfile=None, wavefile=None, 
                        pp_wl=None, flatflux=False):
         """
