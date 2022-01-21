@@ -271,20 +271,21 @@ class GravData():
 
                 # spatial frequency T3
                 magu = np.sqrt(self.u**2.+self.v**2.)
-                max_spf = np.zeros((len(magu)))
+                max_spf = np.zeros((len(magu)/6*4))
                 for idx in range(len(magu)//6):
-                    max_spf[0 + idx*6] = np.max(np.array([magu[0 + idx*6],
+                    max_spf[0 + idx*4] = np.max(np.array([magu[0 + idx*6],
                                                           magu[3 + idx*6],
                                                           magu[1 + idx*6]]))
-                    max_spf[1 + idx*6] = np.max(np.array([magu[0 + idx*6],
+                    max_spf[1 + idx*4] = np.max(np.array([magu[0 + idx*6],
                                                           magu[4 + idx*6],
                                                           magu[2 + idx*6]]))
-                    max_spf[2 + idx*6] = np.max(np.array([magu[1 + idx*6],
+                    max_spf[2 + idx*4] = np.max(np.array([magu[1 + idx*6],
                                                           magu[5 + idx*6],
                                                           magu[2 + idx*6]]))
-                    max_spf[3 + idx*6] = np.max(np.array([magu[3 + idx*6],
+                    max_spf[3 + idx*4] = np.max(np.array([magu[3 + idx*6],
                                                           magu[5 + idx*6],
                                                           magu[4 + idx*6]]))
+
                 self.max_spf = max_spf
                 spFrequAS_T3 = np.zeros((len(max_spf),len(wave)))
                 for idx in range(len(max_spf)):
@@ -503,18 +504,18 @@ class GravData():
 
                 # spatial frequency T3
                 magu = np.sqrt(self.u**2.+self.v**2.)
-                max_spf = np.zeros((len(magu)))
+                max_spf = np.zeros(int(len(magu)/6*4))
                 for idx in range(len(magu)//6):
-                    max_spf[0 + idx*6] = np.max(np.array([magu[0 + idx*6],
+                    max_spf[0 + idx*4] = np.max(np.array([magu[0 + idx*6],
                                                           magu[3 + idx*6],
                                                           magu[1 + idx*6]]))
-                    max_spf[1 + idx*6] = np.max(np.array([magu[0 + idx*6],
+                    max_spf[1 + idx*4] = np.max(np.array([magu[0 + idx*6],
                                                           magu[4 + idx*6],
                                                           magu[2 + idx*6]]))
-                    max_spf[2 + idx*6] = np.max(np.array([magu[1 + idx*6],
+                    max_spf[2 + idx*4] = np.max(np.array([magu[1 + idx*6],
                                                           magu[5 + idx*6],
                                                           magu[2 + idx*6]]))
-                    max_spf[3 + idx*6] = np.max(np.array([magu[3 + idx*6],
+                    max_spf[3 + idx*4] = np.max(np.array([magu[3 + idx*6],
                                                           magu[5 + idx*6],
                                                           magu[4 + idx*6]]))
                 self.max_spf = max_spf
@@ -599,6 +600,7 @@ class GravData():
                     plt.axhline(1, ls='--', lw=0.5)
                     plt.ylim(-0.0, 1.1)
                     plt.ylabel('visibility squared')
+
 
                     axis = plt.subplot(gs[1,0])
                     for idx in range(len(self.t3SC)):
