@@ -9,7 +9,7 @@ from astropy.time import Time
 from datetime import timedelta, datetime
 
 import sys
-import os 
+import os
 
 try:
     from generalFunctions import *
@@ -27,7 +27,7 @@ def convert_date(date):
     t = Time(date)
     t2 = Time('2000-01-01T12:00:00')
     date_decimal = (t.mjd - t2.mjd)/365.25+2000
-    
+
     date = date.replace('T', ' ')
     date = date.split('.')[0]
     date = datetime.strptime(date, '%Y-%m-%d %H:%M:%S')
@@ -43,16 +43,16 @@ class GravData():
         """
         self.name = data
         self.verbose = verbose
-        self.colors_baseline = np.array(['k', 'darkblue', color4, 
+        self.colors_baseline = np.array(['k', 'darkblue', color4,
                                          color2, 'darkred', color1])
         self.colors_closure = np.array([color1, 'darkred', 'k', color2])
-        
-        poscatg = ['VIS_DUAL_SCI_RAW', 'VIS_SINGLE_SCI_RAW', 'VIS_SINGLE_CAL_RAW', 
+
+        poscatg = ['VIS_DUAL_SCI_RAW', 'VIS_SINGLE_SCI_RAW', 'VIS_SINGLE_CAL_RAW',
            'VIS_DUAL_CAL_RAW', 'VIS_SINGLE_CALIBRATED', 'VIS_DUAL_CALIBRATED',
-           'SINGLE_SCI_VIS','SINGLE_SCI_VIS_CALIBRATED','DUAL_SCI_VIS', 
+           'SINGLE_SCI_VIS','SINGLE_SCI_VIS_CALIBRATED','DUAL_SCI_VIS',
            'DUAL_SCI_VIS_CALIBRATED','SINGLE_CAL_VIS','DUAL_CAL_VIS', 'ASTROREDUCED',
            'DUAL_SCI_P2VMRED']
-        
+
         header = fits.open(self.name)[0].header
         date = header['DATE-OBS']
         #if header['HIERARCH ESO INS OPTI11 ID'] == 'ONAXIS':
@@ -60,7 +60,7 @@ class GravData():
             #print('Found onaxis data!')
         #else:
             #onaxis = False
-            
+
         self.header = header
         self.date = convert_date(date)
         self.raw = False
@@ -80,10 +80,10 @@ class GravData():
             if self.verbose:
                 print('Assume this is a raw file!')
             self.raw = True
-        
+
         self.polmode = header['HIERARCH ESO INS POLA MODE']
         self.resolution = header['HIERARCH ESO INS SPEC RES']
-        
+
         tel = fits.open(self.name)[0].header["TELESCOP"]
         if tel == 'ESO-VLTI-U1234':
             self.tel = 'UT'
@@ -91,7 +91,7 @@ class GravData():
             self.tel = 'AT'
         else:
             raise ValueError('Telescope not AT or UT, seomtehign wrong with input data')
-        
+
         # Get BL names
         if self.raw:
             self.baseline_labels = np.array(["UT4-3","UT4-2","UT4-1",
@@ -119,15 +119,15 @@ class GravData():
                 closure_labels.append(tel_name[t1] + '-' + tel_name[t2][2]+ '-' + tel_name[t3][2])
             self.closure_labels = np.array(closure_labels)
             self.baseline_labels = np.array(baseline_labels)
-        
+
         if self.verbose:
             print('Data loaded as:')
             print('Telescope: ' + self.tel)
             print('Polarization: ' + self.polmode)
             print('Resolution: ' + self.resolution)
             print('Category: ' + self.datacatg)
-        
-        
+
+
         if not self.raw:
             if self.polmode == 'SPLIT':
                 self.wlSC_P1 = fits.open(self.name)['OI_WAVELENGTH', 11].data['EFF_WAVE']*1e6
@@ -137,14 +137,14 @@ class GravData():
                 if not datacatg == 'ASTROREDUCED':
                     self.wlFT_P1 = fits.open(self.name)['OI_WAVELENGTH', 21].data['EFF_WAVE']*1e6
                     self.wlFT_P2 = fits.open(self.name)['OI_WAVELENGTH', 22].data['EFF_WAVE']*1e6
-                    
+
             elif self.polmode == 'COMBINED':
                 self.wlSC = fits.open(self.name)['OI_WAVELENGTH', 10].data['EFF_WAVE']*1e6
                 self.channel = len(self.wlSC)
                 if not datacatg == 'ASTROREDUCED':
                     self.wlFT = fits.open(self.name)['OI_WAVELENGTH', 20].data['EFF_WAVE']*1e6
-        
-    
+
+
     def getValue(self, ext1, ext2=None, ext1num=None):
         """
         Get data from one or optional two extensions
@@ -162,7 +162,7 @@ class GravData():
             else:
                 return fits.open(self.name)[ext1].data
 
-    
+
     def getFlux(self, mode='SC', plot=False):
         """
         Get the flux data
@@ -186,7 +186,7 @@ class GravData():
                         plt.errorbar(self.wlSC_P2, self.fluxSC_P2, self.fluxerrSC_P2, color='k')
                     plt.show()
                 return self.fluxtime, self.fluxSC_P1, self.fluxerrSC_P1, self.fluxSC_P2, self.fluxerrSC_P2
-            
+
             elif mode =='FT':
                 if self.datacatg == 'ASTROREDUCED':
                     raise ValueError('Astroreduced has no FT values')
@@ -207,7 +207,7 @@ class GravData():
 
             else:
                 raise ValueError('Mode has to be SC or FT')
-            
+
         elif self.polmode == 'COMBINED':
             self.fluxtime = fits.open(self.name)['OI_FLUX', 10].data['MJD']
             if mode =='SC':
@@ -223,7 +223,7 @@ class GravData():
                     plt.ylabel('Flux')
                     plt.show()
                 return self.fluxtime, self.fluxSC, self.fluxerrSC
-            
+
             elif mode =='FT':
                 if self.datacatg == 'ASTROREDUCED':
                     raise ValueError('Astroreduced has no FT values')
@@ -317,7 +317,7 @@ class GravData():
                 self.vis2errSC_P2 = fitsdata['OI_VIS2', 12].data.field('VIS2ERR')
                 self.t3SC_P2 = fitsdata['OI_T3', 12].data.field('T3PHI')
                 self.t3errSC_P2 = fitsdata['OI_T3', 12].data.field('T3PHIERR')
-                self.t3ampSC_P2 = fitsdata['OI_T3', 12].data.field('T3AMP') 
+                self.t3ampSC_P2 = fitsdata['OI_T3', 12].data.field('T3AMP')
                 self.t3amperrSC_P2 = fitsdata['OI_T3', 12].data.field('T3AMPERR')
 
                 # Flags
@@ -451,13 +451,13 @@ class GravData():
                             plt.errorbar(self.spFrequAS_T3[idx,:],
                                          self.t3ampSC_P2[idx,:],
                                          self.t3amperrSC_P2[idx,:],
-                                         marker='o', ls='', 
+                                         marker='o', ls='',
                                          color=self.colors_closure[idx % 4])
                         for idx in range(len(self.t3SC_P2)):
                             plt.errorbar(self.spFrequAS_T3[idx,:],
                                          self.t3ampSC_P1[idx,:],
                                          self.t3amperrSC_P1[idx,:],
-                                         marker='p', ls='', 
+                                         marker='p', ls='',
                                          color=self.colors_closure[idx % 4])
                         plt.axhline(1, ls='--', lw=0.5)
                         plt.ylim(-0.0, 1.1)
@@ -640,7 +640,7 @@ class GravData():
         fitsdata.close()
 
 
-    def getFluxfromRAW(self, flatfile, method, skyfile=None, wavefile=None, 
+    def getFluxfromRAW(self, flatfile, method, skyfile=None, wavefile=None,
                        pp_wl=None, flatflux=False):
         """
         Get the flux values from a raw file
@@ -653,7 +653,7 @@ class GravData():
         usableMethods = ['spectrum', 'preproc', 'p2vmred', 'dualscivis']
         if method not in usableMethods:
             raise TypeError('method not available, should be one of the following: %s' % usableMethods)
-            
+
         raw = fits.open(self.name)['IMAGING_DATA_SC'].data
         det_gain = 1.984 #e-/ADU
 
@@ -664,23 +664,23 @@ class GravData():
         else:
             sky = fits.open(skyfile)['IMAGING_DATA_SC'].data
             red = (raw-sky)*det_gain
-            
+
         if red.ndim == 3:
             tsteps = red.shape[0]
 
         # sum over spectra domain to find maxpos
         _speclist = np.sum(np.mean(red,0),1)
         _speclist[np.where(_speclist < 300)] = 0
-        
+
         if self.polmode == 'SPLIT':
             numspec = 48
         elif self.polmode == 'COMBINED':
             numspec = 24
-        
+
         if self.resolution == 'LOW':
             numchannels = 14
         elif self.resolution == 'MEDIUM':
-            numchannels = 241  
+            numchannels = 241
         else:
             raise ValueError('High not implemented yet!')
 
@@ -692,11 +692,11 @@ class GravData():
             #specpos.append(np.argmax(_speclist))
             #_speclist[np.argmax(_speclist)-5:np.argmax(_speclist)+6] = 0
         #specpos = sorted(specpos)
-            
+
         flatfits = fits.open(flatfile)
         fieldstart = flatfits['PROFILE_PARAMS'].header['ESO PRO PROFILE STARTX'] - 1
         fieldstop = fieldstart + flatfits['PROFILE_PARAMS'].header['ESO PRO PROFILE NX']
-        
+
         if flatflux:
             flatdata = flatfits['IMAGING_DATA_SC'].data[0]
             flatdata += np.min(flatdata)
@@ -709,15 +709,15 @@ class GravData():
             _specprofile = flatfits['PROFILE_DATA'].data['DATA%i' % (idx+1)]
             _specprofile_t = np.tile(_specprofile[0], (tsteps,1,1))
             red_spectra[:,idx] = np.sum(red[:,:,fieldstart:fieldstop]*_specprofile_t, 1)
-        
+
         if method == 'spectrum':
             return red_spectra
         elif wavefile is None:
             raise ValueError('wavefile needed!')
         elif pp_wl is None:
             raise ValueError('pp_wl needed!')
-        
-        
+
+
         # wl interpolation
         wavefits = fits.open(wavefile)
         red_spectra_i = np.zeros((tsteps, numspec, len(pp_wl)))
@@ -730,10 +730,10 @@ class GravData():
                     red_spectra_i[tdx,idx,:] = interpolate.interp1d(wavefits['WAVE_DATA_SC'].data['DATA%i' % (idx+1)][0],
                                                                     red_spectra[tdx,idx,:], bounds_error=False, fill_value='extrapolate')(pp_wl)
                     print('Extrapolation needed')
-        
+
         if method == 'preproc':
             return red_spectra_i
-        
+
         red_flux_P = np.zeros((tsteps, 4, len(pp_wl)))
         red_flux_S = np.zeros((tsteps, 4, len(pp_wl)))
 
@@ -753,19 +753,19 @@ class GravData():
                         [1,0,1,0]])
         B2TM = np.linalg.pinv(T2BM)
         B2TM /= np.max(B2TM)
-        
+
         for idx in range(tsteps):
             red_flux_P[idx] = np.dot(B2TM,_red_spec_PS[idx])
             red_flux_S[idx] = np.dot(B2TM,_red_spec_SS[idx])
-            
+
         if method == 'p2vmred':
             return red_flux_P, red_flux_S
-        
+
         if method == 'dualscivis':
             return np.sum(red_flux_P, 0), np.sum(red_flux_S, 0)
-    
-    
-    
+
+
+
     def getDlambda(self, idel=False):
         """
         Get the size of the spectral channels
@@ -828,26 +828,25 @@ class GravData():
             dlambda = np.zeros((6,nwave))
             for idx in range(6):
                 dlambda[idx] = effband/2*1e6
-        self.dlambda = dlambda 
-    
-       
+        self.dlambda = dlambda
+
+
 class GravNight():
     def __init__(self, night_name, file_list, verbose=True):
         """
         GravNight - the long awaited full night fit class
-        
         """
         self.night_name = night_name
         self.file_list = file_list
         self.verbose = verbose
-        
+
         self.get_files()
-        
+
     def get_files(self):
         self.gravData_list = []
 
         for num, fi in enumerate(self.file_list):
-                
+
             if num == 0:
                 type1_ = fits.getheader(fi)["ESO INS SOBJ X"]
                 type2_ = fits.getheader(fi)["ESO INS SOBJ OFFX"]
@@ -856,11 +855,11 @@ class GravNight():
                 if type1_ != fits.getheader(fi)["ESO INS SOBJ X"]:
                     raise ValueError("all files need to be the same, but ", fits.getheader(fi)["ESO INS SOBJ X"], " is different from first file: ", type1_)
                 if type2_ != fits.getheader(fi)["ESO INS SOBJ OFFX"]:
-                    raise ValueError("all files need to be the same, but ", fits.getheader(fi)["ESO INS SOBJ OFFX"], " is different from first file: ", type2_)        
+                    raise ValueError("all files need to be the same, but ", fits.getheader(fi)["ESO INS SOBJ OFFX"], " is different from first file: ", type2_)
                 self.gravData_list.append(GravData(fi, verbose=self.verbose))
-            
-            
-        
-    
-    
+
+
+
+
+
 
