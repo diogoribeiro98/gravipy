@@ -7,6 +7,7 @@ from scipy import signal, optimize, interpolate
 from pkg_resources import resource_filename
 from astropy.time import Time
 from datetime import timedelta, datetime
+from .phasecor import averaging
 
 import sys
 import os
@@ -55,11 +56,6 @@ class GravData():
 
         header = fits.open(self.name)[0].header
         date = header['DATE-OBS']
-        #if header['HIERARCH ESO INS OPTI11 ID'] == 'ONAXIS':
-            #onaxis = True
-            #print('Found onaxis data!')
-        #else:
-            #onaxis = False
 
         self.header = header
         self.date = convert_date(date)
@@ -69,10 +65,10 @@ class GravData():
             raise ValueError('File seems to be not from GRAVITY')
         else:
             datatype='RAW' # default data type RAW
-        if 'HIERARCH ESO PRO TYPE' in header:
-            datatype = header['HIERARCH ESO PRO TYPE']
-        if 'HIERARCH ESO PRO CATG' in header:
-            datacatg = header['HIERARCH ESO PRO CATG']
+        if 'ESO PRO TYPE' in header:
+            datatype = header['ESO PRO TYPE']
+        if 'ESO PRO CATG' in header:
+            datacatg = header['ESO PRO CATG']
             if datacatg not in poscatg:
                 raise ValueError('filetype is %s, which is not supported' % datacatg)
             self.datacatg = datacatg
@@ -81,8 +77,16 @@ class GravData():
                 print('Assume this is a raw file!')
             self.raw = True
 
-        self.polmode = header['HIERARCH ESO INS POLA MODE']
-        self.resolution = header['HIERARCH ESO INS SPEC RES']
+        self.polmode = header['ESO INS POLA MODE']
+        self.resolution = header['ESO INS SPEC RES']
+        self.dit = header['ESO DET2 SEQ1 DIT']
+        self.ndit = header['ESO DET2 NDIT']
+        self.mjd = header['MJD-OBS']
+
+        if 'P2VM' in self.datacatg:
+            self.p2vm_file = True
+        else:
+            self.p2vm_file = False
 
         tel = fits.open(self.name)[0].header["TELESCOP"]
         if tel == 'ESO-VLTI-U1234':
@@ -93,7 +97,7 @@ class GravData():
             raise ValueError('Telescope not AT or UT, seomtehign wrong with input data')
 
         # Get BL names
-        if self.raw:
+        if self.raw or self.p2vm_file:
             self.baseline_labels = np.array(["UT4-3","UT4-2","UT4-1",
                                             "UT3-2","UT3-1","UT2-1"])
             self.closure_labels = np.array(["UT4-3-2","UT4-3-1","UT4-2-1","UT3-2-1"])
@@ -121,12 +125,12 @@ class GravData():
             self.baseline_labels = np.array(baseline_labels)
 
         if self.verbose:
-            print('Data loaded as:')
-            print('Telescope: ' + self.tel)
-            print('Polarization: ' + self.polmode)
-            print('Resolution: ' + self.resolution)
-            print('Category: ' + self.datacatg)
-
+            print('Category: %s' % self.datacatg)
+            print('Telescope: %s' % self.tel)
+            print('Polarization: %s' % self.polmode)
+            print('Resolution: %s' % self.resolution)
+            print('DIT: %f' % self.dit)
+            print('NDIT: %i' % self.ndit)
 
         if not self.raw:
             if self.polmode == 'SPLIT':
@@ -248,6 +252,9 @@ class GravData():
         """
         if self.raw:
             raise ValueError('Input is a RAW file,',
+                             'not usable for this function')
+        if self.p2vm_file:
+            raise ValueError('Input is a p2vmred file,',
                              'not usable for this function')
 
         fitsdata = fits.open(self.name)
@@ -832,31 +839,242 @@ class GravData():
 
 
 class GravNight():
-    def __init__(self, night_name, file_list, verbose=True):
+    def __init__(self, file_list, verbose=True):
         """
         GravNight - the long awaited full night fit class
         """
-        self.night_name = night_name
         self.file_list = file_list
         self.verbose = verbose
+
+        self.colors_baseline = np.array(['k', 'darkblue', color4, 
+                                         color2, 'darkred', color1])
+        self.colors_closure = np.array([color1, 'darkred', 'k', color2])
+        self.colors_tel = np.array([color1, 'darkred', 'k', color2])
 
         self.get_files()
 
     def get_files(self):
-        self.gravData_list = []
+        self.datalist = []
 
         for num, fi in enumerate(self.file_list):
+            self.datalist.append(GravData(fi, verbose=False))
 
-            if num == 0:
-                type1_ = fits.getheader(fi)["ESO INS SOBJ X"]
-                type2_ = fits.getheader(fi)["ESO INS SOBJ OFFX"]
-                self.gravData_list.append(GravData(fi, verbose=self.verbose))
-            else:
-                if type1_ != fits.getheader(fi)["ESO INS SOBJ X"]:
-                    raise ValueError("all files need to be the same, but ", fits.getheader(fi)["ESO INS SOBJ X"], " is different from first file: ", type1_)
-                if type2_ != fits.getheader(fi)["ESO INS SOBJ OFFX"]:
-                    raise ValueError("all files need to be the same, but ", fits.getheader(fi)["ESO INS SOBJ OFFX"], " is different from first file: ", type2_)
-                self.gravData_list.append(GravData(fi, verbose=self.verbose))
+        _catg = [i.datacatg for i in self.datalist]
+        if _catg.count(_catg[0]) == len(_catg):
+            self.datacatg = _catg[0]
+        else:
+            print(_catg)
+            raise ValueError('Not all input data from same category')
+
+        _tel = [i.tel for i in self.datalist]
+        if _tel.count(_tel[0]) == len(_tel):
+            self.tel = _tel[0]
+        else:
+            print(_tel)
+            raise ValueError('Not all input data from same tel')
+
+        _pol = [i.polmode for i in self.datalist]
+        if _pol.count(_pol[0]) == len(_pol):
+            self.polmode = _pol[0]
+        else:
+            print(_pol)
+            raise ValueError('Not all input data from same polmode')
+
+        _res = [i.resolution for i in self.datalist]
+        if _res.count(_res[0]) == len(_res):
+            self.resolution = _res[0]
+        else:
+            print(_res)
+            raise ValueError('Not all input data from same resolution')
+
+        _dit = [i.dit for i in self.datalist]
+        if _dit.count(_dit[0]) == len(_dit):
+            self.dit = _dit[0]
+        else:
+            print(_dit)
+            raise ValueError('Not all input data from same dit')
+
+        _ndit = [i.ndit for i in self.datalist]
+        if _ndit.count(_ndit[0]) == len(_ndit):
+            self.ndit = _ndit[0]
+        else:
+            print(_ndit)
+            raise ValueError('Not all input data from same ndit')
+
+        if self.verbose:
+            print('Data loaded as:')
+            print('Category: %s' % self.datacatg)
+            print('Telescope: %s' % self.tel)
+            print('Polarization: %s' % self.polmode)
+            print('Resolution: %s' % self.resolution)
+            print('DIT: %f' % self.dit)
+            print('NDIT: %i' % self.ndit)
+
+        self.mjd = [i.mjd for i in self.datalist]
+        self.mjd0 = np.min(np.array(self.mjd))
+        self.files = [i.name for i in self.datalist]
+
+    def getIntdata(self, mode='SC', plot=False, plotTAmp=False, flag=False,
+                   ignore_tel=[]):
+        for data in self.datalist:
+            data.getIntdata(mode=mode, plot=plot, plotTAmp=plotTAmp, flag=flag,
+                   ignore_tel=ignore_tel)
+
+    def getMetdata(self, plot=False):
+        if 'P2VM' not in self.datacatg:
+            raise ValueError('Only available for p2vmred files')
+        files = self.files
+        if self.polmode == 'SPLIT':
+            fitnum = 11
+        else:
+            fitnum = 10
+
+        MJD = np.array([]).reshape(0,4)
+        OPD_FC = np.array([]).reshape(0,4)
+        OPD_FC_CORR = np.array([]).reshape(0,4)
+        OPD_TEL = np.array([]).reshape(0,4,4)
+        OPD_TEL_CORR = np.array([]).reshape(0,4,4)
+        OPD_TELFC_CORR = np.array([]).reshape(0,4,4)
+        OPD_TELFC_MCORR = np.array([]).reshape(0,4)
+        E_U = np.array([]).reshape(0,4,3)
+        E_V = np.array([]).reshape(0,4,3)
+
+        for fdx, file in enumerate(files):
+            d = fits.open(file)['OI_VIS_MET'].data
+            _MJD0 = fits.open(file)[0].header['MJD-OBS']
+            MJD = np.concatenate((MJD, d['TIME'].reshape(-1,4)/1e6/3600/24 + _MJD0))
+            OPD_FC = np.concatenate((OPD_FC, d['OPD_FC'].reshape(-1,4)*1e6))
+            OPD_FC_CORR = np.concatenate((OPD_FC_CORR, d['OPD_FC_CORR'].reshape(-1,4)*1e6))
+            OPD_TELFC_MCORR = np.concatenate((OPD_TELFC_MCORR, d['OPD_TELFC_MCORR'].reshape(-1,4)*1e6))
+
+            E_U = np.concatenate((E_U, d['E_U'].reshape(-1,4,3)))
+            E_V = np.concatenate((E_V, d['E_V'].reshape(-1,4,3)))
+
+            OPD_TEL = np.concatenate((OPD_TEL, d['OPD_TEL'].reshape(-1,4,4)*1e6))
+            OPD_TEL_CORR = np.concatenate((OPD_TEL_CORR, d['OPD_TEL_CORR'].reshape(-1,4,4)*1e6))
+            OPD_TELFC_CORR = np.concatenate((OPD_TELFC_CORR, d['OPD_TELFC_CORR'].reshape(-1,4,4)*1e6))
+
+        MJD = (MJD - self.mjd0)*24*60
+        self.time = MJD
+        self.opd_fc = OPD_FC
+        self.opd_fc_corr = OPD_FC_CORR
+        self.opd_telfc_mcorr = OPD_TELFC_MCORR
+
+        self.e_u = E_U
+        self.e_v = E_V
+
+        self.opd_tel = OPD_TEL
+        self.opd_tel_corr = OPD_TEL_CORR
+        self.opd_telfc_corr = OPD_TELFC_CORR
+    
+        self.mjd_files = []
+        self.ut_files = []
+        self.lst_files = []
+        for idx, file in enumerate(files):
+            d = fits.open(file)
+            self.mjd_files.append(d['OI_VIS', fitnum].data['MJD'][0])
+            a = file.find('GRAVI.20')
+            self.ut_files.append(file[a+17:a+22])
+            self.lst_files.append(d[0].header['LST'])
+        self.t_files = (np.array(self.mjd_files)-self.mjd0)*24*60
+
+        if plot:
+            av = 100
+            maxval = []
+            for tel in range(4):
+                for dio in range(4):
+                    maxval.append(np.max(np.abs(averaging(OPD_TEL[:, tel, dio]-np.mean(OPD_TEL[:, tel, dio]), av))))
+            maxval = np.max(maxval)*1.2
+
+            gs = gridspec.GridSpec(4,4, wspace=0.05, hspace=0.05)
+            plt.figure(figsize=(7,7))
+            for tel in range(4):
+                for dio in range(4):
+                    ax = plt.subplot(gs[tel,dio])
+                    plt.plot(averaging(MJD[:, tel], av), averaging(OPD_TEL[:, tel, dio]-np.mean(OPD_TEL[:, tel, dio]), av), 
+                            ls='', marker='.', label='UT%i\nDiode %i' % ((4-tel), dio), color=self.colors_tel[tel])
+                    for m in range(len(self.t_files)):
+                        plt.axvline(self.t_files[m], ls='--', lw=0.2, color='grey')
+                        if tel == 0 and dio == 0:
+                            plt.text(self.t_files[m]+0.5, -maxval*0.9, self.ut_files[m], rotation=90, fontsize=5)
+                    plt.legend(loc=2)
+                    plt.ylim(-maxval,maxval)
+                    if tel != 3:
+                        ax.set_xticklabels([])
+                    else:
+                        plt.xlabel('Time [mins]', fontsize=8)
+                    if dio != 0:
+                        ax.set_yticklabels([])
+                    else:
+                        plt.ylabel('OPD_TEL [$\mu$m]', fontsize=8)
+            plt.show()
+
+
+            maxval = []
+            for tel in range(4):
+                maxval.append(np.max(np.abs(averaging(OPD_TELFC_MCORR[:, tel]-np.mean(OPD_TELFC_MCORR[:, tel]), av))))
+            maxval = np.max(maxval)*1.2
+
+            gs = gridspec.GridSpec(1,4, wspace=0.05, hspace=0.05)
+            plt.figure(figsize=(7,2))
+            for tel in range(4):
+                ax = plt.subplot(gs[0,tel])
+                plt.plot(averaging(MJD[:, tel], av), averaging(OPD_TELFC_MCORR[:, tel] - np.mean(OPD_TELFC_MCORR[:, tel]), av), 
+                        ls='', marker='.', label='UT%i' % (4-tel), color=self.colors_tel[tel])
+                for m in range(len(self.t_files)):
+                    plt.axvline(self.t_files[m], ls='--', lw=0.2, color='grey')
+                    if tel == 0:
+                        plt.text(self.t_files[m]+0.5, -maxval*0.9, self.ut_files[m], rotation=90, fontsize=5)
+                plt.legend(loc=2)
+                plt.ylim(-maxval,maxval)
+                plt.xlabel('Time [mins]', fontsize=8)
+                if tel != 0:
+                    ax.set_yticklabels([])
+                else:
+                    plt.ylabel('OPD_TELFC_MCORR \n[$\mu$m]', fontsize=8)
+            plt.show()
+        return 0
+
+    
+    def getFainttimer(self):
+        files = self.files
+        onv = np.array([])
+        ofv = np.array([])
+
+        for file in files:
+            h = fits.open(file)[0].header
+            if h['ESO INS MET MODE'] != 'FAINT':
+                raise ValueError('Metmode is not faint')
+            rate1 = h['ESO INS ANLO3 RATE1']/60
+            rate2 = h['ESO INS ANLO3 RATE2']/60
+            repe1 = h['ESO INS ANLO3 REPEAT1']
+            repe2 = h['ESO INS ANLO3 REPEAT2']
+            time1 = h['ESO INS ANLO3 TIMER1']
+            time2 = h['ESO INS ANLO3 TIMER2']
+            # volt1 = h['ESO INS ANLO3 VOLTAGE1']
+            # volt2 = h['ESO INS ANLO3 VOLTAGE2']
+
+            mt1 = ((time1 / 86400.0) + 2440587.5 - 2400000.5 - self.mjd0)*24*60
+            mt2 = ((time2 / 86400.0) + 2440587.5 - 2400000.5 - self.mjd0)*24*60
+
+            onv = np.concatenate((onv, np.linspace(mt1, mt1+rate1*(repe1-1), repe1-1)))
+            ofv = np.concatenate((ofv, np.linspace(mt2, mt2+rate2*(repe2-1), repe2-1)))
+
+        self.onv = np.concatenate((onv, np.array([self.time[-1,0]])))
+        self.ofv = np.concatenate((np.array([self.time[0,0]]), ofv))   
+
+        # for num, fi in enumerate(self.file_list):
+        # 
+        #     if num == 0:
+        #         type1_ = fits.getheader(fi)["ESO INS SOBJ X"]
+        #         type2_ = fits.getheader(fi)["ESO INS SOBJ OFFX"]
+        #         self.gravData_list.append(GravData(fi, verbose=self.verbose))
+        #     else:
+        #         if type1_ != fits.getheader(fi)["ESO INS SOBJ X"]:
+        #             raise ValueError("all files need to be the same, but ", fits.getheader(fi)["ESO INS SOBJ X"], " is different from first file: ", type1_)
+        #         if type2_ != fits.getheader(fi)["ESO INS SOBJ OFFX"]:
+        #             raise ValueError("all files need to be the same, but ", fits.getheader(fi)["ESO INS SOBJ OFFX"], " is different from first file: ", type2_)
+        #         self.gravData_list.append(GravData(fi, verbose=self.verbose))
 
 
 
