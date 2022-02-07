@@ -1053,12 +1053,15 @@ class GravNight():
             time2 = h['ESO INS ANLO3 TIMER2']
             # volt1 = h['ESO INS ANLO3 VOLTAGE1']
             # volt2 = h['ESO INS ANLO3 VOLTAGE2']
+            print(repe1)
 
             mt1 = ((time1 / 86400.0) + 2440587.5 - 2400000.5 - self.mjd0)*24*60
             mt2 = ((time2 / 86400.0) + 2440587.5 - 2400000.5 - self.mjd0)*24*60
+            
+            print(len(np.linspace(mt1, mt1+rate1*(repe1-1), repe1)))
 
-            onv = np.concatenate((onv, np.linspace(mt1, mt1+rate1*(repe1-1), repe1-1)))
-            ofv = np.concatenate((ofv, np.linspace(mt2, mt2+rate2*(repe2-1), repe2-1)))
+            onv = np.concatenate((onv, np.linspace(mt1, mt1+rate1*(repe1-1), repe1)))
+            ofv = np.concatenate((ofv, np.linspace(mt2, mt2+rate2*(repe2-1), repe2)))
 
         self.onv = np.concatenate((onv, np.array([self.time[-1,0]])))
         self.ofv = np.concatenate((np.array([self.time[0,0]]), ofv))   
