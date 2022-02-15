@@ -919,6 +919,19 @@ class GravNight():
         for data in self.datalist:
             data.getIntdata(mode=mode, plot=plot, plotTAmp=plotTAmp, flag=flag,
                    ignore_tel=ignore_tel)
+        
+    def getTime(self):
+        files = self.files
+        MJD = np.array([]).reshape(0,4)
+        for fdx, file in enumerate(files):
+            d = fits.open(file)['OI_FLUX'].data
+            _MJD0 = fits.open(file)[0].header['MJD-OBS']
+            MJD = np.concatenate((MJD, d['TIME'].reshape(-1,4)/1e6/3600/24 + _MJD0))
+        MJD = (MJD - self.mjd0)*24*60
+        self.time = MJD
+
+
+
 
     def getMetdata(self, plot=False):
         if 'P2VM' not in self.datacatg:
@@ -1053,19 +1066,25 @@ class GravNight():
             time2 = h['ESO INS ANLO3 TIMER2']
             # volt1 = h['ESO INS ANLO3 VOLTAGE1']
             # volt2 = h['ESO INS ANLO3 VOLTAGE2']
-            print(repe1)
 
             mt1 = ((time1 / 86400.0) + 2440587.5 - 2400000.5 - self.mjd0)*24*60
             mt2 = ((time2 / 86400.0) + 2440587.5 - 2400000.5 - self.mjd0)*24*60
-            
-            print(len(np.linspace(mt1, mt1+rate1*(repe1-1), repe1)))
 
             onv = np.concatenate((onv, np.linspace(mt1, mt1+rate1*(repe1-1), repe1)))
             ofv = np.concatenate((ofv, np.linspace(mt2, mt2+rate2*(repe2-1), repe2)))
 
-        self.onv = np.concatenate((onv, np.array([self.time[-1,0]])))
-        self.ofv = np.concatenate((np.array([self.time[0,0]]), ofv))   
-
+        try:
+            self.onv = np.concatenate((onv, np.array([self.time[-1,0]])))
+            self.ofv = np.concatenate((np.array([self.time[0,0]]), ofv))
+        except AttributeError:
+            try:
+                self.getMetdata()
+                self.onv = np.concatenate((onv, np.array([self.time[-1,0]])))
+                self.ofv = np.concatenate((np.array([self.time[0,0]]), ofv))
+            except ValueError:
+                self.ofv = np.concatenate((np.array([0]), ofv))
+                self.onv = np.concatenate((onv, np.array([ofv[-1] + ofv[0]])))
+                
         # for num, fi in enumerate(self.file_list):
         # 
         #     if num == 0:
