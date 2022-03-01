@@ -88,15 +88,11 @@ color4 = '#7A68A6'
     #print(values.shape)
     #return nb_trapz2d_ax(np.imag(values), dt, 0)
 
-
-
 def mathfunc_real(values, dt):
     return np.trapz(np.real(values), dx=dt, axis=0)
 
 def mathfunc_imag(values, dt):
     return np.trapz(np.imag(values), dx=dt, axis=0)
-
-
 
 def complex_quadrature_num(func, a, b, theta, nsteps=int(1e2)):
     t = np.logspace(np.log10(a), np.log10(b), nsteps)
@@ -1779,7 +1775,6 @@ class GravMFit(GravData, GravPhaseMaps):
                 plt.title(title_name)
                 plt.show()
 
-
 @jit(nopython=True)
 def _vis_intensity_approx(s, alpha, lambda0, dlambda):
     """
@@ -1793,7 +1788,7 @@ def _vis_intensity_approx(s, alpha, lambda0, dlambda):
     sinc = np.sinc(x)  # be aware that np.sinc = np.sin(pi*x)/(pi*x)
     return (lambda0/2.2)**(-1-alpha)*2*dlambda*sinc*np.exp(-2.j*np.pi*s/lambda0)
 
-@jit(nopython=True)
+#@jit(nopython=False)
 def _vis_intensity(s, alpha, lambda0, dlambda):
     """
     Analytic solution for Modulated interferometric intensity
@@ -1834,7 +1829,7 @@ def _vis_intensity(s, alpha, lambda0, dlambda):
             res = up - low
     return res
 
-@jit(nopython=True)
+#@jit(nopython=True)
 def _vis_int_full(s, alpha, difflam):
     if s == 0:
         return -2.2**(1 + alpha)/alpha*difflam**(-alpha)
@@ -1844,7 +1839,7 @@ def _vis_int_full(s, alpha, difflam):
     c = (2*np.pi*1j*s/difflam)**alpha
     return (a*b/c)
 
-@jit(nopython=True)
+#@jit(nopython=True)
 def _visibility_integrator(wave, s, alpha):
     """
     complex integral to be integrated over wavelength
@@ -1853,6 +1848,7 @@ def _visibility_integrator(wave, s, alpha):
     """
     return (wave/2.2)**(-1-alpha)*np.exp(-2*np.pi*1j*s/wave)
 
+#@jit(nopython=True)
 def _vis_intensity_num(s, alpha, lambda0, dlambda):
     """
     Dull numeric solution for Modulated interferometric intensity
