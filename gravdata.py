@@ -279,7 +279,7 @@ class GravData():
 
                 # spatial frequency T3
                 magu = np.sqrt(self.u**2.+self.v**2.)
-                max_spf = np.zeros((len(magu)/6*4))
+                max_spf = np.zeros((len(magu)//6*4))
                 for idx in range(len(magu)//6):
                     max_spf[0 + idx*4] = np.max(np.array([magu[0 + idx*6],
                                                           magu[3 + idx*6],
