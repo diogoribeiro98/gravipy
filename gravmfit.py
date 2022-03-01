@@ -438,6 +438,8 @@ class GravPhaseMaps():
 
         wave = self.wlSC
         if pm1.shape[0] != len(wave):
+            print(pm1_file)
+            print(pm1.shape[0], len(wave))
             raise ValueError('Phasemap and data have different num of channels')
 
         amp_map = np.abs(pm1)
@@ -1897,14 +1899,13 @@ def _calc_vis(theta, fitarg, fithelp):
      wave, dlambda, fixedBHalpha, coh_loss, phasemaps, northangle,
      amp_map_int, pha_map_int, amp_map_denom_int, wave) = fithelp
     mas2rad = 1e-3 / 3600 / 180 * np.pi
-    rad2mas = 180 / np.pi * 3600 * 1e3
 
     u = fitarg[0]
     v = fitarg[1]
 
     if phasemaps:
-        ddec = [0,0,0,0]
-        dra = [0,0,0,0]
+        ddec = [0, 0, 0, 0]
+        dra = [0, 0, 0, 0]
 
     th_rest = nsource*2
 
@@ -1932,34 +1933,43 @@ def _calc_vis(theta, fitarg, fithelp):
     if phasemaps:
         pm_sources = []
         pm_amp_c, pm_pha_c, pm_int_c = _readPhasemaps(pc_RA, pc_DEC,
-                                                    northangle, amp_map_int, pha_map_int, amp_map_denom_int, wave)
+                                                      northangle, amp_map_int,
+                                                      pha_map_int,
+                                                      amp_map_denom_int,
+                                                      wave)
         for ndx in range(nsource):
             pm_amp, pm_pha, pm_int = _readPhasemaps(pc_RA + theta[ndx*2],
-                                                        pc_DEC + theta[ndx*2+1],
-                                                        northangle, amp_map_int, pha_map_int, amp_map_denom_int, wave)
+                                                    pc_DEC + theta[ndx*2+1],
+                                                    northangle, amp_map_int,
+                                                    pha_map_int,
+                                                    amp_map_denom_int,
+                                                    wave)
             pm_sources.append([pm_amp, pm_pha, pm_int])
 
 
-    # theta_ = [ra1, dec1, ra2, dec2, ..., alpha BH, f BG, pc RA, pc DEC, fr fileN, fr2, fr3, ...
-    vis = np.zeros((6,len(wave))) + 0j
-    for i in range(0,6):
+    # theta_ = [ra1, dec1, ra2, dec2, ..., 
+    #           alpha BH, f BG, pc RA, pc DEC, fr fileN, fr2, fr3, ...]
+    vis = np.zeros((6, len(wave))) + 0j
+    for i in range(0, 6):
 
         s_SgrA = ((pc_RA)*u[i] + (pc_DEC)*v[i]) * mas2rad * 1e6
         if phasemaps:
-            s_SgrA -= ((pm_pha_c[i,0] - pm_pha_c[i,1])/360*wave)
+            s_SgrA -= ((pm_pha_c[i, 0] - pm_pha_c[i, 1])/360*wave)
 
         s_stars = []
         for ndx in range(nsource):
-            s_s = ((theta[ndx*2] + pc_RA)*u[i] +
-                    (theta[ndx*2+1] + pc_DEC)*v[i]) * mas2rad * 1e6
+            s_s = ((theta[ndx*2] + pc_RA)*u[i]
+                   + (theta[ndx*2+1] + pc_DEC)*v[i]) * mas2rad * 1e6
 
             if phasemaps:
                 _, pm_pha, _ = pm_sources[ndx]
-                s_s -= ((pm_pha[i,0] - pm_pha[i,1])/360*wave)
+                s_s -= ((pm_pha[i, 0] - pm_pha[i ,1])/360*wave)
             s_stars.append(s_s)
 
-        intSgrA = _ind_visibility(s_SgrA, alpha_SgrA, wave, dlambda[i,:], fit_mode)
-        intSgrA_center = _ind_visibility(0, alpha_SgrA, wave, dlambda[i,:], fit_mode)
+        intSgrA = _ind_visibility(s_SgrA, alpha_SgrA, wave,
+                                  dlambda[i, :], fit_mode)
+        intSgrA_center = _ind_visibility(0, alpha_SgrA, wave,
+                                         dlambda[i, :], fit_mode)
 
         f_sgra = theta[th_rest+4]
         nom = 10.**(f_sgra)*intSgrA
@@ -1967,7 +1977,8 @@ def _calc_vis(theta, fitarg, fithelp):
         denom1 = 10.**(f_sgra)*np.copy(intSgrA_center)
         denom2 = 10.**(f_sgra)*np.copy(intSgrA_center)
 
-        int_star_center = _ind_visibility(0, alpha_stars, wave, dlambda[i,:], fit_mode)
+        int_star_center = _ind_visibility(0, alpha_stars, wave,
+                                          dlambda[i, :], fit_mode)
 
         if phasemaps:
             for ndx in range(nsource):
@@ -1975,13 +1986,14 @@ def _calc_vis(theta, fitarg, fithelp):
                     f_star = 1
                 else:
                     f_star = theta[th_rest+4+ndx]
-                int_star = _ind_visibility(s_stars[ndx], alpha_stars, wave, dlambda[i,:], fit_mode)
+                int_star = _ind_visibility(s_stars[ndx], alpha_stars, wave,
+                                           dlambda[i, :], fit_mode)
 
                 pm_amp, _, pm_int = pm_sources[ndx]
-                cr1 = (pm_amp[i,0] / pm_amp_c[i,0])**2
-                cr2 = (pm_amp[i,1] / pm_amp_c[i,1])**2
-                cr_denom1 = (pm_int[i,0] / pm_int_c[i,0])
-                cr_denom2 = (pm_int[i,1] / pm_int_c[i,1])
+                cr1 = (pm_amp[i, 0] / pm_amp_c[i, 0])**2
+                cr2 = (pm_amp[i, 1] / pm_amp_c[i, 1])**2
+                cr_denom1 = (pm_int[i, 0] / pm_int_c[i, 0])
+                cr_denom2 = (pm_int[i, 1] / pm_int_c[i, 1])
 
                 nom += (10.**(f_star) * np.sqrt(cr1*cr2) * int_star)
                 denom1 += (10.**(f_star) * cr_denom1 * int_star_center)
@@ -1992,22 +2004,24 @@ def _calc_vis(theta, fitarg, fithelp):
                     f_star = 0
                 else:
                     f_star = theta[th_rest+4+ndx]
-                int_star = _ind_visibility(s_stars[ndx], alpha_stars, wave, dlambda[i,:], fit_mode)
+                int_star = _ind_visibility(s_stars[ndx], alpha_stars, wave,
+                                           dlambda[i, :], fit_mode)
                 nom += (10.**(f_star) * int_star)
                 denom1 += (10.**(f_star) * int_star_center)
                 denom2 += (10.**(f_star) * int_star_center)
 
-        intBG = _ind_visibility(0, alpha_bg, wave, dlambda[i,:], fit_mode)
+        intBG = _ind_visibility(0, alpha_bg, wave, dlambda[i, :], fit_mode)
         denom1 += (fluxRatioBG * intBG)
         denom2 += (fluxRatioBG * intBG)
 
-        vis[i,:] = nom / (np.sqrt(denom1)*np.sqrt(denom2))
+        vis[i, :] = nom / (np.sqrt(denom1)*np.sqrt(denom2))
 
     visamp = np.abs(vis)
     visphi = np.angle(vis, deg=True)
     closure = np.zeros((4, len(wave)))
     for idx in range(4):
-        closure[idx] = visphi[bispec_ind[idx,0]] + visphi[bispec_ind[idx,1]] - visphi[bispec_ind[idx,2]]
+        closure[idx] = (visphi[bispec_ind[idx,0]] + visphi[bispec_ind[idx,1]]
+                        - visphi[bispec_ind[idx,2]])
 
     visphi = visphi + 360.*(visphi<-180.) - 360.*(visphi>180.)
     closure = closure + 360.*(closure<-180.) - 360.*(closure>180.)
