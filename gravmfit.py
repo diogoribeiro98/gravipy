@@ -3,20 +3,18 @@ from astropy.convolution import Gaussian2DKernel
 import matplotlib.pyplot as plt
 from matplotlib import gridspec
 import numpy as np
-import scipy as sp
 import emcee
 import corner
 from multiprocessing import Pool
 from fpdf import FPDF
 from PIL import Image
-from scipy import signal, optimize, interpolate
+from scipy import signal, interpolate
 import math
 import mpmath
 from pkg_resources import resource_filename
 from numba import njit, prange
-from datetime import timedelta, datetime
+from datetime import datetime
 import multiprocessing
-import sys
 import os
 import pandas as pd
 
@@ -24,7 +22,6 @@ try:
     from numba import jit
 except ModuleNotFoundError:
     print("can't import numba, please install it via pip or conda")
-
 
 from .gravdata import *
 
@@ -36,6 +33,8 @@ except (NameError, ModuleNotFoundError):
 
 import colorsys
 import matplotlib.colors as mc
+
+
 def lighten_color(color, amount=0.5):
     try:
         c = mc.cnames[color]
@@ -51,48 +50,50 @@ color3 = '#F26D21'
 color4 = '#7A68A6'
 
 
-### some numba functions for future!
-#@njit('float64(float64[:], float64[:])', fastmath=False)
-#def nb_trapz(y, x):
-    #sz = y.shape[0]
-    #res = 0
-    #for i in range(sz-1):
-        #res = res + (y[i+1]+y[i])*(x[i+1]-x[i])*0.5
-    #return res
+# some numba functions for future!
+# @njit('float64(float64[:], float64[:])', fastmath=False)
+# def nb_trapz(y, x):
+#     sz = y.shape[0]
+#     res = 0
+#     for i in range(sz-1):
+#         res = res + (y[i+1]+y[i])*(x[i+1]-x[i])*0.5
+#     return res
+#
+# @njit('float64[:](float64[:,:], float64[:], int64)', fastmath=False)
+# def nb_trapz2d_ax(z, xy, axis):
+#
+#     sz1, sz2 = z.shape[0], z.shape[1]
+#
+#     if axis == 0:
+#         res = np.empty(sz2)
+#         for j in prange(sz2):
+#             res[j] = nb_trapz(z[:,j], xy)
+#         return res
+#     elif axis == 1:
+#         res = np.empty(sz1)
+#         for i in prange(sz1):
+#             res[i] = nb_trapz(z[i,:], xy)
+#         return res
+#     else:
+#         raise ValueError
 
-#@njit('float64[:](float64[:,:], float64[:], int64)', fastmath=False)
-#def nb_trapz2d_ax(z, xy, axis):
+# @jit(nopython=True)
+# def mathfunc_real(values, dt):
+#     print(values.shape)
+#     return nb_trapz2d_ax(np.real(values), dt, 0)
 
-    #sz1, sz2 = z.shape[0], z.shape[1]
-
-    #if axis == 0:
-        #res = np.empty(sz2)
-        #for j in prange(sz2):
-            #res[j] = nb_trapz(z[:,j], xy)
-        #return res
-    #elif axis == 1:
-        #res = np.empty(sz1)
-        #for i in prange(sz1):
-            #res[i] = nb_trapz(z[i,:], xy)
-        #return res
-    #else:
-        #raise ValueError
-
-#@jit(nopython=True)
-#def mathfunc_real(values, dt):
-    #print(values.shape)
-    #return nb_trapz2d_ax(np.real(values), dt, 0)
-
-#@jit(nopython=True)
-#def mathfunc_imag(values, dt):
-    #print(values.shape)
-    #return nb_trapz2d_ax(np.imag(values), dt, 0)
+# @jit(nopython=True)
+# def mathfunc_imag(values, dt):
+#     print(values.shape)
+#     return nb_trapz2d_ax(np.imag(values), dt, 0)
 
 def mathfunc_real(values, dt):
     return np.trapz(np.real(values), dx=dt, axis=0)
 
+
 def mathfunc_imag(values, dt):
     return np.trapz(np.imag(values), dx=dt, axis=0)
+
 
 def complex_quadrature_num(func, a, b, theta, nsteps=int(1e2)):
     t = np.logspace(np.log10(a), np.log10(b), nsteps)
@@ -103,43 +104,42 @@ def complex_quadrature_num(func, a, b, theta, nsteps=int(1e2)):
     return real_integral + 1j*imag_integral
 
 
-def procrustes(a,target,padval=0):
+def procrustes(a, target, padval=0):
     try:
         if len(target) != a.ndim:
             raise TypeError('Target shape must have the same number of dimensions as the input')
     except TypeError:
         raise TypeError('Target must be array-like')
-
     try:
-        #Get array in the right size to use
+        # Get array in the right size to use
         b = np.ones(target,a.dtype)*padval
     except TypeError:
         raise TypeError('Pad value must be numeric')
     except ValueError:
         raise ValueError('Pad value must be scalar')
 
-    aind = [slice(None,None)]*a.ndim
-    bind = [slice(None,None)]*a.ndim
+    aind = [slice(None, None)]*a.ndim
+    bind = [slice(None, None)]*a.ndim
 
     for dd in range(a.ndim):
         if a.shape[dd] > target[dd]:
             diff = (a.shape[dd]-target[dd])/2.
-            aind[dd] = slice(int(np.floor(diff)),int(a.shape[dd]-np.ceil(diff)))
+            aind[dd] = slice(int(np.floor(diff)),
+                             int(a.shape[dd]-np.ceil(diff)))
         elif a.shape[dd] < target[dd]:
             diff = (target[dd]-a.shape[dd])/2.
-            bind[dd] = slice(int(np.floor(diff)),int(target[dd]-np.ceil(diff)))
-
+            bind[dd] = slice(int(np.floor(diff)),
+                             int(target[dd]-np.ceil(diff)))
     b[bind] = a[aind]
     return b
-
 
 
 class GravPhaseMaps():
     def createPhasemaps(self, nthreads=1, smooth=10, plot=True, datayear=2019):
         if datayear == 2019:
-            zerfile='phasemap_zernike_20200918_diff_2019data.npy'
+            zerfile = 'phasemap_zernike_20200918_diff_2019data.npy'
         elif datayear == 2020:
-            zerfile='phasemap_zernike_20200922_diff_2020data.npy'
+            zerfile = 'phasemap_zernike_20200922_diff_2020data.npy'
         else:
             raise ValueError('Datayear has to be 2019 or 2020')
         print('Used file: %s' % zerfile)
@@ -155,7 +155,8 @@ class GravPhaseMaps():
 
             Parameters:
             -----------
-            * Static aberrations in the pupil plane are described by low-order Zernicke polynomials
+            * Static aberrations in the pupil plane are described by 
+            * low-order Zernicke polynomials
             * Their amplitudes are in units of micro-meter
 
             00: A00  (float) : piston
@@ -189,15 +190,17 @@ class GravPhaseMaps():
 
             * Static aberrations in the focal plane
             B1m1 (float) : missplacement of the fiber mode in u1-direction in
-                           meters / Zernike coefficient if coefficients > B20 != 0
+                           meters / Zernike coefficient if 
+                           coefficients > B20 != 0
             B1p1 (float) : missplacement of the fiber mode in u2-direction in
-                           meters / Zernike coefficient if coefficients > B20 != 0
+                           meters / Zernike coefficient if 
+                           coefficients > B20 != 0
             B20  (float) : defocuss
             B2m2 (float) : vertical astigmatism
             B2p2 (float) : horizontal astigmatism
 
             * optical system
-            MFR (float)   : sigma of the fiber mode profile in units of dish radius
+            MFR (float)   : sigma of fiber mode profile in units of dish radius
             stopB (float) : outer stop diameter in meters
             stopS (float) : inner stop diameter in meters
 
@@ -206,68 +209,71 @@ class GravPhaseMaps():
             totN   (float) : total number of pixels in the pupil plane
             lam0   (float) : wavelength at which the phase screen is computed in
                              micro-meter
-            d1     (float) : telescope to normalize Zernike RMS in m (UT=8.0, AT=1.82)
+            d1     (float) : telescope to normalize Zernike RMS in m 
+                             (UT=8.0, AT=1.82)
             amax   (float) : maximum off-axis distance in the maps returned
             """
 
-            #--- coordinate scaling ---#
-            lam0   = lam0*1e-6
-            mas    = 1.e-3 * (2.*np.pi/360) *1./3600
-            ext    = totN*d1/lam0*mas*dalpha*dalpha
-            du     = dalpha/ext*d1/lam0
+            # --- coordinate scaling --- #
+            lam0 = lam0*1e-6
+            mas = 1.e-3 * (2.*np.pi/360) * 1./3600
+            ext = totN*d1/lam0*mas*dalpha*dalpha
+            du = dalpha/ext*d1/lam0
 
-            #--- coordinates ---#
-            ii     = np.arange(totN) - (totN/2)
-            ii     = np.fft.fftshift(ii)
+            # --- coordinates --- #
+            ii = np.arange(totN) - (totN/2)
+            ii = np.fft.fftshift(ii)
 
             # image plane
             a1, a2 = np.meshgrid(ii*dalpha, ii*dalpha)
-            aa     = np.sqrt(a1*a1 + a2*a2)
+            aa = np.sqrt(a1*a1 + a2*a2)
 
             # pupil plane
             u1, u2 = np.meshgrid(ii*du*lam0, ii*du*lam0)
-            r     = np.sqrt( u1*u1 + u2*u2 )
-            t      = np.angle(u1 + 1j*u2)
+            r = np.sqrt( u1*u1 + u2*u2 )
+            t = np.angle(u1 + 1j*u2)
 
-            #--- cut our central part ---#
+            # --- cut our central part --- #
             hmapN = int(amax/dalpha)
             cc = slice(int(totN/2)-hmapN, int(totN/2)+hmapN+1)
             if 2*hmapN > totN:
                 print('Requested map sizes too large')
                 return False
 
-            #--- pupil function ---#
+            # --- pupil function --- #
             pupil = r<(stopB/2.)
             if stopS > 0.:
-                pupil = np.logical_and( r<(stopB/2.), r>(stopS/2.) )
+                pupil = np.logical_and(r < (stopB/2.), r > (stopS/2.))
 
-            #--- fiber profile ---#
+            # --- fiber profile --- #
             fiber = np.exp(-0.5*(r/(MFR*d1/2.))**2)
-            if B1m1!=0 or B1p1!=0:
-                fiber = np.exp(-0.5*((u1-B1m1)**2 + (u2-B1p1)**2)/(MFR*d1/2.)**2)
+            if B1m1 != 0 or B1p1 != 0:
+                fiber = np.exp(-0.5*((u1-B1m1)**2 +
+                                     (u2-B1p1)**2)/(MFR*d1/2.)**2)
 
-            # for higher-order focal plane aberrations we need to compute the fourier transform explicitly
-            if np.any([B20, B2m2, B2p2]!=0):
+            # for higher-order focal plane aberrations we need to compute the 
+            # fourier transform explicitly
+            if np.any([B20, B2m2, B2p2] != 0):
                 sigma_fib = lam0/d1/np.pi/MFR/mas
                 sigma_ref = 2.2e-6/d1/np.pi/MFR/mas
                 zernike = 0
                 zernike += B1m1*2*(aa/sigma_ref)*np.sin(t)
                 zernike += B1p1*2*(aa/sigma_ref)*np.cos(t)
-                zernike += B20 *np.sqrt(3.)*(2.*(aa/sigma_ref)**2 - 1)
+                zernike += B20*np.sqrt(3.)*(2.*(aa/sigma_ref)**2 - 1)
                 zernike += B2m2*np.sqrt(6.)*(aa/sigma_ref)**2*np.sin(2.*t)
                 zernike += B2p2*np.sqrt(6.)*(aa/sigma_ref)**2*np.cos(2.*t)
 
-                fiber = np.exp(-0.5*(aa/sigma_fib)**2) * np.exp(2.*np.pi/lam0*1j*zernike*1e-6)
+                fiber = (np.exp(-0.5*(aa/sigma_fib)**2)
+                         * np.exp(2.*np.pi/lam0*1j*zernike*1e-6))
                 fiber = np.fft.fft2(fiber)
 
-
-            #--- phase screens (pupil plane) ---#
-            zernike  = A00
+            # --- phase screens (pupil plane) --- #
+            zernike = A00
             zernike += A1m1*2*(2.*r/d1)*np.sin(t)
             zernike += A1p1*2*(2.*r/d1)*np.cos(t)
             zernike += A2m2*np.sqrt(6.)*(2.*r/d1)**2*np.sin(2.*t)
             zernike += A2p2*np.sqrt(6.)*(2.*r/d1)**2*np.cos(2.*t)
-            zernike += A20 *np.sqrt(3.)*(2.*(2.*r/d1)**2 - 1)
+            zernike += A20*np.sqrt(3.)*(2.*(2.*r/d1)**2 - 1)
             zernike += A3m1*np.sqrt(8.)*(3.*(2.*r/d1)**3 - 2.*(2.*r/d1))*np.sin(t)
             zernike += A3p1*np.sqrt(8.)*(3.*(2.*r/d1)**3 - 2.*(2.*r/d1))*np.cos(t)
             zernike += A3m3*np.sqrt(8.)*(2.*r/d1)**3*np.sin(3.*t)
@@ -293,10 +299,10 @@ class GravPhaseMaps():
 
             phase = 2.*np.pi/lam0*zernike*1.e-6
 
-            #--- transform to image plane ---#
-            complexPsf = np.fft.fftshift(np.fft.fft2(pupil * fiber * np.exp(1j*phase) ))
-            return complexPsf[cc,cc]/np.abs(complexPsf[cc,cc]).max()
-
+            # --- transform to image plane --- #
+            complexPsf = np.fft.fftshift(np.fft.fft2(pupil * fiber
+                                                     * np.exp(1j*phase)))
+            return complexPsf[cc, cc]/np.abs(complexPsf[cc, cc]).max()
 
         zernikefile = resource_filename('gravipy', 'Phasemaps/' + zerfile)
         zer = np.load(zernikefile, allow_pickle=True).item()
@@ -304,10 +310,10 @@ class GravPhaseMaps():
         wave = self.wlSC
 
         if self.tel == 'UT':
-            stopB=8.0
-            stopS=0.96
-            dalpha=1
-            totN=1024
+            stopB = 8.0
+            stopS = 0.96
+            dalpha = 1
+            totN = 1024
             d = 8
             amax = 100
             set_smooth = smooth
@@ -319,7 +325,7 @@ class GravPhaseMaps():
             totN = 1024
             d = 1.8
             amax = 100*4.4
-            set_smooth = smooth #/ 4.4
+            set_smooth = smooth  # / 4.4
 
         kernel = Gaussian2DKernel(x_stddev=smooth)
 
@@ -338,14 +344,16 @@ class GravPhaseMaps():
                 print_status(wdx, len(wave))
                 for GV in range(4):
                     zer_GV = zer['GV%i' % (GV+1)]
-                    pm = phase_screen(*zer_GV, lam0=wl, d1=d, stopB=stopB, stopS=stopS,
-                                      dalpha=dalpha, totN=totN, amax=amax)
+                    pm = phase_screen(*zer_GV, lam0=wl, d1=d, stopB=stopB,
+                                      stopS=stopS, dalpha=dalpha, totN=totN,
+                                      amax=amax)
                     if pm.shape != (201, 201):
                         print(pm.shape)
                         print('Need to convert to (201,201) shape')
-                        pm = procrustes(pm, (201,201), padval=0)
+                        pm = procrustes(pm, (201, 201), padval=0)
                     pm_sm = signal.convolve2d(pm, kernel, mode='same')
-                    pm_sm_denom = signal.convolve2d(np.abs(pm)**2, kernel, mode='same')
+                    pm_sm_denom = signal.convolve2d(np.abs(pm)**2, 
+                                                    kernel, mode='same')
 
                     all_pm[wdx, GV] = pm_sm
                     all_pm_denom[wdx, GV] = pm_sm_denom
@@ -365,8 +373,9 @@ class GravPhaseMaps():
                 m_all_pm_denom = np.zeros((4, 201, 201), dtype=np.complex_)
                 for GV in range(4):
                     zer_GV = zer['GV%i' % (GV+1)]
-                    pm = phase_screen(*zer_GV, lam0=lam, d1=d, stopB=stopB, stopS=stopS,
-                                      dalpha=dalpha, totN=totN, amax=amax)
+                    pm = phase_screen(*zer_GV, lam0=lam, d1=d, stopB=stopB,
+                                      stopS=stopS, dalpha=dalpha, totN=totN,
+                                      amax=amax)
 
                     if pm.shape != (201, 201):
                         print('Need to convert to (201,201) shape')
@@ -374,26 +383,30 @@ class GravPhaseMaps():
                         pm = procrustes(pm, (201,201), padval=0)
 
                     pm_sm = signal.convolve2d(pm, kernel, mode='same')
-                    pm_sm_denom = signal.convolve2d(np.abs(pm)**2, kernel, mode='same')
+                    pm_sm_denom = signal.convolve2d(np.abs(pm)**2, 
+                                                    kernel, mode='same')
                     m_all_pm[GV] = pm_sm
                     m_all_pm_denom[GV] = pm_sm_denom
                 return np.array([m_all_pm, m_all_pm_denom])
 
             res = np.array(Parallel(n_jobs=nthreads)(delayed(multi_pm)(lam) for lam in wave))
 
-            all_pm = res[:,0,:,:,:]
-            all_pm_denom = res[:,1,:,:,:]
+            all_pm = res[:, 0, :, :, :]
+            all_pm_denom = res[:, 1, :, :, :]
         if datayear == 2019:
-            savename = 'Phasemaps/Phasemap_%s_%s_Smooth%i.npy' % (self.tel, self.resolution, smooth)
-            savename2 = 'Phasemaps/Phasemap_%s_%s_Smooth%i_denom.npy' % (self.tel, self.resolution, smooth)
+            savename = ('Phasemaps/Phasemap_%s_%s_Smooth%i.npy'
+                        % (self.tel, self.resolution, smooth))
+            savename2 = ('Phasemaps/Phasemap_%s_%s_Smooth%i_denom.npy'
+                         % (self.tel, self.resolution, smooth))
         else:
-            savename = 'Phasemaps/Phasemap_%s_%s_Smooth%i_2020data.npy' % (self.tel, self.resolution, smooth)
-            savename2 = 'Phasemaps/Phasemap_%s_%s_Smooth%i_2020data_denom.npy' % (self.tel, self.resolution, smooth)
+            savename = ('Phasemaps/Phasemap_%s_%s_Smooth%i_2020data.npy'
+                        % (self.tel, self.resolution, smooth))
+            savename2 = ('Phasemaps/Phasemap_%s_%s_Smooth%i_2020data_denom.npy'
+                         % (self.tel, self.resolution, smooth))
         savefile = resource_filename('gravipy', savename)
         np.save(savefile, all_pm)
         savefile = resource_filename('gravipy', savename2)
         np.save(savefile, all_pm_denom)
-
 
     def rotation(self, ang):
         """
@@ -402,26 +415,30 @@ class GravPhaseMaps():
         return np.array([[np.cos(ang), np.sin(ang)],
                          [-np.sin(ang), np.cos(ang)]])
 
-
     def loadPhasemaps(self, interp, tofits=False):
         smoothkernel = self.smoothkernel
         datayear = self.datayear
         if datayear == 2019:
-            pm1_file = 'Phasemaps/Phasemap_%s_%s_Smooth%i.npy' % (self.tel, self.resolution, smoothkernel)
-            pm2_file = 'Phasemaps/Phasemap_%s_%s_Smooth%i_denom.npy' % (self.tel, self.resolution, smoothkernel)
+            pm1_file = ('Phasemaps/Phasemap_%s_%s_Smooth%i.npy'
+                        % (self.tel, self.resolution, smoothkernel))
+            pm2_file = ('Phasemaps/Phasemap_%s_%s_Smooth%i_denom.npy'
+                        % (self.tel, self.resolution, smoothkernel))
         elif datayear == 2020:
-            pm1_file = 'Phasemaps/Phasemap_%s_%s_Smooth%i_2020data.npy' % (self.tel, self.resolution, smoothkernel)
-            pm2_file = 'Phasemaps/Phasemap_%s_%s_Smooth%i_2020data_denom.npy' % (self.tel, self.resolution, smoothkernel)
+            pm1_file = ('Phasemaps/Phasemap_%s_%s_Smooth%i_2020data.npy'
+                        % (self.tel, self.resolution, smoothkernel))
+            pm2_file = ('Phasemaps/Phasemap_%s_%s_Smooth%i_2020data_denom.npy'
+                        % (self.tel, self.resolution, smoothkernel))
 
         try:
             pm1 = np.load(resource_filename('gravipy', pm1_file))
             pm2 = np.real(np.load(resource_filename('gravipy', pm2_file)))
         except FileNotFoundError:
-            raise ValueError('%s does not exist, you have to create the phasemap first!' % pm1_file)
+            raise ValueError('%s does not exist, you have to create'
+                             'the phasemap first!' % pm1_file)
 
         wave = self.wlSC
         if pm1.shape[0] != len(wave):
-            raise ValueError('Phasemap and data have different numbers of channels')
+            raise ValueError('Phasemap and data have different num of channels')
 
         amp_map = np.abs(pm1)
         pha_map = np.angle(pm1, deg=True)
@@ -429,16 +446,16 @@ class GravPhaseMaps():
 
         for wdx in range(len(wave)):
             for tel in range(4):
-                amp_map[wdx,tel] /= np.max(amp_map[wdx,tel])
-                amp_map_denom[wdx,tel] /= np.max(amp_map_denom[wdx,tel])
+                amp_map[wdx, tel] /= np.max(amp_map[wdx, tel])
+                amp_map_denom[wdx, tel] /= np.max(amp_map_denom[wdx, tel])
 
         if tofits:
             primary_hdu = fits.PrimaryHDU()
             hlist = [primary_hdu]
             for tel in range(4):
-                hlist.append(fits.ImageHDU(amp_map[:,tel],
+                hlist.append(fits.ImageHDU(amp_map[:, tel],
                                            name='SC_AMP UT%i' % (4-tel)))
-                hlist.append(fits.ImageHDU(pha_map[:,tel],
+                hlist.append(fits.ImageHDU(pha_map[:, tel],
                                            name='SC_PHA UT%i' % (4-tel)))
             hdul = fits.HDUList(hlist)
             hdul.writeto(resource_filename('gravipy', 'testfits.fits'),
@@ -457,14 +474,6 @@ class GravPhaseMaps():
             self.pha_map_int = interpolate.RegularGridInterpolator(points, pha_map)
             self.amp_map_denom_int = interpolate.RegularGridInterpolator(points, amp_map_denom)
 
-            #self.amp_map_int = np.zeros((len(wave),4), dtype=object)
-            #self.pha_map_int = np.zeros((len(wave),4), dtype=object)
-            #self.amp_map_denom_int = np.zeros((len(wave),4), dtype=object)
-            #for tel in range(4):
-                #for wdx in range(len(wave)):
-                    #self.amp_map_int[wdx, tel] = interpolate.interp2d(x, y, self.amp_map[wdx, tel])
-                    #self.pha_map_int[wdx, tel] = interpolate.interp2d(x, y, self.pha_map[wdx, tel])
-                    #self.amp_map_denom_int[wdx, tel] = interpolate.interp2d(x, y, self.amp_map_denom[wdx, tel])
         else:
             self.amp_map = amp_map
             self.pha_map = pha_map
@@ -475,10 +484,13 @@ class GravPhaseMaps():
                       interp=True, givepos=False):
         """
         Calculates coupling amplitude / phase for given coordinates
-        ra,dec: RA, DEC position on sky relative to nominal field center = SOBJ [mas]
+        ra,dec: RA, DEC position on sky relative to nominal
+                field center = SOBJ [mas]
         dra,ddec: ESO QC MET SOBJ DRA / DDEC:
-            location of science object (= desired science fiber position, = field center)
-            given by INS.SOBJ relative to *actual* fiber position measured by the laser metrology [mas]
+            location of science object (= desired science fiber position,
+                                        = field center)
+            given by INS.SOBJ relative to *actual* fiber position measured
+            by the laser metrology [mas]
             mis-pointing = actual - desired fiber position = -(DRA,DDEC)
         north_angle: north direction on acqcam in degree
         if fromFits is true, northangle & dra,ddec are taken from fits file
@@ -508,8 +520,8 @@ class GravPhaseMaps():
 
         pm_pos = np.zeros((4, 2))
         readout_pos = np.zeros((4*len(wave),4))
-        readout_pos[:,0] = np.tile(np.arange(len(wave)),4)
-        readout_pos[:,1] = np.repeat(np.arange(4),len(wave))
+        readout_pos[:, 0] = np.tile(np.arange(len(wave)), 4)
+        readout_pos[:, 1] = np.repeat(np.arange(4), len(wave))
 
         for tel in range(4):
             pos = np.array([ra + dra[tel], dec + ddec[tel]])
@@ -521,52 +533,42 @@ class GravPhaseMaps():
             except (NameError, AttributeError):
                 pass
             pos_rot = np.dot(self.rotation(northangle[tel]), pos) + 100
-            readout_pos[readout_pos[:,1]==tel,2] = pos_rot[1]
-            readout_pos[readout_pos[:,1]==tel,3] = pos_rot[0]
+            readout_pos[readout_pos[:, 1] == tel, 2] = pos_rot[1]
+            readout_pos[readout_pos[:, 1] == tel, 3] = pos_rot[0]
             pm_pos[tel] = pos_rot
 
-        cor_amp = self.amp_map_int(readout_pos).reshape(4,len(wave))
-        cor_pha = self.pha_map_int(readout_pos).reshape(4,len(wave))
-        cor_int_denom = self.amp_map_denom_int(readout_pos).reshape(4,len(wave))
+        cor_amp = self.amp_map_int(readout_pos).reshape(4, len(wave))
+        cor_pha = self.pha_map_int(readout_pos).reshape(4, len(wave))
+        cor_int_denom = self.amp_map_denom_int(readout_pos).reshape(4, len(wave))
 
         if givepos:
             return readout_pos
         else:
             return cor_amp, cor_pha, cor_int_denom
 
-
     def phasemap_source(self, x, y, northA, dra, ddec):
         amp, pha, inten = self.readPhasemaps(x, y, fromFits=False,
-                                           northangle=northA, dra=dra, ddec=ddec,
-                                           interp=self.interppm)
+                                             northangle=northA, dra=dra,
+                                             ddec=ddec, interp=self.interppm)
         pm_amp = np.array([[amp[0], amp[1]],
-                            [amp[0], amp[2]],
-                            [amp[0], amp[3]],
-                            [amp[1], amp[2]],
-                            [amp[1], amp[3]],
-                            [amp[2], amp[3]]])
+                           [amp[0], amp[2]],
+                           [amp[0], amp[3]],
+                           [amp[1], amp[2]],
+                           [amp[1], amp[3]],
+                           [amp[2], amp[3]]])
         pm_pha = np.array([[pha[0], pha[1]],
-                            [pha[0], pha[2]],
-                            [pha[0], pha[3]],
-                            [pha[1], pha[2]],
-                            [pha[1], pha[3]],
-                            [pha[2], pha[3]]])
+                           [pha[0], pha[2]],
+                           [pha[0], pha[3]],
+                           [pha[1], pha[2]],
+                           [pha[1], pha[3]],
+                           [pha[2], pha[3]]])
         pm_int = np.array([[inten[0], inten[1]],
-                            [inten[0], inten[2]],
-                            [inten[0], inten[3]],
-                            [inten[1], inten[2]],
-                            [inten[1], inten[3]],
-                            [inten[2], inten[3]]])
+                           [inten[0], inten[2]],
+                           [inten[0], inten[3]],
+                           [inten[1], inten[2]],
+                           [inten[1], inten[3]],
+                           [inten[2], inten[3]]])
         return pm_amp, pm_pha, pm_int
-
-
-
-
-
-
-
-
-
 
 
 def _lnprob_mstars(theta, fitdata, lower, upper, fitarg, fithelp):
@@ -579,7 +581,8 @@ def _lnlike_mstars(theta, fitdata, fitarg, fithelp):
 
     fit_for = fithelp[1]
 
-    model_visamp, model_visphi, model_closure = _calc_vis_mstars(theta, fitarg, fithelp)
+    model_visamp, model_visphi, model_closure = _calc_vis_mstars(theta, fitarg,
+                                                                 fithelp)
     model_vis2 = model_visamp**2.
 
     (visamp, visamp_error, visamp_flag,
@@ -590,22 +593,23 @@ def _lnlike_mstars(theta, fitdata, fitarg, fithelp):
     res_visamp = np.sum(-(model_visamp-visamp)**2/visamp_error**2*(1-visamp_flag))
     res_vis2 = np.sum(-(model_vis2-vis2)**2./vis2_error**2.*(1-vis2_flag))
 
-    res_closure = np.degrees(np.abs(np.exp(1j*np.radians(model_closure)) - np.exp(1j*np.radians(closure))))
+    res_closure = np.degrees(np.abs(np.exp(1j*np.radians(model_closure))
+                                    - np.exp(1j*np.radians(closure))))
     res_clos = np.sum(-res_closure**2./closure_error**2.*(1-closure_flag))
 
-    res_visphi = np.degrees(np.abs(np.exp(1j*np.radians(model_visphi)) - np.exp(1j*np.radians(visphi))))
+    res_visphi = np.degrees(np.abs(np.exp(1j*np.radians(model_visphi))
+                                   - np.exp(1j*np.radians(visphi))))
     res_phi = np.sum(-res_visphi**2./visphi_error**2.*(1-visphi_flag))
 
-    ln_prob_res = 0.5 * (res_visamp * fit_for[0] +
-                         res_vis2 * fit_for[1] +
-                         res_clos * fit_for[2] +
-                         res_phi *  fit_for[3])
+    ln_prob_res = 0.5 * (res_visamp * fit_for[0]
+                         + res_vis2 * fit_for[1]
+                         + res_clos * fit_for[2]
+                         + res_phi * fit_for[3])
     return ln_prob_res
 
 
 def _calc_vis_mstars(theta, fitarg, fithelp):
     mas2rad = 1e-3 / 3600 / 180 * np.pi
-    rad2mas = 180 / np.pi * 3600 * 1e3
 
     (nsource, fit_for, bispec_ind, fit_mode, wave, dlambda,
      fixedBHalpha, coh_loss, phasemaps, northA, dra, ddec, amp_map_int,
@@ -645,90 +649,102 @@ def _calc_vis_mstars(theta, fitarg, fithelp):
         if fit_phasemaps:
             pm_sources = []
             pm_amp_c, pm_pha_c, pm_int_c = _readPhasemaps(pc_RA, pc_DEC, northA,
-                                                          amp_map_int, pha_map_int, amp_map_denom_int,
+                                                          amp_map_int, pha_map_int,
+                                                          amp_map_denom_int,
                                                           wave, dra, ddec)
 
             for ndx in range(nsource):
                 if ndx == 0:
                     pm_amp, pm_pha, pm_int = _readPhasemaps(pc_RA + theta[0],
-                                                            pc_DEC + theta[1], northA,
-                                                            amp_map_int, pha_map_int, amp_map_denom_int,
+                                                            pc_DEC + theta[1],
+                                                            northA, amp_map_int,
+                                                            pha_map_int,
+                                                            amp_map_denom_int,
                                                             wave, dra, ddec)
                     pm_sources.append([pm_amp, pm_pha, pm_int])
                 else:
                     pm_amp, pm_pha, pm_int = _readPhasemaps(pc_RA + theta[ndx*3-1],
-                                                            pc_DEC + theta[ndx*3], northA,
-                                                            amp_map_int, pha_map_int, amp_map_denom_int,
+                                                            pc_DEC + theta[ndx*3],
+                                                            northA, amp_map_int,
+                                                            pha_map_int,
+                                                            amp_map_denom_int,
                                                             wave, dra, ddec)
                     pm_sources.append([pm_amp, pm_pha, pm_int])
         else:
             pm_sources = fix_pm_sources
             pm_amp_c, pm_pha_c, pm_int_c = fix_pm_amp_c, fix_pm_pha_c, fix_pm_int_c
 
-
-    vis = np.zeros((6,len(wave))) + 0j
-    for i in range(0,6):
+    vis = np.zeros((6, len(wave))) + 0j
+    for i in range(0, 6):
         s_SgrA = ((pc_RA)*u[i] + (pc_DEC)*v[i]) * mas2rad * 1e6
 
         if phasemaps:
-            s_SgrA -= ((pm_pha_c[i,0] - pm_pha_c[i,1])/360*wave)
+            s_SgrA -= ((pm_pha_c[i, 0] - pm_pha_c[i, 1])/360*wave)
 
         s_stars = []
         for ndx in range(nsource):
             if ndx == 0:
-                s_s = ((theta[0] + pc_RA)*u[i] +
-                    (theta[1] + pc_DEC)*v[i]) * mas2rad * 1e6
+                s_s = ((theta[0] + pc_RA)*u[i]
+                       + (theta[1] + pc_DEC)*v[i]) * mas2rad * 1e6
             else:
-                s_s = ((theta[ndx*3-1] + pc_RA)*u[i] +
-                    (theta[ndx*3] + pc_DEC)*v[i]) * mas2rad * 1e6
+                s_s = ((theta[ndx*3-1] + pc_RA)*u[i]
+                       + (theta[ndx*3] + pc_DEC)*v[i]) * mas2rad * 1e6
 
             if phasemaps:
                 _, pm_pha, _ = pm_sources[ndx]
-                s_s -= ((pm_pha[i,0] - pm_pha[i,1])/360*wave)
+                s_s -= ((pm_pha[i, 0] - pm_pha[i, 1])/360*wave)
             s_stars.append(s_s)
 
-        intSgrA = _ind_visibility(s_SgrA, alpha_SgrA, wave, dlambda[i,:], fit_mode)
-        intSgrA_center = _ind_visibility(0, alpha_SgrA, wave, dlambda[i,:], fit_mode)
+        intSgrA = _ind_visibility(s_SgrA, alpha_SgrA, wave,
+                                  dlambda[i, :], fit_mode)
+        intSgrA_center = _ind_visibility(0, alpha_SgrA, wave,
+                                         dlambda[i, :], fit_mode)
 
         nom = intSgrA * fr_BH
 
         denom1 = np.copy(intSgrA_center) * fr_BH
         denom2 = np.copy(intSgrA_center) * fr_BH
 
-        int_star_center = _ind_visibility(0, alpha_stars, wave, dlambda[i,:], fit_mode)
+        int_star_center = _ind_visibility(0, alpha_stars, wave,
+                                          dlambda[i, :], fit_mode)
         if phasemaps:
             pm_amp_norm, _, pm_int_norm = pm_sources[0]
 
-            cr1 = (pm_amp_c[i,0] / pm_amp_norm[i,0])**2
-            cr2 = (pm_amp_c[i,1] / pm_amp_norm[i,1])**2
-            cr_denom1 = (pm_int_c[i,0] / pm_int_norm[i,0])
-            cr_denom2 = (pm_int_c[i,1] / pm_int_norm[i,1])
+            cr1 = (pm_amp_c[i, 0] / pm_amp_norm[i, 0])**2
+            cr2 = (pm_amp_c[i, 1] / pm_amp_norm[i, 1])**2
+            cr_denom1 = (pm_int_c[i, 0] / pm_int_norm[i, 0])
+            cr_denom2 = (pm_int_c[i, 1] / pm_int_norm[i, 1])
 
             nom *= np.sqrt(cr1*cr2)
             denom1 *= cr_denom1
             denom2 *= cr_denom2
 
             for ndx in range(nsource):
-                int_star = _ind_visibility(s_stars[ndx], alpha_stars, wave, dlambda[i,:], fit_mode)
+                int_star = _ind_visibility(s_stars[ndx], alpha_stars, wave,
+                                           dlambda[i, :], fit_mode)
 
                 pm_amp, _, pm_int = pm_sources[ndx]
-                cr1 = (pm_amp[i,0] / pm_amp_norm[i,0])**2
-                cr2 = (pm_amp[i,1] / pm_amp_norm[i,1])**2
-                cr_denom1 = (pm_int[i,0] / pm_int_norm[i,0])
-                cr_denom2 = (pm_int[i,1] / pm_int_norm[i,1])
+                cr1 = (pm_amp[i, 0] / pm_amp_norm[i, 0])**2
+                cr2 = (pm_amp[i, 1] / pm_amp_norm[i, 1])**2
+                cr_denom1 = (pm_int[i, 0] / pm_int_norm[i, 0])
+                cr_denom2 = (pm_int[i, 1] / pm_int_norm[i, 1])
 
                 if ndx == 0:
                     nom += (int_star)
                     denom1 += (int_star_center)
                     denom2 += (int_star_center)
                 else:
-                    nom += (10.**(theta[ndx*3+1]) * np.sqrt(cr1*cr2) * int_star)
-                    denom1 += (10.**(theta[ndx*3+1]) * cr_denom1 * int_star_center)
-                    denom2 += (10.**(theta[ndx*3+1]) * cr_denom2 * int_star_center)
+                    nom += (10.**(theta[ndx*3+1]) * np.sqrt(cr1*cr2)
+                            * int_star)
+                    denom1 += (10.**(theta[ndx*3+1]) * cr_denom1
+                               * int_star_center)
+                    denom2 += (10.**(theta[ndx*3+1]) * cr_denom2
+                               * int_star_center)
 
         else:
             for ndx in range(nsource):
-                int_star = _ind_visibility(s_stars[ndx], alpha_stars, wave, dlambda[i,:], fit_mode)
+                int_star = _ind_visibility(s_stars[ndx], alpha_stars, wave,
+                                           dlambda[i, :], fit_mode)
                 if ndx == 0:
                     nom += (int_star)
                     denom1 += (int_star_center)
@@ -738,34 +754,32 @@ def _calc_vis_mstars(theta, fitarg, fithelp):
                     denom1 += (10.**(theta[ndx*3+2]) * int_star_center)
                     denom2 += (10.**(theta[ndx*3+2]) * int_star_center)
 
-
-        intBG = _ind_visibility(0, alpha_bg, wave, dlambda[i,:], fit_mode)
+        intBG = _ind_visibility(0, alpha_bg, wave, dlambda[i, :], fit_mode)
         denom1 += (fluxRatioBG * intBG)
         denom2 += (fluxRatioBG * intBG)
 
-        vis[i,:] = nom / (np.sqrt(denom1)*np.sqrt(denom2))
-        
+        vis[i, :] = nom / (np.sqrt(denom1)*np.sqrt(denom2))
+
         if coh_loss:
-            vis[i,:] *= theta[th_rest+5+i]
+            vis[i, :] *= theta[th_rest+5+i]
 
     visamp = np.abs(vis)
     visphi = np.angle(vis, deg=True)
     closure = np.zeros((4, len(wave)))
     for idx in range(4):
-        closure[idx] = visphi[bispec_ind[idx,0]] + visphi[bispec_ind[idx,1]] - visphi[bispec_ind[idx,2]]
+        closure[idx] = (visphi[bispec_ind[idx,0]]
+                        + visphi[bispec_ind[idx,1]]
+                        - visphi[bispec_ind[idx,2]])
 
-    visphi = visphi + 360.*(visphi<-180.) - 360.*(visphi>180.)
-    closure = closure + 360.*(closure<-180.) - 360.*(closure>180.)
+    visphi = visphi + 360.*(visphi < -180.) - 360.*(visphi>180.)
+    closure = closure + 360.*(closure < -180.) - 360.*(closure>180.)
     return visamp, visphi, closure
-
-
 
 
 class GravMFit(GravData, GravPhaseMaps):
     def __init__(self, data, verbose=False, ignore_tel=[]):
         super().__init__(data, verbose=verbose)
         self.getIntdata(ignore_tel=ignore_tel)
-
 
     def fitStars(self,
                  ra_list,
@@ -779,7 +793,7 @@ class GravMFit(GravData, GravPhaseMaps):
                  nruns=301,
                  bestchi=True,
                  bequiet=False,
-                 fit_for=np.array([0.5,0.5,1.0,0.0]),
+                 fit_for=np.array([0.5, 0.5, 1.0, 0.0]),
                  fit_mode='analytic',
                  coh_loss=None,
                  no_fit=False,
@@ -816,7 +830,8 @@ class GravMFit(GravData, GravPhaseMaps):
         fr_list:        Initial guess for flux ratio of companions
 
         Optional arguments for companions:
-        If those vaues are given they need to be a list with one entry per companion
+        If those vaues are given they need to be a list with one entry per
+        companion:
         fit_size:       Size of fitting area [5]
         fit_pos:        Fit position of each companion [True]
         fit_fr:         Fit flux ratio of each companion [True]
@@ -828,13 +843,15 @@ class GravMFit(GravData, GravPhaseMaps):
         bestchi:        Gives best chi2 (for True) or mcmc res as output [True]
         bequiet:        Suppresses ALL outputs
         fit_for:        weight of VA, V2, T3, VP [[0.5,0.5,1.0,0.0]]
-        fit_mode:       Kind of integration for visibilities (approx, numeric, 
+        fit_mode:       Kind of integration for visibilities (approx, numeric,
                         analytic) [analytic]
-        coh_loss:       If not None, fit for a coherence loss per Basline 
+        coh_loss:       If not None, fit for a coherence loss per Basline
                         Value is initial guess (0-1) [None]
-        no_fit  :       Only gives fitting results for parameters from no_fit_values [False]
+        no_fit  :       Only gives fitting results for parameters from 
+                        no_fit_values [False]
         no_fit_values:  has to be given for donotfit [None]
-        onlypol:        Only fits one polarization for split mode, either 0 or 1 [None]
+        onlypol:        Only fits one polarization for split mode, 
+                        either 0 or 1 [None]
         initial:        Initial guess for fit [None]
         flagtill:       Flag blue channels, has to be changed for not LOW [3]
         flagfrom:       Flag red channels, has to be changed for not LOW [13]
@@ -850,11 +867,13 @@ class GravMFit(GravData, GravPhaseMaps):
                         initial guess value [False]
         interppm:       Interpolate Phasemaps [True]
         smoothkernel:   Size of smoothing kernel in mas [15]
-        simulate_pm:    Phasemaps for simulated data, sets ACQ parameter to 0 [False]
+        simulate_pm:    Phasemaps for simulated data, 
+                        sets ACQ parameter to 0 [False]
         '''
 
         if self.resolution != 'LOW' and flagtill == 3 and flagfrom == 13:
-            raise ValueError('Initial values for flagtill and flagfrom have to be changed if not low resolution')
+            raise ValueError('Initial values for flagtill and flagfrom have'
+                             'to be changed if not low resolution')
 
         self.fit_for = fit_for
         self.fixedBHalpha = fixedBHalpha
@@ -869,7 +888,6 @@ class GravMFit(GravData, GravPhaseMaps):
             coh_loss = False
 
         self.coh_loss = coh_loss
-        rad2as = 180 / np.pi * 3600
 
         self.phasemaps = phasemaps
         self.fit_phasemaps = fit_phasemaps
@@ -883,7 +901,8 @@ class GravMFit(GravData, GravPhaseMaps):
             northangle2 = header['ESO QC ACQ FIELD2 NORTH_ANGLE']/180*math.pi
             northangle3 = header['ESO QC ACQ FIELD3 NORTH_ANGLE']/180*math.pi
             northangle4 = header['ESO QC ACQ FIELD4 NORTH_ANGLE']/180*math.pi
-            self.northangle = [northangle1, northangle2, northangle3, northangle4]
+            self.northangle = [northangle1, northangle2, 
+                               northangle3, northangle4]
 
             ddec1 = header['ESO QC MET SOBJ DDEC1']
             ddec2 = header['ESO QC MET SOBJ DDEC2']
@@ -899,12 +918,12 @@ class GravMFit(GravData, GravPhaseMaps):
 
             if fit_phasemaps:
                 phasemaps = GravPhaseMaps()
-                phasemaps.tel=self.tel
-                phasemaps.resolution=self.resolution
-                phasemaps.smoothkernel=self.smoothkernel
-                phasemaps.datayear=self.datayear
-                phasemaps.wlSC=self.wlSC
-                phasemaps.interppm=interppm
+                phasemaps.tel = self.tel
+                phasemaps.resolution = self.resolution
+                phasemaps.smoothkernel = self.smoothkernel
+                phasemaps.datayear = self.datayear
+                phasemaps.wlSC = self.wlSC
+                phasemaps.interppm = interppm
                 phasemaps.loadPhasemaps(interp=interppm)
 
         nsource = len(ra_list)
@@ -918,7 +937,8 @@ class GravMFit(GravData, GravPhaseMaps):
         if len(de_list) != nsource or len(fit_pos) != nsource or len(fit_size) != nsource:
             raise ValueError('list of input parameters have different lengths')
         if len(fr_list) != (nsource-1) or len(fit_fr) != (nsource-1):
-            raise ValueError('list of input parameters have different lengths, fr list should be nsource-1')
+            raise ValueError('list of input parameters have different lengths,'
+                             'fr list should be nsource-1')
         self.nsource = nsource
 
         # Get data from file
@@ -928,16 +948,8 @@ class GravMFit(GravData, GravPhaseMaps):
         elif tel == 'ESO-VLTI-A1234':
             self.tel = 'AT'
         else:
-            raise ValueError('Telescope not AT or UT, something wrong with input data')
-
-        try:
-            fiberOffX = -fits.open(self.name)[0].header["HIERARCH ESO INS SOBJ OFFX"]
-            fiberOffY = -fits.open(self.name)[0].header["HIERARCH ESO INS SOBJ OFFY"]
-        except KeyError:
-            fiberOffX = 0
-            fiberOffY = 0
-
-        nwave = self.channel
+            raise ValueError('Telescope not AT or UT, something wrong'
+                             'with input data')
 
         MJD = fits.open(self.name)[0].header["MJD-OBS"]
         u = self.u
@@ -945,7 +957,6 @@ class GravMFit(GravData, GravPhaseMaps):
         wave = self.wlSC
         self.wave = wave
         self.getDlambda()
-        dlambda = self.dlambda
 
         stname = self.name.find('GRAVI')
         if phasemaps:
@@ -959,8 +970,6 @@ class GravMFit(GravData, GravPhaseMaps):
             txtfile.write('# Rows are: dRA, dDEC, f1, f2, f3, f4, alpha flare, f BG, alpha BG, PC RA, PC DEC, OPD1, OPD2, OPD3, OPD4 \n')
             txtfile.write('# Parameter which are not fitted have 0.0 as error \n')
             txtfile.write('# MJD: %f \n' % MJD)
-            txtfile.write('# OFFX: %f \n' % fiberOffX)
-            txtfile.write('# OFFY: %f \n\n' % fiberOffY)
 
         results = []
 
@@ -975,7 +984,7 @@ class GravMFit(GravData, GravPhaseMaps):
             pc_RA_in = 0
             pc_DEC_in = 0
             flux_ratio_bh = 1
-        
+
         if coh_loss:
             theta = np.zeros(nsource*3+10)
             lower = np.zeros(nsource*3+10)
@@ -984,11 +993,9 @@ class GravMFit(GravData, GravPhaseMaps):
             theta = np.zeros(nsource*3+4)
             lower = np.zeros(nsource*3+4)
             upper = np.zeros(nsource*3+4)
-            
+
         todel = []
-
         fr_list = [np.log10(i) for i in fr_list]
-
         for ndx in range(nsource):
             if ndx == 0:
                 # first star (no flux ratio)
@@ -1040,7 +1047,7 @@ class GravMFit(GravData, GravPhaseMaps):
         upper[th_rest+2] = pc_RA_in + pc_size
         upper[th_rest+3] = pc_DEC_in + pc_size
         upper[th_rest+4] = np.log10(10.)
-    
+
         if coh_loss:
             theta[th_rest+5:] = coh_loss_in
             upper[th_rest+5:] = 1
@@ -1049,7 +1056,7 @@ class GravMFit(GravData, GravPhaseMaps):
         theta_names = []
         theta_names.append('dRA1')
         theta_names.append('dDEC1')
-        for ndx in range(1,nsource):
+        for ndx in range(1, nsource):
             theta_names.append('dRA%i' % (ndx + 1))
             theta_names.append('dDEC%i' % (ndx + 1))
             theta_names.append('fr%i' % (ndx + 1))
@@ -1088,25 +1095,27 @@ class GravMFit(GravData, GravPhaseMaps):
                                                             0 + theta[1],
                                                             self.northangle, self.dra, self.ddec)
                 self.pm_sources.append([pm_amp, pm_pha, pm_int])
-                for ndx in range(1,nsource):
+                for ndx in range(1, nsource):
                     pm_amp, pm_pha, pm_int = self.phasemap_source(0 + theta[ndx*3-1],
                                                                 0 + theta[ndx*3],
                                                                 self.northangle, self.dra, self.ddec)
                     self.pm_sources.append([pm_amp, pm_pha, pm_int])
 
-
         if no_fit:
             if no_fit_values is None:
-                raise ValueError('If no_fit is True, fit values have to be given by no_fit_values')
+                raise ValueError('If no_fit is True, fit values have to be '
+                                 'given by no_fit_values')
             if len(no_fit_values) != 5:
                 print("alpha BH,  f BG, PC RA, PC DEC, fr BH")
-                raise ValueError('no_fit_values has to have 5 parameters, see above')
+                raise ValueError('no_fit_values has to have 5 parameters,'
+                                 ' see above')
             plotCorner = False
             createpdf = False
             writeresults = False
             theta[-5:] = no_fit_values
             theta[-1] = np.log10(theta[-1])
-            print('Will not fit the data, just print out the results for the given theta')
+            print('Will not fit the data, just print out the results for the '
+                  'given theta')
 
         # Get data
         if self.polmode == 'SPLIT':
@@ -1136,7 +1145,7 @@ class GravMFit(GravData, GravPhaseMaps):
             if onlypol is not None:
                 polnom = [onlypol]
             else:
-                polnom = [0,1]
+                polnom = [0, 1]
 
         elif self.polmode == 'COMBINED':
             visamp_P = [self.visampSC]
@@ -1284,25 +1293,26 @@ class GravMFit(GravData, GravPhaseMaps):
                     if idx == 0 and dit == 0:
                         if not bequiet:
                             print('using channels from #%i to #%i' % (p, t))
-                    visamp_flag[:,0:p] = True
-                    vis2_flag[:,0:p] = True
-                    visphi_flag[:,0:p] = True
-                    closure_flag[:,0:p] = True
-                    closamp_flag[:,0:p] = True
+                    visamp_flag[:, 0:p] = True
+                    vis2_flag[:, 0:p] = True
+                    visphi_flag[:, 0:p] = True
+                    closure_flag[:, 0:p] = True
+                    closamp_flag[:, 0:p] = True
 
-                    visamp_flag[:,t:] = True
-                    vis2_flag[:,t:] = True
-                    visphi_flag[:,t:] = True
-                    closure_flag[:,t:] = True
-                    closamp_flag[:,t:] = True
+                    visamp_flag[:, t:] = True
+                    vis2_flag[:, t:] = True
+                    visphi_flag[:, t:] = True
+                    closure_flag[:, t:] = True
+                    closamp_flag[:, t:] = True
 
                 width = 1e-1
-                pos = np.ones((nwalkers,ndim))
+                pos = np.ones((nwalkers, ndim))
                 for par in range(ndim):
                     if par in todel:
-                        pos[:,par] = theta[par]
+                        pos[:, par] = theta[par]
                     else:
-                        pos[:,par] = theta[par] + width*np.random.randn(nwalkers)
+                        pos[:, par] = (theta[par]
+                                       + width*np.random.randn(nwalkers))
 
                 if not bequiet:
                     if not no_fit:
@@ -1311,46 +1321,55 @@ class GravMFit(GravData, GravPhaseMaps):
                         print('Pol %i' % (idx+1))
 
                 fitdata = [visamp, visamp_error, visamp_flag,
-                            vis2, vis2_error, vis2_flag,
-                            closure, closure_error, closure_flag,
-                            visphi, visphi_error, visphi_flag]
+                           vis2, vis2_error, vis2_flag,
+                           closure, closure_error, closure_flag,
+                           visphi, visphi_error, visphi_flag]
                 fitarg = [u, v]
 
                 if self.phasemaps:
                     if fit_phasemaps:
-                        fithelp = [self.nsource, self.fit_for, self.bispec_ind, self.fit_mode,
-                                self.wave, self.dlambda, self.fixedBHalpha, self.coh_loss,
-                                self.phasemaps,
-                                self.northangle, self.dra, self.ddec, phasemaps.amp_map_int,
-                                phasemaps.pha_map_int, phasemaps.amp_map_denom_int,
-                                fit_phasemaps, None, None, None, None]
+                        fithelp = [self.nsource, self.fit_for, self.bispec_ind,
+                                   self.fit_mode, self.wave, self.dlambda,
+                                   self.fixedBHalpha, self.coh_loss,
+                                   self.phasemaps, self.northangle, self.dra,
+                                   self.ddec, phasemaps.amp_map_int,
+                                   phasemaps.pha_map_int, 
+                                   phasemaps.amp_map_denom_int,
+                                   fit_phasemaps, None, None, None, None]
                     else:
-                        fithelp = [self.nsource, self.fit_for, self.bispec_ind, self.fit_mode,
-                                self.wave, self.dlambda, self.fixedBHalpha, self.coh_loss,
-                                self.phasemaps,
-                                self.northangle, self.dra, self.ddec, None, None, None,
-                                fit_phasemaps, self.pm_sources, self.pm_amp_c,
-                                self.pm_pha_c, self.pm_int_c]
+                        fithelp = [self.nsource, self.fit_for, self.bispec_ind,
+                                   self.fit_mode, self.wave, self.dlambda,
+                                   self.fixedBHalpha, self.coh_loss,
+                                   self.phasemaps, self.northangle, self.dra,
+                                   self.ddec, None, None, None,
+                                   fit_phasemaps, self.pm_sources, 
+                                   self.pm_amp_c, self.pm_pha_c, self.pm_int_c]
                 else:
-                    fithelp = [self.nsource, self.fit_for, self.bispec_ind, self.fit_mode,
-                            self.wave, self.dlambda, self.fixedBHalpha, self.coh_loss,
-                            self.phasemaps,
-                            None, None, None, None, None, None, None, None, None, None, None]
+                    fithelp = [self.nsource, self.fit_for, self.bispec_ind,
+                               self.fit_mode, self.wave, self.dlambda,
+                               self.fixedBHalpha, self.coh_loss,
+                               self.phasemaps, None, None, None, None, None,
+                               None, None, None, None, None, None]
 
                 if not no_fit:
                     if nthreads == 1:
-                        sampler = emcee.EnsembleSampler(nwalkers, ndim, _lnprob_mstars,
-                                                            args=(fitdata, lower,
-                                                                  upper, fitarg, fithelp))
+                        sampler = emcee.EnsembleSampler(nwalkers, ndim,
+                                                        _lnprob_mstars,
+                                                        args=(fitdata, lower,
+                                                              upper, fitarg,
+                                                              fithelp))
                         if bequiet:
                             sampler.run_mcmc(pos, nruns, progress=False)
                         else:
                             sampler.run_mcmc(pos, nruns, progress=True)
                     else:
                         with Pool(processes=nthreads) as pool:
-                            sampler = emcee.EnsembleSampler(nwalkers, ndim, _lnprob_mstars,
-                                                            args=(fitdata, lower,
-                                                                  upper, fitarg, fithelp),
+                            sampler = emcee.EnsembleSampler(nwalkers, ndim,
+                                                            _lnprob_mstars,
+                                                            args=(fitdata,
+                                                                  lower,
+                                                                  upper, fitarg,
+                                                                  fithelp),
                                                             pool=pool)
                             if bequiet:
                                 sampler.run_mcmc(pos, nruns, progress=False)
@@ -1377,7 +1396,7 @@ class GravMFit(GravData, GravPhaseMaps):
                     cldim = len(cllabels)
                     if plotCorner:
                         fig, axes = plt.subplots(cldim, figsize=(8, cldim/1.5),
-                                                sharex=True)
+                                                 sharex=True)
                         for i in range(cldim):
                             ax = axes[i]
                             ax.plot(clsamples[:, :, i].T, "k", alpha=0.3)
@@ -1432,7 +1451,6 @@ class GravMFit(GravData, GravPhaseMaps):
                 self.result_fit_vis2 = fit_vis2
                 self.result_visphi = fit_visphi
                 self.result_closure = fit_closure
-
 
                 res_visamp = fit_visamp-visamp
                 res_vis2 = fit_vis2-vis2
