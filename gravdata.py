@@ -71,12 +71,13 @@ class GravData():
             datacatg = header['ESO PRO CATG']
             if datacatg not in poscatg:
                 raise ValueError('filetype is %s, which is not supported' % datacatg)
-            self.datacatg = datacatg
         else:
             if self.verbose:
                 print('Assume this is a raw file!')
             self.raw = True
+            datacatg = 'RAW'
 
+        self.datacatg = datacatg
         self.polmode = header['ESO INS POLA MODE']
         self.resolution = header['ESO INS SPEC RES']
         self.dit = header['ESO DET2 SEQ1 DIT']
