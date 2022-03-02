@@ -24,6 +24,7 @@ color2 = '#348ABD'
 color3 = '#F26D21'
 color4 = '#7A68A6'
 
+
 def convert_date(date):
     t = Time(date)
     t2 = Time('2000-01-01T12:00:00')
@@ -33,7 +34,6 @@ def convert_date(date):
     date = date.split('.')[0]
     date = datetime.strptime(date, '%Y-%m-%d %H:%M:%S')
     return date_decimal, date
-
 
 
 class GravData():
