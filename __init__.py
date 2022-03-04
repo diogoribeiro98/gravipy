@@ -3,3 +3,4 @@ from .gravdata import *
 from .gravfit import *
 from .gravmfit import *
 from .phasecor import *
+from .gcobs import *
