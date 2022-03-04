@@ -25,8 +25,10 @@ color3 = '#F26D21'
 color4 = '#7A68A6'
 
 
-def convert_date(date):
+def convert_date(date, mjd=False):
     t = Time(date)
+    if mjd:
+        return t.mjd
     t2 = Time('2000-01-01T12:00:00')
     date_decimal = (t.mjd - t2.mjd)/365.25+2000
 
