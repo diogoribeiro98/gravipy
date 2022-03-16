@@ -1529,7 +1529,12 @@ class GravMFit(GravData, GravPhaseMaps):
                     pdf.ln()
 
                 if plotScience:
-                    self.plotFit(theta_result, fitdata, fitarg, fithelp, idx, createpdf=createpdf)
+                    if idx == 0:
+                        plotdata = []
+                    plotdata.append([theta_result, fitdata, fitarg, fithelp])
+                    # self.plotFit(theta_result, fitdata, fitarg, fithelp, idx,
+                    #              createpdf=createpdf)
+
                 if writeresults:
                     txtfile.write("# Polarization %i  \n" % (idx+1))
                     for tdx, t in enumerate(mostprop):
@@ -1575,7 +1580,8 @@ class GravMFit(GravData, GravPhaseMaps):
                             txtfile.write(', ')
                         else:
                             txtfile.write(', 0, 0, 0, 0, 0\n')
-
+            if plotScience:
+                self.plotFitComb(plotdata)
             if createpdf:
                 pdfimages0 = sorted(glob.glob(savetime + '_pol0*.png'))
                 pdfimages1 = sorted(glob.glob(savetime + '_pol1*.png'))
@@ -1628,6 +1634,7 @@ class GravMFit(GravData, GravPhaseMaps):
                 files = glob.glob(savetime + '_pol?_?.png')
                 for file in files:
                     os.remove(file)
+
         if writeresults:
             txtfile.close()
         try:
@@ -1648,13 +1655,255 @@ class GravMFit(GravData, GravPhaseMaps):
         else:
             return results
 
+    def plotFitComb(self, plotdata, nicer=True):
+        rad2as = 180 / np.pi * 3600
+        stname = self.name.find('GRAVI')
+        title_name = self.name[stname:-5]
 
+        nplot = len(plotdata)
+        if nplot == 2:
+            plotsplit = True
+        else:
+            plotsplit = False
+
+        wave = self.wlSC
+        dlambda = self.dlambda
+        if self.phasemaps:
+            wave_model = wave
+        else:
+            wave_model = np.linspace(wave[0], wave[len(wave)-1], 1000)
+        dlambda_model = np.zeros((6, len(wave_model)))
+        for i in range(0, 6):
+            dlambda_model[i, :] = np.interp(wave_model, wave, dlambda[i, :])
+
+        u = self.u
+        v = self.v
+        magu = np.sqrt(u**2.+v**2.)
+
+        u_as_model = np.zeros((len(u),len(wave_model)))
+        v_as_model = np.zeros((len(v),len(wave_model)))
+        for i in range(0, len(u)):
+            u_as_model[i, :] = u[i]/(wave_model*1.e-6) / rad2as
+            v_as_model[i, :] = v[i]/(wave_model*1.e-6) / rad2as
+        magu_as_model = np.sqrt(u_as_model**2.+v_as_model**2.)
+
+        fitres = []
+        for idx in range(nplot):
+            theta, fitdata, fitarg, fithelp = plotdata[idx]
+
+            # (visamp, visamp_error, visamp_flag,
+            #  vis2, vis2_error, vis2_flag,
+            #  closure, closure_error, closure_flag,
+            #  visphi, visphi_error, visphi_flag) = fitdata
+
+            fithelp[4] = wave_model
+            fithelp[5] = dlambda_model
+            self.wave = wave_model
+            self.dlambda = dlambda_model
+            fitres.append(_calc_vis_mstars(theta, fitarg, fithelp))
+
+        self.wave = wave
+        self.dlambda = dlambda
+        magu_as = np.copy(self.spFrequAS)
+        magu_as_T3 = np.copy(self.spFrequAS_T3)
+        magu_as_T3_model = np.zeros((4, len(wave_model)))
+
+        if nicer:
+            bl_sort = [2, 3, 5, 0, 4, 1]
+            cl_sort = [0, 3, 2, 1]
+            nchannel = len(magu_as[0])
+            for bl in range(6):
+                magu_as[bl] = (np.linspace(0, nchannel, nchannel)
+                               + bl_sort[bl]*(nchannel+nchannel//2))
+                magu_as_model[bl] = (np.linspace(0, nchannel, len(wave_model))
+                                     + bl_sort[bl]*(nchannel+nchannel//2))
+            for cl in range(4):
+                magu_as_T3[cl] = (np.linspace(0, nchannel, nchannel)
+                                  + cl_sort[cl]*(nchannel+nchannel//2))
+                magu_as_T3_model[cl] = (np.linspace(0, nchannel,
+                                                    len(wave_model))
+                                        + cl_sort[cl]*(nchannel+nchannel//2))
+        else:
+            for cl in range(4):
+                magu_as_T3_model[cl] = (self.max_spf[cl]/(wave_model*1.e-6)
+                                        / rad2as)
+
+        # Visamp
+        if self.fit_for[0]:
+            plt.figure(figsize=(10, 5))
+            if plotsplit:
+                gs = gridspec.GridSpec(1,2, wspace=0.05)
+            for idx in range(nplot):
+                if plotsplit:
+                    ax = plt.subplot(gs[0, idx])
+                visamp = plotdata[idx][1][0]
+                visamp_error = plotdata[idx][1][1]
+                visamp_flag = plotdata[idx][1][2]
+                model_visamp_full = fitres[idx][0]
+                for i in range(0, 6):
+                    plt.errorbar(magu_as[i, :],
+                                 visamp[i, :]*(1-visamp_flag)[i],
+                                 visamp_error[i, :]*(1-visamp_flag)[i],
+                                 color=self.colors_baseline[i],
+                                 ls='', lw=1, alpha=0.5, capsize=0)
+                    plt.scatter(magu_as[i,:],
+                                visamp[i, :]*(1-visamp_flag)[i],
+                                color=self.colors_baseline[i],
+                                alpha=0.5, label=self.baseline_labels[i])
+                    if nicer:
+                        plt.text(magu_as[i, :].mean(), -0.07,
+                                 self.baseline_labels[i],
+                                 color=self.colors_baseline[i],
+                                 ha='center', va='center')
+                    plt.plot(magu_as_model[i, :], model_visamp_full[i, :],
+                             color='grey', zorder=100)
+                if idx == 0:
+                    plt.ylabel('Visibility Amplitude')
+                else:
+                    ax.set_yticklabels([])
+                plt.ylim(-0.03, 1.1)
+                if nicer:
+                    # ax.set_xticklabels([])
+                    ax.set_xticks([])
+                else:
+                    plt.legend()
+                    plt.xlabel('spatial frequency (1/arcsec)')
+            plt.suptitle(title_name, y=0.92)
+            plt.show()
+
+        # Vis2
+        if self.fit_for[1]:
+            plt.figure(figsize=(10, 5))
+            if plotsplit:
+                gs = gridspec.GridSpec(1, 2, wspace=0.05)
+            for idx in range(nplot):
+                if plotsplit:
+                    ax = plt.subplot(gs[0, idx])
+                vis2 = plotdata[idx][1][3]
+                vis2_error = plotdata[idx][1][4]
+                vis2_flag = plotdata[idx][1][5]
+                model_vis2_full = fitres[idx][0]**2
+                for i in range(0,6):
+                    plt.errorbar(magu_as[i, :],
+                                 vis2[i, :]*(1-vis2_flag)[i],
+                                 vis2_error[i, :]*(1-vis2_flag)[i],
+                                 color=self.colors_baseline[i],
+                                 ls='', lw=1, alpha=0.5, capsize=0)
+                    plt.scatter(magu_as[i,:],
+                                vis2[i, :]*(1-vis2_flag)[i],
+                                color=self.colors_baseline[i],
+                                alpha=0.5, label=self.baseline_labels[i])
+                    if nicer:
+                        plt.text(magu_as[i, :].mean(), -0.07,
+                                 self.baseline_labels[i],
+                                 color=self.colors_baseline[i],
+                                 ha='center', va='center')
+                    plt.plot(magu_as_model[i, :], model_vis2_full[i, :],
+                             color='grey', zorder=100)
+                if idx == 0:
+                    plt.ylabel('Visibility Squared')
+                else:
+                    ax.set_yticklabels([])
+                plt.ylim(-0.03, 1.1)
+                if nicer:
+                    # ax.set_xticklabels([])
+                    ax.set_xticks([])
+                else:
+                    plt.legend()
+                    plt.xlabel('spatial frequency (1/arcsec)')
+            plt.suptitle(title_name, y=0.92)
+            plt.show()
+
+        # T3
+        if self.fit_for[2]:
+            plt.figure(figsize=(10, 5))
+            if plotsplit:
+                gs = gridspec.GridSpec(1, 2, wspace=0.05)
+            for idx in range(nplot):
+                if plotsplit:
+                    ax = plt.subplot(gs[0, idx])
+                closure = plotdata[idx][1][6]
+                closure_error = plotdata[idx][1][7]
+                closure_flag = plotdata[idx][1][8]
+                model_closure_full = fitres[idx][2]
+                for i in range(0,4):
+                    plt.errorbar(magu_as_T3[i, :],
+                                 closure[i, :]*(1-closure_flag)[i],
+                                 closure_error[i, :]*(1-closure_flag)[i],
+                                 color=self.colors_closure[i],
+                                 ls='', lw=1, alpha=0.5, capsize=0)
+                    plt.scatter(magu_as_T3[i, :],
+                                closure[i, :]*(1-closure_flag)[i],
+                                color=self.colors_closure[i],
+                                alpha=0.5, label=self.closure_labels[i])
+                    if nicer:
+                        plt.text(magu_as_T3[i, :].mean(), -192,
+                                 self.closure_labels[i],
+                                 color=self.colors_closure[i],
+                                 ha='center', va='center')
+                    plt.plot(magu_as_T3_model[i, :], model_closure_full[i, :],
+                             color='grey', zorder=100)
+                if idx == 0:
+                    plt.ylabel('Closure Phase (deg)')
+                else:
+                    ax.set_yticklabels([])
+                plt.ylim(-180,180)
+                if nicer:
+                    # ax.set_xticklabels([])
+                    ax.set_xticks([])
+                else:
+                    plt.legend()
+                    plt.xlabel('spatial frequency of largest baseline in triangle (1/arcsec)')
+        plt.suptitle(title_name, y=0.92)
+        plt.show()
+
+        # Visphi
+        if self.fit_for[3]:
+            plt.figure(figsize=(10, 5))
+            if plotsplit:
+                gs = gridspec.GridSpec(1, 2, wspace=0.05)
+            for idx in range(nplot):
+                if plotsplit:
+                    ax = plt.subplot(gs[0, idx])
+                visphi = plotdata[idx][1][9]
+                visphi_error = plotdata[idx][1][10]
+                visphi_flag = plotdata[idx][1][11]
+                model_visphi_full = fitres[idx][1]
+                for i in range(0,6):
+                    plt.errorbar(magu_as[i, :],
+                                 visphi[i, :]*(1-visphi_flag)[i],
+                                 visphi_error[i, :]*(1-visphi_flag)[i],
+                                 color=self.colors_baseline[i],
+                                 ls='', lw=1, alpha=0.5, capsize=0)
+                    plt.scatter(magu_as[i,:],
+                                visphi[i, :]*(1-visphi_flag)[i],
+                                color=self.colors_baseline[i],
+                                alpha=0.5, label=self.baseline_labels[i])
+                    if nicer:
+                        plt.text(magu_as[i, :].mean(), -192,
+                                 self.baseline_labels[i],
+                                 color=self.colors_baseline[i],
+                                 ha='center', va='center')
+                    plt.plot(magu_as_model[i, :], model_visphi_full[i, :],
+                             color='grey', zorder=100)
+                if idx == 0:
+                    plt.ylabel('visibility phase')
+                else:
+                    ax.set_yticklabels([])
+                plt.ylim(-180,180)
+                if nicer:
+                    # ax.set_xticklabels([])
+                    ax.set_xticks([])
+                else:
+                    plt.legend()
+                    plt.xlabel('spatial frequency (1/arcsec)')
+            plt.suptitle(title_name, y=0.92)
+            plt.show()
 
     def plotFit(self, theta, fitdata, fitarg, fithelp, idx=0, createpdf=False):
         """
-        Calculates the theoretical interferometric data for the given parameters in theta
-        and plots them together with the data in fitdata.
-        Mainly used in fitBinary as result plots.
+        Calculates the theoretical interferometric data for the given
+        parameters in theta and plots them together with the data in fitdata.
         """
         rad2as = 180 / np.pi * 3600
         stname = self.name.find('GRAVI')
