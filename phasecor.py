@@ -840,7 +840,8 @@ class GravPhaseNight():
                 '2021-06-25',
                 '2021-07-25',
                 '2021-07-26',
-                '2021-07-27'
+                '2021-07-27',
+                '2022-03-18'
                 ]
         calibrators = ['GRAVI.2019-03-28T08:00:22.802_dualscivis.fits',
                     'GRAVI.2019-03-29T07:35:36.327_dualscivis.fits',
@@ -884,7 +885,8 @@ class GravPhaseNight():
                     'GRAVI.2021-06-26T02:08:16.758_dualscivis.fits',
                     'GRAVI.2021-07-26T01:08:53.419_dualscivis.fits',
                     'GRAVI.2021-07-27T00:18:12.572_dualscivis.fits',
-                    'GRAVI.2021-07-28T01:03:19.149_dualscivis.fits'
+                    'GRAVI.2021-07-28T01:03:19.149_dualscivis.fits',
+                    'GRAVI.2022-03-19T08:46:10.049_dualscivis.fits'
                     ] 
 
         if full_folder:
@@ -939,6 +941,7 @@ class GravPhaseNight():
         if len(allfiles) == 0:
             raise ValueError('No files found, most likely something is wrong with the reduction folder')
         
+        s2data = np.load(resource_filename('gravipy', 's2_orbit.npy'))
         if full_folder:
             sg_files = allfiles
             s2_files = allfiles
@@ -953,13 +956,17 @@ class GravPhaseNight():
                     if h['ESO INS SOBJ OFFX'] == 0:
                         s2_files.append(file)
                     else:
+                        d = convert_date(h['DATE-OBS'])[0]
+                        _x, _y = -s2data[find_nearest(s2data[:,0], d)][1:]*1e3
                         sobjx = h['ESO INS SOBJ X']
                         sobjy = h['ESO INS SOBJ Y']
+                        sobjoffx = h['ESO INS SOBJ OFFX']
+                        sobjoffy = h['ESO INS SOBJ OFFY']
                         if onlysgra:
-                            if -990 > sobjx or sobjx > -940:
+                            if np.abs(sobjoffx - _x) > 10 :
                                 print('File with separation (%i,%i) not on S2 orbit, will be ignored' % (sobjx, sobjy))
                                 continue
-                            if -640 > sobjy or sobjy > -590:
+                            if np.abs(sobjoffy - _y) > 10 :
                                 print('File with separation (%i,%i) not on S2 orbit, will be ignored' % (sobjx, sobjy))
                                 continue
                         sg_files.append(file)
