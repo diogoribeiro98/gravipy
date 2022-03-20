@@ -24,6 +24,10 @@ color2 = '#348ABD'
 color3 = '#F26D21'
 color4 = '#7A68A6'
 
+def fiber_coupling(x):
+    fiber_coup = np.exp(-1*(2*np.pi*np.sqrt(np.sum(x**2))/280)**2)
+    return fiber_coup
+
 
 def convert_date(date, mjd=False):
     t = Time(date)
