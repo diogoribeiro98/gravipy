@@ -1049,7 +1049,7 @@ class GravMFit(GravData, GravPhaseMaps):
         upper[th_rest+1] = 20
         upper[th_rest+2] = pc_RA_in + pc_size
         upper[th_rest+3] = pc_DEC_in + pc_size
-        upper[th_rest+4] = np.log10(10.)
+        upper[th_rest+4] = np.log10(100.)
 
         if coh_loss:
             theta[th_rest+5:] = coh_loss_in
@@ -1713,14 +1713,14 @@ class GravMFit(GravData, GravPhaseMaps):
             cl_sort = [0, 3, 2, 1]
             nchannel = len(magu_as[0])
             for bl in range(6):
-                magu_as[bl] = (np.linspace(0, nchannel, nchannel)
+                magu_as[bl] = (np.linspace(nchannel, 0, nchannel)
                                + bl_sort[bl]*(nchannel+nchannel//2))
-                magu_as_model[bl] = (np.linspace(0, nchannel, len(wave_model))
+                magu_as_model[bl] = (np.linspace(nchannel, 0, len(wave_model))
                                      + bl_sort[bl]*(nchannel+nchannel//2))
             for cl in range(4):
-                magu_as_T3[cl] = (np.linspace(0, nchannel, nchannel)
+                magu_as_T3[cl] = (np.linspace(nchannel, 0, nchannel)
                                   + cl_sort[cl]*(nchannel+nchannel//2))
-                magu_as_T3_model[cl] = (np.linspace(0, nchannel,
+                magu_as_T3_model[cl] = (np.linspace(nchannel, 0,
                                                     len(wave_model))
                                         + cl_sort[cl]*(nchannel+nchannel//2))
         else:
@@ -1816,6 +1816,16 @@ class GravMFit(GravData, GravPhaseMaps):
 
         # T3
         if self.fit_for[2]:
+            try:
+                c1 = plotdata[0][1][6]*(1-plotdata[0][1][8])
+                c2 = plotdata[1][1][6]*(1-plotdata[1][1][8])
+                cmax = np.nanmax(np.abs(np.concatenate((c1, c2))))
+                if cmax < 100:
+                    cmax = cmax*1.5
+                else:
+                    cmax=180
+            except:
+                cmax=180
             plt.figure(figsize=(10, 5))
             if plotsplit:
                 gs = gridspec.GridSpec(1, 2, wspace=0.05)
@@ -1837,7 +1847,7 @@ class GravMFit(GravData, GravPhaseMaps):
                                 color=self.colors_closure[i],
                                 alpha=0.5, label=self.closure_labels[i])
                     if nicer:
-                        plt.text(magu_as_T3[i, :].mean(), -192,
+                        plt.text(magu_as_T3[i, :].mean(), -cmax*1.06,
                                  self.closure_labels[i],
                                  color=self.colors_closure[i],
                                  ha='center', va='center')
@@ -1847,7 +1857,7 @@ class GravMFit(GravData, GravPhaseMaps):
                     plt.ylabel('Closure Phase (deg)')
                 else:
                     ax.set_yticklabels([])
-                plt.ylim(-180,180)
+                plt.ylim(-cmax,cmax)
                 if nicer:
                     # ax.set_xticklabels([])
                     ax.set_xticks([])
@@ -1859,6 +1869,17 @@ class GravMFit(GravData, GravPhaseMaps):
 
         # Visphi
         if self.fit_for[3]:
+            try:
+                c1 = plotdata[0][1][9]*(1-plotdata[0][1][11])
+                c2 = plotdata[1][1][9]*(1-plotdata[1][1][11])
+                cmax = np.nanmax(np.abs(np.concatenate((c1, c2))))
+                if cmax < 100:
+                    cmax = cmax*1.5
+                else:
+                    cmax=180
+                print(cmax)
+            except:
+                cmax=180
             plt.figure(figsize=(10, 5))
             if plotsplit:
                 gs = gridspec.GridSpec(1, 2, wspace=0.05)
@@ -1880,7 +1901,7 @@ class GravMFit(GravData, GravPhaseMaps):
                                 color=self.colors_baseline[i],
                                 alpha=0.5, label=self.baseline_labels[i])
                     if nicer:
-                        plt.text(magu_as[i, :].mean(), -192,
+                        plt.text(magu_as[i, :].mean(), -cmax*1.06,
                                  self.baseline_labels[i],
                                  color=self.colors_baseline[i],
                                  ha='center', va='center')
@@ -1890,7 +1911,7 @@ class GravMFit(GravData, GravPhaseMaps):
                     plt.ylabel('visibility phase')
                 else:
                     ax.set_yticklabels([])
-                plt.ylim(-180,180)
+                plt.ylim(-cmax,cmax)
                 if nicer:
                     # ax.set_xticklabels([])
                     ax.set_xticks([])
