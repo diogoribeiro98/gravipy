@@ -852,19 +852,19 @@ class GravNight():
         """
         self.file_list = file_list
         self.verbose = verbose
-
         self.colors_baseline = np.array(['k', 'darkblue', color4, 
                                          color2, 'darkred', color1])
         self.colors_closure = np.array([color1, 'darkred', 'k', color2])
         self.colors_tel = np.array([color1, 'darkred', 'k', color2])
-
         self.get_files()
 
     def get_files(self):
         self.datalist = []
+        self.headerlist = []
 
         for num, fi in enumerate(self.file_list):
             self.datalist.append(GravData(fi, verbose=False))
+            self.headerlist.append(fits.open(fi)[0].header)
 
         _catg = [i.datacatg for i in self.datalist]
         if _catg.count(_catg[0]) == len(_catg):
@@ -925,20 +925,18 @@ class GravNight():
                    ignore_tel=[]):
         for data in self.datalist:
             data.getIntdata(mode=mode, plot=plot, plotTAmp=plotTAmp, flag=flag,
-                   ignore_tel=ignore_tel)
-        
+                             ignore_tel=ignore_tel)
+
     def getTime(self):
         files = self.files
         MJD = np.array([]).reshape(0,4)
         for fdx, file in enumerate(files):
             d = fits.open(file)['OI_FLUX'].data
             _MJD0 = fits.open(file)[0].header['MJD-OBS']
-            MJD = np.concatenate((MJD, d['TIME'].reshape(-1,4)/1e6/3600/24 + _MJD0))
+            MJD = np.concatenate((MJD, d['TIME'].reshape(-1, 4)/1e6/3600/24
+                                  + _MJD0))
         MJD = (MJD - self.mjd0)*24*60
         self.time = MJD
-
-
-
 
     def getMetdata(self, plot=False):
         if 'P2VM' not in self.datacatg:
@@ -962,31 +960,36 @@ class GravNight():
         for fdx, file in enumerate(files):
             d = fits.open(file)['OI_VIS_MET'].data
             _MJD0 = fits.open(file)[0].header['MJD-OBS']
-            MJD = np.concatenate((MJD, d['TIME'].reshape(-1,4)/1e6/3600/24 + _MJD0))
-            OPD_FC = np.concatenate((OPD_FC, d['OPD_FC'].reshape(-1,4)*1e6))
-            OPD_FC_CORR = np.concatenate((OPD_FC_CORR, d['OPD_FC_CORR'].reshape(-1,4)*1e6))
-            OPD_TELFC_MCORR = np.concatenate((OPD_TELFC_MCORR, d['OPD_TELFC_MCORR'].reshape(-1,4)*1e6))
+            MJD = np.concatenate((MJD,
+                                  d['TIME'].reshape(-1, 4)/1e6/3600/24 + _MJD0))
+            OPD_FC = np.concatenate((OPD_FC, d['OPD_FC'].reshape(-1, 4)*1e6))
+            OPD_FC_CORR = np.concatenate((OPD_FC_CORR, 
+                                          d['OPD_FC_CORR'].reshape(-1, 4)*1e6))
+            OPD_TELFC_MCORR = np.concatenate((OPD_TELFC_MCORR, 
+                                              d['OPD_TELFC_MCORR'].reshape(-1, 4)*1e6))
 
-            E_U = np.concatenate((E_U, d['E_U'].reshape(-1,4,3)))
-            E_V = np.concatenate((E_V, d['E_V'].reshape(-1,4,3)))
+            E_U = np.concatenate((E_U, d['E_U'].reshape(-1, 4, 3)))
+            E_V = np.concatenate((E_V, d['E_V'].reshape(-1, 4, 3)))
 
-            OPD_TEL = np.concatenate((OPD_TEL, d['OPD_TEL'].reshape(-1,4,4)*1e6))
-            OPD_TEL_CORR = np.concatenate((OPD_TEL_CORR, d['OPD_TEL_CORR'].reshape(-1,4,4)*1e6))
-            OPD_TELFC_CORR = np.concatenate((OPD_TELFC_CORR, d['OPD_TELFC_CORR'].reshape(-1,4,4)*1e6))
+            OPD_TEL = np.concatenate((OPD_TEL,
+                                      d['OPD_TEL'].reshape(-1, 4, 4)*1e6))
+            OPD_TEL_CORR = np.concatenate((OPD_TEL_CORR,
+                                           d['OPD_TEL_CORR'].reshape(-1, 4, 4)
+                                           * 1e6))
+            OPD_TELFC_CORR = np.concatenate((OPD_TELFC_CORR,
+                                             d['OPD_TELFC_CORR'].reshape(-1, 4, 4)
+                                             * 1e6))
 
         MJD = (MJD - self.mjd0)*24*60
         self.time = MJD
         self.opd_fc = OPD_FC
         self.opd_fc_corr = OPD_FC_CORR
         self.opd_telfc_mcorr = OPD_TELFC_MCORR
-
         self.e_u = E_U
         self.e_v = E_V
-
         self.opd_tel = OPD_TEL
         self.opd_tel_corr = OPD_TEL_CORR
         self.opd_telfc_corr = OPD_TELFC_CORR
-    
         self.mjd_files = []
         self.ut_files = []
         self.lst_files = []
@@ -1032,21 +1035,26 @@ class GravNight():
 
             maxval = []
             for tel in range(4):
-                maxval.append(np.max(np.abs(averaging(OPD_TELFC_MCORR[:, tel]-np.mean(OPD_TELFC_MCORR[:, tel]), av))))
+                maxval.append(np.max(np.abs(averaging(OPD_TELFC_MCORR[:, tel]
+                                                      - np.mean(OPD_TELFC_MCORR[:, tel]),
+                                                      av))))
             maxval = np.max(maxval)*1.2
-
-            gs = gridspec.GridSpec(1,4, wspace=0.05, hspace=0.05)
+            gs = gridspec.GridSpec(1, 4, wspace=0.05, hspace=0.05)
             plt.figure(figsize=(7,2))
             for tel in range(4):
                 ax = plt.subplot(gs[0,tel])
-                plt.plot(averaging(MJD[:, tel], av), averaging(OPD_TELFC_MCORR[:, tel] - np.mean(OPD_TELFC_MCORR[:, tel]), av), 
-                        ls='', marker='.', label='UT%i' % (4-tel), color=self.colors_tel[tel])
+                plt.plot(averaging(MJD[:, tel], av),
+                         averaging(OPD_TELFC_MCORR[:, tel]
+                                   - np.mean(OPD_TELFC_MCORR[:, tel]), av),
+                         ls='', marker='.', label='UT%i' % (4-tel),
+                         color=self.colors_tel[tel])
                 for m in range(len(self.t_files)):
                     plt.axvline(self.t_files[m], ls='--', lw=0.2, color='grey')
                     if tel == 0:
-                        plt.text(self.t_files[m]+0.5, -maxval*0.9, self.ut_files[m], rotation=90, fontsize=5)
+                        plt.text(self.t_files[m]+0.5, -maxval*0.9,
+                                 self.ut_files[m], rotation=90, fontsize=5)
                 plt.legend(loc=2)
-                plt.ylim(-maxval,maxval)
+                plt.ylim(-maxval, maxval)
                 plt.xlabel('Time [mins]', fontsize=8)
                 if tel != 0:
                     ax.set_yticklabels([])
@@ -1054,7 +1062,6 @@ class GravNight():
                     plt.ylabel('OPD_TELFC_MCORR \n[$\mu$m]', fontsize=8)
             plt.show()
 
-    
     def getFainttimer(self):
         files = self.files
         onv = np.array([])
@@ -1076,21 +1083,23 @@ class GravNight():
             mt1 = ((time1 / 86400.0) + 2440587.5 - 2400000.5 - self.mjd0)*24*60
             mt2 = ((time2 / 86400.0) + 2440587.5 - 2400000.5 - self.mjd0)*24*60
 
-            onv = np.concatenate((onv, np.linspace(mt1, mt1+rate1*(repe1-1), repe1)))
-            ofv = np.concatenate((ofv, np.linspace(mt2, mt2+rate2*(repe2-1), repe2)))
+            onv = np.concatenate((onv, np.linspace(mt1, mt1+rate1*(repe1-1),
+                                                   repe1)))
+            ofv = np.concatenate((ofv, np.linspace(mt2, mt2+rate2*(repe2-1),
+                                                   repe2)))
 
         try:
-            self.onv = np.concatenate((onv, np.array([self.time[-1,0]])))
-            self.ofv = np.concatenate((np.array([self.time[0,0]]), ofv))
+            self.onv = np.concatenate((onv, np.array([self.time[-1, 0]])))
+            self.ofv = np.concatenate((np.array([self.time[0, 0]]), ofv))
         except AttributeError:
             try:
                 self.getMetdata()
-                self.onv = np.concatenate((onv, np.array([self.time[-1,0]])))
-                self.ofv = np.concatenate((np.array([self.time[0,0]]), ofv))
+                self.onv = np.concatenate((onv, np.array([self.time[-1, 0]])))
+                self.ofv = np.concatenate((np.array([self.time[0, 0]]), ofv))
             except ValueError:
                 self.ofv = np.concatenate((np.array([0]), ofv))
                 self.onv = np.concatenate((onv, np.array([ofv[-1] + ofv[0]])))
-                
+
         # for num, fi in enumerate(self.file_list):
         # 
         #     if num == 0:
