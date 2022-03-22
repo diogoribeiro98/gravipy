@@ -2246,20 +2246,19 @@ def _lnlike_night(theta, fitdata, fitarg, fithelp):
     ln_prob_res = 0
     for ndx in range(len_lightcurve):
         _theta = np.zeros(nsource*3+10)
-        for ndx in range(nsource):
-            if ndx == 0:
+        for sdx in range(nsource):
+            if sdx == 0:
                 _theta[:2] = theta[:2]
             else:
-                _theta[ndx*3-1] = theta[ndx*2]
-                _theta[ndx*3] = theta[ndx*2+1]
-                _theta[ndx*3+1] = theta[nsource*2+ndx]
+                _theta[sdx*3-1] = theta[sdx*2]
+                _theta[sdx*3] = theta[sdx*2+1]
+                _theta[sdx*3+1] = theta[nsource*2+sdx-1]
 
         th_rest = nsource*3-1
         if oneBHalpha:
-            _theta[th_rest] = theta[nsource*3-1 + ndx*10+1]
-        else:
             _theta[th_rest] = theta[nsource*3-1 + 1]
-        _theta[th_rest] = theta[nsource*3-1 + ndx*10+1]
+        else:
+            _theta[th_rest] = theta[nsource*3-1 + ndx*10+1]
         _theta[th_rest+1] = 0
         _theta[th_rest+2] = theta[nsource*3-1 + ndx*10+2]
         _theta[th_rest+3] = theta[nsource*3-1 + ndx*10+3]
@@ -2920,19 +2919,19 @@ class GravMNightFit(GravNight):
         for ndx in range(len_lightcurve):
             obj = self.datalist[ndx//2]
             _theta = np.zeros(nsource*3+10)
-            for ndx in range(nsource):
-                if ndx == 0:
+            for sdx in range(nsource):
+                if sdx == 0:
                     _theta[:2] = fitres[:2]
                 else:
-                    _theta[ndx*3-1] = fitres[ndx*2]
-                    _theta[ndx*3] = fitres[ndx*2+1]
-                    _theta[ndx*3+1] = fitres[nsource*2+ndx]
+                    _theta[sdx*3-1] = fitres[sdx*2]
+                    _theta[sdx*3] = fitres[sdx*2+1]
+                    _theta[sdx*3+1] = fitres[nsource*2+sdx-1]
 
             th_rest = nsource*3-1
             if oneBHalpha:
-                _theta[th_rest] = fitres[nsource*3-1 + ndx*10+1]
-            else:
                 _theta[th_rest] = fitres[nsource*3-1 + 1]
+            else:
+                _theta[th_rest] = fitres[nsource*3-1 + ndx*10+1]
             _theta[th_rest+1] = 0
             _theta[th_rest+2] = fitres[nsource*3-1 + ndx*10+2]
             _theta[th_rest+3] = fitres[nsource*3-1 + ndx*10+3]
@@ -3164,25 +3163,25 @@ class GravMNightFit(GravNight):
 
     def getFitVis(self, fitres, fitarg, fithelp):
         (len_lightcurve, nsource, fit_for, bispec_ind, fit_mode,
-         wave, dlambda, fixedBHalpha, oneBHalpha, 
+         wave, dlambda, fixedBHalpha, oneBHalpha,
          phasemaps, pm_sources) = fithelp
 
         allfitres = []
         for ndx in range(len_lightcurve):
             _theta = np.zeros(nsource*3+10)
-            for ndx in range(nsource):
-                if ndx == 0:
+            for sdx in range(nsource):
+                if sdx == 0:
                     _theta[:2] = fitres[:2]
                 else:
-                    _theta[ndx*3-1] = fitres[ndx*2]
-                    _theta[ndx*3] = fitres[ndx*2+1]
-                    _theta[ndx*3+1] = fitres[nsource*2+ndx]
+                    _theta[sdx*3-1] = fitres[sdx*2]
+                    _theta[sdx*3] = fitres[sdx*2+1]
+                    _theta[sdx*3+1] = fitres[nsource*2+sdx-1]
 
             th_rest = nsource*3-1
             if oneBHalpha:
-                _theta[th_rest] = fitres[nsource*3-1 + ndx*10+1]
-            else:
                 _theta[th_rest] = fitres[nsource*3-1 + 1]
+            else:
+                _theta[th_rest] = fitres[nsource*3-1 + ndx*10+1]
             _theta[th_rest+1] = 0
             _theta[th_rest+2] = fitres[nsource*3-1 + ndx*10+2]
             _theta[th_rest+3] = fitres[nsource*3-1 + ndx*10+3]
@@ -3202,8 +3201,11 @@ class GravMNightFit(GravNight):
                             wave, dlambda, fixedBHalpha, True, phasemaps,
                             None, None, None, None, None, None, False,
                             None, None, None, None]
-            allfitres.append(_calc_vis_mstars(_theta, fitarg[:, ndx],
-                                              _fithelp))
+            (visamp, visphi,
+             closure) = _calc_vis_mstars(_theta, fitarg[:, ndx],
+                                                         _fithelp)
+            visamp2 = visamp**2
+            allfitres.append([visamp, visamp2, closure, visphi])
         return allfitres
 
     def plotFitComb(self, mostprop=True, nicer=True):
