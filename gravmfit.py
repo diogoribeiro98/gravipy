@@ -966,7 +966,7 @@ class GravMFit(GravData, GravPhaseMaps):
                  bestchi=True,
                  bequiet=False,
                  fit_for=np.array([0.5, 0.5, 1.0, 0.0]),
-                 fit_mode='analytic',
+                 fit_mode='numeric',
                  no_fit=False,
                  no_fit_values=None,
                  onlypol=None,
@@ -1015,7 +1015,7 @@ class GravMFit(GravData, GravPhaseMaps):
         bequiet:        Suppresses ALL outputs
         fit_for:        weight of VA, V2, T3, VP [[0.5,0.5,1.0,0.0]]
         fit_mode:       Kind of integration for visibilities (approx, numeric,
-                        analytic) [analytic]
+                        analytic) [numeric]
         coh_loss:       If not None, fit for a coherence loss per Basline
                         Value is initial guess (0-1) [None]
         no_fit  :       Only gives fitting results for parameters from 
@@ -2321,7 +2321,7 @@ class GravMNightFit(GravNight):
                  nruns=301,
                  bequiet=False,
                  fit_for=np.array([0.5, 0.5, 1.0, 0.0]),
-                 fit_mode='analytic',
+                 fit_mode='numeric',
                  initial=None,
                  flagtill=3,
                  flagfrom=13,
@@ -2356,7 +2356,7 @@ class GravMNightFit(GravNight):
         bequiet:        Suppresses ALL outputs
         fit_for:        weight of VA, V2, T3, VP [[0.5,0.5,1.0,0.0]]
         fit_mode:       Kind of integration for visibilities
-                        (approx, numeric, analytic) [analytic]
+                        (approx, numeric, analytic) [numeric]
         initial:        Initial guess for fit [None]
         flagtill:       Flag blue channels, has to be changed for not LOW [3]
         flagfrom:       Flag red channels, has to be changed for not LOW [13]
@@ -2694,7 +2694,10 @@ class GravMNightFit(GravNight):
             if par in todel:
                 pos[:, par] = theta[par]
             else:
-                pos[:, par] = theta[par] + width*np.random.randn(nwalkers)
+                if 'coh' in theta_names:
+                    pos[:, par] = theta[par] + width*1e-1*np.random.randn(nwalkers)
+                else:
+                    pos[:, par] = theta[par] + width*np.random.randn(nwalkers)
         self.todel = todel
         self.ndim = ndim
 
@@ -2747,7 +2750,7 @@ class GravMNightFit(GravNight):
         print("Mean acceptance fraction: %.2f"
               % np.mean(self.sampler.acceptance_fraction))
 
-        clinitial = np.delete(samples, self.theta_in)
+        clinitial = np.delete(self.theta_in, self.todel)
         clsamples = np.delete(samples, self.todel, 2)
         cllabels = np.delete(self.theta_names, self.todel)
         clmostprop = np.delete(self.mostprop, self.todel)
@@ -2784,6 +2787,10 @@ class GravMNightFit(GravNight):
         self.lightcurve = np.array([_lightcurve_all[::2],_lightcurve_all[1::2]])
         self.fitres = clmostprop
         self.fittab = fittab
+        keys = fittab.keys()
+        cohkeys = [x for x in keys if 'coh' in x]
+        self.fittab_short = fittab.drop(columns=cohkeys)
+
 
         if plot:
             self.plot_MCMC(plotcorner)
