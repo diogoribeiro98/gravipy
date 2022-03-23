@@ -2227,8 +2227,6 @@ class GravMFit(GravData, GravPhaseMaps):
                 plt.show()
 
 
-
-
 def _lnprob_night(theta, fitdata, lower, upper, fitarg, fithelp):
     if np.any(theta < lower) or np.any(theta > upper):
         return -np.inf
@@ -2288,24 +2286,20 @@ def _lnlike_night(theta, fitdata, fitarg, fithelp):
         res_vis2 = np.sum(-(model_vis2-vis2[ndx])**2.
                           /vis2_error[ndx]**2.*(1-vis2_flag[ndx]))
 
-        res_closure_1 = np.abs(model_closure-closure[ndx])
-        res_closure_2 = 360-np.abs(model_closure-closure[ndx])
-        check = np.abs(res_closure_1) < np.abs(res_closure_2)
-        res_closure = res_closure_1*check + res_closure_2*(1-check)
-        res_clos = np.sum(-res_closure**2.
-                          /closure_error[ndx]**2.*(1-closure_flag[ndx]))
+        res_closure = np.degrees(np.abs(np.exp(1j*np.radians(model_closure))
+                                        - np.exp(1j*np.radians(closure[ndx]))))
+        res_clos = np.sum(-res_closure**2./closure_error[ndx]**2.
+                          * (1-closure_flag[ndx]))
 
-        res_visphi_1 = np.abs(model_visphi-visphi[ndx])
-        res_visphi_2 = 360-np.abs(model_visphi-visphi[ndx])
-        check = np.abs(res_visphi_1) < np.abs(res_visphi_2)
-        res_visphi = res_visphi_1*check + res_visphi_2*(1-check)
-        res_phi = np.sum(-res_visphi**2.
-                         /visphi_error[ndx]**2.*(1-visphi_flag[ndx]))
+        res_visphi = np.degrees(np.abs(np.exp(1j*np.radians(model_visphi))
+                                       - np.exp(1j*np.radians(visphi[ndx]))))
+        res_phi = np.sum(-res_visphi**2./visphi_error[ndx]**2.
+                         * (1-visphi_flag[ndx]))
 
-        ln_prob_res += 0.5 * (res_visamp * fit_for[0] +
-                              res_vis2 * fit_for[1] +
-                              res_clos * fit_for[2] +
-                              res_phi * fit_for[3])
+        ln_prob_res += 0.5 * (res_visamp * fit_for[0]
+                              + res_vis2 * fit_for[1]
+                              + res_clos * fit_for[2]
+                              + res_phi * fit_for[3])
     return ln_prob_res
 
 
@@ -2529,6 +2523,7 @@ class GravMNightFit(GravNight):
             if oneBHalpha and ndx > 0:
                 todel.append(nsource*3-1 + ndx*10+1)
 
+        self.theta_in = np.copy(theta)
         self.theta_names = theta_names
         ndim = len(theta)
         self.ndof = ndim - len(todel)
@@ -2749,7 +2744,10 @@ class GravMNightFit(GravNight):
     def getFitResult(self, plot=True, plotcorner=False, ret=False):
         samples = self.sampler.chain
         self.mostprop = self.sampler.flatchain[np.argmax(self.sampler.flatlnprobability)]
+        print("Mean acceptance fraction: %.2f"
+              % np.mean(self.sampler.acceptance_fraction))
 
+        clinitial = np.delete(samples, self.theta_in)
         clsamples = np.delete(samples, self.todel, 2)
         cllabels = np.delete(self.theta_names, self.todel)
         clmostprop = np.delete(self.mostprop, self.todel)
@@ -2772,10 +2770,12 @@ class GravMNightFit(GravNight):
         percentiles[:, 2] = percentiles[:,2] - percentiles[:,1]
 
         fittab = pd.DataFrame()
-        fittab["column"] = ["M.L.", "M.P.", "$-\sigma$", "$+\sigma$"]
+        fittab["column"] = ["in", "M.L.", "M.P.", "$-\sigma$", "$+\sigma$"]
         for num, name, mostprop in zip(range(len(cllabels)), cllabels,
                                        clmostprop):
-            fittab[name] = pd.Series([mostprop, percentiles[num, 1],
+            fittab[name] = pd.Series([clinitial[num],
+                                      mostprop,
+                                      percentiles[num, 1],
                                       percentiles[num, 0],
                                       percentiles[num, 2]])
 
