@@ -768,36 +768,27 @@ def correct_data(files, mode, subspacing=1, plotav=8, plot=False, lstplot=False)
         plt.ylabel('Corr. Phase [deg]')
         plt.ylim(-35,185)
         plt.show()
-                
     return t_visphi, t_lst, ang, visphi, visphi_fake
-
-
-
-#####################
-# load all corrections
-
-
-
 
 #########################
 # Correct a full night
 
+
 class GravPhaseNight():
-    def __init__(self, night, ndit, verbose=True, nopandas=False, pandasfile=None,
-                 reddir=None, datadir='/data/user/forFrank2/', onlysgra=True, calibrator=None,
-                 full_folder=False):
+    def __init__(self, night, ndit, verbose=True, nopandas=False,
+                 pandasfile=None, reddir=None, datadir='/data/user/forFrank2/',
+                 onlysgra=True, calibrator=None, full_folder=False):
         """
         Package to do the full phase calibration, poscor, correction and fitting
-        
+
         night       : night which shall be used
         ndit        : 1 to use the 5-min files or 32 for the 1frame reduction [1]
         calibrator  : the calibrator to use, if None use defaults - give filename 
-        
         """
         self.night = night
         self.ndit = ndit
         self.verbose = verbose
-        
+
         nights = ['2019-03-27',
                 '2019-03-28',
                 '2019-03-31',
@@ -841,7 +832,9 @@ class GravPhaseNight():
                 '2021-07-25',
                 '2021-07-26',
                 '2021-07-27',
-                '2022-03-18'
+                '2022-03-18',
+                '2022-03-19',
+                '2022-03-20',
                 ]
         calibrators = ['GRAVI.2019-03-28T08:00:22.802_dualscivis.fits',
                     'GRAVI.2019-03-29T07:35:36.327_dualscivis.fits',
@@ -886,7 +879,9 @@ class GravPhaseNight():
                     'GRAVI.2021-07-26T01:08:53.419_dualscivis.fits',
                     'GRAVI.2021-07-27T00:18:12.572_dualscivis.fits',
                     'GRAVI.2021-07-28T01:03:19.149_dualscivis.fits',
-                    'GRAVI.2022-03-19T08:46:10.049_dualscivis.fits'
+                    'GRAVI.2022-03-19T08:46:10.049_dualscivis.fits',
+                    'GRAVI.2022-03-20T08:46:55.494_dualscivis.fits',
+                    'GRAVI.2022-03-21T08:06:14.336_dualscivis.fits'
                     ] 
 
         if full_folder:
