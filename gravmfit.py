@@ -2432,151 +2432,6 @@ class GravMNightFit(GravNight):
             self.dlambda = obj.dlambda
             self.bispec_ind = obj.bispec_ind
 
-        if initial is not None:
-            if len(initial) != 5:
-                raise ValueError('Length of initial parameter '
-                                 'list is not correct, should be 5: '
-                                 'fr_BH, alpha, coherence loss, pc ra, pc dec')
-            fr_BH, alpha_SgrA_in, coh_loss_in, pc_RA_in, pc_DEC_in = initial
-        else:
-            alpha_SgrA_in = -0.5
-            coh_loss_in = 0.9
-            pc_RA_in = 0
-            pc_DEC_in = 0
-            fr_BH = 0
-        lightcurve_list = np.ones(nfiles)*fr_BH
-
-        # nsource*2 positions
-        # (nsource - 1) source flux ratios
-        # len(files) * (flux ratio + pc*2 + sgra color + 6 coherence loss)
-        theta = np.zeros(nsource*2 + (nsource-1) + nfiles*10)
-        lower = np.zeros(nsource*2 + (nsource-1) + nfiles*10)
-        upper = np.zeros(nsource*2 + (nsource-1) + nfiles*10)
-        todel = []
-        theta_names = []
-        pc_size = 5
-        for ndx in range(nsource):
-            theta[ndx*2] = ra_list[ndx]
-            theta[ndx*2+1] = de_list[ndx]
-
-            lower[ndx*2] = ra_list[ndx] - fit_size[ndx]
-            lower[ndx*2+1] = de_list[ndx] - fit_size[ndx]
-
-            upper[ndx*2] = ra_list[ndx] + fit_size[ndx]
-            upper[ndx*2+1] = de_list[ndx] + fit_size[ndx]
-
-            if not fit_pos[ndx]:
-                todel.append(ndx*2)
-                todel.append(ndx*2+1)
-            theta_names.append('dRA%i' % (ndx + 1))
-            theta_names.append('dDEC%i' % (ndx + 1))
-            if not bequiet:
-                if ndx == 0:
-                    print('Initial conditions:')
-                print('dRA%i    = %.2f' % ((ndx + 1), theta[ndx*2]))
-                print('dDec%i   = %.2f' % ((ndx + 1), theta[ndx*2+1]))
-        
-        for ndx in range(nsource-1):
-            theta[nsource*2+ndx] = np.log10(fr_list[ndx])
-            lower[nsource*2+ndx] = np.log10(0.001)
-            upper[nsource*2+ndx] = np.log10(100)
-            if not fit_fr[ndx]:
-                todel.append(nsource*2 + 4 + nfiles + ndx)
-            theta_names.append('fr%i' % (ndx + 2))
-            if not bequiet:
-                print('fr %i/1  = %.2f' % ((ndx + 2), fr_list[ndx]))
-        if not bequiet:
-            print('fr BH/1 = %.2f' % (10**lightcurve_list[0]))
-            print('alphaBH = %.2f' % (alpha_SgrA_in))
-            print('Cohere. = %.2f\n' % coh_loss_in)
-
-        for ndx in range(nfiles):
-            theta[nsource*3-1 + ndx*10] = lightcurve_list[ndx]
-            lower[nsource*3-1 + ndx*10] = np.log10(0.001)
-            upper[nsource*3-1 + ndx*10] = np.log10(100)
-
-            theta[nsource*3-1 + ndx*10+1] = alpha_SgrA_in
-            lower[nsource*3-1 + ndx*10+1] = -10
-            upper[nsource*3-1 + ndx*10+1] = 10
-
-            theta[nsource*3-1 + ndx*10+2] = pc_RA_in
-            lower[nsource*3-1 + ndx*10+2] = pc_RA_in - pc_size
-            upper[nsource*3-1 + ndx*10+2] = pc_RA_in + pc_size
-            theta[nsource*3-1 + ndx*10+3] = pc_DEC_in
-            lower[nsource*3-1 + ndx*10+3] = pc_DEC_in - pc_size
-            upper[nsource*3-1 + ndx*10+3] = pc_DEC_in + pc_size
-
-            theta[nsource*3-1 + ndx*10+4:nsource*3-1 + ndx*10+10] = coh_loss_in
-            lower[nsource*3-1 + ndx*10+4:nsource*3-1 + ndx*10+10] = 0.01
-            upper[nsource*3-1 + ndx*10+4:nsource*3-1 + ndx*10+10] = 1.1
-            theta_names.append('frBH%i' % (ndx+1))
-            theta_names.append('alphaBH%i' % (ndx+1))
-            theta_names.append('pcRa%i' % (ndx+1))
-            theta_names.append('pcDec%i' % (ndx+1))
-            for cdx in range(6):
-                theta_names.append('coh%i-%i' % ((cdx+1), (ndx+1)))
-            if fit_for[3] == 0:
-                todel.append(nsource*3-1 + ndx*10+2)
-                todel.append(nsource*3-1 + ndx*10+3)
-            if fixedBHalpha:
-                todel.append(nsource*3-1 + ndx*10+1)
-            if oneBHalpha and ndx > 0:
-                todel.append(nsource*3-1 + ndx*10+1)
-
-        self.theta_in = np.copy(theta)
-        self.theta_names = theta_names
-        ndim = len(theta)
-        self.ndof = ndim - len(todel)
-
-        if self.phasemaps:
-            phasemaps = GravPhaseMaps()
-            phasemaps.tel = self.tel
-            phasemaps.resolution = self.resolution
-            phasemaps.smoothkernel = self.smoothkernel
-            phasemaps.datayear = self.datayear
-            phasemaps.wlSC = self.datalist[0].wlSC
-            phasemaps.interppm = interppm
-            phasemaps.loadPhasemaps(interp=interppm)
-
-            header = self.headerlist[0]
-            northangle1 = header['ESO QC ACQ FIELD1 NORTH_ANGLE']/180*math.pi
-            northangle2 = header['ESO QC ACQ FIELD2 NORTH_ANGLE']/180*math.pi
-            northangle3 = header['ESO QC ACQ FIELD3 NORTH_ANGLE']/180*math.pi
-            northangle4 = header['ESO QC ACQ FIELD4 NORTH_ANGLE']/180*math.pi
-            self.northangle = [northangle1, northangle2,
-                               northangle3, northangle4]
-            ddec = []
-            dra = []
-            for header in self.headerlist:
-                ddec1 = header['ESO QC MET SOBJ DDEC1']
-                ddec2 = header['ESO QC MET SOBJ DDEC2']
-                ddec3 = header['ESO QC MET SOBJ DDEC3']
-                ddec4 = header['ESO QC MET SOBJ DDEC4']
-                ddec.append([ddec1, ddec2, ddec3, ddec4])
-
-                dra1 = header['ESO QC MET SOBJ DRA1']
-                dra2 = header['ESO QC MET SOBJ DRA2']
-                dra3 = header['ESO QC MET SOBJ DRA3']
-                dra4 = header['ESO QC MET SOBJ DRA4']
-                dra.append([dra1, dra2, dra3, dra4])
-
-            pm_sources = []
-            for ndx in range(nfiles):
-                _sources = []
-                pm_amp, pm_pha, pm_int = phasemaps.phasemap_source(0, 0,
-                                                              self.northangle,
-                                                              dra[ndx//2],
-                                                              ddec[ndx//2])
-                _sources.append([pm_amp, pm_pha, pm_int])
-                for sdx in range(nsource):
-                    pm_amp, pm_pha, pm_int = phasemaps.phasemap_source(theta[sdx*2],
-                                                                  theta[sdx*2+1],
-                                                                  self.northangle,
-                                                                  dra[ndx//2],
-                                                                  ddec[ndx//2])
-                    _sources.append([pm_amp, pm_pha, pm_int])
-                pm_sources.append(_sources)
-
         # Get data
         if self.polmode == 'SPLIT':
             visamp_P = []
@@ -2688,6 +2543,152 @@ class GravMNightFit(GravNight):
                 visphi_flag_P[num, :, t:] = True
                 closure_flag_P[num, :, t:] = True
 
+        if initial is not None:
+            if len(initial) != 4:
+                raise ValueError('Length of initial parameter '
+                                 'list is not correct, should be 4: '
+                                 'fr_BH, alpha, pc ra, pc dec')
+            fr_BH, alpha_SgrA_in, pc_RA_in, pc_DEC_in = initial
+        else:
+            alpha_SgrA_in = -0.5
+            pc_RA_in = 0
+            pc_DEC_in = 0
+            fr_BH = 0
+        lightcurve_list = np.ones(nfiles)*fr_BH
+
+        # nsource*2 positions
+        # (nsource - 1) source flux ratios
+        # len(files) * (flux ratio + pc*2 + sgra color + 6 coherence loss)
+        theta = np.zeros(nsource*2 + (nsource-1) + nfiles*10)
+        lower = np.zeros(nsource*2 + (nsource-1) + nfiles*10)
+        upper = np.zeros(nsource*2 + (nsource-1) + nfiles*10)
+        todel = []
+        theta_names = []
+        pc_size = 5
+        for ndx in range(nsource):
+            theta[ndx*2] = ra_list[ndx]
+            theta[ndx*2+1] = de_list[ndx]
+
+            lower[ndx*2] = ra_list[ndx] - fit_size[ndx]
+            lower[ndx*2+1] = de_list[ndx] - fit_size[ndx]
+
+            upper[ndx*2] = ra_list[ndx] + fit_size[ndx]
+            upper[ndx*2+1] = de_list[ndx] + fit_size[ndx]
+
+            if not fit_pos[ndx]:
+                todel.append(ndx*2)
+                todel.append(ndx*2+1)
+            theta_names.append('dRA%i' % (ndx + 1))
+            theta_names.append('dDEC%i' % (ndx + 1))
+            if not bequiet:
+                if ndx == 0:
+                    print('Initial conditions:')
+                print('dRA%i    = %.2f' % ((ndx + 1), theta[ndx*2]))
+                print('dDec%i   = %.2f' % ((ndx + 1), theta[ndx*2+1]))
+
+        for ndx in range(nsource-1):
+            theta[nsource*2+ndx] = np.log10(fr_list[ndx])
+            lower[nsource*2+ndx] = np.log10(0.001)
+            upper[nsource*2+ndx] = np.log10(100)
+            if not fit_fr[ndx]:
+                todel.append(nsource*2 + 4 + nfiles + ndx)
+            theta_names.append('fr%i' % (ndx + 2))
+            if not bequiet:
+                print('fr %i/1  = %.2f' % ((ndx + 2), fr_list[ndx]))
+        if not bequiet:
+            print('fr BH/1 = %.2f' % (10**lightcurve_list[0]))
+            print('alphaBH = %.2f' % (alpha_SgrA_in))
+
+        for ndx in range(nfiles):
+            theta[nsource*3-1 + ndx*10] = lightcurve_list[ndx]
+            lower[nsource*3-1 + ndx*10] = np.log10(0.001)
+            upper[nsource*3-1 + ndx*10] = np.log10(100)
+
+            theta[nsource*3-1 + ndx*10+1] = alpha_SgrA_in
+            lower[nsource*3-1 + ndx*10+1] = -10
+            upper[nsource*3-1 + ndx*10+1] = 10
+
+            theta[nsource*3-1 + ndx*10+2] = pc_RA_in
+            lower[nsource*3-1 + ndx*10+2] = pc_RA_in - pc_size
+            upper[nsource*3-1 + ndx*10+2] = pc_RA_in + pc_size
+            theta[nsource*3-1 + ndx*10+3] = pc_DEC_in
+            lower[nsource*3-1 + ndx*10+3] = pc_DEC_in - pc_size
+            upper[nsource*3-1 + ndx*10+3] = pc_DEC_in + pc_size
+
+            _visamp = visamp_P[ndx]*(1-visamp_flag_P[ndx])
+            for bl in range(6):
+                _max = np.percentile(_visamp[bl],90)
+                theta[nsource*3-1 + ndx*10 + 4 + bl] = _max
+            lower[nsource*3-1 + ndx*10+4:nsource*3-1 + ndx*10+10] = 0.01
+            upper[nsource*3-1 + ndx*10+4:nsource*3-1 + ndx*10+10] = 1.1
+            theta_names.append('frBH%i' % (ndx+1))
+            theta_names.append('alphaBH%i' % (ndx+1))
+            theta_names.append('pcRa%i' % (ndx+1))
+            theta_names.append('pcDec%i' % (ndx+1))
+            for cdx in range(6):
+                theta_names.append('coh%i-%i' % ((cdx+1), (ndx+1)))
+            if fit_for[3] == 0:
+                todel.append(nsource*3-1 + ndx*10+2)
+                todel.append(nsource*3-1 + ndx*10+3)
+            if fixedBHalpha:
+                todel.append(nsource*3-1 + ndx*10+1)
+            if oneBHalpha and ndx > 0:
+                todel.append(nsource*3-1 + ndx*10+1)
+
+        self.theta_in = np.copy(theta)
+        self.theta_names = theta_names
+        ndim = len(theta)
+        self.ndof = ndim - len(todel)
+
+        if self.phasemaps:
+            phasemaps = GravPhaseMaps()
+            phasemaps.tel = self.tel
+            phasemaps.resolution = self.resolution
+            phasemaps.smoothkernel = self.smoothkernel
+            phasemaps.datayear = self.datayear
+            phasemaps.wlSC = self.datalist[0].wlSC
+            phasemaps.interppm = interppm
+            phasemaps.loadPhasemaps(interp=interppm)
+
+            header = self.headerlist[0]
+            northangle1 = header['ESO QC ACQ FIELD1 NORTH_ANGLE']/180*math.pi
+            northangle2 = header['ESO QC ACQ FIELD2 NORTH_ANGLE']/180*math.pi
+            northangle3 = header['ESO QC ACQ FIELD3 NORTH_ANGLE']/180*math.pi
+            northangle4 = header['ESO QC ACQ FIELD4 NORTH_ANGLE']/180*math.pi
+            self.northangle = [northangle1, northangle2,
+                               northangle3, northangle4]
+            ddec = []
+            dra = []
+            for header in self.headerlist:
+                ddec1 = header['ESO QC MET SOBJ DDEC1']
+                ddec2 = header['ESO QC MET SOBJ DDEC2']
+                ddec3 = header['ESO QC MET SOBJ DDEC3']
+                ddec4 = header['ESO QC MET SOBJ DDEC4']
+                ddec.append([ddec1, ddec2, ddec3, ddec4])
+
+                dra1 = header['ESO QC MET SOBJ DRA1']
+                dra2 = header['ESO QC MET SOBJ DRA2']
+                dra3 = header['ESO QC MET SOBJ DRA3']
+                dra4 = header['ESO QC MET SOBJ DRA4']
+                dra.append([dra1, dra2, dra3, dra4])
+
+            pm_sources = []
+            for ndx in range(nfiles):
+                _sources = []
+                pm_amp, pm_pha, pm_int = phasemaps.phasemap_source(0, 0,
+                                                              self.northangle,
+                                                              dra[ndx//2],
+                                                              ddec[ndx//2])
+                _sources.append([pm_amp, pm_pha, pm_int])
+                for sdx in range(nsource):
+                    pm_amp, pm_pha, pm_int = phasemaps.phasemap_source(theta[sdx*2],
+                                                                  theta[sdx*2+1],
+                                                                  self.northangle,
+                                                                  dra[ndx//2],
+                                                                  ddec[ndx//2])
+                    _sources.append([pm_amp, pm_pha, pm_int])
+                pm_sources.append(_sources)
+
         width = 1e-1
         pos = np.ones((nwalkers, ndim))
         for par in range(ndim):
@@ -2695,7 +2696,7 @@ class GravMNightFit(GravNight):
                 pos[:, par] = theta[par]
             else:
                 if 'coh' in theta_names:
-                    pos[:, par] = theta[par] + width*1e-1*np.random.randn(nwalkers)
+                    pos[:, par] = theta[par] + width*5e-2*np.random.randn(nwalkers)
                 else:
                     pos[:, par] = theta[par] + width*np.random.randn(nwalkers)
         self.todel = todel
