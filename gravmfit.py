@@ -2404,7 +2404,7 @@ class GravMNightFit(GravNight):
         if len(fit_pos) != nsource:
             raise ValueError('list of input parameters have different lengths')
         if fr_list is None:
-            fr_list = np.ones(nsource-1)*0
+            fr_list = np.ones(nsource-1)
         else:
             if len(fr_list) != (nsource-1):
                 raise ValueError('list of fr_list has to be the'
@@ -2476,7 +2476,12 @@ class GravMNightFit(GravNight):
                 todel.append(ndx*2+1)
             theta_names.append('dRA%i' % (ndx + 1))
             theta_names.append('dDEC%i' % (ndx + 1))
-
+            if not bequiet:
+                if ndx == 0:
+                    print('Initial conditions:')
+                print('dRA%i    = %.2f' % ((ndx + 1), theta[ndx*2]))
+                print('dDec%i   = %.2f' % ((ndx + 1), theta[ndx*2+1]))
+        
         for ndx in range(nsource-1):
             theta[nsource*2+ndx] = np.log10(fr_list[ndx])
             lower[nsource*2+ndx] = np.log10(0.001)
@@ -2484,6 +2489,12 @@ class GravMNightFit(GravNight):
             if not fit_fr[ndx]:
                 todel.append(nsource*2 + 4 + nfiles + ndx)
             theta_names.append('fr%i' % (ndx + 2))
+            if not bequiet:
+                print('fr %i/1  = %.2f' % ((ndx + 2), fr_list[ndx]))
+        if not bequiet:
+            print('fr BH/1 = %.2f' % (10**lightcurve_list[0]))
+            print('alphaBH = %.2f' % (alpha_SgrA_in))
+            print('Cohere. = %.2f\n' % coh_loss_in)
 
         for ndx in range(nfiles):
             theta[nsource*3-1 + ndx*10] = lightcurve_list[ndx]
@@ -2519,7 +2530,6 @@ class GravMNightFit(GravNight):
                 todel.append(nsource*3-1 + ndx*10+1)
 
         self.theta_names = theta_names
-
         ndim = len(theta)
         self.ndof = ndim - len(todel)
 
