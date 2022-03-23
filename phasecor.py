@@ -1787,9 +1787,9 @@ class GravPhaseNight():
                     if self.verbose:
                         print("saving to default location")
                     if linear_cor:
-                        folder = file[:file.find('GRAVI')] + 'correction_' + mode +'_lincor/'
+                        folder = file[:file.find('GRAVI')] + 'poscor_met_' + mode +'_lincor/'
                     else:
-                        folder = file[:file.find('GRAVI')] + 'correction_' + mode +'/'
+                        folder = file[:file.find('GRAVI')] + 'poscor_met_' + mode +'/'
                 if not os.path.isdir(folder):
                     os.mkdir(folder)
                 if self.verbose:
@@ -1828,9 +1828,9 @@ class GravPhaseNight():
                     if self.verbose:
                         print("saving to default location")
                     if linear_cor:
-                        folder = file[:file.find('GRAVI')] + 'correction_nocor_new/'
+                        folder = file[:file.find('GRAVI')] + 'poscor_nometcor_new/'
                     else:
-                        folder = file[:file.find('GRAVI')] + 'correction_nocor/'
+                        folder = file[:file.find('GRAVI')] + 'poscor_nometcor/'
                 if not os.path.isdir(folder):
                     os.mkdir(folder)
                 for fdx, file in enumerate(sg_files):
