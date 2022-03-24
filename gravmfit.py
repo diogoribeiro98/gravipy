@@ -975,6 +975,7 @@ class GravMFit(GravData, GravPhaseMaps):
                  flagfrom=13,
                  fixedBHalpha=False,
                  fixedBG=False,
+                 coh_loss=False,
                  plotCorner=True,
                  plotScience=True,
                  createpdf=False,
@@ -1049,6 +1050,7 @@ class GravMFit(GravData, GravPhaseMaps):
         self.fit_for = fit_for
         self.fixedBHalpha = fixedBHalpha
         self.fixedBG = fixedBG
+        self.coh_loss = coh_loss
         self.interppm = interppm
         self.fit_mode = fit_mode
         self.bequiet = bequiet
