@@ -1226,6 +1226,10 @@ class GravMFit(GravData, GravPhaseMaps):
         if not coh_loss:
             todel.extend(np.arange(th_rest+5, th_rest+5+6))
         ndof = ndim - len(todel)
+        self.theta_in = np.copy(theta)
+        self.theta_allnames = np.copy(theta_names)
+        self.theta_names = theta_names
+
 
         if phasemaps:
             if not self.fit_phasemaps:
@@ -1264,6 +1268,8 @@ class GravMFit(GravData, GravPhaseMaps):
         theta = np.delete(theta, todel)
         lower = np.delete(lower, todel)
         upper = np.delete(upper, todel)
+        self.fixed = fixed
+        self.todel = todel
 
         # Get data
         if self.polmode == 'SPLIT':
@@ -1437,8 +1443,6 @@ class GravMFit(GravData, GravPhaseMaps):
                                self.phasemaps, None, None, None, None, None,
                                None, None, None, None, None, None]
 
-                print(_lnprob_mstars(theta, fitdata, lower,
-                                     upper, fitarg, fithelp))
                 if not no_fit:
                     if nthreads == 1:
                         sampler = emcee.EnsembleSampler(nwalkers, ndim,
@@ -1505,6 +1509,9 @@ class GravMFit(GravData, GravPhaseMaps):
 
                     # get the actual fit
                     theta_fit = np.percentile(fl_samples, [50], axis=0).T.flatten()
+                    percentiles = np.percentile(fl_samples, [16, 50, 84], axis=0).T
+                    mostlike_m = percentiles[:,1] - percentiles[:,0]
+                    mostlike_p = percentiles[:,2] - percentiles[:,1]
                     if bestchi:
                         theta_result = mostprop
                     else:
@@ -1516,8 +1523,32 @@ class GravMFit(GravData, GravPhaseMaps):
 
                 results.append(theta_result)
                 fulltheta = np.copy(theta_result)
+                all_mostprop = np.copy(mostprop)
+                all_mostlike = np.copy(theta_fit)
                 for ddx in range(len(todel)):
                     fulltheta = np.insert(fulltheta, todel[ddx], fixed[ddx])
+                    all_mostprop = np.insert(all_mostprop, todel[ddx],
+                                             fixed[ddx])
+                    all_mostlike = np.insert(all_mostlike, todel[ddx],
+                                             fixed[ddx])
+                    mostlike_m = np.insert(mostlike_m, todel[ddx], 0)
+                    mostlike_p = np.insert(mostlike_p, todel[ddx], 0)
+
+                if idx == 0 and dit == 0:
+                    fittab = pd.DataFrame()
+                _fittab = pd.DataFrame()
+                _fittab["column"] = ["in P%i_%i" % (idx, dit),
+                                     "M.L. P%i_%i" % (idx, dit),
+                                     "M.P. P%i_%i" % (idx, dit),
+                                     "$-\sigma$ P%i_%i" % (idx, dit),
+                                     "$+\sigma$ P%i_%i" % (idx, dit)]
+                for ndx, name in enumerate(self.theta_allnames):
+                    _fittab[name] = pd.Series([self.theta_in[ndx],
+                                               all_mostprop[ndx],
+                                               all_mostlike[ndx],
+                                               mostlike_m[ndx],
+                                               mostlike_p[ndx]])
+                fittab = fittab.append(_fittab, ignore_index=True)
 
                 (fit_visamp, fit_visphi,
                  fit_closure) = _calc_vis_mstars(fulltheta, fitarg, fithelp)
@@ -1595,6 +1626,7 @@ class GravMFit(GravData, GravPhaseMaps):
 
             if plotScience:
                 self.plotFitComb(plotdata)
+        self.fittab = fittab
 
         try:
             fitted = 1-(np.array(self.fit_for) == 0)
@@ -2482,6 +2514,7 @@ class GravMNightFit(GravNight):
             # todel.extend(np.arange(nsource*3-1 + ndx*11 + 5, nsource*3-1 + ndx*11+11))
 
         self.theta_in = np.copy(theta)
+        self.theta_allnames = np.copy(theta_names)
         self.theta_names = theta_names
         ndim = len(theta)
         self.ndof = ndim - len(todel)
@@ -2541,6 +2574,8 @@ class GravMNightFit(GravNight):
         theta = np.delete(theta, todel)
         lower = np.delete(lower, todel)
         upper = np.delete(upper, todel)
+        self.fixed = fixed
+        self.todel = todel
 
         ndim = len(theta)
         width = 1e-1
@@ -2606,7 +2641,7 @@ class GravMNightFit(GravNight):
         print("Mean acceptance fraction: %.2f"
               % np.mean(self.sampler.acceptance_fraction))
 
-        clinitial = self.theta_in  # np.delete(self.theta_in, self.todel)
+        clinitial = np.delete(self.theta_in, self.todel)
         clsamples = samples  # np.delete(samples, self.todel, 2)
         cllabels = self.theta_names  # np.delete(self.theta_names, self.todel)
         clmostprop = self.mostprop  # np.delete(self.mostprop, self.todel)
@@ -2630,13 +2665,23 @@ class GravMNightFit(GravNight):
 
         fittab = pd.DataFrame()
         fittab["column"] = ["in", "M.L.", "M.P.", "$-\sigma$", "$+\sigma$"]
-        for num, name, mostprop in zip(range(len(cllabels)), cllabels,
-                                       clmostprop):
-            fittab[name] = pd.Series([clinitial[num],
-                                      mostprop,
-                                      percentiles[num, 1],
-                                      percentiles[num, 0],
-                                      percentiles[num, 2]])
+        _ct_del = 0
+        _ct_used = 0
+        for idx, name in enumerate(self.theta_allnames):
+            if idx in self.todel:
+                fittab[name] = pd.Series([self.fixed[_ct_del],
+                                          self.fixed[_ct_del],
+                                          self.fixed[_ct_del],
+                                          0,
+                                          0])
+                _ct_del += 1
+            else:
+                fittab[name] = pd.Series([clinitial[_ct_used],
+                                          clmostprop[_ct_used],
+                                          percentiles[_ct_used, 1],
+                                          percentiles[_ct_used, 0],
+                                          percentiles[_ct_used, 2]])
+                _ct_used += 1
 
         len_lightcurve = self.nfiles
         _lightcurve_all = 10**(clmostprop[-(len_lightcurve+self.nsource-1):-(self.nsource-1)])
