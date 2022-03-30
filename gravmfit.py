@@ -1504,40 +1504,44 @@ class GravMFit(GravData, GravPhaseMaps):
                         theta_result = mostprop
                     else:
                         theta_result = theta_fit
+
+                    results.append(theta_result)
+                    fulltheta = np.copy(theta_result)
+                    all_mostprop = np.copy(mostprop)
+                    all_mostlike = np.copy(theta_fit)
+                    for ddx in range(len(todel)):
+                        fulltheta = np.insert(fulltheta, todel[ddx], fixed[ddx])
+                        all_mostprop = np.insert(all_mostprop, todel[ddx],
+                                                 fixed[ddx])
+                        all_mostlike = np.insert(all_mostlike, todel[ddx],
+                                                 fixed[ddx])
+                        mostlike_m = np.insert(mostlike_m, todel[ddx], 0)
+                        mostlike_p = np.insert(mostlike_p, todel[ddx], 0)
+
+                    if idx == 0 and dit == 0:
+                        fittab = pd.DataFrame()
+                    _fittab = pd.DataFrame()
+                    _fittab["column"] = ["in P%i_%i" % (idx, dit),
+                                         "M.L. P%i_%i" % (idx, dit),
+                                         "M.P. P%i_%i" % (idx, dit),
+                                         "$-\sigma$ P%i_%i" % (idx, dit),
+                                         "$+\sigma$ P%i_%i" % (idx, dit)]
+                    for ndx, name in enumerate(self.theta_allnames):
+                        _fittab[name] = pd.Series([self.theta_in[ndx],
+                                                   all_mostprop[ndx],
+                                                   all_mostlike[ndx],
+                                                   mostlike_m[ndx],
+                                                   mostlike_p[ndx]])
+                    fittab = fittab.append(_fittab, ignore_index=True)
+
                 else:
                     theta_result = theta
-
+                    fulltheta = np.copy(theta_result)
+                    for ddx in range(len(todel)):
+                        fulltheta = np.insert(fulltheta, todel[ddx], fixed[ddx])
+                    fittab = None
+                    
                 self.theta_result = theta_result
-
-                results.append(theta_result)
-                fulltheta = np.copy(theta_result)
-                all_mostprop = np.copy(mostprop)
-                all_mostlike = np.copy(theta_fit)
-                for ddx in range(len(todel)):
-                    fulltheta = np.insert(fulltheta, todel[ddx], fixed[ddx])
-                    all_mostprop = np.insert(all_mostprop, todel[ddx],
-                                             fixed[ddx])
-                    all_mostlike = np.insert(all_mostlike, todel[ddx],
-                                             fixed[ddx])
-                    mostlike_m = np.insert(mostlike_m, todel[ddx], 0)
-                    mostlike_p = np.insert(mostlike_p, todel[ddx], 0)
-
-                if idx == 0 and dit == 0:
-                    fittab = pd.DataFrame()
-                _fittab = pd.DataFrame()
-                _fittab["column"] = ["in P%i_%i" % (idx, dit),
-                                     "M.L. P%i_%i" % (idx, dit),
-                                     "M.P. P%i_%i" % (idx, dit),
-                                     "$-\sigma$ P%i_%i" % (idx, dit),
-                                     "$+\sigma$ P%i_%i" % (idx, dit)]
-                for ndx, name in enumerate(self.theta_allnames):
-                    _fittab[name] = pd.Series([self.theta_in[ndx],
-                                               all_mostprop[ndx],
-                                               all_mostlike[ndx],
-                                               mostlike_m[ndx],
-                                               mostlike_p[ndx]])
-                fittab = fittab.append(_fittab, ignore_index=True)
-
                 (fit_visamp, fit_visphi,
                  fit_closure) = _calc_vis_mstars(fulltheta, fitarg, fithelp)
                 fit_vis2 = fit_visamp**2.
@@ -1570,12 +1574,15 @@ class GravMFit(GravData, GravPhaseMaps):
                 else:
                     chi2string = 'chi2'
 
-                redchi = [redchi_visamp, redchi_vis2, redchi_closure, redchi_visphi]
+                redchi = [redchi_visamp, redchi_vis2,
+                          redchi_closure, redchi_visphi]
                 if idx == 0:
-                    redchi0 = [redchi_visamp, redchi_vis2, redchi_closure, redchi_visphi]
+                    redchi0 = [redchi_visamp, redchi_vis2,
+                               redchi_closure, redchi_visphi]
                     self.redchi0 = redchi0
                 elif idx == 1:
-                    redchi1 = [redchi_visamp, redchi_vis2, redchi_closure, redchi_visphi]
+                    redchi1 = [redchi_visamp, redchi_vis2,
+                               redchi_closure, redchi_visphi]
                     self.redchi1 = redchi1
 
                 if not bequiet:
