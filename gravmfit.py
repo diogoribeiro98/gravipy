@@ -2423,6 +2423,7 @@ class GravMNightFit(GravNight):
             pc_DEC_in = 0
             fr_BH = 0
         lightcurve_list = np.ones(nfiles)*fr_BH
+        fluxBG_list = np.ones(nfiles)*flux_ratio_bg_in
 
         # nsource*2 positions
         # (nsource - 1) source flux ratios
@@ -2465,7 +2466,7 @@ class GravMNightFit(GravNight):
                 print('fr %i/1  = %.2f' % ((ndx + 2), fr_list[ndx]))
         if not bequiet:
             print('fr BH/1 = %.2f' % (10**lightcurve_list[0]))
-            print('fr BG   = %.2f' % (flux_ratio_bg_in))
+            print('fr BG   = %.2f' % (fluxBG_list[0]))
             print('alphaBH = %.2f' % (alpha_SgrA_in))
 
         for ndx in range(nfiles):
@@ -2473,9 +2474,9 @@ class GravMNightFit(GravNight):
             lower[nsource*3-1 + ndx*11] = -10
             upper[nsource*3-1 + ndx*11] = 10
 
-            theta[nsource*3-1 + ndx*11 + 1] = flux_ratio_bg_in
+            theta[nsource*3-1 + ndx*11 + 1] = fluxBG_list[ndx]
             lower[nsource*3-1 + ndx*11 + 1] = 0.1
-            upper[nsource*3-1 + ndx*11 + 1] = 10
+            upper[nsource*3-1 + ndx*11 + 1] = 20
 
             theta[nsource*3-1 + ndx*11 + 2] = pc_RA_in
             lower[nsource*3-1 + ndx*11 + 2] = pc_RA_in - pc_size
