@@ -968,7 +968,6 @@ class GravMFit(GravData, GravPhaseMaps):
                  fit_for=np.array([0.5, 0.5, 1.0, 0.0]),
                  fit_mode='numeric',
                  no_fit=False,
-                 no_fit_values=None,
                  onlypol=None,
                  initial=None,
                  flagtill=3,
@@ -1017,8 +1016,7 @@ class GravMFit(GravData, GravPhaseMaps):
         coh_loss:       If not None, fit for a coherence loss per Basline
                         Value is initial guess (0-1) [None]
         no_fit  :       Only gives fitting results for parameters from 
-                        no_fit_values [False]
-        no_fit_values:  has to be given for donotfit [None]
+                        initial guess [False]
         onlypol:        Only fits one polarization for split mode, 
                         either 0 or 1 [None]
         initial:        Initial guess for fit [None]
@@ -1121,7 +1119,8 @@ class GravMFit(GravData, GravPhaseMaps):
         # Initial guesses
         if initial is not None:
             if len(initial) != 6:
-                raise ValueError('Length of initial parameter list is not correct')
+                raise ValueError('Length of initial parameter list is'
+                                 ' not correct')
             (alpha_SgrA_in, flux_ratio_bg_in, pc_RA_in, pc_DEC_in,
              flux_ratio_bh, coh_loss_in) = initial
         else:
@@ -1230,7 +1229,6 @@ class GravMFit(GravData, GravPhaseMaps):
         self.theta_allnames = np.copy(theta_names)
         self.theta_names = theta_names
 
-
         if phasemaps:
             if not self.fit_phasemaps:
                 self.pm_sources = []
@@ -1248,19 +1246,9 @@ class GravMFit(GravData, GravPhaseMaps):
                     self.pm_sources.append([pm_amp, pm_pha, pm_int])
 
         if no_fit:
-            if no_fit_values is None:
-                raise ValueError('If no_fit is True, fit values have to be '
-                                 'given by no_fit_values')
-            if len(no_fit_values) != 5:
-                print("alpha BH,  f BG, PC RA, PC DEC, fr BH")
-                raise ValueError('no_fit_values has to have 5 parameters,'
-                                 ' see above')
             plotCorner = False
-            theta[-5:] = no_fit_values
-            theta[-1] = np.log10(theta[-1])
             print('Will not fit the data, just print out the results for the '
                   'given initial conditions')
-            raise ValueError('Needs fixing')
 
         for ddx in sorted(todel, reverse=True):
             del theta_names[ddx]
