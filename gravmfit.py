@@ -874,12 +874,12 @@ def _calc_vis_mstars(theta_in, fitarg, fithelp):
         if phasemaps:
             pm_amp_norm, _, pm_int_norm = pm_sources[0]
 
-            cr1 = (pm_amp_c[i, 0])**2
-            cr2 = (pm_amp_c[i, 1])**2
+            cr1 = (pm_amp_c[i, 0])
+            cr2 = (pm_amp_c[i, 1])
             cr_denom1 = (pm_int_c[i, 0])
             cr_denom2 = (pm_int_c[i, 1])
 
-            nom *= np.sqrt(cr1*cr2)
+            nom *= (cr1*cr2)
             denom1 *= cr_denom1
             denom2 *= cr_denom2
 
@@ -888,23 +888,23 @@ def _calc_vis_mstars(theta_in, fitarg, fithelp):
                                            dlambda[i, :], fit_mode)
 
                 pm_amp, _, pm_int = pm_sources[ndx]
-                cr1 = (pm_amp[i, 0])**2
-                cr2 = (pm_amp[i, 1])**2
+                cr1 = (pm_amp[i, 0])
+                cr2 = (pm_amp[i, 1])
                 cr_denom1 = (pm_int[i, 0])
                 cr_denom2 = (pm_int[i, 1])
                 # print(cr_denom1)
 
-                # if ndx == 0:
-                #     nom += (int_star)
-                #     denom1 += (int_star_center)
-                #     denom2 += (int_star_center)
-                # else:
-                nom += (10.**(theta[ndx*3+1]) * np.sqrt(cr1*cr2)
-                        * int_star)
-                denom1 += (10.**(theta[ndx*3+1]) * cr_denom1
-                           * int_star_center)
-                denom2 += (10.**(theta[ndx*3+1]) * cr_denom2
-                           * int_star_center)
+                if ndx == 0:
+                    nom += (int_star * (cr1*cr2))
+                    denom1 += (int_star_center * cr_denom1)
+                    denom2 += (int_star_center * cr_denom2)
+                else:
+                    nom += (10.**(theta[ndx*3+1]) * (cr1*cr2)
+                            * int_star)
+                    denom1 += (10.**(theta[ndx*3+1]) * cr_denom1
+                               * int_star_center)
+                    denom2 += (10.**(theta[ndx*3+1]) * cr_denom2
+                               * int_star_center)
             # cr1 = (pm_amp_c[i, 0] / pm_amp_norm[i, 0])**2
             # cr2 = (pm_amp_c[i, 1] / pm_amp_norm[i, 1])**2
             # cr_denom1 = (pm_int_c[i, 0] / pm_int_norm[i, 0])
