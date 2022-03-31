@@ -798,16 +798,6 @@ def _calc_vis_mstars(theta_in, fitarg, fithelp):
     v = fitarg[1]
 
     theta = theta_in
-    # theta = np.zeros(nsource*3+10)
-    # _th_count = 0
-    # _fi_count = 0
-    # for ndx in range(len(theta)):
-    #     if ndx in todel:
-    #         theta[ndx] = fixed[_fi_count]
-    #         _fi_count += 1
-    #     else:
-    #         theta[ndx] = theta_in[_th_count]
-    #         _th_count += 1
 
     th_rest = nsource*3-1
     alpha_SgrA = theta[th_rest]
@@ -884,10 +874,10 @@ def _calc_vis_mstars(theta_in, fitarg, fithelp):
         if phasemaps:
             pm_amp_norm, _, pm_int_norm = pm_sources[0]
 
-            cr1 = (pm_amp_c[i, 0] / pm_amp_norm[i, 0])**2
-            cr2 = (pm_amp_c[i, 1] / pm_amp_norm[i, 1])**2
-            cr_denom1 = (pm_int_c[i, 0] / pm_int_norm[i, 0])
-            cr_denom2 = (pm_int_c[i, 1] / pm_int_norm[i, 1])
+            cr1 = (pm_amp_c[i, 0])**2
+            cr2 = (pm_amp_c[i, 1])**2
+            cr_denom1 = (pm_int_c[i, 0])
+            cr_denom2 = (pm_int_c[i, 1])
 
             nom *= np.sqrt(cr1*cr2)
             denom1 *= cr_denom1
@@ -898,22 +888,30 @@ def _calc_vis_mstars(theta_in, fitarg, fithelp):
                                            dlambda[i, :], fit_mode)
 
                 pm_amp, _, pm_int = pm_sources[ndx]
-                cr1 = (pm_amp[i, 0] / pm_amp_norm[i, 0])**2
-                cr2 = (pm_amp[i, 1] / pm_amp_norm[i, 1])**2
-                cr_denom1 = (pm_int[i, 0] / pm_int_norm[i, 0])
-                cr_denom2 = (pm_int[i, 1] / pm_int_norm[i, 1])
+                cr1 = (pm_amp[i, 0])**2
+                cr2 = (pm_amp[i, 1])**2
+                cr_denom1 = (pm_int[i, 0])
+                cr_denom2 = (pm_int[i, 1])
+                # print(cr_denom1)
 
-                if ndx == 0:
-                    nom += (int_star)
-                    denom1 += (int_star_center)
-                    denom2 += (int_star_center)
-                else:
-                    nom += (10.**(theta[ndx*3+1]) * np.sqrt(cr1*cr2)
-                            * int_star)
-                    denom1 += (10.**(theta[ndx*3+1]) * cr_denom1
-                               * int_star_center)
-                    denom2 += (10.**(theta[ndx*3+1]) * cr_denom2
-                               * int_star_center)
+                # if ndx == 0:
+                #     nom += (int_star)
+                #     denom1 += (int_star_center)
+                #     denom2 += (int_star_center)
+                # else:
+                nom += (10.**(theta[ndx*3+1]) * np.sqrt(cr1*cr2)
+                        * int_star)
+                denom1 += (10.**(theta[ndx*3+1]) * cr_denom1
+                           * int_star_center)
+                denom2 += (10.**(theta[ndx*3+1]) * cr_denom2
+                           * int_star_center)
+            # cr1 = (pm_amp_c[i, 0] / pm_amp_norm[i, 0])**2
+            # cr2 = (pm_amp_c[i, 1] / pm_amp_norm[i, 1])**2
+            # cr_denom1 = (pm_int_c[i, 0] / pm_int_norm[i, 0])
+            # cr_denom2 = (pm_int_c[i, 1] / pm_int_norm[i, 1])
+            # nom /= np.sqrt(cr1*cr2)
+            # denom1 /= cr_denom1
+            # denom2 /= cr_denom2
 
         else:
             for ndx in range(nsource):
@@ -1232,6 +1230,7 @@ class GravMFit(GravData, GravPhaseMaps):
         if phasemaps:
             if not self.fit_phasemaps:
                 self.pm_sources = []
+                print(theta[0], theta[1])
                 self.pm_amp_c, self.pm_pha_c, self.pm_int_c = self.phasemap_source(0, 0,
                                                                         self.northangle, self.dra, self.ddec)
 
