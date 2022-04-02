@@ -2633,12 +2633,12 @@ class GravMNightFit(GravNight):
     def getFitResult(self, plot=True, plotcorner=False, ret=False):
         samples = self.sampler.chain
         self.mostprop = self.sampler.flatchain[np.argmax(self.sampler.flatlnprobability)]
+        print("-----------------------------------")
         print("Mean acceptance fraction: %.2f"
               % np.mean(self.sampler.acceptance_fraction))
 
         clinitial = np.delete(self.theta_in, self.todel)
         clsamples = samples  # np.delete(samples, self.todel, 2)
-        cllabels = self.theta_names  # np.delete(self.theta_names, self.todel)
         clmostprop = self.mostprop  # np.delete(self.mostprop, self.todel)
         cldim = len(clmostprop)
 
@@ -2652,11 +2652,59 @@ class GravMNightFit(GravNight):
             fl_samples = samples.reshape((-1, self.ndim))
             fl_clsamples = clsamples.reshape((-1, cldim))
         self.fl_clsamples = fl_clsamples
-        self.medianprop = np.percentile(fl_samples, [50],axis=0)[0]
+        self.medianprop = np.percentile(fl_samples, [50], axis=0)[0]
+
+        lnlike = _lnlike_night(self.medianprop, self.fitdata,
+                               self.fitarg, self.fithelp)
+        print('LogLikelihood: %i' % (lnlike*-1))
+        allfitres = self.getFitVis(self.medianprop, self.fitarg,
+                                   self.fithelp)
+        (visamp, visamp_error, visamp_flag,
+         vis2, vis2_error, vis2_flag,
+         closure, closure_error, closure_flag,
+         visphi, visphi_error, visphi_flag) = self.fitdata
+
+        fit_visamp = np.zeros_like(visamp)
+        fit_vis2 = np.zeros_like(vis2)
+        fit_closure = np.zeros_like(closure)
+        fit_visphi = np.zeros_like(visphi)
+        for fdx in range(len(fit_visamp)):
+            fit_visamp[fdx] = allfitres[fdx][0]
+            fit_vis2[fdx] = allfitres[fdx][1]
+            fit_closure[fdx] = allfitres[fdx][2]
+            fit_visphi[fdx] = allfitres[fdx][3]
+
+        res_visamp = fit_visamp-visamp
+        redchi_visamp = np.sum(res_visamp**2./visamp_error**2.*(1-visamp_flag))
+
+        res_vis2 = fit_vis2-vis2
+        redchi_vis2 = np.sum(res_vis2**2./vis2_error**2.*(1-vis2_flag))
+
+        res_closure = np.degrees(np.abs(np.exp(1j*np.radians(fit_closure)) - np.exp(1j*np.radians(closure))))
+        redchi_closure = np.sum(res_closure**2./closure_error**2.*(1-closure_flag))
+
+        res_visphi = np.degrees(np.abs(np.exp(1j*np.radians(fit_visphi)) - np.exp(1j*np.radians(visphi))))
+        redchi_visphi = np.sum(res_visphi**2./visphi_error**2.*(1-visphi_flag))
+
+        ndof = len(self.medianprop)
+        fitted = 1-(np.array(self.fit_for) == 0)
+        tot_ndof = np.array([(visamp.size-np.sum(visamp_flag)-ndof),
+                             (vis2.size-np.sum(vis2_flag)-ndof),
+                             (closure.size-np.sum(closure_flag)-ndof),
+                             (visphi.size-np.sum(visphi_flag)-ndof)])
+        redchi = (np.sum(np.array([redchi_visamp, redchi_vis2,
+                                  redchi_closure, redchi_visphi])*fitted)
+                  / np.sum(tot_ndof*fitted))
+        print('Total  RChi2:  %.2f' % redchi)
+        print('VisAmp RChi2:  %.2f' % (redchi_visamp/tot_ndof[0]))
+        print('Vis2   RChi2:  %.2f' % (redchi_vis2/tot_ndof[1]))
+        print('Closur RChi2:  %.2f' % (redchi_closure/tot_ndof[2]))
+        print('Visphi RChi2:  %.2f' % (redchi_visphi/tot_ndof[3]))
+        print("-----------------------------------")
 
         percentiles = np.percentile(fl_clsamples, [16, 50, 84], axis=0).T
-        percentiles[:, 0] = percentiles[:,1] - percentiles[:,0]
-        percentiles[:, 2] = percentiles[:,2] - percentiles[:,1]
+        percentiles[:, 0] = percentiles[:, 1] - percentiles[:, 0]
+        percentiles[:, 2] = percentiles[:, 2] - percentiles[:, 1]
 
         fittab = pd.DataFrame()
         fittab["column"] = ["in", "M.L.", "M.P.", "$-\sigma$", "$+\sigma$"]
@@ -2679,14 +2727,15 @@ class GravMNightFit(GravNight):
                 _ct_used += 1
 
         len_lightcurve = self.nfiles
-        _lightcurve_all = 10**(clmostprop[-(len_lightcurve+self.nsource-1):-(self.nsource-1)])
-        self.lightcurve = np.array([_lightcurve_all[::2],_lightcurve_all[1::2]])
+        _lightcurve_all = 10**(clmostprop[-(len_lightcurve+self.nsource-1):
+                                          -(self.nsource-1)])
+        self.lightcurve = np.array([_lightcurve_all[::2],
+                                    _lightcurve_all[1::2]])
         self.fitres = clmostprop
         self.fittab = fittab
         keys = fittab.keys()
         cohkeys = [x for x in keys if 'coh' in x]
         self.fittab_short = fittab.drop(columns=cohkeys)
-
 
         if plot:
             self.plot_MCMC(plotcorner)
@@ -2715,367 +2764,9 @@ class GravMNightFit(GravNight):
         plt.show()
 
         if plotcorner:
-            ranges = np.percentile(self.fl_clsamples, [3, 97], axis=0).T
             fig = corner.corner(self.fl_clsamples, quantiles=[0.16, 0.5, 0.84],
                                 truths=clmostprop, labels=cllabels)
             plt.show()
-
-    # def plot_fit_better(self, fitdata, fitres, fitarg, fithelp, figsize=None):
-    #     (len_lightcurve, nsource, fit_for, bispec_ind, fit_mode,
-    #     wave, dlambda, fixedBHalpha, soh_loss, phasemaps,
-    #     northA, amp_map_int, pha_map_int, amp_map_denom_int, wave) = fithelp
-    # 
-    #     (visamp_d, visamp_error_d, visamp_flag_d,
-    #      vis2_d, vis2_error_d, vis2_flag_d,
-    #      closure_d, closure_error_d, closure_flag_d,
-    #      visphi_d, visphi_error_d, visphi_flag_d) = fitdata
-    #     if figsize is None:
-    #         plt.figure(figsize=(7,len_lightcurve*0.7))
-    #     else:
-    #         plt.figure(figsize=figsize)
-    #     gs = gridspec.GridSpec(len_lightcurve//2, 3, hspace=0.05)
-    #     for idx in range(len_lightcurve//2):
-    #         num = idx*2
-    #         obj = self.gravData_list[idx]
-    # 
-    #         theta_ = np.copy(fitres[:nsource*2 + 4])
-    #         theta_ = np.append(theta_, fitres[num + len(theta_)])
-    #         theta_ = np.append(theta_, fitres[-nsource+1:])
-    #         visamp, visphi, closure = _calc_vis(theta_, fitarg[:, num], fithelp)
-    # 
-    #         theta_ = np.copy(fitres[:nsource*2 + 4])
-    #         theta_ = np.append(theta_, fitres[num+1 + len(theta_)])
-    #         theta_ = np.append(theta_, fitres[-nsource+1:])
-    #         visamp2, visphi2, closure2 = _calc_vis(theta_, fitarg[:, num+1], fithelp)
-    # 
-    # 
-    #         vis2 = visamp**2
-    #         vis22 = visamp2**2
-    #         magu_as = obj.spFrequAS
-    # 
-    #         ax = plt.subplot(gs[idx,0])
-    #         for i in range(6):
-    #             plt.errorbar(magu_as[i,:], visamp_d[num][i,:]*(1-visamp_flag_d[num])[i],
-    #                         visamp_error_d[num][i,:]*(1-visamp_flag_d[num])[i],
-    #                         color=obj.colors_baseline[i], ls='', marker='o', markersize=2,
-    #                         lw=1, alpha=1, capsize=0)
-    # 
-    #             plt.errorbar(magu_as[i,:], visamp_d[num+1][i,:]*(1-visamp_flag_d[num+1])[i],
-    #                         visamp_error_d[num+1][i,:]*(1-visamp_flag_d[num+1])[i],
-    #                         color=obj.colors_baseline[i], ls='', marker='o', markersize=2,
-    #                         lw=1, alpha=1, capsize=0)
-    # 
-    #             plt.plot(magu_as[i, :], visamp[i, :], color='k', zorder=100)
-    #             plt.plot(magu_as[i, :], visamp2[i, :], ls='--', color='k', zorder=100)
-    #         plt.ylim(0,1.1)
-    #         ax.set_xticklabels([])
-    #         if idx == 0:
-    #             plt.title('Visamp')
-    #         plt.ylabel('File %i' % (idx+1))
-    # 
-    #         ax = plt.subplot(gs[idx,1])
-    #         for i in range(6):
-    #             plt.errorbar(magu_as[i,:], vis2_d[num][i,:]*(1-vis2_flag_d[num])[i],
-    #                         vis2_error_d[num][i,:]*(1-vis2_flag_d[num])[i],
-    #                         color=obj.colors_baseline[i], ls='', marker='o', markersize=2,
-    #                         lw=1, alpha=1, capsize=0)
-    # 
-    #             plt.errorbar(magu_as[i,:], vis2_d[num+1][i,:]*(1-vis2_flag_d[num+1])[i],
-    #                         vis2_error_d[num+1][i,:]*(1-vis2_flag_d[num+1])[i],
-    #                         color=obj.colors_baseline[i], ls='', marker='o', markersize=2,
-    #                         lw=1, alpha=1, capsize=0)
-    # 
-    #             plt.plot(magu_as[i, :], vis2[i, :], color='k', zorder=100)
-    #             plt.plot(magu_as[i, :], vis22[i, :], ls='--', color='k', zorder=100)
-    #         plt.ylim(0,1.1)
-    #         ax.set_xticklabels([])
-    #         if idx == 0:
-    #             plt.title('Vis2')
-    # 
-    #         ax = plt.subplot(gs[idx,2])
-    #         for i in range(4):
-    #             plt.errorbar(obj.spFrequAS_T3[i,:], closure_d[num][i,:]*(1-closure_flag_d[num])[i],
-    #                         closure_error_d[num][i,:]*(1-closure_flag_d[num])[i],
-    #                         color=obj.colors_closure[i], ls='', marker='o', markersize=2,
-    #                         lw=1, alpha=1, capsize=0)
-    # 
-    #             plt.errorbar(obj.spFrequAS_T3[i,:], closure_d[num+1][i,:]*(1-closure_flag_d[num+1])[i],
-    #                         closure_error_d[num+1][i,:]*(1-closure_flag_d[num+1])[i],
-    #                         color=obj.colors_closure[i], ls='', marker='o', markersize=2,
-    #                         lw=1, alpha=1, capsize=0)
-    # 
-    #             plt.plot(obj.spFrequAS_T3[i,:], closure[i, :], color='k', zorder=100)
-    #             plt.plot(obj.spFrequAS_T3[i,:], closure2[i, :], ls='--', color='k', zorder=100)
-    #         plt.ylim(-180,180)
-    #         ax.set_xticklabels([])
-    #         if idx == 0:
-    #             plt.title('Closure Phase')
-    #     plt.show()
-    # 
-    # 
-    # 
-    # 
-    # 
-    # def plot_fit(self, fitres, fitarg, fithelp, axes=None):
-    #     (len_lightcurve, nsource, fit_for, bispec_ind, fit_mode,
-    #      wave, dlambda, fixedBHalpha, oneBHalpha, phasemaps, pm_sources) = fithelp
-    #     if axes is None:
-    #         #fig, axes = plt.subplots(2, 2, gridspec_kw={})
-    #         fig, axes0 = plt.subplots()
-    #         fig, axes1 = plt.subplots()
-    #         fig, axes2 = plt.subplots()
-    #         fig, axes3 = plt.subplots()
-    #         axes = np.ones((2,2), dtype=object)
-    # 
-    #         axes[0,0] = axes0
-    #         axes[0,1] = axes1
-    #         axes[1,0] = axes2
-    #         axes[1,1] = axes3
-    # 
-    #     for ndx in range(len_lightcurve):
-    #         obj = self.datalist[ndx//2]
-    #         _theta = np.zeros(nsource*3+10)
-    #         for sdx in range(nsource):
-    #             if sdx == 0:
-    #                 _theta[:2] = fitres[:2]
-    #             else:
-    #                 _theta[sdx*3-1] = fitres[sdx*2]
-    #                 _theta[sdx*3] = fitres[sdx*2+1]
-    #                 _theta[sdx*3+1] = fitres[nsource*2+sdx-1]
-    # 
-    #         th_rest = nsource*3-1
-    #         if oneBHalpha:
-    #             _theta[th_rest] = fitres[nsource*3-1 + 1]
-    #         else:
-    #             _theta[th_rest] = fitres[nsource*3-1 + ndx*10+1]
-    #         _theta[th_rest+1] = 0
-    #         _theta[th_rest+2] = fitres[nsource*3-1 + ndx*10+2]
-    #         _theta[th_rest+3] = fitres[nsource*3-1 + ndx*10+3]
-    #         _theta[th_rest+4] = fitres[nsource*3-1 + ndx*10]
-    #         _theta[th_rest+5:] = fitres[nsource*3-1 + ndx*10+4:nsource*3-1 + ndx*10+10]
-    # 
-    #         if phasemaps:
-    #             _pm_sources = pm_sources[ndx]
-    #             pm_amp_c, pm_pha_c, pm_int_c = _pm_sources[0]
-    #             _pm_sources = _pm_sources[1:]
-    #             _fithelp = [nsource, fit_for, bispec_ind, fit_mode,
-    #                         wave, dlambda, fixedBHalpha, True, phasemaps,
-    #                         None, None, None, None, None, None, False,
-    #                         _pm_sources, pm_amp_c, pm_pha_c, pm_int_c]
-    #         else:
-    #             _fithelp = [nsource, fit_for, bispec_ind, fit_mode,
-    #                         wave, dlambda, fixedBHalpha, True, phasemaps,
-    #                         None, None, None, None, None, None, False,
-    #                         None, None, None, None]
-    #         visamp, visphi, closure = _calc_vis_mstars(_theta, fitarg[:, ndx],
-    #                                                    _fithelp)
-    #         visamp2 = visamp**2
-    #         magu_as = obj.spFrequAS
-    #         for i in range(6):
-    #             axes[0,0].plot(magu_as[i, :], visamp[i, :], color='k', zorder=100)
-    #             axes[0,1].plot(magu_as[i, :], visamp2[i, :], color='k', zorder=100)
-    #             axes[1,1].plot(magu_as[i, :], visphi[i, :], color='k', zorder=100)
-    #         for i in range(4):
-    #             axes[1,0].plot(obj.spFrequAS_T3[i,:], closure[i, :], color='k', zorder=100)
-    # 
-    # def plot_data(self, fitdata, fitarg, axes=None):
-    #     len_lightcurve = self.nfiles
-    #     if axes is None:
-    #         #fig, axes = plt.subplots(2, 2, gridspec_kw={})
-    #         fig, axes0 = plt.subplots()
-    #         fig, axes1 = plt.subplots()
-    #         fig, axes2 = plt.subplots()
-    #         fig, axes3 = plt.subplots()
-    #         axes = np.ones((2,2), dtype=object)
-    # 
-    #         axes[0,0] = axes0
-    #         axes[0,1] = axes1
-    #         axes[1,0] = axes2
-    #         axes[1,1] = axes3
-    #     (visamp, visamp_error, visamp_flag,
-    #         vis2, vis2_error, vis2_flag,
-    #         closure, closure_error, closure_flag,
-    #         visphi, visphi_error, visphi_flag) = fitdata
-    #     (u, v) = fitarg
-    #     for num in range(len_lightcurve):
-    #         obj = self.datalist[num//2]
-    #         magu_as = obj.spFrequAS
-    #         for i in range(0,6):
-    #             ## visamp
-    #             axes[0,0].errorbar(magu_as[i,:], visamp[num][i,:]*(1-visamp_flag[num])[i],
-    #                         visamp_error[num][i,:]*(1-visamp_flag[num])[i],
-    #                         color=lighten_color(obj.colors_baseline[i], (num+1)/len_lightcurve), ls='', lw=1, alpha=0.5, capsize=0)
-    #             if num == 0:
-    #                 axes[0,0].scatter(magu_as[i,:], visamp[num][i,:]*(1-visamp_flag[num])[i],
-    #                             color=lighten_color(obj.colors_baseline[i], (num+1)/len_lightcurve), alpha=0.5, label=obj.baseline_labels[i])
-    #             else:
-    #                 axes[0,0].scatter(magu_as[i,:], visamp[num][i,:]*(1-visamp_flag[num])[i],
-    #                             color=lighten_color(obj.colors_baseline[i], (num+1)/len_lightcurve), alpha=0.5)
-    # 
-    #             ## vis2
-    #             axes[0,1].errorbar(magu_as[i,:], vis2[num][i,:]*(1-vis2_flag[num])[i],
-    #                         vis2_error[num][i,:]*(1-vis2_flag[num])[i],
-    #                         color=lighten_color(obj.colors_baseline[i], (num+1)/len_lightcurve),ls='', lw=1, alpha=0.5, capsize=0)
-    # 
-    #             axes[0,1].scatter(magu_as[i,:], vis2[num][i,:]*(1-vis2_flag[num])[i],
-    #                         color=lighten_color(obj.colors_baseline[i], (num+1)/len_lightcurve),alpha=0.5)
-    # 
-    # 
-    #             ## visphi
-    # 
-    #             axes[1,1].errorbar(magu_as[i,:], visphi[num][i,:]*(1-visphi_flag[num])[i],
-    #                         visphi_error[num][i,:]*(1-visphi_flag[num])[i],
-    #                         color=lighten_color(obj.colors_baseline[i], (num+1)/len_lightcurve), ls='', lw=1, alpha=0.5, capsize=0)
-    #             axes[1,1].scatter(magu_as[i,:], visphi[num][i,:]*(1-visphi_flag[num])[i],
-    #                         color=lighten_color(obj.colors_baseline[i], (num+1)/len_lightcurve), alpha=0.5)
-    # 
-    #         for i in range(4):
-    #             ## t3visphi
-    #             axes[1,0].errorbar(obj.spFrequAS_T3[i,:], closure[num][i,:]*(1-closure_flag[num])[i],
-    #                         closure_error[num][i,:]*(1-closure_flag[num])[i],
-    #                         color=lighten_color(obj.colors_closure[i], (num+1)/len_lightcurve),ls='', lw=1, alpha=0.5, capsize=0)
-    #             if num == 0:
-    #                 axes[1,0].scatter(obj.spFrequAS_T3[i,:], closure[num][i,:]*(1-closure_flag[num])[i],
-    #                                   label=obj.closure_labels[i], color=lighten_color(obj.colors_closure[i], (num+1)/len_lightcurve))
-    #             else:
-    #                 axes[1,0].scatter(obj.spFrequAS_T3[i,:], closure[num][i,:]*(1-closure_flag[num])[i],
-    #                                   color=lighten_color(obj.colors_closure[i], (num+1)/len_lightcurve))
-    # 
-    #     axes[0,0].set_ylabel('visibility modulus')
-    #     axes[0,0].set_ylim(-0.1,1.1)
-    #     axes[0,0].set_xlabel('spatial frequency (1/arcsec)')
-    #     axes[0,0].legend(fontsize=12)
-    # 
-    #     axes[0,1].set_xlabel('spatial frequency (1/arcsec)')
-    #     axes[0,1].set_ylabel('visibility squared')
-    #     axes[0,1].set_ylim(-0.1,1.1)
-    # 
-    # 
-    #     axes[1,0].set_xlabel('spatial frequency of largest baseline in triangle (1/arcsec)')
-    #     axes[1,0].set_ylabel('closure phase (deg)')
-    #     axes[1,0].set_ylim(-180,180)
-    #     axes[1,0].legend(fontsize=12)
-    # 
-    #     axes[1,1].set_ylabel('visibility phase')
-    #     axes[1,0].set_ylim(-180,180)
-    #     axes[1,1].set_xlabel('spatial frequency (1/arcsec)')
-    # 
-    # def plot_residual(self, fitdata, fitarg, fitres, fithelp, axes=None, show=False):
-    #     (len_lightcurve, nsource, fit_for, bispec_ind, fit_mode,
-    #      wave, dlambda, fixedBHalpha, coh_loss, phasemaps, northA,
-    #      amp_map_int, pha_map_int, amp_map_denom_int, wave) = fithelp
-    #     if axes is None:
-    #         #fig, axes = plt.subplots(2, 2, gridspec_kw={})
-    #         fig, axes0 = plt.subplots()
-    #         fig, axes1 = plt.subplots()
-    #         fig, axes2 = plt.subplots()
-    #         fig, axes3 = plt.subplots()
-    #         axes = np.ones((2,2), dtype=object)
-    # 
-    #         axes[0,0] = axes0
-    #         axes[0,1] = axes1
-    #         axes[1,0] = axes2
-    #         axes[1,1] = axes3
-    #     (visamp, visamp_error, visamp_flag,
-    #         vis2, vis2_error, vis2_flag,
-    #         closure, closure_error, closure_flag,
-    #         visphi, visphi_error, visphi_flag) = fitdata
-    #     (u, v) = fitarg
-    #     for num in range(len_lightcurve):
-    #         obj = self.gravData_list[num//2]
-    #         magu_as = obj.spFrequAS
-    # 
-    #         theta_ = np.copy(fitres[:nsource*2 + 4])
-    #         theta_ = np.append(theta_,  fitres[num + nsource*2 + 4])
-    #         theta_ = np.append(theta_,  fitres[-nsource+1:])
-    # 
-    #         model_visamp, model_visphi, model_closure = _calc_vis(theta_, fitarg[:, num], fithelp)
-    #         model_visamp2 = model_visamp**2
-    # 
-    #         for i in range(0,6):
-    #             ## visamp
-    #             axes[0,0].errorbar(magu_as[i,:], (visamp-model_visamp)[num][i,:]*(1-visamp_flag[num])[i],
-    #                         visamp_error[num][i,:]*(1-visamp_flag[num])[i],
-    #                         color=lighten_color(obj.colors_baseline[i], (num+1)/len_lightcurve), ls='', lw=1, alpha=0.5, capsize=0)
-    #             if num == len_lightcurve-1:
-    #                 axes[0,0].scatter(magu_as[i,:], (visamp-model_visamp)[num][i,:]*(1-visamp_flag[num])[i],
-    #                             color=lighten_color(obj.colors_baseline[i], (num+1)/len_lightcurve), alpha=0.5, label=obj.baseline_labels[i])
-    #             else:
-    #                 axes[0,0].scatter(magu_as[i,:], (visamp-model_visamp)[num][i,:]*(1-visamp_flag[num])[i],
-    #                             color=lighten_color(obj.colors_baseline[i], (num+1)/len_lightcurve), alpha=0.5)
-    # 
-    #             ## vis2
-    #             axes[0,1].errorbar(magu_as[i,:], (vis2-model_visamp2)[num][i,:]*(1-vis2_flag[num])[i],
-    #                         vis2_error[num][i,:]*(1-vis2_flag[num])[i],
-    #                         color=lighten_color(obj.colors_baseline[i], (num+1)/len_lightcurve),ls='', lw=1, alpha=0.5, capsize=0)
-    # 
-    #             axes[0,1].scatter(magu_as[i,:], (vis2-model_visamp2)[num][i,:]*(1-vis2_flag[num])[i],
-    #                         color=lighten_color(obj.colors_baseline[i], (num+1)/len_lightcurve),alpha=0.5)
-    # 
-    # 
-    #             ## visphi
-    # 
-    #             axes[1,1].errorbar(magu_as[i,:], (visphi-model_visphi)[num][i,:]*(1-visphi_flag[num])[i],
-    #                         visphi_error[num][i,:]*(1-visphi_flag[num])[i],
-    #                         color=lighten_color(obj.colors_baseline[i], (num+1)/len_lightcurve), ls='', lw=1, alpha=0.5, capsize=0)
-    #             axes[1,1].scatter(magu_as[i,:], (visphi-model_visphi)[num][i,:]*(1-visphi_flag[num])[i],
-    #                         color=lighten_color(obj.colors_baseline[i], (num+1)/len_lightcurve), alpha=0.5)
-    # 
-    #         for i in range(4):
-    #             ## t3visphi
-    #             axes[1,0].errorbar(obj.spFrequAS_T3[i,:], (closure-model_closure)[num][i,:]*(1-closure_flag[num])[i],
-    #                         closure_error[num][i,:]*(1-closure_flag[num])[i],
-    #                         color=lighten_color(obj.colors_closure[i], (num+1)/len_lightcurve),ls='', lw=1, alpha=0.5, capsize=0)
-    #             if num == len_lightcurve-1:
-    #                 axes[1,0].scatter(obj.spFrequAS_T3[i,:], (closure-model_closure)[num][i,:]*(1-closure_flag[num])[i],
-    #                                   label=obj.closure_labels[i], color=lighten_color(obj.colors_closure[i], (num+1)/len_lightcurve))
-    #             else:
-    #                 axes[1,0].scatter(obj.spFrequAS_T3[i,:], (closure-model_closure)[num][i,:]*(1-closure_flag[num])[i],
-    #                                   color=lighten_color(obj.colors_closure[i], (num+1)/len_lightcurve))
-    # 
-    #     axes[0,0].set_ylabel('visibility modulus')
-    #     axes[0,0].set_ylim(-0.4,0.4)
-    #     axes[0,0].set_xlabel('spatial frequency (1/arcsec)')
-    #     axes[0,0].legend(fontsize=12)
-    # 
-    #     axes[0,1].set_xlabel('spatial frequency (1/arcsec)')
-    #     axes[0,1].set_ylabel('visibility squared')
-    #     axes[0,1].set_ylim(-0.4,0.4)
-    # 
-    # 
-    #     axes[1,0].set_xlabel('spatial frequency of largest baseline in triangle (1/arcsec)')
-    #     axes[1,0].set_ylabel('closure phase (deg)')
-    #     axes[1,0].set_ylim(-40,40)
-    #     axes[1,0].legend(fontsize=12)
-    # 
-    #     axes[1,1].set_ylabel('visibility phase')
-    #     axes[1,1].set_ylim(-40,40)
-    #     axes[1,1].set_xlabel('spatial frequency (1/arcsec)')
-    #     if show:
-    #         plt.show()
-    # 
-    # def plotFit(self):
-    #     fig, axes0 = plt.subplots()
-    #     fig, axes1 = plt.subplots()
-    #     fig, axes2 = plt.subplots()
-    #     fig, axes3 = plt.subplots()
-    #     axes = np.ones((2,2), dtype=object)
-    # 
-    #     axes[0,0] = axes0
-    #     axes[0,1] = axes1
-    #     axes[1,0] = axes2
-    #     axes[1,1] = axes3
-    #     try:
-    #         self.mostprop
-    #         self.fitarg
-    #         self.fithelp
-    #         self.fitdata
-    #         self.fitarg
-    #     except NameError:
-    #         print('mostprop, fitarg, fithelp and fitarg are not attributes. '
-    #               'Need to run the fit first!')
-    #     self.plot_fit(self.mostprop, self.fitarg, self.fithelp, axes=axes)
-    #     self.plot_data(self.fitdata, self.fitarg, axes=axes)
 
     def getFitVis(self, fitres, fitarg, fithelp):
         (len_lightcurve, nsource, fit_for, bispec_ind, fit_mode,
@@ -3154,7 +2845,7 @@ class GravMNightFit(GravNight):
         for i in range(0, 6):
             dlambda_model[i, :] = np.interp(wave_model, wave, dlambda[i, :])
 
-        fithelp_model = self.fithelp
+        fithelp_model = np.copy(self.fithelp)
         fithelp_model[5] = wave_model
         fithelp_model[6] = dlambda_model
         allfitres = self.getFitVis(result, self.fitarg, fithelp_model)
