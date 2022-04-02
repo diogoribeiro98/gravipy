@@ -2695,6 +2695,7 @@ class GravMNightFit(GravNight):
         redchi = (np.sum(np.array([redchi_visamp, redchi_vis2,
                                   redchi_closure, redchi_visphi])*fitted)
                   / np.sum(tot_ndof*fitted))
+        self.redchi = redchi
         print('Total  RChi2:  %.2f' % redchi)
         print('VisAmp RChi2:  %.2f' % (redchi_visamp/tot_ndof[0]))
         print('Vis2   RChi2:  %.2f' % (redchi_vis2/tot_ndof[1]))
