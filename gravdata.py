@@ -45,8 +45,6 @@ def convert_date(date, mjd=False):
 class GravData():
     def __init__(self, data, verbose=True, plot=False):
         """
-        verbose (True)
-        plot (False) if True runs the plotting utilty of self.getIntdata (plots data ect.)
         """
         self.name = data
         self.verbose = verbose
@@ -54,11 +52,13 @@ class GravData():
                                          color2, 'darkred', color1])
         self.colors_closure = np.array([color1, 'darkred', 'k', color2])
 
-        poscatg = ['VIS_DUAL_SCI_RAW', 'VIS_SINGLE_SCI_RAW', 'VIS_SINGLE_CAL_RAW',
-           'VIS_DUAL_CAL_RAW', 'VIS_SINGLE_CALIBRATED', 'VIS_DUAL_CALIBRATED',
-           'SINGLE_SCI_VIS','SINGLE_SCI_VIS_CALIBRATED','DUAL_SCI_VIS',
-           'DUAL_SCI_VIS_CALIBRATED','SINGLE_CAL_VIS','DUAL_CAL_VIS', 'ASTROREDUCED',
-           'DUAL_SCI_P2VMRED']
+        poscatg = ['VIS_DUAL_SCI_RAW', 'VIS_SINGLE_SCI_RAW',
+                   'VIS_SINGLE_CAL_RAW', 'VIS_DUAL_CAL_RAW',
+                   'VIS_SINGLE_CALIBRATED', 'VIS_DUAL_CALIBRATED',
+                   'SINGLE_SCI_VIS', 'SINGLE_SCI_VIS_CALIBRATED',
+                   'DUAL_SCI_VIS', 'DUAL_SCI_VIS_CALIBRATED',
+                   'SINGLE_CAL_VIS', 'DUAL_CAL_VIS', 'ASTROREDUCED',
+                   'DUAL_SCI_P2VMRED']
 
         header = fits.open(self.name)[0].header
         date = header['DATE-OBS']
@@ -70,13 +70,14 @@ class GravData():
         if 'GRAV' not in header['INSTRUME']:
             raise ValueError('File seems to be not from GRAVITY')
         else:
-            datatype='RAW' # default data type RAW
+            datatype = 'RAW' # default data type RAW
         if 'ESO PRO TYPE' in header:
             datatype = header['ESO PRO TYPE']
         if 'ESO PRO CATG' in header:
             datacatg = header['ESO PRO CATG']
             if datacatg not in poscatg:
-                raise ValueError('filetype is %s, which is not supported' % datacatg)
+                raise ValueError('filetype is %s, which is not supported'
+                                 % datacatg)
         else:
             if self.verbose:
                 print('Assume this is a raw file!')
@@ -101,33 +102,36 @@ class GravData():
         elif tel == 'ESO-VLTI-A1234':
             self.tel = 'AT'
         else:
-            raise ValueError('Telescope not AT or UT, seomtehign wrong with input data')
+            raise ValueError('Telescope not AT or UT, seomtehign '
+                             'wrong with input data')
 
         # Get BL names
         if self.raw or self.p2vm_file:
-            self.baseline_labels = np.array(["UT4-3","UT4-2","UT4-1",
-                                            "UT3-2","UT3-1","UT2-1"])
-            self.closure_labels = np.array(["UT4-3-2","UT4-3-1","UT4-2-1","UT3-2-1"])
+            self.baseline_labels = np.array(["UT4-3", "UT4-2", "UT4-1",
+                                            "UT3-2", "UT3-1", "UT2-1"])
+            self.closure_labels = np.array(["UT4-3-2", "UT4-3-1",
+                                            "UT4-2-1", "UT3-2-1"])
         else:
             baseline_labels = []
             closure_labels = []
             tel_name = fits.open(self.name)['OI_ARRAY'].data['TEL_NAME']
             sta_index = fits.open(self.name)['OI_ARRAY'].data['STA_INDEX']
             if self.polmode == 'SPLIT':
-                vis_index = fits.open(self.name)['OI_VIS',11].data['STA_INDEX']
-                t3_index = fits.open(self.name)['OI_T3',11].data['STA_INDEX']
+                vis_index = fits.open(self.name)['OI_VIS', 11].data['STA_INDEX']
+                t3_index = fits.open(self.name)['OI_T3', 11].data['STA_INDEX']
             else:
-                vis_index = fits.open(self.name)['OI_VIS',10].data['STA_INDEX']
-                t3_index = fits.open(self.name)['OI_T3',10].data['STA_INDEX']
+                vis_index = fits.open(self.name)['OI_VIS', 10].data['STA_INDEX']
+                t3_index = fits.open(self.name)['OI_T3', 10].data['STA_INDEX']
             for bl in range(6):
-                t1 = np.where(sta_index == vis_index[bl,0])[0][0]
-                t2 = np.where(sta_index == vis_index[bl,1])[0][0]
+                t1 = np.where(sta_index == vis_index[bl, 0])[0][0]
+                t2 = np.where(sta_index == vis_index[bl, 1])[0][0]
                 baseline_labels.append(tel_name[t1] + '-' + tel_name[t2][2])
             for cl in range(4):
-                t1 = np.where(sta_index == t3_index[cl,0])[0][0]
-                t2 = np.where(sta_index == t3_index[cl,1])[0][0]
-                t3 = np.where(sta_index == t3_index[cl,2])[0][0]
-                closure_labels.append(tel_name[t1] + '-' + tel_name[t2][2]+ '-' + tel_name[t3][2])
+                t1 = np.where(sta_index == t3_index[cl, 0])[0][0]
+                t2 = np.where(sta_index == t3_index[cl, 1])[0][0]
+                t3 = np.where(sta_index == t3_index[cl, 2])[0][0]
+                closure_labels.append(tel_name[t1] + '-'
+                                      + tel_name[t2][2] + '-' + tel_name[t3][2])
             self.closure_labels = np.array(closure_labels)
             self.baseline_labels = np.array(baseline_labels)
 
@@ -154,25 +158,6 @@ class GravData():
                 self.channel = len(self.wlSC)
                 if not datacatg == 'ASTROREDUCED':
                     self.wlFT = fits.open(self.name)['OI_WAVELENGTH', 20].data['EFF_WAVE']*1e6
-
-
-    def getValue(self, ext1, ext2=None, ext1num=None):
-        """
-        Get data from one or optional two extensions
-        """
-        if self.raw:
-            raise ValueError('Input is a RAW file, not usable for this function')
-        if ext2:
-            if ext1num:
-                return fits.open(self.name)[ext1, ext1num].data[ext2]
-            else:
-                return fits.open(self.name)[ext1].data[ext2]
-        else:
-            if ext1num:
-                return fits.open(self.name)[ext1, ext1num].data
-            else:
-                return fits.open(self.name)[ext1].data
-
 
     def getFlux(self, mode='SC', plot=False):
         """
@@ -250,7 +235,7 @@ class GravData():
                 return self.fluxtime, self.fluxFT, self.fluxerrFT
 
     def getIntdata(self, mode='SC', plot=False, plotTAmp=False, flag=False,
-                   ignore_tel=[]):
+                   reload=False, ignore_tel=[]):
         """
         Reads out all interferometric data and saves it into the class:
         visamp, visphi, visphi2, closure amplitude and phase
@@ -310,41 +295,43 @@ class GravData():
                                             [0,4,2],
                                             [1,5,2],
                                             [3,5,4]])
-                # Data
-                # P1
-                self.visampSC_P1 = fitsdata['OI_VIS', 11].data.field('VISAMP')
-                self.visamperrSC_P1 = fitsdata['OI_VIS', 11].data.field('VISAMPERR')
-                self.visphiSC_P1 = fitsdata['OI_VIS', 11].data.field('VISPHI')
-                self.visphierrSC_P1 = fitsdata['OI_VIS', 11].data.field('VISPHIERR')
-                self.vis2SC_P1 = fitsdata['OI_VIS2', 11].data.field('VIS2DATA')
-                self.vis2errSC_P1 = fitsdata['OI_VIS2', 11].data.field('VIS2ERR')
-                self.t3SC_P1 = fitsdata['OI_T3', 11].data.field('T3PHI')
-                self.t3errSC_P1 = fitsdata['OI_T3', 11].data.field('T3PHIERR')
-                self.t3ampSC_P1 = fitsdata['OI_T3', 11].data.field('T3AMP')
-                self.t3amperrSC_P1 = fitsdata['OI_T3', 11].data.field('T3AMPERR')
-                # P2
-                self.visampSC_P2 = fitsdata['OI_VIS', 12].data.field('VISAMP')
-                self.visamperrSC_P2 = fitsdata['OI_VIS', 12].data.field('VISAMPERR')
-                self.visphiSC_P2 = fitsdata['OI_VIS', 12].data.field('VISPHI')
-                self.visphierrSC_P2 = fitsdata['OI_VIS', 12].data.field('VISPHIERR')
-                self.vis2SC_P2 = fitsdata['OI_VIS2', 12].data.field('VIS2DATA')
-                self.vis2errSC_P2 = fitsdata['OI_VIS2', 12].data.field('VIS2ERR')
-                self.t3SC_P2 = fitsdata['OI_T3', 12].data.field('T3PHI')
-                self.t3errSC_P2 = fitsdata['OI_T3', 12].data.field('T3PHIERR')
-                self.t3ampSC_P2 = fitsdata['OI_T3', 12].data.field('T3AMP')
-                self.t3amperrSC_P2 = fitsdata['OI_T3', 12].data.field('T3AMPERR')
+                
+                if not hasattr(self, 'visphiSC_P1') or reload:
+                    # Data
+                    # P1
+                    self.visampSC_P1 = fitsdata['OI_VIS', 11].data.field('VISAMP')
+                    self.visamperrSC_P1 = fitsdata['OI_VIS', 11].data.field('VISAMPERR')
+                    self.visphiSC_P1 = fitsdata['OI_VIS', 11].data.field('VISPHI')
+                    self.visphierrSC_P1 = fitsdata['OI_VIS', 11].data.field('VISPHIERR')
+                    self.vis2SC_P1 = fitsdata['OI_VIS2', 11].data.field('VIS2DATA')
+                    self.vis2errSC_P1 = fitsdata['OI_VIS2', 11].data.field('VIS2ERR')
+                    self.t3SC_P1 = fitsdata['OI_T3', 11].data.field('T3PHI')
+                    self.t3errSC_P1 = fitsdata['OI_T3', 11].data.field('T3PHIERR')
+                    self.t3ampSC_P1 = fitsdata['OI_T3', 11].data.field('T3AMP')
+                    self.t3amperrSC_P1 = fitsdata['OI_T3', 11].data.field('T3AMPERR')
+                    # P2
+                    self.visampSC_P2 = fitsdata['OI_VIS', 12].data.field('VISAMP')
+                    self.visamperrSC_P2 = fitsdata['OI_VIS', 12].data.field('VISAMPERR')
+                    self.visphiSC_P2 = fitsdata['OI_VIS', 12].data.field('VISPHI')
+                    self.visphierrSC_P2 = fitsdata['OI_VIS', 12].data.field('VISPHIERR')
+                    self.vis2SC_P2 = fitsdata['OI_VIS2', 12].data.field('VIS2DATA')
+                    self.vis2errSC_P2 = fitsdata['OI_VIS2', 12].data.field('VIS2ERR')
+                    self.t3SC_P2 = fitsdata['OI_T3', 12].data.field('T3PHI')
+                    self.t3errSC_P2 = fitsdata['OI_T3', 12].data.field('T3PHIERR')
+                    self.t3ampSC_P2 = fitsdata['OI_T3', 12].data.field('T3AMP')
+                    self.t3amperrSC_P2 = fitsdata['OI_T3', 12].data.field('T3AMPERR')
 
-                # Flags
-                self.visampflagSC_P1 = fitsdata['OI_VIS', 11].data.field('FLAG')
-                self.visampflagSC_P2 = fitsdata['OI_VIS', 12].data.field('FLAG')
-                self.vis2flagSC_P1 = fitsdata['OI_VIS2', 11].data.field('FLAG')
-                self.vis2flagSC_P2 = fitsdata['OI_VIS2', 12].data.field('FLAG')
-                self.t3flagSC_P1 = fitsdata['OI_T3', 11].data.field('FLAG')
-                self.t3flagSC_P2 = fitsdata['OI_T3', 12].data.field('FLAG')
-                self.t3ampflagSC_P1 = fitsdata['OI_T3', 11].data.field('FLAG')
-                self.t3ampflagSC_P2 = fitsdata['OI_T3', 12].data.field('FLAG')
-                self.visphiflagSC_P1 = fitsdata['OI_VIS', 11].data.field('FLAG')
-                self.visphiflagSC_P2 = fitsdata['OI_VIS', 12].data.field('FLAG')
+                    # Flags
+                    self.visampflagSC_P1 = fitsdata['OI_VIS', 11].data.field('FLAG')
+                    self.visampflagSC_P2 = fitsdata['OI_VIS', 12].data.field('FLAG')
+                    self.vis2flagSC_P1 = fitsdata['OI_VIS2', 11].data.field('FLAG')
+                    self.vis2flagSC_P2 = fitsdata['OI_VIS2', 12].data.field('FLAG')
+                    self.t3flagSC_P1 = fitsdata['OI_T3', 11].data.field('FLAG')
+                    self.t3flagSC_P2 = fitsdata['OI_T3', 12].data.field('FLAG')
+                    self.t3ampflagSC_P1 = fitsdata['OI_T3', 11].data.field('FLAG')
+                    self.t3ampflagSC_P2 = fitsdata['OI_T3', 12].data.field('FLAG')
+                    self.visphiflagSC_P1 = fitsdata['OI_VIS', 11].data.field('FLAG')
+                    self.visphiflagSC_P2 = fitsdata['OI_VIS', 12].data.field('FLAG')
 
                 for t in ignore_tel:
                     for cdx, cl in enumerate(self.closure_labels):
@@ -844,6 +831,40 @@ class GravData():
                 dlambda[idx] = effband/2*1e6
         self.dlambda = dlambda
 
+    def av_phases(self, phases, axis=0):
+        phases = np.exp(1j*np.radians(phases))
+        phases = (np.nanmean(np.real(phases), axis=axis)
+                  + 1j*np.nanmean(np.imag(phases), axis=axis))
+        phases = np.angle(phases, deg=True)
+        return phases
+
+    def calibrate_phi(self, calibrator):
+        if not hasattr(self, 'visphiSC_P1'):
+            self.getIntdata()
+        c = fits.open(calibrator)
+        c_channel = len(c['OI_WAVELENGTH', 11].data['EFF_WAVE'])
+        if c_channel != self.channel:
+            raise ValueError('Calibrator has different number '
+                             'of spectral channels')
+        cP1 = c['OI_VIS', 11].data['VISPHI']
+        cP2 = c['OI_VIS', 12].data['VISPHI']
+        cf1 = c['OI_VIS', 11].data['FLAG']
+        cf2 = c['OI_VIS', 12].data['FLAG']
+        cP1[cf1] = np.nan
+        cP2[cf2] = np.nan
+        cP1 = self.av_phases(cP1.reshape(-1, 6, self.channel))[np.newaxis,:,:]
+        cP2 = self.av_phases(cP2.reshape(-1, 6, self.channel))[np.newaxis,:,:]
+
+        sP1 = self.visphiSC_P1.reshape(-1, 6, self.channel)
+        sP2 = self.visphiSC_P2.reshape(-1, 6, self.channel)
+
+        self.visphiSC_P1 = np.angle(np.exp(1j*np.radians(sP1))
+                                    / np.exp(1j*np.radians(cP1)), deg=True)
+        self.visphiSC_P2 = np.angle(np.exp(1j*np.radians(sP2))
+                                    / np.exp(1j*np.radians(cP2)), deg=True)
+        if self.visphiSC_P1.shape[0] == 1:
+            self.visphiSC_P1 = self.visphiSC_P1[0]
+            self.visphiSC_P2 = self.visphiSC_P2[0]
 
 class GravNight():
     def __init__(self, file_list, verbose=True):
