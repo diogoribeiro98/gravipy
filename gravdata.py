@@ -862,9 +862,13 @@ class GravData():
                                     / np.exp(1j*np.radians(cP1)), deg=True)
         self.visphiSC_P2 = np.angle(np.exp(1j*np.radians(sP2))
                                     / np.exp(1j*np.radians(cP2)), deg=True)
+
         if self.visphiSC_P1.shape[0] == 1:
             self.visphiSC_P1 = self.visphiSC_P1[0]
             self.visphiSC_P2 = self.visphiSC_P2[0]
+        else:
+            self.visphiSC_P1 = self.visphiSC_P1.reshape(-1,self.channel)
+            self.visphiSC_P2 = self.visphiSC_P2.reshape(-1,self.channel)
 
 class GravNight():
     def __init__(self, file_list, verbose=True):
