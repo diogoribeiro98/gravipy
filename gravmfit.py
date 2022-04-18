@@ -1469,7 +1469,7 @@ class GravMFit(GravData, GravPhaseMaps):
                     clmostprop = mostprop
 
                     cldim = len(cllabels)
-                    if plotCorner:
+                    if plotCorner in ['steps', 'both']:
                         fig, axes = plt.subplots(cldim, figsize=(8, cldim/1.5),
                                                  sharex=True)
                         for i in range(cldim):
@@ -1487,7 +1487,7 @@ class GravMFit(GravData, GravPhaseMaps):
                     else:
                         fl_samples = samples.reshape((-1, ndim))
 
-                    if plotCorner:
+                    if plotCorner in ['corner', 'both']:
                         fig = corner.corner(fl_samples,
                                             quantiles=[0.16, 0.5, 0.84],
                                             truths=mostprop,
@@ -1539,7 +1539,7 @@ class GravMFit(GravData, GravPhaseMaps):
                     for ddx in range(len(todel)):
                         fulltheta = np.insert(fulltheta, todel[ddx], fixed[ddx])
                     fittab = None
-                    
+
                 self.theta_result = theta_result
                 (fit_visamp, fit_visphi,
                  fit_closure) = _calc_vis_mstars(fulltheta, fitarg, fithelp)
