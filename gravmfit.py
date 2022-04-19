@@ -6,18 +6,15 @@ import numpy as np
 import emcee
 import corner
 from multiprocessing import Pool
-from fpdf import FPDF
-from PIL import Image
 from scipy import signal, interpolate
 import math
 import mpmath
 from pkg_resources import resource_filename
 from numba import njit, prange
-from datetime import datetime
-import multiprocessing
 import os
 import pandas as pd
 from joblib import Parallel, delayed
+from lmfit import minimize, Parameters
 
 try:
     from numba import jit
@@ -731,15 +728,15 @@ def _vis_intensity_num(s, alpha, lambda0, dlambda):
 
 
 def _ind_visibility(s, alpha, wave, dlambda, fit_mode):
-    mode = fit_mode
-    if mode == "approx":
+    if fit_mode == "approx":
         ind_vis = _vis_intensity_approx(s, alpha, wave, dlambda)
-    elif mode == "analytic":
+    elif fit_mode == "analytic":
         ind_vis = _vis_intensity(s, alpha, wave, dlambda)
-    elif mode == "numeric":
+    elif fit_mode == "numeric":
         ind_vis = _vis_intensity_num(s, alpha, wave, dlambda)
     else:
-        raise ValueError('approx has to be approx, analytic or numeric')
+        print(fit_mode)
+        raise ValueError('fitmode has to be approx, analytic or numeric')
     return ind_vis
 
 
@@ -748,6 +745,11 @@ def _lnprob_mstars(theta, fitdata, lower, upper, fitarg, fithelp):
         return -np.inf
     return _lnlike_mstars(theta, fitdata, fitarg, fithelp)
 
+def _leastsq_mstars(params, theta1, theta2, fitdata, fitarg, fithelp):
+    pcRa = params['pcRa']
+    pcDec = params['pcDec']
+    theta = np.concatenate((theta1, np.array([pcRa, pcDec]), theta2))
+    return -2*_lnlike_mstars(theta, fitdata, fitarg, fithelp)
 
 def _lnlike_mstars(theta, fitdata, fitarg, fithelp):
 
@@ -1037,6 +1039,12 @@ class GravMFit(GravData, GravPhaseMaps):
             raise ValueError('Initial values for flagtill and flagfrom have'
                              'to be changed if not low resolution')
 
+        if fit_mode == 'phasefit':
+            fit_mode = 'approx'
+            fit_for = [0,0,0,1]
+            onlyphases = True
+        else:
+            onlyphases = False
         self.fit_for = fit_for
         self.fixedBHalpha = fixedBHalpha
         self.fixedBG = fixedBG
@@ -1230,7 +1238,6 @@ class GravMFit(GravData, GravPhaseMaps):
         if phasemaps:
             if not self.fit_phasemaps:
                 self.pm_sources = []
-                print(theta[0], theta[1])
                 self.pm_amp_c, self.pm_pha_c, self.pm_int_c = self.phasemap_source(0, 0,
                                                                         self.northangle, self.dra, self.ddec)
 
@@ -1431,107 +1438,145 @@ class GravMFit(GravData, GravPhaseMaps):
                                None, None, None, None, None, None]
 
                 if not no_fit:
-                    if nthreads == 1:
-                        sampler = emcee.EnsembleSampler(nwalkers, ndim,
-                                                        _lnprob_mstars,
-                                                        args=(fitdata, lower,
-                                                              upper, fitarg,
-                                                              fithelp))
-                        if bequiet:
-                            sampler.run_mcmc(pos, nruns, progress=False)
-                        else:
-                            sampler.run_mcmc(pos, nruns, progress=True)
-                    else:
-                        with Pool(processes=nthreads) as pool:
+                    if not onlyphases:
+                        if nthreads == 1:
                             sampler = emcee.EnsembleSampler(nwalkers, ndim,
                                                             _lnprob_mstars,
-                                                            args=(fitdata,
-                                                                  lower,
+                                                            args=(fitdata, lower,
                                                                   upper, fitarg,
-                                                                  fithelp),
-                                                            pool=pool)
+                                                                  fithelp))
                             if bequiet:
                                 sampler.run_mcmc(pos, nruns, progress=False)
                             else:
                                 sampler.run_mcmc(pos, nruns, progress=True)
+                        else:
+                            with Pool(processes=nthreads) as pool:
+                                sampler = emcee.EnsembleSampler(nwalkers, ndim,
+                                                                _lnprob_mstars,
+                                                                args=(fitdata,
+                                                                      lower,
+                                                                      upper, fitarg,
+                                                                      fithelp),
+                                                                pool=pool)
+                                if bequiet:
+                                    sampler.run_mcmc(pos, nruns, progress=False)
+                                else:
+                                    sampler.run_mcmc(pos, nruns, progress=True)
 
-                    if not bequiet:
-                        print("---------------------------------------")
-                        print("Mean acceptance fraction: %.2f"
-                              % np.mean(sampler.acceptance_fraction))
-                        print("---------------------------------------")
+                        if not bequiet:
+                            print("---------------------------------------")
+                            print("Mean acceptance fraction: %.2f"
+                                  % np.mean(sampler.acceptance_fraction))
+                            print("---------------------------------------")
 
-                    samples = sampler.chain
-                    mostprop = sampler.flatchain[np.argmax(sampler.flatlnprobability)]
+                        samples = sampler.chain
+                        mostprop = sampler.flatchain[np.argmax(sampler.flatlnprobability)]
 
-                    clsamples = samples
-                    cllabels = theta_names
-                    clmostprop = mostprop
+                        clsamples = samples
+                        cllabels = theta_names
+                        clmostprop = mostprop
 
-                    cldim = len(cllabels)
-                    if plotCorner in ['steps', 'both']:
-                        fig, axes = plt.subplots(cldim, figsize=(8, cldim/1.5),
-                                                 sharex=True)
-                        for i in range(cldim):
-                            ax = axes[i]
-                            ax.plot(clsamples[:, :, i].T, "k", alpha=0.3)
-                            ax.set_ylabel(theta_names[i])
-                            ax.yaxis.set_label_coords(-0.1, 0.5)
-                        axes[-1].set_xlabel("step number")
-                        plt.show()
+                        cldim = len(cllabels)
+                        if plotCorner in ['steps', 'both']:
+                            fig, axes = plt.subplots(cldim, figsize=(8, cldim/1.5),
+                                                     sharex=True)
+                            for i in range(cldim):
+                                ax = axes[i]
+                                ax.plot(clsamples[:, :, i].T, "k", alpha=0.3)
+                                ax.set_ylabel(theta_names[i])
+                                ax.yaxis.set_label_coords(-0.1, 0.5)
+                            axes[-1].set_xlabel("step number")
+                            plt.show()
 
-                    if nruns > 300:
-                        fl_samples = samples[:, -200:, :].reshape((-1, ndim))
-                    elif nruns > 200:
-                        fl_samples = samples[:, -100:, :].reshape((-1, ndim))
+                        if nruns > 300:
+                            fl_samples = samples[:, -200:, :].reshape((-1, ndim))
+                        elif nruns > 200:
+                            fl_samples = samples[:, -100:, :].reshape((-1, ndim))
+                        else:
+                            fl_samples = samples.reshape((-1, ndim))
+
+                        if plotCorner in ['corner', 'both']:
+                            fig = corner.corner(fl_samples,
+                                                quantiles=[0.16, 0.5, 0.84],
+                                                truths=mostprop,
+                                                labels=theta_names)
+                            plt.show()
+
+                        # get the actual fit
+                        theta_fit = np.percentile(fl_samples, [50], axis=0).T.flatten()
+                        percentiles = np.percentile(fl_samples, [16, 50, 84], axis=0).T
+                        mostlike_m = percentiles[:,1] - percentiles[:,0]
+                        mostlike_p = percentiles[:,2] - percentiles[:,1]
+                        if bestchi:
+                            theta_result = mostprop
+                        else:
+                            theta_result = theta_fit
+
+                        results.append(theta_result)
+                        fulltheta = np.copy(theta_result)
+                        all_mostprop = np.copy(mostprop)
+                        all_mostlike = np.copy(theta_fit)
+                        for ddx in range(len(todel)):
+                            fulltheta = np.insert(fulltheta, todel[ddx], fixed[ddx])
+                            all_mostprop = np.insert(all_mostprop, todel[ddx],
+                                                     fixed[ddx])
+                            all_mostlike = np.insert(all_mostlike, todel[ddx],
+                                                     fixed[ddx])
+                            mostlike_m = np.insert(mostlike_m, todel[ddx], 0)
+                            mostlike_p = np.insert(mostlike_p, todel[ddx], 0)
+
+                        if idx == 0 and dit == 0:
+                            fittab = pd.DataFrame()
+                        _fittab = pd.DataFrame()
+                        _fittab["column"] = ["in P%i_%i" % (idx, dit),
+                                             "M.L. P%i_%i" % (idx, dit),
+                                             "M.P. P%i_%i" % (idx, dit),
+                                             "$-\sigma$ P%i_%i" % (idx, dit),
+                                             "$+\sigma$ P%i_%i" % (idx, dit)]
+                        for ndx, name in enumerate(self.theta_allnames):
+                            _fittab[name] = pd.Series([self.theta_in[ndx],
+                                                       all_mostprop[ndx],
+                                                       all_mostlike[ndx],
+                                                       mostlike_m[ndx],
+                                                       mostlike_p[ndx]])
+                        fittab = fittab.append(_fittab, ignore_index=True)
+
                     else:
-                        fl_samples = samples.reshape((-1, ndim))
+                        _pc_idx = theta_names.index('pc RA')
+                        theta1 = theta[:_pc_idx]
+                        theta2 = theta[_pc_idx+2:]
+                        params = Parameters()
+                        params.add('pcRa', value=theta[_pc_idx],
+                                   min=theta[_pc_idx]-5,
+                                   max=theta[_pc_idx]+5)
+                        params.add('pcDec', value=theta[_pc_idx+1],
+                                   min=theta[_pc_idx+1]-5,
+                                   max=theta[_pc_idx+1]+5)
 
-                    if plotCorner in ['corner', 'both']:
-                        fig = corner.corner(fl_samples,
-                                            quantiles=[0.16, 0.5, 0.84],
-                                            truths=mostprop,
-                                            labels=theta_names)
-                        plt.show()
+                        out = minimize(_leastsq_mstars, params, 
+                                       args=(theta1, theta2, fitdata,
+                                             fitarg, fithelp),
+                                       method='least_squares')
+                        pcRa = out.params['pcRa'].value
+                        pcDec = out.params['pcDec'].value
 
-                    # get the actual fit
-                    theta_fit = np.percentile(fl_samples, [50], axis=0).T.flatten()
-                    percentiles = np.percentile(fl_samples, [16, 50, 84], axis=0).T
-                    mostlike_m = percentiles[:,1] - percentiles[:,0]
-                    mostlike_p = percentiles[:,2] - percentiles[:,1]
-                    if bestchi:
-                        theta_result = mostprop
-                    else:
-                        theta_result = theta_fit
+                        if idx == 0 and dit == 0:
+                            fittab = pd.DataFrame()
+                        _fittab = pd.DataFrame()
+                        _fittab["column"] = ["in P%i_%i" % (idx, dit),
+                                             "MFit P%i_%i" % (idx, dit)]
+                        _fittab['pcRa'] = pd.Series([theta[_pc_idx],
+                                                     pcRa])
+                        _fittab['pcDec'] = pd.Series([theta[_pc_idx+1],
+                                                      pcDec])
+                        fittab = fittab.append(_fittab, ignore_index=True)
 
-                    results.append(theta_result)
-                    fulltheta = np.copy(theta_result)
-                    all_mostprop = np.copy(mostprop)
-                    all_mostlike = np.copy(theta_fit)
-                    for ddx in range(len(todel)):
-                        fulltheta = np.insert(fulltheta, todel[ddx], fixed[ddx])
-                        all_mostprop = np.insert(all_mostprop, todel[ddx],
-                                                 fixed[ddx])
-                        all_mostlike = np.insert(all_mostlike, todel[ddx],
-                                                 fixed[ddx])
-                        mostlike_m = np.insert(mostlike_m, todel[ddx], 0)
-                        mostlike_p = np.insert(mostlike_p, todel[ddx], 0)
-
-                    if idx == 0 and dit == 0:
-                        fittab = pd.DataFrame()
-                    _fittab = pd.DataFrame()
-                    _fittab["column"] = ["in P%i_%i" % (idx, dit),
-                                         "M.L. P%i_%i" % (idx, dit),
-                                         "M.P. P%i_%i" % (idx, dit),
-                                         "$-\sigma$ P%i_%i" % (idx, dit),
-                                         "$+\sigma$ P%i_%i" % (idx, dit)]
-                    for ndx, name in enumerate(self.theta_allnames):
-                        _fittab[name] = pd.Series([self.theta_in[ndx],
-                                                   all_mostprop[ndx],
-                                                   all_mostlike[ndx],
-                                                   mostlike_m[ndx],
-                                                   mostlike_p[ndx]])
-                    fittab = fittab.append(_fittab, ignore_index=True)
+                        theta_result = np.concatenate((theta1,
+                                                       np.array([pcRa, pcDec]),
+                                                       theta2))
+                        fulltheta = np.copy(theta_result)
+                        for ddx in range(len(todel)):
+                            fulltheta = np.insert(fulltheta, todel[ddx], fixed[ddx])
 
                 else:
                     theta_result = theta
@@ -1593,7 +1638,7 @@ class GravMFit(GravData, GravPhaseMaps):
                     print(chi2string + " for closure: %.2f" % redchi_closure)
                     print('\n')
 
-                if not no_fit:
+                if not no_fit and not onlyphases:
                     percentiles = np.percentile(fl_samples,
                                                 [16, 50, 84], axis=0).T
                     percentiles[:, 0] = percentiles[:, 1] - percentiles[:, 0]
@@ -1664,7 +1709,6 @@ class GravMFit(GravData, GravPhaseMaps):
 
         u = self.u
         v = self.v
-        magu = np.sqrt(u**2.+v**2.)
 
         u_as_model = np.zeros((len(u),len(wave_model)))
         v_as_model = np.zeros((len(v),len(wave_model)))
@@ -1817,9 +1861,9 @@ class GravMFit(GravData, GravPhaseMaps):
                 if cmax < 100:
                     cmax = cmax*1.5
                 else:
-                    cmax=180
+                    cmax = 180
             except:
-                cmax=180
+                cmax = 180
             plt.figure(figsize=(10, 5))
             if plotsplit:
                 gs = gridspec.GridSpec(1, 2, wspace=0.05)
@@ -1870,10 +1914,9 @@ class GravMFit(GravData, GravPhaseMaps):
                 if cmax < 100:
                     cmax = cmax*1.5
                 else:
-                    cmax=180
-                print(cmax)
+                    cmax = 180
             except:
-                cmax=180
+                cmax = 180
             plt.figure(figsize=(10, 5))
             if plotsplit:
                 gs = gridspec.GridSpec(1, 2, wspace=0.05)
@@ -1884,7 +1927,7 @@ class GravMFit(GravData, GravPhaseMaps):
                 visphi_error = plotdata[idx][1][10]
                 visphi_flag = plotdata[idx][1][11]
                 model_visphi_full = fitres[idx][1]
-                for i in range(0,6):
+                for i in range(0, 6):
                     plt.errorbar(magu_as[i, :],
                                  visphi[i, :]*(1-visphi_flag)[i],
                                  visphi_error[i, :]*(1-visphi_flag)[i],
