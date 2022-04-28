@@ -61,9 +61,9 @@ class GCorbits():
         # vy = v*((star['e']+cf)*(-ci*co*sO-cO*so)-sf*(co*cO-ci*so*sO))
         # vz = v*((star['e']+cf)*co*si-sf*si*so)
         if rall:
-            return x, y, z
+            return np.array([x, y, z])
         else:
-            return x, y
+            return np.array([x, y])
 
     def pos_pm(self, star, t):
         vx = star['vx']/1000
@@ -81,7 +81,7 @@ class GCorbits():
             ay = star['ay']/1000
             y += ay/2*(t-star['T'])**2
             vy += ay*(t-star['T'])
-        return -x, y
+        return np.array([-x, y])
 
     def true_anomaly(self, e, M):
         E = self.eccentric_anomaly(e, M)
