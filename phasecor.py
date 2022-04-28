@@ -835,6 +835,8 @@ class GravPhaseNight():
                 '2022-03-18',
                 '2022-03-19',
                 '2022-03-20',
+                '2022-04-23',
+                '2022-04-25',
                 ]
         calibrators = ['GRAVI.2019-03-28T08:00:22.802_dualscivis.fits',
                     'GRAVI.2019-03-29T07:35:36.327_dualscivis.fits',
@@ -881,7 +883,9 @@ class GravPhaseNight():
                     'GRAVI.2021-07-28T01:03:19.149_dualscivis.fits',
                     'GRAVI.2022-03-19T08:46:10.049_dualscivis.fits',
                     'GRAVI.2022-03-20T08:46:55.494_dualscivis.fits',
-                    'GRAVI.2022-03-21T08:06:14.336_dualscivis.fits'
+                    'GRAVI.2022-03-21T08:06:14.336_dualscivis.fits',
+                    'GRAVI.2022-04-24T08:26:23.376_driftcorr_dualscivis.fits',
+                    'GRAVI.2022-04-26T08:31:35.167_dualscivis.fits',
                     ] 
 
         if full_folder:
