@@ -6,13 +6,22 @@ from scipy.optimize import newton
 from .star_orbits import star_pms, star_orbits
 
 class GCorbits():
-    def __init__(self):
+    def __init__(self, verbose=True):
         self.star_orbits = {}
+        self.orbit_stars = []
         for s in star_orbits:
             self.star_orbits[s['name']] = s
+            self.orbit_stars.append(s['name'])
         self.star_pms = {}
+        self.pm_stars = []
         for s in star_pms:
             self.star_pms[s['name']] = s
+            self.pm_stars.append(s['name'])
+        if verbose:
+            print('Stars with orbits:')
+            print(self.orbit_stars)
+            print('\nStars with proper motions:')
+            print(self.pm_stars)
 
     def pos_orbit(self, star, t, rall=False):
         M0 = 4.40
