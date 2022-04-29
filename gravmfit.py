@@ -1597,12 +1597,8 @@ class GravMFit(GravData, GravPhaseMaps):
 
                 res_visamp = fit_visamp-visamp
                 res_vis2 = fit_vis2-vis2
-
                 res_closure = np.degrees(np.abs(np.exp(1j*np.radians(fit_closure)) - np.exp(1j*np.radians(closure))))
-                res_closure = np.sum(-res_closure**2./closure_error**2.*(1-closure_flag))
-
                 res_visphi = np.degrees(np.abs(np.exp(1j*np.radians(fit_visphi)) - np.exp(1j*np.radians(visphi))))
-                res_visphi = np.sum(-res_visphi**2./visphi_error**2.*(1-visphi_flag))
 
                 redchi_visamp = np.sum(res_visamp**2./visamp_error**2.*(1-visamp_flag))
                 redchi_vis2 = np.sum(res_vis2**2./vis2_error**2.*(1-vis2_flag))
@@ -1768,12 +1764,16 @@ class GravMFit(GravData, GravPhaseMaps):
 
         # Visamp
         if self.fit_for[0]:
-            plt.figure(figsize=(10, 5))
             if plotsplit:
+                plt.figure(figsize=(10, 5))
                 gs = gridspec.GridSpec(1,2, wspace=0.05)
+            else:
+                plt.figure(figsize=(5, 5))
             for idx in range(nplot):
                 if plotsplit:
                     ax = plt.subplot(gs[0, idx])
+                else:
+                    ax = plt.subplot()
                 visamp = plotdata[idx][1][0]
                 visamp_error = plotdata[idx][1][1]
                 visamp_flag = plotdata[idx][1][2]
@@ -1811,12 +1811,16 @@ class GravMFit(GravData, GravPhaseMaps):
 
         # Vis2
         if self.fit_for[1]:
-            plt.figure(figsize=(10, 5))
             if plotsplit:
-                gs = gridspec.GridSpec(1, 2, wspace=0.05)
+                plt.figure(figsize=(10, 5))
+                gs = gridspec.GridSpec(1,2, wspace=0.05)
+            else:
+                plt.figure(figsize=(5, 5))
             for idx in range(nplot):
                 if plotsplit:
                     ax = plt.subplot(gs[0, idx])
+                else:
+                    ax = plt.subplot()
                 vis2 = plotdata[idx][1][3]
                 vis2_error = plotdata[idx][1][4]
                 vis2_flag = plotdata[idx][1][5]
@@ -1864,12 +1868,16 @@ class GravMFit(GravData, GravPhaseMaps):
                     cmax = 180
             except:
                 cmax = 180
-            plt.figure(figsize=(10, 5))
             if plotsplit:
-                gs = gridspec.GridSpec(1, 2, wspace=0.05)
+                plt.figure(figsize=(10, 5))
+                gs = gridspec.GridSpec(1,2, wspace=0.05)
+            else:
+                plt.figure(figsize=(5, 5))
             for idx in range(nplot):
                 if plotsplit:
                     ax = plt.subplot(gs[0, idx])
+                else:
+                    ax = plt.subplot()
                 closure = plotdata[idx][1][6]
                 closure_error = plotdata[idx][1][7]
                 closure_flag = plotdata[idx][1][8]
@@ -1917,12 +1925,16 @@ class GravMFit(GravData, GravPhaseMaps):
                     cmax = 180
             except:
                 cmax = 180
-            plt.figure(figsize=(10, 5))
             if plotsplit:
-                gs = gridspec.GridSpec(1, 2, wspace=0.05)
+                plt.figure(figsize=(10, 5))
+                gs = gridspec.GridSpec(1,2, wspace=0.05)
+            else:
+                plt.figure(figsize=(5, 5))
             for idx in range(nplot):
                 if plotsplit:
                     ax = plt.subplot(gs[0, idx])
+                else:
+                    ax = plt.subplot()
                 visphi = plotdata[idx][1][9]
                 visphi_error = plotdata[idx][1][10]
                 visphi_flag = plotdata[idx][1][11]
