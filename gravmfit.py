@@ -745,14 +745,15 @@ def _lnprob_mstars(theta, fitdata, lower, upper, fitarg, fithelp):
         return -np.inf
     return _lnlike_mstars(theta, fitdata, fitarg, fithelp)
 
+
 def _leastsq_mstars(params, theta1, theta2, fitdata, fitarg, fithelp):
     pcRa = params['pcRa']
     pcDec = params['pcDec']
     theta = np.concatenate((theta1, np.array([pcRa, pcDec]), theta2))
     return -2*_lnlike_mstars(theta, fitdata, fitarg, fithelp)
 
-def _lnlike_mstars(theta, fitdata, fitarg, fithelp):
 
+def _lnlike_mstars(theta, fitdata, fitarg, fithelp):
     (nsource, fit_for, bispec_ind, fit_mode, wave, dlambda,
      fixedBHalpha, todel, fixed, phasemaps, northA, dra, ddec, amp_map_int,
      pha_map_int, amp_map_denom_int, fit_phasemaps, fix_pm_sources,
@@ -801,7 +802,10 @@ def _calc_vis_mstars(theta_in, fitarg, fithelp):
 
     theta = theta_in
 
-    th_rest = nsource*3-1
+    if nsource == 0:
+        theta_rest = 0
+    else:
+        th_rest = nsource*3-1
     alpha_SgrA = theta[th_rest]
     fluxRatioBG = theta[th_rest+1]
     pc_RA = theta[th_rest+2]
@@ -1041,7 +1045,7 @@ class GravMFit(GravData, GravPhaseMaps):
 
         if fit_mode == 'phasefit':
             fit_mode = 'approx'
-            fit_for = [0,0,0,1]
+            fit_for = [0, 0, 0, 1]
             onlyphases = True
         else:
             onlyphases = False
@@ -1090,18 +1094,23 @@ class GravMFit(GravData, GravPhaseMaps):
                 phasemaps.loadPhasemaps(interp=interppm)
 
         nsource = len(ra_list)
-        if fit_size is None:
-            fit_size = np.ones(nsource)*5
-        if fit_pos is None:
-            fit_pos = np.ones(nsource)
-        if fit_fr is None:
-            fit_fr = np.ones(nsource-1)
+        if nsource == 0:
+            singlesource = True
+        else:
+            singlesource = False
+            if fit_size is None:
+                fit_size = np.ones(nsource)*5
+            if fit_pos is None:
+                fit_pos = np.ones(nsource)
+            if fit_fr is None:
+                fit_fr = np.ones(nsource-1)
 
-        if len(de_list) != nsource or len(fit_pos) != nsource or len(fit_size) != nsource:
-            raise ValueError('list of input parameters have different lengths')
-        if len(fr_list) != (nsource-1) or len(fit_fr) != (nsource-1):
-            raise ValueError('list of input parameters have different lengths,'
-                             'fr list should be nsource-1')
+            if len(de_list) != nsource or len(fit_pos) != nsource or len(fit_size) != nsource:
+                raise ValueError('list of input parameters have '
+                                 'different lengths')
+            if len(fr_list) != (nsource-1) or len(fit_fr) != (nsource-1):
+                raise ValueError('list of input parameters have different'
+                                 ' lengths, fr list should be nsource-1')
         self.nsource = nsource
 
         # Get data from file
@@ -1114,7 +1123,7 @@ class GravMFit(GravData, GravPhaseMaps):
             raise ValueError('Telescope not AT or UT, something wrong'
                              'with input data')
 
-        MJD = fits.open(self.name)[0].header["MJD-OBS"]
+        # MJD = fits.open(self.name)[0].header["MJD-OBS"]
         u = self.u
         v = self.v
         wave = self.wlSC
@@ -1125,6 +1134,7 @@ class GravMFit(GravData, GravPhaseMaps):
         # Initial guesses
         if initial is not None:
             if len(initial) != 6:
+                print('Give: [alpha, fr BG, pc, fr BH, coh. loss]')
                 raise ValueError('Length of initial parameter list is'
                                  ' not correct')
             (alpha_SgrA_in, flux_ratio_bg_in, pc_RA_in, pc_DEC_in,
@@ -1180,7 +1190,10 @@ class GravMFit(GravData, GravPhaseMaps):
                 theta_names.append('dDEC%i' % (ndx + 1))
                 theta_names.append('fr%i' % (ndx + 1))
 
-        th_rest = nsource*3-1
+        if singlesource:
+            th_rest = 0
+        else:
+            th_rest = nsource*3-1
 
         theta[th_rest] = alpha_SgrA_in
         theta[th_rest+1] = flux_ratio_bg_in
@@ -1228,6 +1241,8 @@ class GravMFit(GravData, GravPhaseMaps):
         if fit_for[3] == 0:
             todel.append(th_rest+2)
             todel.append(th_rest+3)
+        if singlesource:
+            todel.append(th_rest+4)
         if not coh_loss:
             todel.extend(np.arange(th_rest+5, th_rest+5+6))
         ndof = ndim - len(todel)
@@ -1442,8 +1457,10 @@ class GravMFit(GravData, GravPhaseMaps):
                         if nthreads == 1:
                             sampler = emcee.EnsembleSampler(nwalkers, ndim,
                                                             _lnprob_mstars,
-                                                            args=(fitdata, lower,
-                                                                  upper, fitarg,
+                                                            args=(fitdata,
+                                                                  lower,
+                                                                  upper,
+                                                                  fitarg,
                                                                   fithelp))
                             if bequiet:
                                 sampler.run_mcmc(pos, nruns, progress=False)
@@ -1455,7 +1472,8 @@ class GravMFit(GravData, GravPhaseMaps):
                                                                 _lnprob_mstars,
                                                                 args=(fitdata,
                                                                       lower,
-                                                                      upper, fitarg,
+                                                                      upper,
+                                                                      fitarg,
                                                                       fithelp),
                                                                 pool=pool)
                                 if bequiet:
