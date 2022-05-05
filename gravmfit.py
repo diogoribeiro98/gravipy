@@ -803,7 +803,7 @@ def _calc_vis_mstars(theta_in, fitarg, fithelp):
     theta = theta_in
 
     if nsource == 0:
-        theta_rest = 0
+        th_rest = 0
     else:
         th_rest = nsource*3-1
     alpha_SgrA = theta[th_rest]
@@ -1146,10 +1146,14 @@ class GravMFit(GravData, GravPhaseMaps):
             pc_DEC_in = 0
             flux_ratio_bh = 1
             coh_loss_in = 1
-
-        theta = np.zeros(nsource*3+10)
-        lower = np.zeros(nsource*3+10)
-        upper = np.zeros(nsource*3+10)
+        if singlesource:
+            theta = np.zeros(11)
+            lower = np.zeros(11)
+            upper = np.zeros(11)
+        else:
+            theta = np.zeros(nsource*3+10)
+            lower = np.zeros(nsource*3+10)
+            upper = np.zeros(nsource*3+10)
 
         theta_names = []
         todel = []
