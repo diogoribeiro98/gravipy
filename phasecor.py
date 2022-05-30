@@ -777,7 +777,7 @@ def correct_data(files, mode, subspacing=1, plotav=8, plot=False, lstplot=False)
 class GravPhaseNight():
     def __init__(self, night, ndit, verbose=True, nopandas=False,
                  pandasfile=None, reddir=None, datadir='/data/user/forFrank2/',
-                 onlysgra=True, calibrator=None, full_folder=False):
+                 onlysgra=True, calibrator=None, full_folder=False, s2_offx=0, ignore_files=[]):
         """
         Package to do the full phase calibration, poscor, correction and fitting
 
@@ -837,6 +837,7 @@ class GravPhaseNight():
                 '2022-03-20',
                 '2022-04-23',
                 '2022-04-25',
+                '2022-05-19_recovered',
                 ]
         calibrators = ['GRAVI.2019-03-28T08:00:22.802_dualscivis.fits',
                     'GRAVI.2019-03-29T07:35:36.327_dualscivis.fits',
@@ -886,7 +887,7 @@ class GravPhaseNight():
                     'GRAVI.2022-03-21T08:06:14.336_dualscivis.fits',
                     'GRAVI.2022-04-24T08:26:23.376_driftcorr_dualscivis.fits',
                     'GRAVI.2022-04-26T08:31:35.167_dualscivis.fits',
-                    ] 
+                    'GRAVI.2022-05-20T05:19:41.676_dualscivis.fits'] 
 
         if full_folder:
             nopandas = True
@@ -952,8 +953,9 @@ class GravPhaseNight():
                 if h['ESO FT ROBJ NAME'] != 'IRS16C':
                     continue
                 if h['ESO INS SOBJ NAME'] == 'S2':
-                    if h['ESO INS SOBJ OFFX'] == 0:
-                        s2_files.append(file)
+                    if h['ESO INS SOBJ OFFX'] == s2_offx:
+                        if file not in ignore_files:
+                            s2_files.append(file)
                     else:
                         d = convert_date(h['DATE-OBS'])[0]
                         _x, _y = -s2data[find_nearest(s2data[:,0], d)][1:]*1e3
@@ -968,7 +970,8 @@ class GravPhaseNight():
                             if np.abs(sobjoffy - _y) > 10 :
                                 print('File with separation (%i,%i) not on S2 orbit, will be ignored' % (sobjx, sobjy))
                                 continue
-                        sg_files.append(file)
+                        if file not in ignore_files:
+                            sg_files.append(file)
         if self.verbose:
             print('            %i SGRA files \n            %i S2 files' % (len(sg_files), len(s2_files)))
         self.s2_files = s2_files
