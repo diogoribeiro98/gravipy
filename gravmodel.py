@@ -341,16 +341,16 @@ class GravModel():
             ro_b = 4.97
         else:
             raise Exception('Resolution must be LOW or MED')
-        if ro is not None:
+        if ro != None:
             self.readout_noise = ro
         else:
             self.readout_noise = sqrt_fit(self.dit, ro_a, ro_b)
-        if extSignal is None:
+        if extSignal == None:
             print('Use Signal from Class')
-            if self.signal is None:
+            if self.signal == None:
                 self.getSignal() 
             extSignal = self.signal
-        elif extSignal is 0:
+        elif extSignal == 0:
             print('No signal used for Noise')
             extSignal = np.zeros_like(np.array(background))
 
@@ -376,14 +376,14 @@ class GravModel():
             self.readout_noise = 9.48
         else:
             raise Exception('Resolution must be LOW or MED')
-        if extSignal is None:
+        if extSignal ==  None:
             print('Use Signal from Class')
-            if self.signal is None:
+            if self.signal == None:
                 self.getSignal() 
                 extSignal = self.signal
             else:
                 extSignal = self.signal
-        elif extSignal is 0:
+        elif extSignal == 0:
             print('No signal used for Noise')
             extSignal = np.zeros_like(np.array(background))
             
@@ -395,7 +395,7 @@ class GravModel():
     
     def getExpNoise(self, exp=308, overhead=0.263, extSignal=None):
         print('Noise for Dit=%i, Exp=%i, OHs=%.3f' % (self.dit, exp, overhead))
-        if extSignal is not None and extSignal is not 0:
+        if extSignal != None and extSignal != 0:
             print('Use given signal. Careful: Should be per DIT, not per EXP!')
         self.getDITNoise(extSignal=extSignal)    
         if exp == 0:
@@ -414,11 +414,11 @@ class GravModel():
     
     def getExpSNR(self, exp=308, overhead=0.263, extSignal=None):
         print('SNR for Dit=%i, Exp=%i, OHs=%.3f' % (self.dit, exp, overhead))
-        if extSignal is not None and extSignal is not 0:
+        if extSignal != None and extSignal != 0:
             print('Use given signal. Careful: Should be per DIT, not per EXP!')
-        if self.ditnoise is None:
+        if self.ditnoise == None:
             self.getDITNoise(extSignal=extSignal)    
-        if extSignal is None:
+        if extSignal == None:
             self.getSignal()    
             extSignal = self.signal
         if exp == 0:
