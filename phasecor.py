@@ -777,7 +777,7 @@ def correct_data(files, mode, subspacing=1, plotav=8, plot=False, lstplot=False)
 class GravPhaseNight():
     def __init__(self, night, ndit, verbose=True, nopandas=False,
                  pandasfile=None, reddir=None, datadir='/data/user/forFrank2/',
-                 onlysgra=True, calibrator=None, full_folder=False, s2_offx=0, ignore_files=[]):
+                 onlysgra=False, calibrator=None, full_folder=False, s2_offx=0, ignore_files=[]):
         """
         Package to do the full phase calibration, poscor, correction and fitting
 
@@ -838,6 +838,7 @@ class GravPhaseNight():
                 '2022-04-23',
                 '2022-04-25',
                 '2022-05-19_recovered',
+                '2022-05-22',
                 ]
         calibrators = ['GRAVI.2019-03-28T08:00:22.802_dualscivis.fits',
                     'GRAVI.2019-03-29T07:35:36.327_dualscivis.fits',
@@ -887,7 +888,8 @@ class GravPhaseNight():
                     'GRAVI.2022-03-21T08:06:14.336_dualscivis.fits',
                     'GRAVI.2022-04-24T08:26:23.376_driftcorr_dualscivis.fits',
                     'GRAVI.2022-04-26T08:31:35.167_dualscivis.fits',
-                    'GRAVI.2022-05-20T05:19:41.676_dualscivis.fits'] 
+                    'GRAVI.2022-05-20T05:19:41.676_dualscivis.fits',
+                    'GRAVI.2022-05-23T04:51:42.408_dualscivis.fits'] 
 
         if full_folder:
             nopandas = True

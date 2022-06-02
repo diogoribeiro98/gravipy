@@ -1043,6 +1043,9 @@ class GravMFit(GravData, GravPhaseMaps):
             raise ValueError('Initial values for flagtill and flagfrom have'
                              'to be changed if not low resolution')
 
+        if fit_mode not in ['phasefit', 'approx', 'numeric', 'analytic']:
+            raise ValueError('Fitmode has to be phasefit, approx, numeric or analytic')
+
         if fit_mode == 'phasefit':
             fit_mode = 'approx'
             fit_for = [0, 0, 0, 1]
@@ -1884,7 +1887,9 @@ class GravMFit(GravData, GravPhaseMaps):
                 c1 = plotdata[0][1][6]*(1-plotdata[0][1][8])
                 c2 = plotdata[1][1][6]*(1-plotdata[1][1][8])
                 cmax = np.nanmax(np.abs(np.concatenate((c1, c2))))
-                if cmax < 100:
+                if cmax < 5:
+                    cmax = 10
+                elif cmax < 100:
                     cmax = cmax*1.5
                 else:
                     cmax = 180
@@ -1941,7 +1946,9 @@ class GravMFit(GravData, GravPhaseMaps):
                 c1 = plotdata[0][1][9]*(1-plotdata[0][1][11])
                 c2 = plotdata[1][1][9]*(1-plotdata[1][1][11])
                 cmax = np.nanmax(np.abs(np.concatenate((c1, c2))))
-                if cmax < 100:
+                if cmax < 5:
+                    cmax = 10
+                elif cmax < 100:
                     cmax = cmax*1.5
                 else:
                     cmax = 180
@@ -2900,7 +2907,7 @@ class GravMNightFit(GravNight):
             allfitres.append([visamp, visamp2, closure, visphi])
         return allfitres
 
-    def plotFitComb(self, mostprop=True, nicer=True):
+    def plotFitComb(self, plotall=False, mostprop=True, nicer=True):
         rad2as = 180 / np.pi * 3600
         len_lightcurve = self.nfiles
         if mostprop:
@@ -2935,7 +2942,7 @@ class GravMNightFit(GravNight):
         plot_max = [1.1, 1.1, 180, 180]
         plot_text = [-0.07, -0.07, -180*1.06, -180*1.06]
         for pdx in range(len(plot_quant)):
-            if self.fit_for[pdx] == 0:
+            if self.fit_for[pdx] == 0 and not plotall:
                 continue
             print(plot_quant[pdx])
 
@@ -3012,6 +3019,8 @@ class GravMNightFit(GravNight):
                              color='grey', zorder=100)
                 if ndx%2 == 0:
                     plt.ylabel(plot_quant[pdx])
+                    plt.text(0.98, 0.92, '%i/%i' % (ndx//2+1, len_lightcurve//2),
+                            transform=ax.transAxes, fontsize=8,horizontalalignment='right')
                 else:
                     ax.set_yticklabels([])
                 plt.ylim(plot_min[pdx], plot_max[pdx])
