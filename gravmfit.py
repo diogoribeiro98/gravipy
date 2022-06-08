@@ -991,7 +991,8 @@ class GravMFit(GravData, GravPhaseMaps):
                  fit_phasemaps=False,
                  interppm=True,
                  smoothkernel=15,
-                 pmdatayear=2019):
+                 pmdatayear=2019,
+                 iopandas=True):
         '''
         Multi source fit to GRAVITY data
         Function fits a central source and a number of companion sources.
@@ -1278,6 +1279,18 @@ class GravMFit(GravData, GravPhaseMaps):
                                                                 self.northangle, self.dra, self.ddec)
                     self.pm_sources.append([pm_amp, pm_pha, pm_int])
 
+        if iopandas and not no_fit:
+            isExist = os.path.exists('./fitresults/')
+            if not isExist:
+                os.makedirs('./fitresults/')
+            pdname = self.filename[:-4] + 'pd'
+            try:
+                self.fittab = pd.read_pickle(pdname)
+                pdexists = True
+                no_fit = True
+            except FileNotFoundError:
+                pdexists = False
+        
         if no_fit:
             plotCorner = False
             print('Will not fit the data, just print out the results for the '
@@ -1609,11 +1622,14 @@ class GravMFit(GravData, GravPhaseMaps):
                             fulltheta = np.insert(fulltheta, todel[ddx], fixed[ddx])
 
                 else:
-                    theta_result = theta
-                    fulltheta = np.copy(theta_result)
-                    for ddx in range(len(todel)):
-                        fulltheta = np.insert(fulltheta, todel[ddx], fixed[ddx])
-                    fittab = None
+                    if iopandas and pdexists:
+                        theta_result = self.fittab.loc[self.fittab['column'].str.contains('M.L. P%i_%i' % (idx, dit))].values[0, 2:]
+                        fulltheta = theta_result
+                    else:
+                        theta_result = theta
+                        fulltheta = np.copy(theta_result)
+                        for ddx in range(len(todel)):
+                            fulltheta = np.insert(fulltheta, todel[ddx], fixed[ddx])
 
                 self.theta_result = theta_result
                 (fit_visamp, fit_visphi,
@@ -1693,6 +1709,8 @@ class GravMFit(GravData, GravPhaseMaps):
                 self.plotFitComb(plotdata)
                 self.plotdata = plotdata
         self.fittab = fittab
+        if iopandas and not pdexists:
+            self.fittab.to_pickle(pdname)
 
         try:
             fitted = 1-(np.array(self.fit_for) == 0)

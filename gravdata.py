@@ -47,6 +47,7 @@ class GravData():
         """
         """
         self.name = data
+        self.filename = os.path.basename(data)
         self.verbose = verbose
         self.colors_baseline = np.array(['k', 'darkblue', color4,
                                          color2, 'darkred', color1])
