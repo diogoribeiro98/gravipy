@@ -1283,9 +1283,10 @@ class GravMFit(GravData, GravPhaseMaps):
             isExist = os.path.exists('./fitresults/')
             if not isExist:
                 os.makedirs('./fitresults/')
-            pdname = self.filename[:-4] + 'pd'
+            pdname = './fitresults/' + self.filename[:-4] + 'pd'
             try:
-                self.fittab = pd.read_pickle(pdname)
+                fittab = pd.read_pickle(pdname)
+                print('Results exist at %s' % pdname)
                 pdexists = True
                 no_fit = True
             except FileNotFoundError:
@@ -1623,8 +1624,9 @@ class GravMFit(GravData, GravPhaseMaps):
 
                 else:
                     if iopandas and pdexists:
-                        theta_result = self.fittab.loc[self.fittab['column'].str.contains('M.L. P%i_%i' % (idx, dit))].values[0, 2:]
-                        fulltheta = theta_result
+                        fulltheta = fittab.loc[fittab['column'].str.contains('M.L. P%i_%i' % (idx, dit))].values[0, 1:]
+                        theta_result = np.copy(fulltheta)
+                        theta_result = np.delete(theta_result, todel)
                     else:
                         theta_result = theta
                         fulltheta = np.copy(theta_result)
@@ -1632,6 +1634,8 @@ class GravMFit(GravData, GravPhaseMaps):
                             fulltheta = np.insert(fulltheta, todel[ddx], fixed[ddx])
 
                 self.theta_result = theta_result
+                print(fulltheta)
+                print(theta_result)
                 (fit_visamp, fit_visphi,
                  fit_closure) = _calc_vis_mstars(fulltheta, fitarg, fithelp)
                 fit_vis2 = fit_visamp**2.
@@ -1710,7 +1714,7 @@ class GravMFit(GravData, GravPhaseMaps):
                 self.plotdata = plotdata
         self.fittab = fittab
         if iopandas and not pdexists:
-            self.fittab.to_pickle(pdname)
+           fittab.to_pickle(pdname)
 
         try:
             fitted = 1-(np.array(self.fit_for) == 0)
