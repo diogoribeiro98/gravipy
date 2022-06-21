@@ -992,7 +992,7 @@ class GravMFit(GravData, GravPhaseMaps):
                  interppm=True,
                  smoothkernel=15,
                  pmdatayear=2019,
-                 iopandas=True):
+                 iopandas=False):
         '''
         Multi source fit to GRAVITY data
         Function fits a central source and a number of companion sources.
@@ -1022,7 +1022,7 @@ class GravMFit(GravData, GravPhaseMaps):
         bequiet:        Suppresses ALL outputs
         fit_for:        weight of VA, V2, T3, VP [[0.5,0.5,1.0,0.0]]
         fit_mode:       Kind of integration for visibilities (approx, numeric,
-                        analytic) [numeric]
+                        analytic, onlyphases) [numeric]
         coh_loss:       If not None, fit for a coherence loss per Basline
                         Value is initial guess (0-1) [None]
         no_fit  :       Only gives fitting results for parameters from 
@@ -1043,6 +1043,9 @@ class GravMFit(GravData, GravPhaseMaps):
         smoothkernel:   Size of smoothing kernel in mas [15]
         simulate_pm:    Phasemaps for simulated data, 
                         sets ACQ parameter to 0 [False]
+        iopandas:       I/O of pandas file. Saves results in dedicated
+                        Folder and loads them instead of fitting if 
+                        available [False]
         '''
 
         if self.resolution != 'LOW' and flagtill == 3 and flagfrom == 13:
