@@ -992,7 +992,7 @@ class GravMFit(GravData, GravPhaseMaps):
                  interppm=True,
                  smoothkernel=15,
                  pmdatayear=2019,
-                 iopandas=False):
+                 iopandas=None):
         '''
         Multi source fit to GRAVITY data
         Function fits a central source and a number of companion sources.
@@ -1045,7 +1045,7 @@ class GravMFit(GravData, GravPhaseMaps):
                         sets ACQ parameter to 0 [False]
         iopandas:       I/O of pandas file. Saves results in dedicated
                         Folder and loads them instead of fitting if 
-                        available [False]
+                        available. Give prefix to filename [None]
         '''
 
         if self.resolution != 'LOW' and flagtill == 3 and flagfrom == 13:
@@ -1282,11 +1282,11 @@ class GravMFit(GravData, GravPhaseMaps):
                                                                 self.northangle, self.dra, self.ddec)
                     self.pm_sources.append([pm_amp, pm_pha, pm_int])
 
-        if iopandas and not no_fit:
+        if iopandas is not None and not no_fit:
             isExist = os.path.exists('./fitresults/')
             if not isExist:
                 os.makedirs('./fitresults/')
-            pdname = './fitresults/' + self.filename[:-4] + 'pd'
+            pdname = './fitresults/' + iopandas + '_' + self.filename[:-4] + 'pd'
             try:
                 fittab = pd.read_pickle(pdname)
                 print('Results exist at %s' % pdname)
@@ -1626,7 +1626,7 @@ class GravMFit(GravData, GravPhaseMaps):
                             fulltheta = np.insert(fulltheta, todel[ddx], fixed[ddx])
 
                 else:
-                    if iopandas and pdexists:
+                    if iopandas is not None and pdexists:
                         fulltheta = fittab.loc[fittab['column'].str.contains('M.L. P%i_%i' % (idx, dit))].values[0, 1:]
                         theta_result = np.copy(fulltheta)
                         theta_result = np.delete(theta_result, todel)
@@ -1716,7 +1716,7 @@ class GravMFit(GravData, GravPhaseMaps):
                 self.plotFitComb(plotdata)
                 self.plotdata = plotdata
         self.fittab = fittab
-        if iopandas and not pdexists:
+        if iopandas is not None and not pdexists:
            fittab.to_pickle(pdname)
 
         try:
