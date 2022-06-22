@@ -1006,8 +1006,8 @@ class GravMFit(GravData, GravPhaseMaps):
         bequiet:        Suppresses ALL outputs
         bestchi:        Gives best chi2 (for True) or mcmc res as output [True]
         redchi2:        Gives redchi2 instead of chi2 [True]
-        flagtill:       Flag blue channels, defult 3 for LOW, 30 for MED
-        flagfrom:       Flag red channels, defult 13 for LOW, 200 for MED
+        flagtill:       Flag blue channels, default 3 for LOW, 30 for MED
+        flagfrom:       Flag red channels, default 13 for LOW, 200 for MED
         coh_loss:       If not None, fit for a coherence loss per Basline
                         Value is initial guess (0-1) [None]
         no_fit  :       Only gives fitting results for parameters from 
@@ -2291,21 +2291,13 @@ class GravMNightFit(GravNight):
                  nthreads=1,
                  nwalkers=301,
                  nruns=301,
-                 bequiet=False,
                  fit_for=np.array([0.5, 0.5, 1.0, 0.0]),
-                 error_scale=1,
-                 fit_mode='numeric',
-                 initial=None,
-                 flagtill=3,
-                 flagfrom=13,
                  fixedBHalpha=False,
                  oneBHalpha=False,
                  oneBG=True,
-                 nocohloss=False,
-                 phasemaps=False,
-                 interppm=True,
-                 smoothkernel=15,
-                 pmdatayear=2019):
+                 initial=None,
+                 phasemaps=True,
+                 **kwargs):
         """
         Multi source fit to GRAVITY data
         Function fits a central source and a number of companion sources.
@@ -2324,28 +2316,50 @@ class GravMNightFit(GravNight):
         fit_pos:        Fit position of each companion [True]
         fit_fr:         Fit flux ratio of each companion [True]
 
-        Other optional arguments:
+        Optional named arguments:
         nthreads:       number of cores [4]
         nwalkers:       number of walkers [500]
         nruns:          number of MCMC runs [500]
-        bequiet:        Suppresses ALL outputs
         fit_for:        weight of VA, V2, T3, VP [[0.5,0.5,1.0,0.0]]
-        fit_mode:       Kind of integration for visibilities
-                        (approx, numeric, analytic) [numeric]
         initial:        Initial guess for fit [None]
-        flagtill:       Flag blue channels, has to be changed for not LOW [3]
-        flagfrom:       Flag red channels, has to be changed for not LOW [13]
         fixedBHalpha:   No fit for black hole power law [False]
         oneBHalpha:     One power law index for all files [False]
         phasemaps:      Use Phasemaps for fit [False]
+
+        Optional unnamed arguments (can be given via kwargs):
+        fit_mode:       Kind of integration for visibilities
+                        (approx, numeric, analytic) [numeric]
+        bequiet:        Suppresses ALL outputs
+        flagtill:       Flag blue channels, default 3 for LOW, 30 for MED
+        flagfrom:       Flag red channels, default 13 for LOW, 200 for MED
+        error_scale:    Scaling of error bars [1]
+        nocohloss:      if True does not fit a coherence loss [False]
         interppm:       Interpolate Phasemaps [True]
         smoothkernel:   Size of smoothing kernel in mas [15]
+        pmdatayear:     Phasemaps year, 2019 or 2020 [2019]
         """
 
-        if (self.datalist[0].resolution != 'LOW'
-                and flagtill == 3 and flagfrom == 13):
-            raise ValueError('Initial values for flagtill and flagfrom have'
-                             'to be changed if not low resolution')
+        fit_mode = kwargs.get('fit_mode', 'numeric')
+        bequiet = kwargs.get('bequiet', False)
+        flagtill = kwargs.get('flagtill', None)
+        flagfrom = kwargs.get('flagfrom', None)
+        error_scale = kwargs.get('error_scale', 1)
+        nocohloss = kwargs.get('nocohloss', False)
+
+        interppm = kwargs.get('interppm', True)
+        self.datayear = kwargs.get('pmdatayear', 2019)
+        self.smoothkernel = kwargs.get('smoothkernel', 15)
+
+        if flagtill is None and flagfrom is None:
+            if self.datalist[0].resolution == 'LOW':
+                flagtill = 3
+                flagfrom = 13
+            elif self.datalist[0].resolution == 'MEDIUM':
+                flagtill = 30
+                flagfrom = 200
+            else:
+                raise ValueError('HIGH data, give values for flagtill '
+                                 'and flagfrom')
 
         self.fit_for = fit_for
         self.fixedBHalpha = fixedBHalpha
@@ -2355,10 +2369,7 @@ class GravMNightFit(GravNight):
         self.fit_mode = fit_mode
         self.bequiet = bequiet
         self.nruns = nruns
-
         self.phasemaps = phasemaps
-        self.datayear = pmdatayear
-        self.smoothkernel = smoothkernel
 
         nsource = len(ra_list)
         nfiles = len(self.datalist)*2
