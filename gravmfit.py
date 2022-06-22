@@ -812,8 +812,6 @@ def _calc_vis_mstars(theta_in, fitarg, fithelp):
     pc_DEC = theta[th_rest+3]
     fr_BH = 10**(theta[th_rest+4])
 
-    #print(pc_RA)
-    
     alpha_bg = 3.
     alpha_stars = 3
 
@@ -900,7 +898,6 @@ def _calc_vis_mstars(theta_in, fitarg, fithelp):
                 cr2 = (pm_amp[i, 1])
                 cr_denom1 = (pm_int[i, 0])
                 cr_denom2 = (pm_int[i, 1])
-                # print(cr_denom1)
 
                 if ndx == 0:
                     nom += (int_star * (cr1*cr2))
@@ -913,13 +910,6 @@ def _calc_vis_mstars(theta_in, fitarg, fithelp):
                                * int_star_center)
                     denom2 += (10.**(theta[ndx*3+1]) * cr_denom2
                                * int_star_center)
-            # cr1 = (pm_amp_c[i, 0] / pm_amp_norm[i, 0])**2
-            # cr2 = (pm_amp_c[i, 1] / pm_amp_norm[i, 1])**2
-            # cr_denom1 = (pm_int_c[i, 0] / pm_int_norm[i, 0])
-            # cr_denom2 = (pm_int_c[i, 1] / pm_int_norm[i, 1])
-            # nom /= np.sqrt(cr1*cr2)
-            # denom1 /= cr_denom1
-            # denom2 /= cr_denom2
 
         else:
             for ndx in range(nsource):
@@ -939,8 +929,6 @@ def _calc_vis_mstars(theta_in, fitarg, fithelp):
         denom2 += (fluxRatioBG * intBG)
 
         vis[i, :] = nom / (np.sqrt(denom1)*np.sqrt(denom2))
-        #vis[i, :] *= theta[th_rest+5+i]
-    #print(th_rest+5+i)
 
     visamp = np.abs(vis)
     visphi = np.angle(vis, deg=True)
@@ -1648,8 +1636,6 @@ class GravMFit(GravData, GravPhaseMaps):
                             fulltheta = np.insert(fulltheta, todel[ddx], fixed[ddx])
 
                 self.theta_result = theta_result
-                print(fulltheta)
-                print(theta_result)
                 (fit_visamp, fit_visphi,
                  fit_closure) = _calc_vis_mstars(fulltheta, fitarg, fithelp)
                 fit_vis2 = fit_visamp**2.
@@ -2218,7 +2204,6 @@ def _lnlike_night(theta, fitdata, fitarg, fithelp):
 
     for ddx in range(len(todel)):
         theta = np.insert(theta, todel[ddx], fixed[ddx])
-    #print(theta)
     ln_prob_res = 0
     for ndx in range(len_lightcurve):
         _theta = np.zeros(nsource*3+10)
@@ -2231,7 +2216,6 @@ def _lnlike_night(theta, fitdata, fitarg, fithelp):
                 _theta[sdx*3+1] = theta[nsource*2+sdx-1]
 
             th_rest = nsource*3-1
-            #print(th_rest)
             if oneBHalpha:
                 _theta[th_rest] = theta[nsource*3-1]
             else:
@@ -2259,7 +2243,6 @@ def _lnlike_night(theta, fitdata, fitarg, fithelp):
                         wave, dlambda, fixedBHalpha, None, None, phasemaps,
                         None, None, None, None, None, None, False,
                         None, None, None, None]
-        #print(_theta, len(_theta))
         (model_visamp, model_visphi,
          model_closure) = _calc_vis_mstars(_theta, fitarg[:, ndx], _fithelp)
         model_vis2 = model_visamp**2.
@@ -2284,7 +2267,7 @@ def _lnlike_night(theta, fitdata, fitarg, fithelp):
                               + res_vis2 * fit_for[1]
                               + res_clos * fit_for[2]
                               + res_phi * fit_for[3])
-        #print(loglike)
+
         ln_prob_res += 0.5 * (res_visamp * fit_for[0]
                               + res_vis2 * fit_for[1]
                               + res_clos * fit_for[2]
@@ -2734,11 +2717,6 @@ class GravMNightFit(GravNight):
                        self.dlambda, self.fixedBHalpha, oneBHalpha,
                        oneBG, todel, fixed, self.phasemaps, None]
 
-        #print(theta)
-        #_lnprob_night(theta, fitdata, lower, upper, theta_names,
-        #               fitarg, fithelp)
-        #sys.exit()
-        
         if nthreads == 1:
             self.sampler = emcee.EnsembleSampler(nwalkers, ndim, _lnprob_night,
                                                  args=(fitdata, lower,
