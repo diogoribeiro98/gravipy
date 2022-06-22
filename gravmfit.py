@@ -972,27 +972,14 @@ class GravMFit(GravData, GravPhaseMaps):
                  nthreads=1,
                  nwalkers=301,
                  nruns=301,
-                 bestchi=True,
-                 bequiet=False,
                  fit_for=np.array([0.5, 0.5, 1.0, 0.0]),
-                 fit_mode='numeric',
-                 no_fit=False,
-                 onlypol=None,
-                 initial=None,
-                 flagtill=3,
-                 flagfrom=13,
                  fixedBHalpha=False,
                  fixedBG=False,
-                 coh_loss=False,
+                 initial=None,
                  plotCorner=True,
                  plotScience=True,
-                 redchi2=False,
-                 phasemaps=False,
-                 fit_phasemaps=False,
-                 interppm=True,
-                 smoothkernel=15,
-                 pmdatayear=2019,
-                 iopandas=None):
+                 phasemaps=True,
+                 **kwargs):
         '''
         Multi source fit to GRAVITY data
         Function fits a central source and a number of companion sources.
@@ -1014,46 +1001,72 @@ class GravMFit(GravData, GravPhaseMaps):
         fit_pos:        Fit position of each companion [True]
         fit_fr:         Fit flux ratio of each companion [True]
 
-        Other optional arguments:
+        Optional named arguments:
         nthreads:       number of cores [4]
         nwalkers:       number of walkers [500]
         nruns:          number of MCMC runs [500]
-        bestchi:        Gives best chi2 (for True) or mcmc res as output [True]
-        bequiet:        Suppresses ALL outputs
         fit_for:        weight of VA, V2, T3, VP [[0.5,0.5,1.0,0.0]]
+        initial:        Initial guess for fit [None]
+        fixedBHalpha:   Fit for black hole power law [False]
+        plotCorner:     plot MCMC results [True]
+        plotScience:    plot fit result [True]
+        phasemaps:      Use Phasemaps for fit [False]
+
+        Optional unnamed arguments (can be given via kwargs):
         fit_mode:       Kind of integration for visibilities (approx, numeric,
                         analytic, onlyphases) [numeric]
+        bequiet:        Suppresses ALL outputs
+        bestchi:        Gives best chi2 (for True) or mcmc res as output [True]
+        redchi2:        Gives redchi2 instead of chi2 [True]
+        flagtill:       Flag blue channels, defult 3 for LOW, 30 for MED
+        flagfrom:       Flag red channels, defult 13 for LOW, 200 for MED
         coh_loss:       If not None, fit for a coherence loss per Basline
                         Value is initial guess (0-1) [None]
         no_fit  :       Only gives fitting results for parameters from 
                         initial guess [False]
         onlypol:        Only fits one polarization for split mode, 
                         either 0 or 1 [None]
-        initial:        Initial guess for fit [None]
-        flagtill:       Flag blue channels, has to be changed for not LOW [3]
-        flagfrom:       Flag red channels, has to be changed for not LOW [13]
-        fixedBHalpha:   Fit for black hole power law [False]
-        plotCorner:     plot MCMC results [True]
-        plotScience:    plot fit result [True]
-        redchi2:        Gives redchi2 instead of chi2 [False]
-        phasemaps:      Use Phasemaps for fit [False]
+        iopandas:       I/O of pandas file. Saves results in dedicated
+                        Folder and loads them instead of fitting if
+                        available. Give prefix to filename [None]
         fit_phasemaps:  Fit phasemaps at each step, otherwise jsut takes the 
                         initial guess value [False]
         interppm:       Interpolate Phasemaps [True]
+        pmdatayear:     Phasemaps year, 2019 or 2020 [2019]
         smoothkernel:   Size of smoothing kernel in mas [15]
-        simulate_pm:    Phasemaps for simulated data, 
-                        sets ACQ parameter to 0 [False]
-        iopandas:       I/O of pandas file. Saves results in dedicated
-                        Folder and loads them instead of fitting if 
-                        available. Give prefix to filename [None]
-        '''
 
-        if self.resolution != 'LOW' and flagtill == 3 and flagfrom == 13:
-            raise ValueError('Initial values for flagtill and flagfrom have'
-                             'to be changed if not low resolution')
+
+        '''
+        fit_mode = kwargs.get('fit_mode', 'numeric')
+        bequiet = kwargs.get('bequiet', False)
+        bestchi = kwargs.get('bestchi', True)
+        redchi2 = kwargs.get('redchi2', True)
+        flagtill = kwargs.get('flagtill', None)
+        flagfrom = kwargs.get('flagfrom', None)
+        coh_loss = kwargs.get('coh_loss', False)
+        no_fit = kwargs.get('no_fit', False)
+        onlypol = kwargs.get('onlypol', None)
+        iopandas = kwargs.get('iopandas', None)
+
+        fit_phasemaps = kwargs.get('fit_phasemaps', False)
+        interppm = kwargs.get('interppm', True)
+        self.datayear = kwargs.get('pmdatayear', 2019)
+        self.smoothkernel = kwargs.get('smoothkernel', 15)
+
+        if flagtill is None and flagfrom is None:
+            if self.resolution == 'LOW':
+                flagtill = 3
+                flagfrom = 13
+            elif self.resolution == 'MEDIUM':
+                flagtill = 30
+                flagfrom = 200
+            else:
+                raise ValueError('HIGH data, give values for flagtill '
+                                 'and flagfrom')
 
         if fit_mode not in ['phasefit', 'approx', 'numeric', 'analytic']:
-            raise ValueError('Fitmode has to be phasefit, approx, numeric or analytic')
+            raise ValueError('Fitmode has to be phasefit, approx,'
+                             ' numeric or analytic')
 
         if fit_mode == 'phasefit':
             fit_mode = 'approx'
@@ -1070,8 +1083,6 @@ class GravMFit(GravData, GravPhaseMaps):
         self.bequiet = bequiet
         self.phasemaps = phasemaps
         self.fit_phasemaps = fit_phasemaps
-        self.datayear = pmdatayear
-        self.smoothkernel = smoothkernel
         if phasemaps:
             self.loadPhasemaps(interp=interppm)
 
