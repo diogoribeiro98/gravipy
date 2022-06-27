@@ -998,7 +998,7 @@ class GravMFit(GravData, GravPhaseMaps):
         fixedBHalpha:   Fit for black hole power law [False]
         plotCorner:     plot MCMC results [True]
         plotScience:    plot fit result [True]
-        phasemaps:      Use Phasemaps for fit [False]
+        phasemaps:      Use Phasemaps for fit [True]
 
         Optional unnamed arguments (can be given via kwargs):
         fit_mode:       Kind of integration for visibilities (approx, numeric,
@@ -1022,8 +1022,6 @@ class GravMFit(GravData, GravPhaseMaps):
         interppm:       Interpolate Phasemaps [True]
         pmdatayear:     Phasemaps year, 2019 or 2020 [2019]
         smoothkernel:   Size of smoothing kernel in mas [15]
-
-
         '''
         fit_mode = kwargs.get('fit_mode', 'numeric')
         bequiet = kwargs.get('bequiet', False)
