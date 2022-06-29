@@ -4,7 +4,7 @@ from matplotlib import gridspec
 from pkg_resources import resource_filename
 import pandas as pd
 from astropy.io import fits
-from scipy import interpolate, optimize
+from scipy import interpolate, optimize, stats
 from astropy.time import Time
 from datetime import datetime
 from joblib import Parallel, delayed
@@ -128,124 +128,147 @@ def convert_date(date):
 #########################
 # Read in metrology correction
 
-def create_met_files(create=True, force_new = False,
-                      datadir='/data/user/forFrank2/'):
+def create_met_files(target='SGRA', create=True, force_new = False,
+                     datadir='/data/user/forFrank2/'):
     folders = sorted(glob.glob(datadir + '20??-??-??'))
     
-    s2data = np.load(resource_filename('gravipy', 's2_orbit.npy'))
+    s2orbit = np.load(resource_filename('gravipy', 's2_orbit.npy'))
+    s2orbit[:,1:] *= 1e3
     for folder in folders:
         night = folder[-10:]
-        save_dir = folder + 'metrology_files'
-        print(save_dir)
-        # if os.path.isfile('%s%s_%s_angle.npy' % (save_dir, target, night)) and not allnew:
-        #     print('%s already exists' % night)
-        #     continue
-        print(night)
-        # 
-        # if int(night[:4]) > 2020:
-        #     files = sorted(glob.glob(folder + '/reduced_PL20210429/*p2vmred.fits'))
-        # else:
-        #     files = sorted(glob.glob(folder + '/reduced_PL20200513_1frame/*p2vmred.fits'))
-        # first = True
-        # for file in files:
-        #     h = fits.open(file)[0].header
-        #     if target == 'SGRA':
-        #         fitstarget = 'S2'
-        #     else:
-        #         fitstarget = target
-        #     if h['ESO INS SOBJ NAME'] == fitstarget:
-        #         if target == 'S2':
-        #             try:
-        #                 if h['ESO INS SOBJ OFFX'] != 0:
-        #                     continue
-        #             except KeyError:
-        #                 continue
-        #         if target == 'SGRA':
-        #             try:
-        #                 if h['ESO INS SOBJ OFFX'] == 0:
-        #                     continue
-        #                 if h['ESO FT ROBJ NAME'] != 'IRS16C':
-        #                     continue
-        #                 sobjx = h['ESO INS SOBJ OFFX']
-        #                 sobjy = h['ESO INS SOBJ OFFY']
-        # 
-        #                 sdx = find_nearest(s2orbit[:,0], convert_date(h['DATE-OBS'])[0])
-        #                 if (s2orbit[sdx,0] - convert_date(h['DATE-OBS'])[0])*300 > 1:
-        #                     raise ValueError('Date offset too big')
-        # 
-        #                 ra = s2orbit[sdx,1]
-        #                 de = s2orbit[sdx,2]
-        #                 if np.abs(ra-sobjx) > 10 or np.abs(de-sobjy) > 10:
-        #                     continue
-        #             except KeyError:
-        #                 continue 
-        #         print(file)
-        #         m = fits.open(file)['OI_VIS_MET']
-        #         data0 = np.zeros((len(m.data["OPD_TELFC_CORR"])//4))
-        #         data1 = np.zeros((len(m.data["OPD_TELFC_CORR"])//4, 4, 4))
-        #         data2 = np.zeros((len(m.data["OPD_TELFC_MCORR"])//4, 4))
-        #         data3 = np.zeros((len(m.data["OPD_TELFC_MCORR"])//4, 4))
-        #         data4 = np.zeros((len(m.data["OPD_TELFC_MCORR"])//4, 4, 2))
-        #         data5 = np.zeros((len(m.data["OPD_TELFC_MCORR"])//4, 4, 2))
-        # 
-        #         lst0 = h['LST']/3600
-        #         time = m.data['TIME'][::4]/1e6/3600
-        #         data0 = time + lst0
-        #         data0 = data0%24
-        # 
-        #         for tel in range(4):
-        #             data1[:,tel,:] = m.data["OPD_TELFC_CORR"][tel::4]
-        #             data2[:,tel] = m.data["OPD_TELFC_MCORR"][tel::4]
-        #             data3[:,tel] = get_angle_header_all(h, tel, len(data3))
-        #             data4[:,tel,0] = m.data["PUPIL_U"][tel::4]
-        #             data4[:,tel,1] = m.data["PUPIL_V"][tel::4]
-        #             data5[:,tel,0] = m.data["FIBER_DU"][tel::4]
-        #             data5[:,tel,1] = m.data["FIBER_DV"][tel::4]
-        # 
-        #         if first:
-        #             LST = data0
-        #             OPD_TELFC_CORR = data1
-        #             OPD_TELFC_MCORR = data2
-        #             REFANGLE = data3
-        #             PUPIL = data4
-        #             FIBER = data5
-        #             first = False
-        #         else:
-        #             LST = np.concatenate((LST, data0))
-        #             OPD_TELFC_CORR = np.concatenate((OPD_TELFC_CORR, data1), 0)
-        #             OPD_TELFC_MCORR = np.concatenate((OPD_TELFC_MCORR, data2), 0)
-        #             REFANGLE = np.concatenate((REFANGLE, data3), 0)
-        #             PUPIL = np.concatenate((PUPIL, data4), 0)
-        #             FIBER = np.concatenate((FIBER, data5), 0)
-        # 
-        # if not first:
-        #     num_bins = 3600
-        #     angle_bins = np.linspace(0, 360, num_bins)
-        # 
-        #     bin_TELFC_CORR = np.zeros((num_bins-1, 4, 4))
-        #     bin_TELFC_MCORR = np.zeros((num_bins-1, 4))
-        #     bin_PUPIL = np.zeros((num_bins-1, 4, 2))
-        #     bin_FIBER = np.zeros((num_bins-1, 4, 2))
-        # 
-        # 
-        #     for tel in range(4):
-        #         a = REFANGLE[:,tel]
-        #         bin_TELFC_MCORR[:,tel] = stats.binned_statistic(a, OPD_TELFC_MCORR[:,tel], 
-        #                                                         bins=angle_bins, statistic="median")[0]
-        #         for dio in range(4):
-        #             bin_TELFC_CORR[:,tel,dio] = stats.binned_statistic(a, OPD_TELFC_CORR[:,tel,dio], 
-        #                                                                bins=angle_bins, statistic="median")[0]
-        #         for dim in range(2):
-        #             bin_PUPIL[:,tel,dim] = stats.binned_statistic(a, PUPIL[:,tel,dim], 
-        #                                                           bins=angle_bins, statistic="median")[0]
-        #             bin_FIBER[:,tel,dim] = stats.binned_statistic(a, FIBER[:,tel,dim], 
-        #                                                           bins=angle_bins, statistic="median")[0]
-        #     np.save('%s%s_%s_telfcmcorr.npy' % (save_dir, target, night), bin_TELFC_MCORR)
-        #     np.save('%s%s_%s_telfccorr.npy' % (save_dir, target, night), bin_TELFC_CORR)
-        #     np.save('%s%s_%s_angle.npy' % (save_dir, target, night), angle_bins)
-        #     np.save('%s%s_%s_puil.npy' % (save_dir, target, night), bin_PUPIL)            
-        #     np.save('%s%s_%s_fiber.npy' % (save_dir, target, night), bin_FIBER)
+        if night in ['2019-03-27', '2022-06-18']:
+            print('Need to fix this night! %s' % night)
+            continue
+        savedir = folder + '/metrology_files/'
+        isExist = os.path.exists(savedir)
+        if not isExist:
+            print('Creating metrology folder: %s' % savedir)
+            os.makedirs(savedir)
+        if os.path.isfile('%s%s_%s_angle.npy' % (savedir, target, night)) and not force_new:
+            print('%s already exists' % night)
+            continue
+        else:
+            print('Creating metrology files for %s' % night)
+        pl_list = sorted(glob.glob(datadir + night
+                                   + '/reduced_PL????????'))
+        if len(pl_list) < 1:
+            raise ValueError('Something wrong with given directory '
+                             'No reduction folder in %s'
+                             % (datadir + night))
+        redfolder = pl_list[-1]
+
+        files = sorted(glob.glob(redfolder + '/*p2vmred.fits'))
+        first = True
+        tfiles = []
+        if target not in ['SGRA', 'S2']:
+            for file in files:
+                h = fits.open(file)[0].header
+                if h['ESO INS SOBJ NAME'] == target:
+                    tfiles.append(file)
+        else:
+            tfiles_off = []
+            for file in files:
+                h = fits.open(file)[0].header
+                if first:
+                    date = convert_date(h['DATE-OBS'])[0]
+                    sdx = find_nearest(s2orbit[:,0], date)
+                    if (s2orbit[sdx,0] - date)*300 > 2:
+                        raise ValueError('Date offset too big')
+                    ra = s2orbit[sdx,1]
+                    de = s2orbit[sdx,2]
+                    first = False
+
+                
+                if h['ESO FT ROBJ NAME'] != 'IRS16C':
+                    continue
+                if h['ESO INS SOBJ NAME'] == 'S2':
+                    try:
+                        if h['ESO INS SOBJ OFFX'] != 0:
+                            sobjx = h['ESO INS SOBJ OFFX']
+                            sobjy = h['ESO INS SOBJ OFFY']
+                            if np.abs(np.abs(sobjx) - np.abs(ra)) < 3 and np.abs(np.abs(sobjy) - np.abs(de)) < 3:
+                                tfiles_off.append(file)
+                                if np.abs(sobjx - ra) < 3:
+                                    reverse = True
+                                    print('!!!!!!!!!REVERSE!!!!!!')
+                                else:
+                                    reverse = False
+                                
+                        else:
+                            tfiles.append(file)
+                    except KeyError:
+                        continue
+            if reverse and target == 'S2':
+                tfiles = tfiles_off
+            if not reverse and target == 'SGRA':
+                tfiles = tfiles_off
+        
+        first = True
+        for file in tfiles:
+            try:
+                m = fits.open(file)['OI_VIS_MET']
+            except KeyError:
+                continue
+            data0 = np.zeros((len(m.data["OPD_TELFC_CORR"])//4))
+            data1 = np.zeros((len(m.data["OPD_TELFC_CORR"])//4, 4, 4))
+            data2 = np.zeros((len(m.data["OPD_TELFC_MCORR"])//4, 4))
+            data3 = np.zeros((len(m.data["OPD_TELFC_MCORR"])//4, 4))
+            data4 = np.zeros((len(m.data["OPD_TELFC_MCORR"])//4, 4, 2))
+            data5 = np.zeros((len(m.data["OPD_TELFC_MCORR"])//4, 4, 2))
+            lst0 = h['LST']/3600
+            time = m.data['TIME'][::4]/1e6/3600
+            data0 = time + lst0
+            data0 = data0 % 24
+        
+            for tel in range(4):
+                data1[:,tel,:] = m.data["OPD_TELFC_CORR"][tel::4]
+                data2[:,tel] = m.data["OPD_TELFC_MCORR"][tel::4]
+                data3[:,tel] = get_angle_header_all(h, tel, len(data3))
+                data4[:,tel,0] = m.data["PUPIL_U"][tel::4]
+                data4[:,tel,1] = m.data["PUPIL_V"][tel::4]
+                data5[:,tel,0] = m.data["FIBER_DU"][tel::4]
+                data5[:,tel,1] = m.data["FIBER_DV"][tel::4]
+            if first:
+                LST = data0
+                OPD_TELFC_CORR = data1
+                OPD_TELFC_MCORR = data2
+                REFANGLE = data3
+                PUPIL = data4
+                FIBER = data5
+                first = False
+            else:
+                LST = np.concatenate((LST, data0))
+                OPD_TELFC_CORR = np.concatenate((OPD_TELFC_CORR, data1), 0)
+                OPD_TELFC_MCORR = np.concatenate((OPD_TELFC_MCORR, data2), 0)
+                REFANGLE = np.concatenate((REFANGLE, data3), 0)
+                PUPIL = np.concatenate((PUPIL, data4), 0)
+                FIBER = np.concatenate((FIBER, data5), 0)
     
+        if not first:
+            num_bins = 3600
+            angle_bins = np.linspace(0, 360, num_bins)
+            bin_TELFC_CORR = np.zeros((num_bins-1, 4, 4))
+            bin_TELFC_MCORR = np.zeros((num_bins-1, 4))
+            bin_PUPIL = np.zeros((num_bins-1, 4, 2))
+            bin_FIBER = np.zeros((num_bins-1, 4, 2))
+        
+            for tel in range(4):
+                a = REFANGLE[:,tel]
+                bin_TELFC_MCORR[:,tel] = stats.binned_statistic(a, OPD_TELFC_MCORR[:,tel], 
+                                                                bins=angle_bins, statistic="median")[0]
+                for dio in range(4):
+                    bin_TELFC_CORR[:,tel,dio] = stats.binned_statistic(a, OPD_TELFC_CORR[:,tel,dio], 
+                                                                       bins=angle_bins, statistic="median")[0]
+                for dim in range(2):
+                    bin_PUPIL[:,tel,dim] = stats.binned_statistic(a, PUPIL[:,tel,dim], 
+                                                                  bins=angle_bins, statistic="median")[0]
+                    bin_FIBER[:,tel,dim] = stats.binned_statistic(a, FIBER[:,tel,dim], 
+                                                                  bins=angle_bins, statistic="median")[0]
+            np.save('%s%s_%s_telfcmcorr.npy' % (savedir, target, night), bin_TELFC_MCORR)
+            np.save('%s%s_%s_telfccorr.npy' % (savedir, target, night), bin_TELFC_CORR)
+            np.save('%s%s_%s_angle.npy' % (savedir, target, night), angle_bins)
+            np.save('%s%s_%s_puil.npy' % (savedir, target, night), bin_PUPIL)            
+            np.save('%s%s_%s_fiber.npy' % (savedir, target, night), bin_FIBER)
     
     
     
