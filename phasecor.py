@@ -900,7 +900,8 @@ class GravPhaseNight():
                   % (len(sg_files), len(s2_files)))
         self.s2_files = s2_files
         self.sg_files = sg_files
-
+        self.ndit = len(fits.open(self.s2_files[0])['OI_VIS', 11].data['TIME'])//6
+        print('NDIT:        %i' % self.ndit)
         try:
             year = int(night[:4])
             if year > 2019 and not nopandas:
@@ -956,7 +957,6 @@ class GravPhaseNight():
             self.sg_header = sg_header
         if self.verbose:
             print('\n\n')
-        # self.ndit = ndit
 
 
     def get_corrections(self, bequiet=False):
