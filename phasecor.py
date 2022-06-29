@@ -790,16 +790,27 @@ def correct_data(files, mode, subspacing=1, plotav=8,
 # Correct a full night
 
 class GravPhaseNight():
-    def __init__(self, night=None, verbose=True, nopandas=False,
+    def __init__(self, night=None, verbose=True, usepandas=False,
                  pandasfile=None, reddir=None, datadir='/data/user/forFrank2/',
                  onlysgra=False, calibrator=None, full_folder=False, s2_offx=0,
                  ignore_files=[]):
         """
-        Package to do the full phase calibration, poscor, correction and fitting
+        Package to do the full phase calibration, poscor, and
+        metrology correction
+
+        For 2019 data some fitting is available too
 
         night       : night which shall be used
-        ndit        : 1 to use the 5-min files or 32 for the 1frame reduction [1]
-        calibrator  : the calibrator to use, if None use defaults - give filename 
+        verbose     : show printouts [True]
+        usepandas   : if True gets flux values for 2019 data [False]
+        pandasfile  : allows to pick different file if not None [None]
+        reddir      : allows to pick a specific reduction directory [None]
+        datadir     : pick directory with data [/data/user/forFrank2/]
+        onlysgra    : picks only sgra files for science [False]
+        calibrator  : the calibrator to use, if None use defaults [None]
+        full_folder : Just load everything (for testing) [False]
+        s2_offx     : SOBJ.OFFX of S2 files [0.0]
+        ignore_files: List of files to be ignored
         """
         self.night = night
         self.verbose = verbose
@@ -814,7 +825,7 @@ class GravPhaseNight():
             raise ValueError('Night has to be given as argument')
 
         if full_folder:
-            nopandas = True
+            usepandas = True
             self.folder = night
             if calibrator is None:
                 raise ValueError('For full_folder you need to give a calibrator')
@@ -901,17 +912,17 @@ class GravPhaseNight():
         self.s2_files = s2_files
         self.sg_files = sg_files
         self.ndit = len(fits.open(self.s2_files[0])['OI_VIS', 11].data['TIME'])//6
-        print('NDIT:        %i' % self.ndit)
+        print('NDIT:       %i' % self.ndit)
         try:
             year = int(night[:4])
-            if year > 2019 and not nopandas:
+            if year > 2019 and usepandas:
                 if self.verbose:
                     print('No flux data in pandas for %i' % year)
-                nopandas = True
+                usepandas = False
         except ValueError:
             pass
 
-        if not nopandas:
+        if usepandas:
             ################
             # read in flux from pandas
             ################
