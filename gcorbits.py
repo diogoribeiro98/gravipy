@@ -5,6 +5,7 @@ from astropy import wcs
 from scipy.optimize import newton
 from .star_orbits import star_pms, star_orbits
 
+
 class GCorbits():
     def __init__(self, verbose=True):
         self.star_orbits = {}

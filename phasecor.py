@@ -790,7 +790,7 @@ def correct_data(files, mode, subspacing=1, plotav=8,
 # Correct a full night
 
 class GravPhaseNight():
-    def __init__(self, night, ndit, verbose=True, nopandas=False,
+    def __init__(self, night=None, verbose=True, nopandas=False,
                  pandasfile=None, reddir=None, datadir='/data/user/forFrank2/',
                  onlysgra=False, calibrator=None, full_folder=False, s2_offx=0,
                  ignore_files=[]):
@@ -802,7 +802,6 @@ class GravPhaseNight():
         calibrator  : the calibrator to use, if None use defaults - give filename 
         """
         self.night = night
-        self.ndit = ndit
         self.verbose = verbose
 
         nights = []
@@ -810,6 +809,9 @@ class GravPhaseNight():
         for _n in list_nights:
             nights.append(_n['night'])
             calibrators.append(_n['calibrator'])
+        if night is None:
+            print(nights)
+            raise ValueError('Night has to be given as argument')
 
         if full_folder:
             nopandas = True
@@ -898,7 +900,7 @@ class GravPhaseNight():
                   % (len(sg_files), len(s2_files)))
         self.s2_files = s2_files
         self.sg_files = sg_files
-        
+
         try:
             year = int(night[:4])
             if year > 2019 and not nopandas:
@@ -954,6 +956,8 @@ class GravPhaseNight():
             self.sg_header = sg_header
         if self.verbose:
             print('\n\n')
+        # self.ndit = ndit
+
 
     def get_corrections(self, bequiet=False):
         folder = resource_filename('gravipy', 'met_corrections/')
