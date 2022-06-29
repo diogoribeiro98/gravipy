@@ -6,7 +6,7 @@ import pandas as pd
 from astropy.io import fits
 from scipy import interpolate, optimize
 from astropy.time import Time
-from datetime import timedelta, datetime
+from datetime import datetime
 from joblib import Parallel, delayed
 import multiprocessing
 import os
@@ -16,7 +16,7 @@ import corner
 import glob
 import gc
 from lmfit import Model
-
+from .obs_nights import list_nights
 
 try:
     from generalFunctions import *
@@ -35,14 +35,13 @@ colors_baseline = np.array(['k', 'darkblue', color4,
 colors_UT = np.array(['k', 'darkblue', color2, color1])
 
 
-
-
 ########################
 # Auxilary functions
 
 def find_nearest(array, value):
     idx = (np.abs(array-value)).argmin()
     return idx
+
 
 def averaging(x, N):
     if x.ndim == 2:
@@ -52,11 +51,12 @@ def averaging(x, N):
         return res
     elif x.ndim == 1:
         # pad with nans
-        l = x.shape[0]
-        xx = np.pad(x, (0,N-l%N), constant_values=np.nan)
+        ll = x.shape[0]
+        xx = np.pad(x, (0, N - ll % N), constant_values=np.nan)
         res = np.nanmean(xx.reshape(-1, N), axis=1)
         return res
-    
+
+
 def averaging_std(x, N):
     if x.ndim == 2:
         res = np.zeros((x.shape[0], x.shape[1]//N))
@@ -65,89 +65,94 @@ def averaging_std(x, N):
         return res
     elif x.ndim == 1:
         # pad with nans
-        l = x.shape[0]
-        xx = np.pad(x, (0,N-l%N), constant_values=np.nan)
+        ll = x.shape[0]
+        xx = np.pad(x, (0, N - ll % N), constant_values=np.nan)
         res = np.nanstd(xx.reshape(-1, N), axis=1)
-        return res    
-    
+        return res
+
+
 def get_angle_header_all(header, tel, length):
     pa1 = header["ESO ISS PARANG START"]
     pa2 = header["ESO ISS PARANG END"]
     parang = np.linspace(pa1, pa2, length+1)
     parang = parang[:-1]
-    drottoff = header["ESO INS DROTOFF" +str(4-tel)]
+    drottoff = header["ESO INS DROTOFF" + str(4-tel)]
     dx = header["ESO INS SOBJ X"] - header["ESO INS SOBJ OFFX"]
     dy = header["ESO INS SOBJ Y"] - header["ESO INS SOBJ OFFY"]
     posangle = np.arctan2(dx, dy) * 180 / np.pi;
     fangle = - posangle - drottoff + 270
     angle = fangle + parang + 45.
-    return (angle)%360
+    return angle % 360
+
 
 def get_angle_header_start(header, tel):
     pa1 = header["ESO ISS PARANG START"]
     parang = pa1
-    drottoff = header["ESO INS DROTOFF" +str(4-tel)]
+    drottoff = header["ESO INS DROTOFF" + str(4-tel)]
     dx = header["ESO INS SOBJ X"] - header["ESO INS SOBJ OFFX"]
     dy = header["ESO INS SOBJ Y"] - header["ESO INS SOBJ OFFY"]
     posangle = np.arctan2(dx, dy) * 180 / np.pi;
     fangle = - posangle - drottoff + 270
     angle = fangle + parang + 45.
-    return (angle)%360
+    return angle % 360
+
 
 def get_angle_header_mean(header, tel):
     pa1 = header["ESO ISS PARANG START"]
     pa2 = header["ESO ISS PARANG END"]
     parang = (pa1+pa2)/2
-    drottoff = header["ESO INS DROTOFF" +str(4-tel)]
+    drottoff = header["ESO INS DROTOFF" + str(4-tel)]
     dx = header["ESO INS SOBJ X"] - header["ESO INS SOBJ OFFX"]
     dy = header["ESO INS SOBJ Y"] - header["ESO INS SOBJ OFFY"]
     posangle = np.arctan2(dx, dy) * 180 / np.pi;
     fangle = - posangle - drottoff + 270
     angle = fangle + parang + 45.
-    return (angle)%360
+    return angle % 360
+
 
 def rotation(ang):
     return np.array([[np.cos(ang), np.sin(ang)],
                      [-np.sin(ang), np.cos(ang)]])
-    
+
+
 def convert_date(date):
     t = Time(date)
     t2 = Time('2000-01-01T12:00:00')
     date_decimal = (t.mjd - t2.mjd)/365.25+2000
-    
     date = date.replace('T', ' ')
     date = date.split('.')[0]
     date = datetime.strptime(date, '%Y-%m-%d %H:%M:%S')
     return date_decimal, date
 
 
-
 #########################
 # Read in metrology correction
 
-def read_correction(mcor_files, xscale, list_dim=1, fancy=True, wrap=False, lst=False,
-                    textpos=15, av=20, std_cut=0.03, met_cut=0.2, bequiet=False):
+def read_correction(mcor_files, xscale, list_dim=1, fancy=True,
+                    wrap=False, lst=False, textpos=15, av=20, std_cut=0.03,
+                    met_cut=0.2, bequiet=False):
     """
     Reads in the correction created by 
     TODO add function to create correction
-    
     Input:
     mcor_files:     List of all metrology measurements
     xscale:         X axis of tje mcor_files
-    list_dim:       If mcor_files is a list of lists this has to be length of that lists [1]
+    list_dim:       If mcor_files is a list of lists this has to be length
+                    of that lists [1]
     fancy:          Use the fancy median correction [True]
     wrap:           Wraps the metrology at 180 degree [False]
     lst:            Has to be true if input is a function of lst [False]
     textpos:        Postition to plot text in figures [15]
     av:             Average for the median of the output figure [20]
-    std_cut:        Metrology datapoints are ignored if the std is higher than this value [0.03]
-    met_cut:        Metrology datapoints are ignored if the value is higher than this [0.2]
+    std_cut:        Metrology datapoints are ignored if the std is higher 
+                    than this value [0.03]
+    met_cut:        Metrology datapoints are ignored if the value is higher 
+                    than this [0.2]
     bequiet:        If true all outputs are supressed [False]
-    
+
     Output:
     x values and array with all corrected metrology measurements
     """
-    
     if list_dim == 1:
         if len(mcor_files) < 10 and fancy:
             print('Very short list of input.')
@@ -156,12 +161,15 @@ def read_correction(mcor_files, xscale, list_dim=1, fancy=True, wrap=False, lst=
         if wrap:
             if lst:
                 raise ValueError('Wrap and lst do not work together!')
+
             def wrap_data(a):
                 a1 = a[:a.shape[0]//2]
                 a2 = a[a.shape[0]//2+1:]
-                b = np.nanmean((a1,a2),0)
+                b = np.nanmean((a1, a2),0)
                 return b
-            TELFC_MCORR_S2 = np.array([wrap_data(np.load(fi)*1e6) for fi in mcor_files])
+
+            TELFC_MCORR_S2 = np.array([wrap_data(np.load(fi)*1e6)
+                                       for fi in mcor_files])
             x = np.load(xscale)[:-1]
             x = x[:len(x)//2]
         else:
@@ -173,13 +181,14 @@ def read_correction(mcor_files, xscale, list_dim=1, fancy=True, wrap=False, lst=
         len_data = []
         ndata = len(TELFC_MCORR_S2)
         for idx in range(ndata):
-            len_data.append(len(TELFC_MCORR_S2[idx,0,~np.isnan(TELFC_MCORR_S2[idx,0])]))
+            len_data.append(len(TELFC_MCORR_S2[idx, 0, ~np.isnan(TELFC_MCORR_S2[idx, 0])]))
         sort = np.array(len_data).argsort()[::-1]
         TELFC_MCORR_S2 = TELFC_MCORR_S2[sort]
-        
+
     else:
         if len(mcor_files) != list_dim:
-            raise ValueError('list_dim is different then length of input list, input is wrong')
+            raise ValueError('list_dim is different then length of input list,'
+                             ' input is wrong')
         if wrap:
             raise ValueError('Wrap is not defined yet for multiple input lists')
         else:
@@ -190,24 +199,26 @@ def read_correction(mcor_files, xscale, list_dim=1, fancy=True, wrap=False, lst=
                 len_data = []
                 ndata = len(in_mcorr)
                 for idx in range(ndata):
-                    len_data.append(len(in_mcorr[idx,0,~np.isnan(in_mcorr[idx,0])]))
+                    len_data.append(len(in_mcorr[idx, 0, ~np.isnan(in_mcorr[idx,0])]))
                 sort = np.array(len_data).argsort()[::-1]
                 if ldx == 0:
                     TELFC_MCORR_S2 = in_mcorr[sort]
                 else:
-                    TELFC_MCORR_S2 = np.concatenate((TELFC_MCORR_S2, in_mcorr[sort]), 0)
+                    TELFC_MCORR_S2 = np.concatenate((TELFC_MCORR_S2,
+                                                     in_mcorr[sort]), 0)
             x = np.load(xscale)[:-1]
             ndata = len(TELFC_MCORR_S2)
-            colors = plt.cm.jet(np.linspace(0,1,ndata))
+            colors = plt.cm.jet(np.linspace(0, 1, ndata))
             colors_lists = ['k', color2, color3]
 
     if not bequiet:
-        gs = gridspec.GridSpec(2,2,wspace=0.1,hspace=0.1)
-        plt.figure(figsize=(8,6))
+        gs = gridspec.GridSpec(2, 2, wspace=0.1, hspace=0.1)
+        plt.figure(figsize=(8, 6))
         for tel in range(4):
-            ax = plt.subplot(gs[tel%2,tel//2])
+            ax = plt.subplot(gs[tel % 2, tel // 2])
             for idx in range(ndata):
-                data = TELFC_MCORR_S2[idx,:,tel] - np.nanmean(TELFC_MCORR_S2[idx,:,tel])
+                data = (TELFC_MCORR_S2[idx, :, tel]
+                        - np.nanmean(TELFC_MCORR_S2[idx, :, tel]))
                 if list_dim == 1:
                     plt.plot(x, data,
                              marker='.', ls='', alpha=0.5, color=colors[idx])
@@ -221,44 +232,46 @@ def read_correction(mcor_files, xscale, list_dim=1, fancy=True, wrap=False, lst=
                 ax.set_yticklabels([])
             else:
                 plt.ylabel('TELFC_MCORR [$\mu$m]')
-            if tel%2 != 1:
+            if tel % 2 != 1:
                 ax.set_xticklabels([])
             else:
                 if lst:
                     plt.xlabel('LST [h]')
                 else:
                     plt.xlabel('Ref. angle [deg]')
-        plt.show()        
+        plt.show()
 
     if not fancy:
         TELFC_MCORR_S2_corr = np.copy(TELFC_MCORR_S2)
         for idx in range(ndata):
             for tel in range(4):
-                TELFC_MCORR_S2_corr[idx,:,tel] -= np.nanmean(TELFC_MCORR_S2_corr[idx,:,tel])
+                TELFC_MCORR_S2_corr[idx, :, tel] -= np.nanmean(TELFC_MCORR_S2_corr[idx, :, tel])
 
         for tel in range(4):
-            TELFC_MCORR_S2_corr[:,:,tel] -= np.nanmean(TELFC_MCORR_S2_corr[:,:,tel])
-                
-        gs = gridspec.GridSpec(2,2,wspace=0.1,hspace=0.1)
-        plt.figure(figsize=(8,6))
+            TELFC_MCORR_S2_corr[:, :, tel] -= np.nanmean(TELFC_MCORR_S2_corr[:, :, tel])
+
+        gs = gridspec.GridSpec(2, 2, wspace=0.1, hspace=0.1)
+        plt.figure(figsize=(8, 6))
         for tel in range(4):
-            ax = plt.subplot(gs[tel%2,tel//2])
+            ax = plt.subplot(gs[tel % 2, tel // 2])
             for idx in range(ndata):
-                data = TELFC_MCORR_S2_corr[idx,:,tel]
+                data = TELFC_MCORR_S2_corr[idx, :, tel]
                 if list_dim == 1:
                     plt.plot(x, data, marker='.', ls='', alpha=0.5, color='k')
                 else:
                     ndx = np.where(np.array(len_lists) <= idx)[0][-1]
-                    plt.plot(angl, data, marker='.', ls='', 
+                    plt.plot(x, data, marker='.', ls='',
                              alpha=0.1, color=colors_lists[ndx])
             plt.text(textpos, -0.25, 'UT%i' % (4-tel))
             plt.ylim(-0.3,0.3)
-            plt.plot(averaging(x,av), averaging(np.nanmedian(TELFC_MCORR_S2_corr[:,:,tel], 0), av), color=color1)
+            plt.plot(averaging(x, av),
+                     averaging(np.nanmedian(TELFC_MCORR_S2_corr[:, : ,tel], 0), av),
+                     color=color1)
             if tel//2 != 0:
                 ax.set_yticklabels([])
             else:
                 plt.ylabel('TELFC_MCORR [$\mu$m]')
-            if tel%2 != 1:
+            if tel % 2 != 1:
                 ax.set_xticklabels([])
             else:
                 if lst:
@@ -270,65 +283,65 @@ def read_correction(mcor_files, xscale, list_dim=1, fancy=True, wrap=False, lst=
         return x, TELFC_MCORR_S2_corr
 
     TELFC_MCORR_S2_corr = np.copy(TELFC_MCORR_S2)
-    TELFC_MCORR_S2_av = np.zeros((ndata,TELFC_MCORR_S2.shape[1]//av,4))
-    TELFC_MCORR_S2_std = np.zeros((ndata,TELFC_MCORR_S2.shape[1]//av,4))
+    TELFC_MCORR_S2_av = np.zeros((ndata, TELFC_MCORR_S2.shape[1]//av, 4))
+    TELFC_MCORR_S2_std = np.zeros((ndata, TELFC_MCORR_S2.shape[1]//av, 4))
     for idx in range(ndata):
         for tel in range(4):
-            TELFC_MCORR_S2_av[idx,:,tel] = averaging(TELFC_MCORR_S2[idx,:,tel],av)[:-1]
-            TELFC_MCORR_S2_std[idx,:,tel] = averaging_std(TELFC_MCORR_S2[idx,:,tel],av)[:-1]
+            TELFC_MCORR_S2_av[idx, :, tel] = averaging(TELFC_MCORR_S2[idx, :, tel], av)[:-1]
+            TELFC_MCORR_S2_std[idx, :, tel] = averaging_std(TELFC_MCORR_S2[idx, :, tel], av)[:-1]
     for tel in range(4):
-        TELFC_MCORR_S2_corr[0,:,tel] -= np.nanmean(TELFC_MCORR_S2_corr[0,:,tel])
-        TELFC_MCORR_S2_av[0,:,tel] -= np.nanmean(TELFC_MCORR_S2_av[0,:,tel])
-        TELFC_MCORR_S2_corr[0,np.where(np.abs(TELFC_MCORR_S2_corr[0,:,tel]) > met_cut),tel] *= np.nan
-        TELFC_MCORR_S2_av[0,np.where(np.abs(TELFC_MCORR_S2_av[0,:,tel]) > met_cut),tel] *= np.nan
+        TELFC_MCORR_S2_corr[0, :, tel] -= np.nanmean(TELFC_MCORR_S2_corr[0, :, tel])
+        TELFC_MCORR_S2_av[0, :, tel] -= np.nanmean(TELFC_MCORR_S2_av[0, :, tel])
+        TELFC_MCORR_S2_corr[0, np.where(np.abs(TELFC_MCORR_S2_corr[0, :, tel]) > met_cut),tel] *= np.nan
+        TELFC_MCORR_S2_av[0, np.where(np.abs(TELFC_MCORR_S2_av[0, :, tel]) > met_cut),tel] *= np.nan
 
-    for idx in range(1,ndata):
+    for idx in range(1, ndata):
         if idx == 1:
             corr = TELFC_MCORR_S2_av[0]
         else:
             corr = np.nanmedian(TELFC_MCORR_S2_av[:(idx-1)],0)
 
         for tel in range(4):
-            TELFC_MCORR_S2_av[idx,[np.where(TELFC_MCORR_S2_std[idx,:,tel] > std_cut)],tel] = np.nan
-            mask = ~np.isnan(corr[:,tel])*~np.isnan(TELFC_MCORR_S2_av[idx,:,tel])
+            TELFC_MCORR_S2_av[idx, [np.where(TELFC_MCORR_S2_std[idx,:,tel] > std_cut)],tel] = np.nan
+            mask = ~np.isnan(corr[:, tel])*~np.isnan(TELFC_MCORR_S2_av[idx, :, tel])
             if len(mask[mask == True]) == 0:
-                TELFC_MCORR_S2_av[idx,:,tel] -= np.nanmedian(TELFC_MCORR_S2_av[idx,:,tel])
-                TELFC_MCORR_S2_corr[idx,:,tel] -= np.nanmedian(TELFC_MCORR_S2_corr[idx,:,tel])
+                TELFC_MCORR_S2_av[idx, :, tel] -= np.nanmedian(TELFC_MCORR_S2_av[idx, :, tel])
+                TELFC_MCORR_S2_corr[idx, :, tel] -= np.nanmedian(TELFC_MCORR_S2_corr[idx, :, tel])
                 if not bequiet:
                     if tel == 0:
                         print('%i no overlap' % idx)
             else:
-                mdiff = np.mean(TELFC_MCORR_S2_av[idx,mask,tel])-np.mean(corr[mask,tel])
-                TELFC_MCORR_S2_corr[idx,:,tel] -= mdiff
-                TELFC_MCORR_S2_av[idx,:,tel] -= mdiff
+                mdiff = np.mean(TELFC_MCORR_S2_av[idx, mask, tel])-np.mean(corr[mask, tel])
+                TELFC_MCORR_S2_corr[idx, :, tel] -= mdiff
+                TELFC_MCORR_S2_av[idx, :, tel] -= mdiff
                 if not bequiet:
                     if tel == 0:
                         print(idx, mdiff)
-            if np.nanstd(TELFC_MCORR_S2_corr[idx,:,tel]) > 0.1:
+            if np.nanstd(TELFC_MCORR_S2_corr[idx, :, tel]) > 0.1:
                 if not bequiet:
                     print('%i, %i: std of data too big' % (idx, tel))
-                TELFC_MCORR_S2_corr[idx,:,tel] *= np.nan
-                TELFC_MCORR_S2_av[idx,:,tel] *= np.nan
+                TELFC_MCORR_S2_corr[idx, :, tel] *= np.nan
+                TELFC_MCORR_S2_av[idx, :, tel] *= np.nan
 
-            TELFC_MCORR_S2_corr[idx,np.where(np.abs(TELFC_MCORR_S2_corr[idx,:,tel]) > met_cut),tel] *= np.nan
-            TELFC_MCORR_S2_av[idx,np.where(np.abs(TELFC_MCORR_S2_av[idx,:,tel]) > met_cut),tel] *= np.nan
-            
+            TELFC_MCORR_S2_corr[idx, np.where(np.abs(TELFC_MCORR_S2_corr[idx, : ,tel]) > met_cut), tel] *= np.nan
+            TELFC_MCORR_S2_av[idx, np.where(np.abs(TELFC_MCORR_S2_av[idx, : ,tel]) > met_cut), tel] *= np.nan
+
     if not bequiet:
-        gs = gridspec.GridSpec(2,2,wspace=0.1,hspace=0.1)
-        plt.figure(figsize=(8,6))
+        gs = gridspec.GridSpec(2, 2, wspace=0.1, hspace=0.1)
+        plt.figure(figsize=(8, 6))
         for tel in range(4):
-            ax = plt.subplot(gs[tel%2,tel//2])
+            ax = plt.subplot(gs[tel%2, tel//2])
             for idx in range(ndata):
-                data = TELFC_MCORR_S2_corr[idx,:,tel]
+                data = TELFC_MCORR_S2_corr[idx, :, tel]
                 plt.plot(x, data,
                          marker='.', ls='', alpha=0.5, color=colors[idx])
             plt.text(textpos, -0.25, 'UT%i' % (4-tel))
-            plt.ylim(-0.3,0.3)
+            plt.ylim(-0.3, 0.3)
             if tel//2 != 0:
                 ax.set_yticklabels([])
             else:
                 plt.ylabel('TELFC_MCORR [$\mu$m]')
-            if tel%2 != 1:
+            if tel % 2 != 1:
                 ax.set_xticklabels([])
             else:
                 if lst:
@@ -336,31 +349,33 @@ def read_correction(mcor_files, xscale, list_dim=1, fancy=True, wrap=False, lst=
                 else:
                     plt.xlabel('Ref. angle [deg]')
         plt.show()
-    
+
     for tel in range(4):
-        TELFC_MCORR_S2_corr[:,:,tel] -= np.nanmean(TELFC_MCORR_S2_corr[:,:,tel])
-    
+        TELFC_MCORR_S2_corr[:, :, tel] -= np.nanmean(TELFC_MCORR_S2_corr[:, :, tel])
+
     if not bequiet:
-        gs = gridspec.GridSpec(2,2,wspace=0.1,hspace=0.1)
-        plt.figure(figsize=(8,6))
+        gs = gridspec.GridSpec(2, 2, wspace=0.1, hspace=0.1)
+        plt.figure(figsize=(8, 6))
         for tel in range(4):
-            ax = plt.subplot(gs[tel%2,tel//2])
+            ax = plt.subplot(gs[tel % 2, tel//2])
             for idx in range(ndata):
-                data = TELFC_MCORR_S2_corr[idx,:,tel]
+                data = TELFC_MCORR_S2_corr[idx, :, tel]
                 if list_dim == 1:
                     plt.plot(x, data, marker='.', ls='', alpha=0.5, color='k')
                 else:
                     ndx = np.where(np.array(len_lists) <= idx)[0][-1]
-                    plt.plot(x, data, marker='.', ls='', 
-                            alpha=0.1, color=colors_lists[ndx])
+                    plt.plot(x, data, marker='.', ls='',
+                             alpha=0.1, color=colors_lists[ndx])
             plt.text(textpos, -0.25, 'UT%i' % (4-tel))
             plt.ylim(-0.3,0.3)
-            plt.plot(averaging(x,av), averaging(np.nanmedian(TELFC_MCORR_S2_corr[:,:,tel], 0), av), color=color1)
+            plt.plot(averaging(x, av),
+                     averaging(np.nanmedian(TELFC_MCORR_S2_corr[:, :, tel], 0), av),
+                     color=color1)
             if tel//2 != 0:
                 ax.set_yticklabels([])
             else:
                 plt.ylabel('TELFC_MCORR [$\mu$m]')
-            if tel%2 != 1:
+            if tel % AttributeError2 != 1:
                 ax.set_xticklabels([])
             else:
                 if lst:
@@ -371,188 +386,188 @@ def read_correction(mcor_files, xscale, list_dim=1, fancy=True, wrap=False, lst=
 
     return x, TELFC_MCORR_S2_corr
 
-
-def read_correction_sebo(sebo_mcor_files, sebo_angl_files, fancy=True, bequiet=False,
-                        wrap=False, textpos=15, av=20, std_cut=0.03, met_cut=0.2):
-    """
-    Same as read_correction, but for files created by Sebastiano Daniel Maximilian von Fellenberg
-    """
-    if wrap:
-        def wrap_data(a):
-            a1 = a[:,:a.shape[1]//2]
-            a2 = a[:,a.shape[1]//2+1:]
-            b = np.nanmean((a1,a2),0)
-            return b
-        TELFC_MCORR_S2 = np.array([wrap_data(np.load(fi)*1e6) for fi in sebo_mcor_files])
-        ANGLE_S2 = np.load(sebo_angl_files[0])[:-1]
-        ANGLE_S2 = ANGLE_S2[:len(ANGLE_S2)//2]
-    else:
-        TELFC_MCORR_S2 = np.array([np.load(fi)*1e6 for fi in sebo_mcor_files])
-        ANGLE_S2 = np.load(sebo_angl_files[0])[:-1]
-        
-    ndata = len(sebo_mcor_files)
-    colors = plt.cm.jet(np.linspace(0,1,ndata))
-    len_data = []
-    ndata = len(TELFC_MCORR_S2)
-    for idx in range(ndata):
-        len_data.append(len(TELFC_MCORR_S2[idx,0,~np.isnan(TELFC_MCORR_S2[idx,0])]))
-    sort = np.array(len_data).argsort()[::-1]
-    TELFC_MCORR_S2 = TELFC_MCORR_S2[sort]
-    if not bequiet:
-        gs = gridspec.GridSpec(2,2,wspace=0.1,hspace=0.1)
-        plt.figure(figsize=(8,6))
-        for tel in range(4):
-            ax = plt.subplot(gs[tel%2,tel//2])
-            for idx in range(ndata):
-                angl = ANGLE_S2
-                data = TELFC_MCORR_S2[idx,tel] - np.nanmean(TELFC_MCORR_S2[idx,tel])
-                plt.plot(angl, data,
-                         marker='.', ls='', alpha=0.5, color=colors[idx])
-            plt.text(textpos, -0.25, 'UT%i' % (4-tel))
-            plt.ylim(-0.3,0.3)
-            if tel//2 != 0:
-                ax.set_yticklabels([])
-            else:
-                plt.ylabel('TELFC_MCORR [$\mu$m]')
-            if tel%2 != 1:
-                ax.set_xticklabels([])
-            else:
-                plt.xlabel('Ref. angle [deg]')
-        plt.show()
-
-    if not fancy:
-        TELFC_MCORR_S2_corr = np.copy(TELFC_MCORR_S2)
-        for idx in range(ndata):
-            for tel in range(4):
-                TELFC_MCORR_S2_corr[idx,tel] -= np.nanmean(TELFC_MCORR_S2_corr[idx,tel])
-        
-        for tel in range(4):
-            TELFC_MCORR_S2_corr[:,tel] -= np.nanmean(TELFC_MCORR_S2_corr[:,tel])
-                
-        gs = gridspec.GridSpec(2,2,wspace=0.1,hspace=0.1)
-        plt.figure(figsize=(8,6))
-        for tel in range(4):
-            ax = plt.subplot(gs[tel%2,tel//2])
-            for idx in range(ndata):
-                angl = ANGLE_S2
-                data = TELFC_MCORR_S2_corr[idx,tel]
-                plt.plot(angl, data, marker='.', ls='', alpha=0.5, color='k')
-            plt.text(textpos, -0.25, 'UT%i' % (4-tel))
-            plt.ylim(-0.3,0.3)
-
-            plt.plot(averaging(ANGLE_S2,av), averaging(np.nanmedian(TELFC_MCORR_S2_corr[:,tel], 0), av), color=color1)
-            if tel//2 != 0:
-                ax.set_yticklabels([])
-            else:
-                plt.ylabel('TELFC_MCORR [$\mu$m]')
-            if tel%2 != 1:
-                ax.set_xticklabels([])
-            else:
-                plt.xlabel('Ref. angle [deg]')
-        plt.show()
-
-        return ANGLE_S2, TELFC_MCORR_S2_corr
-    
-    TELFC_MCORR_S2_corr = np.copy(TELFC_MCORR_S2)
-    TELFC_MCORR_S2_av = np.zeros((ndata,4,TELFC_MCORR_S2.shape[2]//av))
-    TELFC_MCORR_S2_std = np.zeros((ndata,4,TELFC_MCORR_S2.shape[2]//av))
-    for idx in range(ndata):
-        for tel in range(4):
-            TELFC_MCORR_S2_av[idx,tel] = averaging(TELFC_MCORR_S2[idx,tel],av)[:-1]
-            TELFC_MCORR_S2_std[idx,tel] = averaging_std(TELFC_MCORR_S2[idx,tel],av)[:-1]
-    for tel in range(4):
-        TELFC_MCORR_S2_corr[0,tel] -= np.nanmean(TELFC_MCORR_S2_corr[0,tel])
-        TELFC_MCORR_S2_av[0,tel] -= np.nanmean(TELFC_MCORR_S2_av[0,tel])
-        TELFC_MCORR_S2_corr[0,tel,np.where(np.abs(TELFC_MCORR_S2_corr[0,tel]) > met_cut)] *= np.nan
-        TELFC_MCORR_S2_av[0,tel,np.where(np.abs(TELFC_MCORR_S2_av[0,tel]) > met_cut)] *= np.nan
-
-    for idx in range(1,ndata):
-        if idx == 1:
-            corr = TELFC_MCORR_S2_av[0]
-        else:
-            corr = np.nanmedian(TELFC_MCORR_S2_av[:(idx-1)],0)
-
-        for tel in range(4):
-            TELFC_MCORR_S2_av[idx,tel,[np.where(TELFC_MCORR_S2_std[idx,tel] > std_cut)]] = np.nan
-            mask = ~np.isnan(corr[tel])*~np.isnan(TELFC_MCORR_S2_av[idx,tel])
-            if len(mask[mask == True]) == 0:
-                TELFC_MCORR_S2_av[idx,tel] -= np.nanmedian(TELFC_MCORR_S2_av[idx,tel])
-                TELFC_MCORR_S2_corr[idx,tel] -= np.nanmedian(TELFC_MCORR_S2_corr[idx,tel])
-                if not bequiet:
-                    if tel == 0:
-                        print('%i no overlap' % idx)
-            else:
-                mdiff = np.mean(TELFC_MCORR_S2_av[idx,tel,mask])-np.mean(corr[tel,mask])
-                TELFC_MCORR_S2_corr[idx,tel] -= mdiff
-                TELFC_MCORR_S2_av[idx,tel] -= mdiff
-                if not bequiet:
-                    if tel == 0:
-                        print(idx, mdiff)
-            if np.nanstd(TELFC_MCORR_S2_corr[idx,tel]) > 0.1:
-                if not bequiet:
-                    print('%i, %i: std of data too big' % (idx, tel))
-                TELFC_MCORR_S2_corr[idx,tel] *= np.nan
-                TELFC_MCORR_S2_av[idx,tel] *= np.nan
-
-            TELFC_MCORR_S2_corr[idx,tel,np.where(np.abs(TELFC_MCORR_S2_corr[idx,tel]) > met_cut)] *= np.nan
-            TELFC_MCORR_S2_av[idx,tel,np.where(np.abs(TELFC_MCORR_S2_av[idx,tel]) > met_cut)] *= np.nan
-            
-    if not bequiet:
-        gs = gridspec.GridSpec(2,2,wspace=0.1,hspace=0.1)
-        plt.figure(figsize=(8,6))
-
-        for tel in range(4):
-            ax = plt.subplot(gs[tel%2,tel//2])
-            for idx in range(ndata):
-                angl = ANGLE_S2
-                data = TELFC_MCORR_S2_corr[idx,tel]
-                plt.plot(angl, data,
-                         marker='.', ls='', alpha=0.5, color=colors[idx])
-            plt.text(textpos, -0.25, 'UT%i' % (4-tel))
-            plt.ylim(-0.3,0.3)
-            if tel//2 != 0:
-                ax.set_yticklabels([])
-            else:
-                plt.ylabel('TELFC_MCORR [$\mu$m]')
-            if tel%2 != 1:
-                ax.set_xticklabels([])
-            else:
-                plt.xlabel('Ref. angle [deg]')
-        plt.show()
-
-    for tel in range(4):
-        TELFC_MCORR_S2_corr[:,tel] -= np.nanmean(TELFC_MCORR_S2_corr[:,tel])
-
-    gs = gridspec.GridSpec(2,2,wspace=0.1,hspace=0.1)
-    plt.figure(figsize=(8,6))
-    for tel in range(4):
-        ax = plt.subplot(gs[tel%2,tel//2])
-        for idx in range(ndata):
-            angl = ANGLE_S2
-            data = TELFC_MCORR_S2_corr[idx,tel]
-            plt.plot(angl, data, marker='.', ls='', alpha=0.5, color='k')
-        plt.text(textpos, -0.25, 'UT%i' % (4-tel))
-        plt.ylim(-0.3,0.3)
-
-        plt.plot(averaging(ANGLE_S2,av), averaging(np.nanmedian(TELFC_MCORR_S2_corr[:,tel], 0), av), color=color1)
-        if tel//2 != 0:
-            ax.set_yticklabels([])
-        else:
-            plt.ylabel('TELFC_MCORR [$\mu$m]')
-        if tel%2 != 1:
-            ax.set_xticklabels([])
-        else:
-            plt.xlabel('Ref. angle [deg]')
-    plt.show()
-
-    return ANGLE_S2, TELFC_MCORR_S2_corr
+# 
+# def read_correction_sebo(sebo_mcor_files, sebo_angl_files, fancy=True, bequiet=False,
+#                         wrap=False, textpos=15, av=20, std_cut=0.03, met_cut=0.2):
+#     """
+#     Same as read_correction, but for files created by Sebastiano Daniel Maximilian von Fellenberg
+#     """
+#     if wrap:
+#         def wrap_data(a):
+#             a1 = a[:,:a.shape[1]//2]
+#             a2 = a[:,a.shape[1]//2+1:]
+#             b = np.nanmean((a1,a2),0)
+#             return b
+#         TELFC_MCORR_S2 = np.array([wrap_data(np.load(fi)*1e6) for fi in sebo_mcor_files])
+#         ANGLE_S2 = np.load(sebo_angl_files[0])[:-1]
+#         ANGLE_S2 = ANGLE_S2[:len(ANGLE_S2)//2]
+#     else:
+#         TELFC_MCORR_S2 = np.array([np.load(fi)*1e6 for fi in sebo_mcor_files])
+#         ANGLE_S2 = np.load(sebo_angl_files[0])[:-1]
+# 
+#     ndata = len(sebo_mcor_files)
+#     colors = plt.cm.jet(np.linspace(0,1,ndata))
+#     len_data = []
+#     ndata = len(TELFC_MCORR_S2)
+#     for idx in range(ndata):
+#         len_data.append(len(TELFC_MCORR_S2[idx,0,~np.isnan(TELFC_MCORR_S2[idx,0])]))
+#     sort = np.array(len_data).argsort()[::-1]
+#     TELFC_MCORR_S2 = TELFC_MCORR_S2[sort]
+#     if not bequiet:
+#         gs = gridspec.GridSpec(2,2,wspace=0.1,hspace=0.1)
+#         plt.figure(figsize=(8,6))
+#         for tel in range(4):
+#             ax = plt.subplot(gs[tel%2,tel//2])
+#             for idx in range(ndata):
+#                 angl = ANGLE_S2
+#                 data = TELFC_MCORR_S2[idx,tel] - np.nanmean(TELFC_MCORR_S2[idx,tel])
+#                 plt.plot(angl, data,
+#                          marker='.', ls='', alpha=0.5, color=colors[idx])
+#             plt.text(textpos, -0.25, 'UT%i' % (4-tel))
+#             plt.ylim(-0.3,0.3)
+#             if tel//2 != 0:
+#                 ax.set_yticklabels([])
+#             else:
+#                 plt.ylabel('TELFC_MCORR [$\mu$m]')
+#             if tel%2 != 1:
+#                 ax.set_xticklabels([])
+#             else:
+#                 plt.xlabel('Ref. angle [deg]')
+#         plt.show()
+# 
+#     if not fancy:
+#         TELFC_MCORR_S2_corr = np.copy(TELFC_MCORR_S2)
+#         for idx in range(ndata):
+#             for tel in range(4):
+#                 TELFC_MCORR_S2_corr[idx,tel] -= np.nanmean(TELFC_MCORR_S2_corr[idx,tel])
+# 
+#         for tel in range(4):
+#             TELFC_MCORR_S2_corr[:,tel] -= np.nanmean(TELFC_MCORR_S2_corr[:,tel])
+# 
+#         gs = gridspec.GridSpec(2,2,wspace=0.1,hspace=0.1)
+#         plt.figure(figsize=(8,6))
+#         for tel in range(4):
+#             ax = plt.subplot(gs[tel%2,tel//2])
+#             for idx in range(ndata):
+#                 angl = ANGLE_S2
+#                 data = TELFC_MCORR_S2_corr[idx,tel]
+#                 plt.plot(angl, data, marker='.', ls='', alpha=0.5, color='k')
+#             plt.text(textpos, -0.25, 'UT%i' % (4-tel))
+#             plt.ylim(-0.3,0.3)
+# 
+#             plt.plot(averaging(ANGLE_S2,av), averaging(np.nanmedian(TELFC_MCORR_S2_corr[:,tel], 0), av), color=color1)
+#             if tel//2 != 0:
+#                 ax.set_yticklabels([])
+#             else:
+#                 plt.ylabel('TELFC_MCORR [$\mu$m]')
+#             if tel%2 != 1:
+#                 ax.set_xticklabels([])
+#             else:
+#                 plt.xlabel('Ref. angle [deg]')
+#         plt.show()
+# 
+#         return ANGLE_S2, TELFC_MCORR_S2_corr
+# 
+#     TELFC_MCORR_S2_corr = np.copy(TELFC_MCORR_S2)
+#     TELFC_MCORR_S2_av = np.zeros((ndata,4,TELFC_MCORR_S2.shape[2]//av))
+#     TELFC_MCORR_S2_std = np.zeros((ndata,4,TELFC_MCORR_S2.shape[2]//av))
+#     for idx in range(ndata):
+#         for tel in range(4):
+#             TELFC_MCORR_S2_av[idx,tel] = averaging(TELFC_MCORR_S2[idx,tel],av)[:-1]
+#             TELFC_MCORR_S2_std[idx,tel] = averaging_std(TELFC_MCORR_S2[idx,tel],av)[:-1]
+#     for tel in range(4):
+#         TELFC_MCORR_S2_corr[0,tel] -= np.nanmean(TELFC_MCORR_S2_corr[0,tel])
+#         TELFC_MCORR_S2_av[0,tel] -= np.nanmean(TELFC_MCORR_S2_av[0,tel])
+#         TELFC_MCORR_S2_corr[0,tel,np.where(np.abs(TELFC_MCORR_S2_corr[0,tel]) > met_cut)] *= np.nan
+#         TELFC_MCORR_S2_av[0,tel,np.where(np.abs(TELFC_MCORR_S2_av[0,tel]) > met_cut)] *= np.nan
+# 
+#     for idx in range(1,ndata):
+#         if idx == 1:
+#             corr = TELFC_MCORR_S2_av[0]
+#         else:
+#             corr = np.nanmedian(TELFC_MCORR_S2_av[:(idx-1)],0)
+# 
+#         for tel in range(4):
+#             TELFC_MCORR_S2_av[idx,tel,[np.where(TELFC_MCORR_S2_std[idx,tel] > std_cut)]] = np.nan
+#             mask = ~np.isnan(corr[tel])*~np.isnan(TELFC_MCORR_S2_av[idx,tel])
+#             if len(mask[mask == True]) == 0:
+#                 TELFC_MCORR_S2_av[idx,tel] -= np.nanmedian(TELFC_MCORR_S2_av[idx,tel])
+#                 TELFC_MCORR_S2_corr[idx,tel] -= np.nanmedian(TELFC_MCORR_S2_corr[idx,tel])
+#                 if not bequiet:
+#                     if tel == 0:
+#                         print('%i no overlap' % idx)
+#             else:
+#                 mdiff = np.mean(TELFC_MCORR_S2_av[idx,tel,mask])-np.mean(corr[tel,mask])
+#                 TELFC_MCORR_S2_corr[idx,tel] -= mdiff
+#                 TELFC_MCORR_S2_av[idx,tel] -= mdiff
+#                 if not bequiet:
+#                     if tel == 0:
+#                         print(idx, mdiff)
+#             if np.nanstd(TELFC_MCORR_S2_corr[idx,tel]) > 0.1:
+#                 if not bequiet:
+#                     print('%i, %i: std of data too big' % (idx, tel))
+#                 TELFC_MCORR_S2_corr[idx,tel] *= np.nan
+#                 TELFC_MCORR_S2_av[idx,tel] *= np.nan
+# 
+#             TELFC_MCORR_S2_corr[idx,tel,np.where(np.abs(TELFC_MCORR_S2_corr[idx,tel]) > met_cut)] *= np.nan
+#             TELFC_MCORR_S2_av[idx,tel,np.where(np.abs(TELFC_MCORR_S2_av[idx,tel]) > met_cut)] *= np.nan
+# 
+#     if not bequiet:
+#         gs = gridspec.GridSpec(2,2,wspace=0.1,hspace=0.1)
+#         plt.figure(figsize=(8,6))
+# 
+#         for tel in range(4):
+#             ax = plt.subplot(gs[tel%2,tel//2])
+#             for idx in range(ndata):
+#                 angl = ANGLE_S2
+#                 data = TELFC_MCORR_S2_corr[idx,tel]
+#                 plt.plot(angl, data,
+#                          marker='.', ls='', alpha=0.5, color=colors[idx])
+#             plt.text(textpos, -0.25, 'UT%i' % (4-tel))
+#             plt.ylim(-0.3,0.3)
+#             if tel//2 != 0:
+#                 ax.set_yticklabels([])
+#             else:
+#                 plt.ylabel('TELFC_MCORR [$\mu$m]')
+#             if tel%2 != 1:
+#                 ax.set_xticklabels([])
+#             else:
+#                 plt.xlabel('Ref. angle [deg]')
+#         plt.show()
+# 
+#     for tel in range(4):
+#         TELFC_MCORR_S2_corr[:,tel] -= np.nanmean(TELFC_MCORR_S2_corr[:,tel])
+# 
+#     gs = gridspec.GridSpec(2,2,wspace=0.1,hspace=0.1)
+#     plt.figure(figsize=(8,6))
+#     for tel in range(4):
+#         ax = plt.subplot(gs[tel%2,tel//2])
+#         for idx in range(ndata):
+#             angl = ANGLE_S2
+#             data = TELFC_MCORR_S2_corr[idx,tel]
+#             plt.plot(angl, data, marker='.', ls='', alpha=0.5, color='k')
+#         plt.text(textpos, -0.25, 'UT%i' % (4-tel))
+#         plt.ylim(-0.3,0.3)
+# 
+#         plt.plot(averaging(ANGLE_S2,av), averaging(np.nanmedian(TELFC_MCORR_S2_corr[:,tel], 0), av), color=color1)
+#         if tel//2 != 0:
+#             ax.set_yticklabels([])
+#         else:
+#             plt.ylabel('TELFC_MCORR [$\mu$m]')
+#         if tel%2 != 1:
+#             ax.set_xticklabels([])
+#         else:
+#             plt.xlabel('Ref. angle [deg]')
+#     plt.show()
+# 
+#     return ANGLE_S2, TELFC_MCORR_S2_corr
 
 
 ######################
 # Correct a set of data
 
-
-def correct_data(files, mode, subspacing=1, plotav=8, plot=False, lstplot=False):
+def correct_data(files, mode, subspacing=1, plotav=8,
+                 plot=False, lstplot=False):
     corrections_dict = get_corrections(bequiet=True)
     try:
         interp_list = corrections_dict[mode]
@@ -770,14 +785,15 @@ def correct_data(files, mode, subspacing=1, plotav=8, plot=False, lstplot=False)
         plt.show()
     return t_visphi, t_lst, ang, visphi, visphi_fake
 
+
 #########################
 # Correct a full night
-
 
 class GravPhaseNight():
     def __init__(self, night, ndit, verbose=True, nopandas=False,
                  pandasfile=None, reddir=None, datadir='/data/user/forFrank2/',
-                 onlysgra=False, calibrator=None, full_folder=False, s2_offx=0, ignore_files=[]):
+                 onlysgra=False, calibrator=None, full_folder=False, s2_offx=0,
+                 ignore_files=[]):
         """
         Package to do the full phase calibration, poscor, correction and fitting
 
@@ -789,109 +805,11 @@ class GravPhaseNight():
         self.ndit = ndit
         self.verbose = verbose
 
-        nights = ['2019-03-27',
-                '2019-03-28',
-                '2019-03-31',
-                '2019-04-15',
-                '2019-04-16',
-                '2019-04-18',
-        #           '2019-04-19',
-                '2019-04-21',
-        #           '2019-06-14',
-                '2019-06-16',
-        #           '2019-06-17',
-                '2019-06-19',
-                '2019-06-20',
-                '2019-07-15',
-                '2019-07-17',
-                '2019-08-13',
-                '2019-08-14',
-                '2019-08-15',
-                '2019-08-18',
-                '2019-08-19',
-        #           '2019-09-11',
-                '2019-09-12',
-                '2019-09-13',
-                '2019-09-15',
-                '2021-03-27',
-                '2021-03-28',
-                '2021-03-29',
-                '2021-03-30',
-                '2021-03-31',
-                '2021-05-22',
-                '2021-05-23',
-                '2021-05-24',
-                '2021-05-25',
-                '2021-05-28',
-                '2021-05-29',
-                '2021-05-30',
-                '2021-06-19',
-                '2021-06-20',
-                '2021-06-24',
-                '2021-06-25',
-                '2021-07-25',
-                '2021-07-26',
-                '2021-07-27',
-                '2022-03-18',
-                '2022-03-19',
-                '2022-03-20',
-                '2022-04-23',
-                '2022-04-25',
-                '2022-05-19',
-                '2022-05-22',
-                '2022-06-19',
-                ]
-        calibrators = ['GRAVI.2019-03-28T08:00:22.802_dualscivis.fits',
-                    'GRAVI.2019-03-29T07:35:36.327_dualscivis.fits',
-                    'GRAVI.2019-04-01T06:53:20.843_dualscivis.fits',
-                    'GRAVI.2019-04-16T08:08:45.675_dualscivis.fits',
-                    'GRAVI.2019-04-17T09:08:30.918_dualscivis.fits',
-                    'GRAVI.2019-04-19T06:00:32.198_dualscivis.fits',
-        #                'GRAVI.2019-04-20T09:31:56.475_dualscivis.fits',
-                    'GRAVI.2019-04-22T07:05:46.470_dualscivis.fits',
-        #                'GRAVI.2019-06-15T04:40:02.407_dualscivis.fits',
-                    'GRAVI.2019-06-17T04:44:03.992_dualscivis.fits',
-        #                'GRAVI.2019-06-18T01:19:27.829_dualscivis.fits',
-                    'GRAVI.2019-06-20T05:29:44.870_dualscivis.fits',
-                    'GRAVI.2019-06-21T05:47:16.581_dualscivis.fits',
-                    'GRAVI.2019-07-16T02:09:48.436_dualscivis.fits',
-                    'GRAVI.2019-07-18T02:41:59.504_dualscivis.fits',
-                    'GRAVI.2019-08-14T01:22:28.240_dualscivis.fits',
-                    'GRAVI.2019-08-15T01:58:01.049_dualscivis.fits',
-                    'GRAVI.2019-08-16T01:09:36.547_dualscivis.fits',
-                    'GRAVI.2019-08-19T01:30:49.497_dualscivis.fits',#'GRAVI.2019-08-18T23:55:52.258_dualscivis.fits',
-                    'GRAVI.2019-08-20T02:41:24.122_dualscivis.fits',
-        #                'GRAVI.2019-09-12T01:26:51.547_dualscivis.fits',
-                    'GRAVI.2019-09-12T23:48:18.886_dualscivis.fits',
-                    'GRAVI.2019-09-14T00:13:24.592_dualscivis.fits',
-                    'GRAVI.2019-09-16T00:08:07.335_dualscivis.fits',
-                    'GRAVI.2021-03-28T09:09:44.486_dualscivis.fits',
-                    'GRAVI.2021-03-29T07:36:04.166_dualscivis.fits',
-                    'GRAVI.2021-03-30T07:32:41.730_dualscivis.fits',
-                    'GRAVI.2021-03-31T08:55:06.856_dualscivis.fits',
-                    'GRAVI.2021-04-01T08:35:49.986_dualscivis.fits',
-                    'GRAVI.2021-05-23T04:20:48.130_dualscivis.fits',
-                    'GRAVI.2021-05-24T07:20:05.866_dualscivis.fits',
-                    'GRAVI.2021-05-25T08:14:27.208_dualscivis.fits',
-                    'GRAVI.2021-05-26T07:35:57.734_dualscivis.fits',
-                    'GRAVI.2021-05-29T06:53:52.614_dualscivis.fits',
-                    'GRAVI.2021-05-30T06:27:50.478_dualscivis.fits',
-                    'GRAVI.2021-05-31T04:49:19.787_dualscivis.fits',
-                    'GRAVI.2021-06-20T03:27:36.544_dualscivis.fits',
-                    'GRAVI.2021-06-21T05:44:52.682_dualscivis.fits',
-                    'GRAVI.2021-06-25T02:33:30.152_dualscivis.fits',
-                    'GRAVI.2021-06-26T02:08:16.758_dualscivis.fits',
-                    'GRAVI.2021-07-26T01:08:53.419_dualscivis.fits',
-                    'GRAVI.2021-07-27T00:18:12.572_dualscivis.fits',
-                    'GRAVI.2021-07-28T01:03:19.149_dualscivis.fits',
-                    'GRAVI.2022-03-19T08:46:10.049_dualscivis.fits',
-                    'GRAVI.2022-03-20T08:46:55.494_dualscivis.fits',
-                    'GRAVI.2022-03-21T08:06:14.336_dualscivis.fits',
-                    'GRAVI.2022-04-24T08:26:23.376_driftcorr_dualscivis.fits',
-                    'GRAVI.2022-04-26T08:31:35.167_dualscivis.fits',
-                    'GRAVI.2022-05-20T05:19:41.676_dualscivis.fits',
-                    'GRAVI.2022-05-23T04:51:42.408_dualscivis.fits',
-                    'GRAVI.2022-06-20T07:05:36.095_dualscivis.fits'] 
+        nights = []
+        calibrators = []
+        for _n in list_nights:
+            nights.append(_n['night'])
+            calibrators.append(_n['calibrator'])
 
         if full_folder:
             nopandas = True
@@ -899,7 +817,7 @@ class GravPhaseNight():
             if calibrator is None:
                 raise ValueError('For full_folder you need to give a calibrator')
             self.calibrator = calibrator
-            
+
         else:
             try:
                 if calibrator is None:
@@ -911,40 +829,37 @@ class GravPhaseNight():
                         print("using custom calibrator")
                     self.calibrator = calibrator
                 if self.verbose:
-                    print('Night:      %s \nCalibrator: %s' % (night, self.calibrator))
+                    print('Night:      %s \nCalibrator: %s' % (night,
+                                                               self.calibrator))
             except ValueError:
                 if self.verbose:
                     print('Night is not available, try one of those:')
                     print(nights)
                 raise ValueError('Night is not available')
-            
             if reddir is None:
-                if int(night[:4]) > 2020:
-                    pl_dir = '/reduced_PL20210429'
-                else:
-                    pl_dir = '/reduced_PL20200513'
-                
-                if ndit == 1:
-                    self.folder = datadir + night + pl_dir
-                elif ndit == 32:
-                    self.folder = datadir + night + pl_dir + '_1frame'
-                else:
-                    raise ValueError('Ndit has to be 1 or 32')
+                pl_list = sorted(glob.glob(datadir + night
+                                           + '/reduced_PL????????'))
+                if len(pl_list) < 1:
+                    raise ValueError('Something wrong with given directory '
+                                     'No reduction folder in %s'
+                                     % (datadir + night))
+                self.folder = pl_list[-1]
             else:
                 self.folder = datadir + night + '/' + reddir
         if self.verbose:
             print('Data from:  %s' % self.folder)
-        self.bl_array = np.array([[0,1],
-                            [0,2],
-                            [0,3],
-                            [1,2],
-                            [1,3],
-                            [2,3]])
-        
+        self.bl_array = np.array([[0, 1],
+                                  [0, 2],
+                                  [0, 3],
+                                  [1, 2],
+                                  [1, 3],
+                                  [2, 3]])
+
         allfiles = sorted(glob.glob(self.folder + '/GRAVI*dualscivis.fits'))
         if len(allfiles) == 0:
-            raise ValueError('No files found, most likely something is wrong with the reduction folder')
-        
+            raise ValueError('No files found, most likely something is wrong'
+                             ' with the given reduction folder')
+
         s2data = np.load(resource_filename('gravipy', 's2_orbit.npy'))
         if full_folder:
             sg_files = allfiles
@@ -962,35 +877,37 @@ class GravPhaseNight():
                             s2_files.append(file)
                     else:
                         d = convert_date(h['DATE-OBS'])[0]
-                        _x, _y = -s2data[find_nearest(s2data[:,0], d)][1:]*1e3
+                        _x, _y = -s2data[find_nearest(s2data[:, 0], d)][1:]*1e3
                         sobjx = h['ESO INS SOBJ X']
                         sobjy = h['ESO INS SOBJ Y']
                         sobjoffx = h['ESO INS SOBJ OFFX']
                         sobjoffy = h['ESO INS SOBJ OFFY']
                         if onlysgra:
                             if np.abs(sobjoffx - _x) > 10 :
-                                print('File with separation (%i,%i) not on S2 orbit, will be ignored' % (sobjx, sobjy))
+                                print('File with separation (%i,%i) not on S2 '
+                                      'orbit, will be ignored' % (sobjx, sobjy))
                                 continue
                             if np.abs(sobjoffy - _y) > 10 :
-                                print('File with separation (%i,%i) not on S2 orbit, will be ignored' % (sobjx, sobjy))
+                                print('File with separation (%i,%i) not on S2 '
+                                      'orbit, will be ignored' % (sobjx, sobjy))
                                 continue
                         if file not in ignore_files:
                             sg_files.append(file)
         if self.verbose:
-            print('            %i SGRA files \n            %i S2 files' % (len(sg_files), len(s2_files)))
+            print('            %i SGRA files \n            %i S2 files' 
+                  % (len(sg_files), len(s2_files)))
         self.s2_files = s2_files
         self.sg_files = sg_files
-        
         
         try:
             year = int(night[:4])
             if year > 2019 and not nopandas:
                 if self.verbose:
                     print('No flux data in pandas for %i' % year)
-                nopandas=True
+                nopandas = True
         except ValueError:
             pass
-        
+
         if not nopandas:
             ################
             # read in flux from pandas
@@ -1002,9 +919,10 @@ class GravPhaseNight():
             else:
                 if self.verbose:
                     print('Read in pandas')
-                pandasfile = resource_filename('gravipy', 'GRAVITY_DATA_2019_4_frame_simple.object')
+                pandasfile = resource_filename('gravipy',
+                                               'GRAVITY_DATA_2019_4_frame_simple.object')
                 pand = pd.read_pickle(pandasfile)
-                
+
             sg_flux = []
             sg_flux_p1 = []
             sg_flux_p2 = []
@@ -1023,12 +941,12 @@ class GravPhaseNight():
                 sg_flux.append(sg_fr)
                 sg_flux_p1.append(p1)
                 sg_flux_p2.append(p2)
-                
+
                 ddate = convert_date(obsdate)[0]
                 orbitfile = resource_filename('gravipy', 's2_orbit_082020.txt')
                 orbit = np.genfromtxt(orbitfile)
-                s2_pos.append(orbit[find_nearest(orbit[:,0], ddate)][1:]*1000)
-                    
+                s2_pos.append(orbit[find_nearest(orbit[:, 0], ddate)][1:]*1000)
+
             self.s2_pos = s2_pos
             self.sg_flux = sg_flux
             self.sg_flux_p1 = sg_flux_p1
@@ -1037,7 +955,6 @@ class GravPhaseNight():
         if self.verbose:
             print('\n\n')
 
-        
     def get_corrections(self, bequiet=False):
         folder = resource_filename('gravipy', 'met_corrections/')
         corr_ang = sorted(glob.glob(folder + 'correction*'))
