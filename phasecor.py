@@ -1050,18 +1050,21 @@ class GravPhaseNight():
                         if onlysgra:
                             if s2_offx != 0.0:
                                 if sobjoffx != 0.0 or sobjoffy != 0.0:
-                                    print('File with separation (%i,%i) not '
-                                          'an SGRA file, will be ignored'
-                                          % (sobjx, sobjy))
+                                    if self.verbose:
+                                        print('File with separation (%i,%i) not '
+                                              'an SGRA file, will be ignored'
+                                              % (sobjx, sobjy))
                                     continue
                             else:
-                                if np.abs(sobjoffx - _x) > 10 :
-                                    print('File with separation (%i,%i) not on S2 '
-                                          'orbit, will be ignored' % (sobjx, sobjy))
+                                if np.abs(sobjoffx - _x) > 10:
+                                    if self.verbose:
+                                        print('File with separation (%i,%i) not on S2 '
+                                              'orbit, will be ignored' % (sobjx, sobjy))
                                     continue
-                                if np.abs(sobjoffy - _y) > 10 :
-                                    print('File with separation (%i,%i) not on S2 '
-                                          'orbit, will be ignored' % (sobjx, sobjy))
+                                if np.abs(sobjoffy - _y) > 10:
+                                    if self.verbose:
+                                        print('File with separation (%i,%i) not on S2 '
+                                              'orbit, will be ignored' % (sobjx, sobjy))
                                     continue
                         if file not in ignore_files:
                             sg_files.append(file)
@@ -1071,7 +1074,8 @@ class GravPhaseNight():
         self.s2_files = s2_files
         self.sg_files = sg_files
         self.ndit = len(fits.open(self.s2_files[0])['OI_VIS', 11].data['TIME'])//6
-        print('NDIT:       %i' % self.ndit)
+        if self.verbose:
+            print('NDIT:       %i' % self.ndit)
         try:
             year = int(night[:4])
             if year > 2019 and usepandas:
