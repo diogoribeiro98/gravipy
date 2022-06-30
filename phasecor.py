@@ -1807,7 +1807,7 @@ class GravPhaseNight():
         self.sg_visphi_p1 = sg_visphi_p1
         self.sg_visphi_p2 = sg_visphi_p2
 
-        if plot:
+        if plot and mode is not None:
             fig = plt.figure()
             ax1 = fig.add_subplot(111)
             ax2 = ax1.twiny()
