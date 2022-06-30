@@ -1663,7 +1663,7 @@ class GravMFit(GravData, GravPhaseMaps):
                 else:
                     chi2string = 'chi2'
 
-                if not onlyphases:
+                if not onlyphases and not no_fit:
                     chi2pd = pd.DataFrame({'chi2': [redchi_visamp, redchi_vis2, 
                                                     redchi_closure, redchi_visphi]
                                            })
@@ -1711,7 +1711,8 @@ class GravMFit(GravData, GravPhaseMaps):
                     if idx == 0:
                         plotdata = []
                     plotdata.append([theta_result, fitdata, fitarg, fithelp])
-                fittab = fittab.append(_fittab, ignore_index=True)
+                if not no_fit:
+                    fittab = fittab.append(_fittab, ignore_index=True)
 
             if plotScience:
                 self.plotFitComb(plotdata)
