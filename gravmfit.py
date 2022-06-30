@@ -1711,14 +1711,12 @@ class GravMFit(GravData, GravPhaseMaps):
                     if idx == 0:
                         plotdata = []
                     plotdata.append([theta_result, fitdata, fitarg, fithelp])
+                fittab = fittab.append(_fittab, ignore_index=True)
 
             if plotScience:
                 self.plotFitComb(plotdata)
                 self.plotdata = plotdata
 
-            fittab = fittab.append(_fittab, ignore_index=True)
-                
-            
         self.fittab = fittab
         if iopandas is not None and not pdexists:
            fittab.to_pickle(pdname)
