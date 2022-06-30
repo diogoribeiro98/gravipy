@@ -1198,15 +1198,12 @@ class GravPhaseNight():
                 corrections_dict[name] = interp
             else:
                 raise ValueError('Weird dimension of npy file')
-            
+
         if not bequiet:
             print('Available datasets:')
             print(corrections_dict.keys())
         return corrections_dict
 
-
-        
-        
     def process_night(self, mode,  fluxcut=0.0, subspacing=1,
                       poscor=True, plot=False,
                       fitstart=0, fitstop=-1, linear_cor=False,
@@ -1220,24 +1217,22 @@ class GravPhaseNight():
         subspacing  : spaces the applied corrections more than the data [1]
         poscor      : apply poscor [True]
         plot        : Show some plots [False]
-        linear_cor  : subtracts a polynom of 1st degree from each baseline [False]    
+        linear_cor  : subtracts a polynom of 1st degree from each
+                      baseline [False]    
         fitstart    : file number from which to start the linear fit [0]
         fitstop     : file number where to stop measure the linear fit [-1]
-        save        : saves the final data under one of the following folders [False]
+        save        : saves the final data under one of the following 
+                      folders [False]
                       (depending on the options)
                       /data/user/forFrank2/ + night + /reduced_PL20200513/correction_ + mode + _new/
                       /data/user/forFrank2/ + night + /reduced_PL20200513_1frame/correction_ + mode + _new/ 
                       if save is a string, save files will be save to string value
-                      
         ret         : Returns list with all results
         """
         ndit = self.ndit
 
         s2_files = self.s2_files
         sg_files = self.sg_files
-        if fluxcut > 0:
-            sg_flux = self.sg_flux
-        
         if mode is None:
             correction = False
             if self.verbose:
@@ -1251,13 +1246,15 @@ class GravPhaseNight():
                 except KeyError:
                     print('mode not avialable, use one of those:')
                     print(corrections_dict.keys())
-                    print('More corrections in: /data/user/fwidmann/Phase_fit_cor/corrections_data/')
+                    print('More corrections in: '
+                          '/data/user/fwidmann/Phase_fit_cor/corrections_data/')
                     raise KeyError
 
                 if 'lst' in mode:
                     lst_corr = True
                     if ndit == 1:
-                        raise ValueError('Ndit 1 and lst correction is not implemented properly')
+                        raise ValueError('Ndit 1 and lst correction is not '
+                                         'implemented properly')
                     print('Apply LST correction')
                 else:
                     lst_corr = False
@@ -1275,8 +1272,8 @@ class GravPhaseNight():
                     if self.verbose:
                         print('using the interpolations given in input')
                 else:
-                    raise ValueError('If interpolations are given mode has to be a list of four')
-            
+                    raise ValueError('If interpolations are given mode has '
+                                     'to be a list of four')
             
         if phasecorrection is not None:
             cor_cor = True
@@ -1289,16 +1286,15 @@ class GravPhaseNight():
                 raise KeyError
         else:
             cor_cor = False
-            
-            
-        ################
+
+        ################################
         # read in al necessary data
-        ################
+        ################################
         try:
             d = fits.open(sg_files[0])
         except IndexError:
             d = fits.open(s2_files[0])
-        wave = d['OI_WAVELENGTH',11].data['EFF_WAVE']
+        wave = d['OI_WAVELENGTH', 11].data['EFF_WAVE']
         self.wave = wave
         nchannel = len(wave)
         sg_visphi_p1 = np.zeros((len(sg_files), ndit*6, nchannel))*np.nan
@@ -1314,7 +1310,7 @@ class GravPhaseNight():
         sg_v_raw = np.zeros((len(sg_files), ndit*6))*np.nan
         sg_correction = np.zeros((len(sg_files), ndit*6, nchannel))*np.nan
         sg_correction_wo = np.zeros((len(sg_files), ndit*6, nchannel))*np.nan
-        
+
         for fdx, file in enumerate(sg_files):
             d = fits.open(file)
             h = d[0].header
@@ -1328,24 +1324,25 @@ class GravPhaseNight():
             time -= time[0]
             sg_lst[fdx] = time + lst0
 
-            U = d['OI_VIS',11].data['UCOORD']
-            V = d['OI_VIS',11].data['VCOORD']
+            U = d['OI_VIS', 11].data['UCOORD']
+            V = d['OI_VIS', 11].data['VCOORD']
             sg_u_raw[fdx] = U
             sg_v_raw[fdx] = V
-            wave = d['OI_WAVELENGTH',11].data['EFF_WAVE']
-            U_as = np.zeros((ndit*6,nchannel))
-            V_as = np.zeros((ndit*6,nchannel))
+            wave = d['OI_WAVELENGTH', 11].data['EFF_WAVE']
+            U_as = np.zeros((ndit*6, nchannel))
+            V_as = np.zeros((ndit*6, nchannel))
             for bl in range(ndit*6):
                 for wdx, wl in enumerate(wave):
-                    U_as[bl,wdx] = U[bl]/wl * np.pi / 180. / 3600./1000
-                    V_as[bl,wdx] = V[bl]/wl * np.pi / 180. / 3600./1000
+                    U_as[bl, wdx] = U[bl]/wl * np.pi / 180. / 3600./1000
+                    V_as[bl, wdx] = V[bl]/wl * np.pi / 180. / 3600./1000
             sg_u[fdx] = U_as
             sg_v[fdx] = V_as
 
             angle = [get_angle_header_all(h, i, o_ndit) for i in range(4)]
-            sg_ang[fdx] = np.mean([get_angle_header_all(h, i, ndit) for i in range(4)], 0)
-            wave = d['OI_WAVELENGTH',12].data['EFF_WAVE']*1e6
-            dlambda = d['OI_WAVELENGTH',11].data['EFF_BAND']/2*1e6
+            sg_ang[fdx] = np.mean([get_angle_header_all(h, i, ndit)
+                                   for i in range(4)], 0)
+            wave = d['OI_WAVELENGTH', 12].data['EFF_WAVE']*1e6
+            dlambda = d['OI_WAVELENGTH', 11].data['EFF_BAND']/2*1e6
             fullcor = np.zeros((6*ndit, len(wave)))
 
             if correction:
@@ -1403,13 +1400,13 @@ class GravPhaseNight():
                                 cor *= 1e6
                         if ndit == 1:
                             cor = np.mean(cor)
-                            
+
                         wcor = np.zeros((ndit, len(wave)))
                         for w in range(len(wave)):
-                            wcor[:,w] = cor/wave[w]*360
+                            wcor[:, w] = cor/wave[w]*360
                         fullcor[base::6] = wcor
                     sg_correction_wo[fdx] = fullcor
-                    
+
                     if cor_cor:
                         for base in range(6):
                             t1 = self.bl_array[base][0]
@@ -1433,13 +1430,13 @@ class GravPhaseNight():
 
                 except ValueError:
                     fullcor = 0
-                    
+
                 sg_visphi_p1[fdx] = d['OI_VIS', 11].data['VISPHI'] + fullcor
                 sg_visphi_p2[fdx] = d['OI_VIS', 12].data['VISPHI'] + fullcor
             else:
                 sg_visphi_p1[fdx] = d['OI_VIS', 11].data['VISPHI']
                 sg_visphi_p2[fdx] = d['OI_VIS', 12].data['VISPHI']
-            
+
             sg_correction[fdx] = fullcor
 
             flag1 = d['OI_VIS', 11].data['FLAG']
@@ -1483,25 +1480,25 @@ class GravPhaseNight():
             time -= time[0]
             s2_lst[fdx] = time + lst0
 
-            U = d['OI_VIS',11].data['UCOORD']
-            V = d['OI_VIS',11].data['VCOORD']
+            U = d['OI_VIS', 11].data['UCOORD']
+            V = d['OI_VIS', 11].data['VCOORD']
             s2_u_raw[fdx] = U
             s2_v_raw[fdx] = V
-            wave = d['OI_WAVELENGTH',11].data['EFF_WAVE']
-            U_as = np.zeros((ndit*6,nchannel))
-            V_as = np.zeros((ndit*6,nchannel))
+            wave = d['OI_WAVELENGTH', 11].data['EFF_WAVE']
+            U_as = np.zeros((ndit*6, nchannel))
+            V_as = np.zeros((ndit*6, nchannel))
             for bl in range(ndit*6):
                 for wdx, wl in enumerate(wave):
-                    U_as[bl,wdx] = U[bl]/wl * np.pi / 180. / 3600./1000
-                    V_as[bl,wdx] = V[bl]/wl * np.pi / 180. / 3600./1000
+                    U_as[bl, wdx] = U[bl]/wl * np.pi / 180. / 3600./1000
+                    V_as[bl, wdx] = V[bl]/wl * np.pi / 180. / 3600./1000
             s2_u[fdx] = U_as
             s2_v[fdx] = V_as
 
             angle = [get_angle_header_all(h, i, o_ndit) for i in range(4)]
             s2_ang[fdx] = np.mean([get_angle_header_all(h, i, ndit) for i in range(4)], 0)
-            wave = d['OI_WAVELENGTH',12].data['EFF_WAVE']*1e6
+            wave = d['OI_WAVELENGTH', 12].data['EFF_WAVE']*1e6
             fullcor = np.zeros((6*ndit, len(wave)))
-            
+
             if correction:
                 try:
                     for base in range(6):
@@ -1561,10 +1558,10 @@ class GravPhaseNight():
 
                         wcor = np.zeros((ndit, len(wave)))
                         for w in range(len(wave)):
-                            wcor[:,w] = cor/wave[w]*360
+                            wcor[:, w] = cor/wave[w]*360
                         fullcor[base::6] = wcor
                     s2_correction_wo[fdx] = fullcor
-                
+
                     if cor_cor:
                         for base in range(6):
                             t1 = self.bl_array[base][0]
@@ -1609,11 +1606,10 @@ class GravPhaseNight():
 
         self.s2_u_raw = s2_u_raw
         self.s2_v_raw = s2_u_raw
-        
+
         tstart = np.nanmin((np.nanmin(s2_t), np.nanmin(sg_t)))
         s2_t = (s2_t-tstart)*24*60
         sg_t = (sg_t-tstart)*24*60
-        
 
         ##########################
         # Calibrate
@@ -1633,45 +1629,49 @@ class GravPhaseNight():
         cal_p2 = np.zeros_like(c_p2, dtype=np.complex)
 
         for bl in range(6):
-            mc_p1[:,bl,:] = c_p1[bl::6,:]
-            mc_p2[:,bl,:] = c_p2[bl::6,:]
-
+            mc_p1[:, bl, :] = c_p1[bl::6, :]
+            mc_p2[:, bl, :] = c_p2[bl::6, :]
 
         mc_p1 = np.exp(1j*mc_p1/180*np.pi)
-        mc_p1 = np.nanmean(mc_p1,0)
+        mc_p1 = np.nanmean(mc_p1, 0)
         mc_p2 = np.exp(1j*mc_p2/180*np.pi)
-        mc_p2 = np.nanmean(mc_p2,0)
+        mc_p2 = np.nanmean(mc_p2, 0)
 
         for dit in range(ndit):
             cal_p1[dit*6:(dit+1)*6] = mc_p1
             cal_p2[dit*6:(dit+1)*6] = mc_p2
 
         for fdx, file in enumerate(sg_files):
-            sg_visphi_p1[fdx] = np.angle((np.exp(1j*sg_visphi_p1[fdx]/180*np.pi) / cal_p1), deg=True)
-            sg_visphi_p2[fdx] = np.angle((np.exp(1j*sg_visphi_p2[fdx]/180*np.pi) / cal_p2), deg=True)
+            sg_visphi_p1[fdx] = np.angle((np.exp(1j*sg_visphi_p1[fdx]/180*np.pi)
+                                          / cal_p1), deg=True)
+            sg_visphi_p2[fdx] = np.angle((np.exp(1j*sg_visphi_p2[fdx]/180*np.pi)
+                                          / cal_p2), deg=True)
 
         for fdx, file in enumerate(s2_files):
-            s2_visphi_p1[fdx] = np.angle((np.exp(1j*s2_visphi_p1[fdx]/180*np.pi) / cal_p1), deg=True)
-            s2_visphi_p2[fdx] = np.angle((np.exp(1j*s2_visphi_p2[fdx]/180*np.pi) / cal_p2), deg=True)
+            s2_visphi_p1[fdx] = np.angle((np.exp(1j*s2_visphi_p1[fdx]/180*np.pi)
+                                          / cal_p1), deg=True)
+            s2_visphi_p2[fdx] = np.angle((np.exp(1j*s2_visphi_p2[fdx]/180*np.pi)
+                                          / cal_p2), deg=True)
 
         ##########################
         # Poscor
         ##########################
-
         if poscor:
             s2_B = np.zeros((s2_u.shape[0], 6, nchannel, 2))
             SpFreq = np.zeros((s2_u.shape[0], 6, nchannel))
             for bl in range(6):
                 if ndit == 1:
-                    s2_B[:,bl,:,0] = s2_u[:,bl,:]
-                    s2_B[:,bl,:,1] = s2_v[:,bl,:]
-                    SpFreq[:,bl,:] = np.sqrt(s2_u[:,bl,:]**2 + s2_v[:,bl,:]**2)
+                    s2_B[:, bl, :, 0] = s2_u[:, bl, :]
+                    s2_B[:, bl, :, 1] = s2_v[:, bl, :]
+                    SpFreq[:, bl, :] = np.sqrt(s2_u[:, bl, :]**2
+                                               + s2_v[:, bl, :]**2)
                 else:
-                    s2_u[s2_u==0] = np.nan
-                    s2_v[s2_v==0] = np.nan
-                    s2_B[:,bl,:,0] = np.nanmean(s2_u[:,bl::6,:],1)
-                    s2_B[:,bl,:,1] = np.nanmean(s2_v[:,bl::6,:],1)
-                    SpFreq[:,bl,:] = np.sqrt(np.nanmean(s2_u[:,bl::6,:],1)**2 + np.nanmean(s2_v[:,bl::6,:],1)**2)
+                    s2_u[s2_u == 0] = np.nan
+                    s2_v[s2_v == 0] = np.nan
+                    s2_B[:, bl, :, 0] = np.nanmean(s2_u[:, bl::6, :], 1)
+                    s2_B[:, bl, :, 1] = np.nanmean(s2_v[:, bl::6, :], 1)
+                    SpFreq[:, bl, :] = np.sqrt(np.nanmean(s2_u[:, bl::6, :], 1)**2
+                                               + np.nanmean(s2_v[:, bl::6, :], 1)**2)
 
             s2_dB = np.copy(s2_B)
             s2_dB = s2_dB - s2_B[calib_file]
@@ -1763,8 +1763,7 @@ class GravPhaseNight():
 
             s2_visphi_p1 -= np.dot(s2_dB,dS)*360
             s2_visphi_p2 -= np.dot(s2_dB,dS)*360
-            
-        
+
         ##########################
         # linear bl fit
         ##########################
@@ -1788,24 +1787,22 @@ class GravPhaseNight():
                 popt, pcov = optimize.curve_fit(linreg, x[valid], y[valid], sigma=yerr[valid], p0=[0,0])
                 for wdx in range(len(wave)):
                     sg_visphi_p2[:,bl::6,wdx] -= linreg(sg_t, *popt)
-                    
-                    
-        
+
         ##########################
         # unwrap phases
         ##########################
-        
         sg_visphi_p1 = ((sg_visphi_p1+180)%360)-180
         sg_visphi_p2 = ((sg_visphi_p2+180)%360)-180
         s2_visphi_p1 = ((s2_visphi_p1+180)%360)-180
         s2_visphi_p2 = ((s2_visphi_p2+180)%360)-180
-        
-        
 
-        result = [[sg_t, sg_lst, sg_ang, sg_visphi_p1, sg_visphi_err_p1, sg_visphi_p2, sg_visphi_err_p2],
-                  [s2_t, s2_lst, s2_ang, s2_visphi_p1, s2_visphi_err_p1, s2_visphi_p2, s2_visphi_err_p2]]
+        result = [[sg_t, sg_lst, sg_ang, sg_visphi_p1, sg_visphi_err_p1,
+                   sg_visphi_p2, sg_visphi_err_p2],
+                  [s2_t, s2_lst, s2_ang, s2_visphi_p1, s2_visphi_err_p1,
+                   s2_visphi_p2, s2_visphi_err_p2]]
+        self.sg_visphi_p1 = sg_visphi_p1
+        self.sg_visphi_p2 = sg_visphi_p2
 
-        
         if plot:
             fig = plt.figure()
             ax1 = fig.add_subplot(111)
@@ -1819,7 +1816,7 @@ class GravPhaseNight():
                 all_cor = -all_cor[all_t_s]
                 all_cor_wo = -all_cor_wo[all_t_s]
                 all_t = all_t[all_t_s]
-                
+
                 if idx == 3:
                     ax1.plot(s2_lst.flatten(), (np.nanmedian(s2_visphi_p1[:,idx::6,2:-2],2).flatten()+
                                               np.nanmedian(s2_visphi_p1[:,idx::6,2:-2],2).flatten())/2+idx*50, 
@@ -1875,13 +1872,12 @@ class GravPhaseNight():
             # plt.xlim(-5, xmax)
             plt.show()
             
-            
         ##########################
         # save data
         ##########################
         if save:
             if correction:
-                if type(save) ==str:
+                if type(save) == str:
                     if self.verbose:
                         print("saving string")
                     folder = save
@@ -1908,7 +1904,7 @@ class GravPhaseNight():
                         d['OI_VIS', 11].data['VISPHI'] = visphi_p1
                         d['OI_VIS', 12].data['VISPHI'] = visphi_p2
                         d.writeto(folder+fname, overwrite=True)
-                        
+
                 for fdx, file in enumerate(s2_files):
                     fname = file[file.find('GRAVI'):]
                     visphi_p1 = result[1][3][fdx]
@@ -1920,7 +1916,7 @@ class GravPhaseNight():
                         d['OI_VIS', 11].data['VISPHI'] = visphi_p1
                         d['OI_VIS', 12].data['VISPHI'] = visphi_p2
                         d.writeto(folder+fname, overwrite=True)
-                    
+
             else:
                 if type(save) ==str:
                     if self.verbose:
