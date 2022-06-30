@@ -717,225 +717,225 @@ def read_correction(mcor_files, xscale, list_dim=1, fancy=True,
 
 ######################
 # Correct a set of data
-
-def correct_data(files, mode, subspacing=1, plotav=8,
-                 plot=False, lstplot=False):
-    corrections_dict = get_corrections(bequiet=True)
-    try:
-        interp_list = corrections_dict[mode]
-    except KeyError:
-        print('Given mode not avialable, use one of those:')
-        print(corrections_dict.keys())
-        raise KeyError('Given mode not avialable')
-        
-    if 'lst' in mode:
-        lst_corr = True
-        print('Apply LST correction')
-    else:
-        lst_corr = False
-        
-    if 'bl' in mode:
-        bl_corr = True
-        print('Apply BL correction')
-    else:
-        bl_corr = False
-        
-    bl_array = np.array([[0,1],
-                   [0,2],
-                   [0,3],
-                   [1,2],
-                   [1,3],
-                   [2,3]])
-        
-    for idx, file in enumerate(files):
-        d = fits.open(file)
-        h = d[0].header
-        if idx == 0:
-            if h['ESO INS SPEC RES'] == 'LOW':
-                low = True
-            else:
-                low = False
-            
-        a1 = d['OI_VIS', 11].data['VISPHI']
-        a2 = d['OI_VIS', 12].data['VISPHI']
-        t = d['OI_VIS', 12].data['MJD'][::6]
-        flag1 = d['OI_VIS', 11].data['FLAG']
-        flag2 = d['OI_VIS', 12].data['FLAG']
-        flag = flag1 + flag2
-        a = (a1+a2)/2
-        a[np.where(flag ==True)] = np.nan
-        if low:
-            aa = np.nanmean(a[:,2:-2],1)
-        else:
-            aa = np.nanmean(a[:,30:-30],1) 
-        
-        b = np.zeros((6, int(a.shape[0]/6)))
-        b[0] = aa[::6]
-        b[1] = aa[1::6]
-        b[2] = aa[2::6]
-        b[3] = aa[3::6]
-        b[4] = aa[4::6]
-        b[5] = aa[5::6]
-
-        c = np.zeros_like(b)
-        lst0 = h['LST']/3600
-        time = d['OI_VIS', 11].data['TIME'][::6]/3600
-        time -= time[0]
-        lst = time + lst0
-        angle = [get_angle_header_all(h, i, len(t)) for i in range(4)]
-        wave = d['OI_WAVELENGTH',12].data['EFF_WAVE']*1e6
-        for base in range(6):
-            if bl_corr:
-                if lst_corr:
-                    if subspacing != 1:
-                        lstdif = lst[-1] - lst[-2]
-                        lst_s = np.linspace(lst[0], lst[-1] + lstdif, len(lst)*subspacing)
-                        cor = -averaging(interp_list[base](lst_s), subspacing)[:-1]
-                    else:
-                        cor = -interp_list[base](lst)
-                else:
-                    t1 = bl_array[base][0]
-                    t2 = bl_array[base][1]
-                    ang1 = angle[t1]
-                    ang2 = angle[t2]
-                    mang = (ang1 + ang2)/2
-                    if subspacing != 1:
-                        mangdif = (mang[-1]-mang[-2])/2
-                        mang_s = np.linspace(mang[0] - mangdif, mang[-1] + mangdif, len(mang)*subspacing)
-                        cor = -averaging(interp_list[base](mang_s), subspacing)[:-1]
-                    else:
-                        cor = -interp_list[base](mang)
-
-            else:
-                t1 = bl_array[base][0]
-                t2 = bl_array[base][1]
-                if lst_corr:
-                    if subspacing != 1:
-                        lstdif = lst[-1] - lst[-2]
-                        lst_s = np.linspace(lst[0], lst[-1] + lstdif, len(lst)*subspacing)
-                        cor1 = averaging(interp_list[t1](lst_s), subspacing)[:-1]
-                        cor2 = averaging(interp_list[t2](lst_s), subspacing)[:-1]
-                    else:
-                        cor1 = interp_list[t1](lst)
-                        cor2 = interp_list[t2](lst)  
-                else:
-                    ang1 = angle[t1]
-                    ang2 = angle[t2]
-                    if subspacing != 1:
-                        angdif1 = (ang1[-1]-ang1[-2])/2
-                        angdif2 = (ang2[-1]-ang2[-2])/2
-                        ang1_s = np.linspace(ang1[0] - angdif1, ang1[-1] + angdif1, len(ang1)*subspacing)
-                        ang2_s = np.linspace(ang2[0] - angdif2, ang2[-1] + angdif2, len(ang2)*subspacing)
-                        cor1 = averaging(interp_list[t1](ang1_s), subspacing)[:-1]
-                        cor2 = averaging(interp_list[t2](ang2_s), subspacing)[:-1]
-                    else:
-                        cor1 = interp_list[t1](ang1)
-                        cor2 = interp_list[t2](ang2)
-                
-                cor = cor1-cor2
-                if mode in ['lst_standard', 'standard']:
-                    cor *= 1e6
-                    
-            wcor = np.zeros((len(t), len(wave)))
-            for w in range(len(wave)):
-                wcor[:,w] = cor/wave[w]*360
-            c[base] -= np.mean(wcor[:,2:-2],1)
-
-        if idx == 0:
-            b0 = np.nanmean(b,1)
-            c0 = np.nanmean(c,1)
-        for bl in range(6):
-            b[bl] -= b0[bl]
-            c[bl] -= c0[bl]
-            
-        if idx == 0:
-            visphi = b
-            visphi_fake = c
-            t_visphi = t
-            ang = np.mean(np.asarray(angle),0)
-            t_lst = lst
-        else:
-            visphi = np.concatenate((visphi,b),1)
-            visphi_fake = np.concatenate((visphi_fake,c),1)
-            t_visphi = np.concatenate((t_visphi,t))
-            ang = np.concatenate((ang, np.mean(np.asarray(angle),0)))
-            t_lst = np.concatenate((t_lst,lst))
-
-    if plot:
-        mjd_files = []
-        ut_files = []
-        lst_files = []
-        for idx, file in enumerate(files):
-            d = fits.open(file)
-            mjd_files.append(d['OI_VIS', 12].data['MJD'][0])
-            a = file.find('GRAVI.20')
-            ut_files.append(file[a+17:a+22])
-            lst_files.append(d[0].header['LST']/3600)
-        tt = (t_visphi-t_visphi[0])*24*60
-        t_files = (mjd_files-t_visphi[0])*24*60
-        
-        gs = gridspec.GridSpec(2,1, hspace=0.01)
-        plt.figure(figsize=(8,10))
-        off = 30
-
-        ax = plt.subplot(gs[0,0])
-        for idx in range(6):
-            if lstplot:
-                x = t_lst
-            else:
-                x = tt
-
-            if idx == 0:
-                plt.plot(averaging(x, plotav), averaging(visphi[idx], plotav)+idx*off, 
-                         ls='-', lw=0.5, marker='o', zorder=10, color=colors_baseline[idx],
-                         label='Data')
-                plt.plot(averaging(x, plotav), averaging(visphi_fake[idx], plotav)+idx*off, 
-                         ls='--', lw=0.5, marker='', zorder=10, color=colors_baseline[idx],
-                         label='averaged TELFC_MCORR')
-            else:
-                plt.plot(averaging(x, plotav), averaging(visphi[idx], plotav)+idx*off, 
-                         ls='-', lw=0.5, marker='o', zorder=10, color=colors_baseline[idx])
-                plt.plot(averaging(x, plotav), averaging(visphi_fake[idx], plotav)+idx*off, 
-                         ls='--', lw=0.5, marker='', zorder=10, color=colors_baseline[idx])
-            blstd = np.nanstd(averaging(visphi_fake[idx], plotav) - averaging(visphi[idx], plotav))
-            print('Bl %s std: %.2f' % (baseline[idx], blstd))
-            plt.axhline(idx*off, lw=0.5, color=colors_baseline[idx])
-
-        ang_av = averaging(ang, plotav)[:-1]
-        ang_sep = int(len(ang_av)/len(t_files))
-        if lstplot:
-            for m in range(len(t_files)):
-                plt.axvline(lst_files[m], ls='--', lw=0.5, color='grey')
-                plt.text(lst_files[m]+0.01, -27, '%.1f$^\circ$' % (ang_av[::ang_sep][m]), rotation=90, fontsize=7)
-        else:
-            for m in range(len(t_files)):
-                plt.axvline(t_files[m], ls='--', lw=0.5, color='grey')
-                plt.text(t_files[m]+0.5, -27, '%.1f$^\circ$' % (ang_av[::ang_sep][m]), rotation=90, fontsize=7)
-        plt.ylim(-35,185)
-        plt.legend(loc=2)
-        plt.ylabel('Phase [deg]')
-        ax.set_xticklabels([])
-
-        ax = plt.subplot(gs[1,0])
-        for idx in range(6):
-            plt.plot(averaging(x, plotav), averaging(visphi[idx], plotav)-averaging(visphi_fake[idx], plotav)+idx*off, 
-                     ls='-', lw=0.5, marker='o', zorder=10, color=colors_baseline[idx],
-                     label='Data')
-            plt.axhline(idx*off, lw=0.5, color=colors_baseline[idx])
-        if lstplot:
-            for m in range(len(t_files)):
-                plt.axvline(lst_files[m], ls='--', lw=0.5, color='grey')
-                plt.text(lst_files[m]+0.01, 168, ut_files[m], rotation=90, fontsize=7)
-            plt.xlabel('LST [h]')
-        else:
-            for m in range(len(t_files)):
-                plt.axvline(t_files[m], ls='--', lw=0.5, color='grey')
-                plt.text(t_files[m]+0.5, 168, ut_files[m], rotation=90, fontsize=7)
-            plt.xlabel('Time [min]')
-        plt.ylabel('Corr. Phase [deg]')
-        plt.ylim(-35,185)
-        plt.show()
-    return t_visphi, t_lst, ang, visphi, visphi_fake
+# 
+# def correct_data(files, mode, subspacing=1, plotav=8,
+#                  plot=False, lstplot=False):
+#     corrections_dict = get_corrections(bequiet=True)
+#     try:
+#         interp_list = corrections_dict[mode]
+#     except KeyError:
+#         print('Given mode not avialable, use one of those:')
+#         print(corrections_dict.keys())
+#         raise KeyError('Given mode not avialable')
+# 
+#     if 'lst' in mode:
+#         lst_corr = True
+#         print('Apply LST correction')
+#     else:
+#         lst_corr = False
+# 
+#     if 'bl' in mode:
+#         bl_corr = True
+#         print('Apply BL correction')
+#     else:
+#         bl_corr = False
+# 
+#     bl_array = np.array([[0,1],
+#                    [0,2],
+#                    [0,3],
+#                    [1,2],
+#                    [1,3],
+#                    [2,3]])
+# 
+#     for idx, file in enumerate(files):
+#         d = fits.open(file)
+#         h = d[0].header
+#         if idx == 0:
+#             if h['ESO INS SPEC RES'] == 'LOW':
+#                 low = True
+#             else:
+#                 low = False
+# 
+#         a1 = d['OI_VIS', 11].data['VISPHI']
+#         a2 = d['OI_VIS', 12].data['VISPHI']
+#         t = d['OI_VIS', 12].data['MJD'][::6]
+#         flag1 = d['OI_VIS', 11].data['FLAG']
+#         flag2 = d['OI_VIS', 12].data['FLAG']
+#         flag = flag1 + flag2
+#         a = (a1+a2)/2
+#         a[np.where(flag ==True)] = np.nan
+#         if low:
+#             aa = np.nanmean(a[:,2:-2],1)
+#         else:
+#             aa = np.nanmean(a[:,30:-30],1) 
+# 
+#         b = np.zeros((6, int(a.shape[0]/6)))
+#         b[0] = aa[::6]
+#         b[1] = aa[1::6]
+#         b[2] = aa[2::6]
+#         b[3] = aa[3::6]
+#         b[4] = aa[4::6]
+#         b[5] = aa[5::6]
+# 
+#         c = np.zeros_like(b)
+#         lst0 = h['LST']/3600
+#         time = d['OI_VIS', 11].data['TIME'][::6]/3600
+#         time -= time[0]
+#         lst = time + lst0
+#         angle = [get_angle_header_all(h, i, len(t)) for i in range(4)]
+#         wave = d['OI_WAVELENGTH',12].data['EFF_WAVE']*1e6
+#         for base in range(6):
+#             if bl_corr:
+#                 if lst_corr:
+#                     if subspacing != 1:
+#                         lstdif = lst[-1] - lst[-2]
+#                         lst_s = np.linspace(lst[0], lst[-1] + lstdif, len(lst)*subspacing)
+#                         cor = -averaging(interp_list[base](lst_s), subspacing)[:-1]
+#                     else:
+#                         cor = -interp_list[base](lst)
+#                 else:
+#                     t1 = bl_array[base][0]
+#                     t2 = bl_array[base][1]
+#                     ang1 = angle[t1]
+#                     ang2 = angle[t2]
+#                     mang = (ang1 + ang2)/2
+#                     if subspacing != 1:
+#                         mangdif = (mang[-1]-mang[-2])/2
+#                         mang_s = np.linspace(mang[0] - mangdif, mang[-1] + mangdif, len(mang)*subspacing)
+#                         cor = -averaging(interp_list[base](mang_s), subspacing)[:-1]
+#                     else:
+#                         cor = -interp_list[base](mang)
+# 
+#             else:
+#                 t1 = bl_array[base][0]
+#                 t2 = bl_array[base][1]
+#                 if lst_corr:
+#                     if subspacing != 1:
+#                         lstdif = lst[-1] - lst[-2]
+#                         lst_s = np.linspace(lst[0], lst[-1] + lstdif, len(lst)*subspacing)
+#                         cor1 = averaging(interp_list[t1](lst_s), subspacing)[:-1]
+#                         cor2 = averaging(interp_list[t2](lst_s), subspacing)[:-1]
+#                     else:
+#                         cor1 = interp_list[t1](lst)
+#                         cor2 = interp_list[t2](lst)  
+#                 else:
+#                     ang1 = angle[t1]
+#                     ang2 = angle[t2]
+#                     if subspacing != 1:
+#                         angdif1 = (ang1[-1]-ang1[-2])/2
+#                         angdif2 = (ang2[-1]-ang2[-2])/2
+#                         ang1_s = np.linspace(ang1[0] - angdif1, ang1[-1] + angdif1, len(ang1)*subspacing)
+#                         ang2_s = np.linspace(ang2[0] - angdif2, ang2[-1] + angdif2, len(ang2)*subspacing)
+#                         cor1 = averaging(interp_list[t1](ang1_s), subspacing)[:-1]
+#                         cor2 = averaging(interp_list[t2](ang2_s), subspacing)[:-1]
+#                     else:
+#                         cor1 = interp_list[t1](ang1)
+#                         cor2 = interp_list[t2](ang2)
+# 
+#                 cor = cor1-cor2
+#                 if mode in ['lst_standard', 'standard']:
+#                     cor *= 1e6
+# 
+#             wcor = np.zeros((len(t), len(wave)))
+#             for w in range(len(wave)):
+#                 wcor[:,w] = cor/wave[w]*360
+#             c[base] -= np.mean(wcor[:,2:-2],1)
+# 
+#         if idx == 0:
+#             b0 = np.nanmean(b,1)
+#             c0 = np.nanmean(c,1)
+#         for bl in range(6):
+#             b[bl] -= b0[bl]
+#             c[bl] -= c0[bl]
+# 
+#         if idx == 0:
+#             visphi = b
+#             visphi_fake = c
+#             t_visphi = t
+#             ang = np.mean(np.asarray(angle),0)
+#             t_lst = lst
+#         else:
+#             visphi = np.concatenate((visphi,b),1)
+#             visphi_fake = np.concatenate((visphi_fake,c),1)
+#             t_visphi = np.concatenate((t_visphi,t))
+#             ang = np.concatenate((ang, np.mean(np.asarray(angle),0)))
+#             t_lst = np.concatenate((t_lst,lst))
+# 
+#     if plot:
+#         mjd_files = []
+#         ut_files = []
+#         lst_files = []
+#         for idx, file in enumerate(files):
+#             d = fits.open(file)
+#             mjd_files.append(d['OI_VIS', 12].data['MJD'][0])
+#             a = file.find('GRAVI.20')
+#             ut_files.append(file[a+17:a+22])
+#             lst_files.append(d[0].header['LST']/3600)
+#         tt = (t_visphi-t_visphi[0])*24*60
+#         t_files = (mjd_files-t_visphi[0])*24*60
+# 
+#         gs = gridspec.GridSpec(2,1, hspace=0.01)
+#         plt.figure(figsize=(8,10))
+#         off = 30
+# 
+#         ax = plt.subplot(gs[0,0])
+#         for idx in range(6):
+#             if lstplot:
+#                 x = t_lst
+#             else:
+#                 x = tt
+# 
+#             if idx == 0:
+#                 plt.plot(averaging(x, plotav), averaging(visphi[idx], plotav)+idx*off, 
+#                          ls='-', lw=0.5, marker='o', zorder=10, color=colors_baseline[idx],
+#                          label='Data')
+#                 plt.plot(averaging(x, plotav), averaging(visphi_fake[idx], plotav)+idx*off, 
+#                          ls='--', lw=0.5, marker='', zorder=10, color=colors_baseline[idx],
+#                          label='averaged TELFC_MCORR')
+#             else:
+#                 plt.plot(averaging(x, plotav), averaging(visphi[idx], plotav)+idx*off, 
+#                          ls='-', lw=0.5, marker='o', zorder=10, color=colors_baseline[idx])
+#                 plt.plot(averaging(x, plotav), averaging(visphi_fake[idx], plotav)+idx*off, 
+#                          ls='--', lw=0.5, marker='', zorder=10, color=colors_baseline[idx])
+#             blstd = np.nanstd(averaging(visphi_fake[idx], plotav) - averaging(visphi[idx], plotav))
+#             print('Bl %s std: %.2f' % (baseline[idx], blstd))
+#             plt.axhline(idx*off, lw=0.5, color=colors_baseline[idx])
+# 
+#         ang_av = averaging(ang, plotav)[:-1]
+#         ang_sep = int(len(ang_av)/len(t_files))
+#         if lstplot:
+#             for m in range(len(t_files)):
+#                 plt.axvline(lst_files[m], ls='--', lw=0.5, color='grey')
+#                 plt.text(lst_files[m]+0.01, -27, '%.1f$^\circ$' % (ang_av[::ang_sep][m]), rotation=90, fontsize=7)
+#         else:
+#             for m in range(len(t_files)):
+#                 plt.axvline(t_files[m], ls='--', lw=0.5, color='grey')
+#                 plt.text(t_files[m]+0.5, -27, '%.1f$^\circ$' % (ang_av[::ang_sep][m]), rotation=90, fontsize=7)
+#         plt.ylim(-35,185)
+#         plt.legend(loc=2)
+#         plt.ylabel('Phase [deg]')
+#         ax.set_xticklabels([])
+# 
+#         ax = plt.subplot(gs[1,0])
+#         for idx in range(6):
+#             plt.plot(averaging(x, plotav), averaging(visphi[idx], plotav)-averaging(visphi_fake[idx], plotav)+idx*off, 
+#                      ls='-', lw=0.5, marker='o', zorder=10, color=colors_baseline[idx],
+#                      label='Data')
+#             plt.axhline(idx*off, lw=0.5, color=colors_baseline[idx])
+#         if lstplot:
+#             for m in range(len(t_files)):
+#                 plt.axvline(lst_files[m], ls='--', lw=0.5, color='grey')
+#                 plt.text(lst_files[m]+0.01, 168, ut_files[m], rotation=90, fontsize=7)
+#             plt.xlabel('LST [h]')
+#         else:
+#             for m in range(len(t_files)):
+#                 plt.axvline(t_files[m], ls='--', lw=0.5, color='grey')
+#                 plt.text(t_files[m]+0.5, 168, ut_files[m], rotation=90, fontsize=7)
+#             plt.xlabel('Time [min]')
+#         plt.ylabel('Corr. Phase [deg]')
+#         plt.ylim(-35,185)
+#         plt.show()
+#     return t_visphi, t_lst, ang, visphi, visphi_fake
 
 
 #########################
@@ -1048,14 +1048,21 @@ class GravPhaseNight():
                         sobjoffx = h['ESO INS SOBJ OFFX']
                         sobjoffy = h['ESO INS SOBJ OFFY']
                         if onlysgra:
-                            if np.abs(sobjoffx - _x) > 10 :
-                                print('File with separation (%i,%i) not on S2 '
-                                      'orbit, will be ignored' % (sobjx, sobjy))
-                                continue
-                            if np.abs(sobjoffy - _y) > 10 :
-                                print('File with separation (%i,%i) not on S2 '
-                                      'orbit, will be ignored' % (sobjx, sobjy))
-                                continue
+                            if s2_offx != 0.0:
+                                if sobjoffx != 0.0 or sobjoffy != 0.0:
+                                    print('File with separation (%i,%i) not '
+                                          'an SGRA file, will be ignored'
+                                          % (sobjx, sobjy))
+                                    continue
+                            else:
+                                if np.abs(sobjoffx - _x) > 10 :
+                                    print('File with separation (%i,%i) not on S2 '
+                                          'orbit, will be ignored' % (sobjx, sobjy))
+                                    continue
+                                if np.abs(sobjoffy - _y) > 10 :
+                                    print('File with separation (%i,%i) not on S2 '
+                                          'orbit, will be ignored' % (sobjx, sobjy))
+                                    continue
                         if file not in ignore_files:
                             sg_files.append(file)
         if self.verbose:
