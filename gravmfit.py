@@ -1547,10 +1547,12 @@ class GravMFit(GravData, GravPhaseMaps):
                             plt.show()
 
                         # get the actual fit
-                        theta_fit = np.percentile(fl_samples, [50], axis=0).T.flatten()
-                        percentiles = np.percentile(fl_samples, [16, 50, 84], axis=0).T
-                        mostlike_m = percentiles[:,1] - percentiles[:,0]
-                        mostlike_p = percentiles[:,2] - percentiles[:,1]
+                        theta_fit = np.percentile(fl_samples, [50],
+                                                  axis=0).T.flatten()
+                        percentiles = np.percentile(fl_samples, [16, 50, 84],
+                                                    axis=0).T
+                        mostlike_m = percentiles[:, 1] - percentiles[:, 0]
+                        mostlike_p = percentiles[:, 2] - percentiles[:, 1]
                         if bestchi:
                             theta_result = mostprop
                         else:
@@ -1561,7 +1563,8 @@ class GravMFit(GravData, GravPhaseMaps):
                         all_mostprop = np.copy(mostprop)
                         all_mostlike = np.copy(theta_fit)
                         for ddx in range(len(todel)):
-                            fulltheta = np.insert(fulltheta, todel[ddx], fixed[ddx])
+                            fulltheta = np.insert(fulltheta, todel[ddx],
+                                                  fixed[ddx])
                             all_mostprop = np.insert(all_mostprop, todel[ddx],
                                                      fixed[ddx])
                             all_mostlike = np.insert(all_mostlike, todel[ddx],
@@ -1583,7 +1586,6 @@ class GravMFit(GravData, GravPhaseMaps):
                                                        all_mostlike[ndx],
                                                        mostlike_m[ndx],
                                                        mostlike_p[ndx]])
-                        fittab = fittab.append(_fittab, ignore_index=True)
 
                     else:
                         _pc_idx = theta_names.index('pc RA')
@@ -1613,7 +1615,6 @@ class GravMFit(GravData, GravPhaseMaps):
                                                      pcRa])
                         _fittab['pcDec'] = pd.Series([theta[_pc_idx+1],
                                                       pcDec])
-                        fittab = fittab.append(_fittab, ignore_index=True)
 
                         theta_result = np.concatenate((theta1,
                                                        np.array([pcRa, pcDec]),
@@ -1662,8 +1663,12 @@ class GravMFit(GravData, GravPhaseMaps):
                 else:
                     chi2string = 'chi2'
 
-                redchi = [redchi_visamp, redchi_vis2,
-                          redchi_closure, redchi_visphi]
+                if not onlyphases:
+                    chi2pd = pd.DataFrame({'chi2': [redchi_visamp, redchi_vis2, 
+                                                    redchi_closure, redchi_visphi]
+                                           })
+                    _fittab = pd.concat([_fittab, chi2pd], axis=1)
+
                 if idx == 0:
                     redchi0 = [redchi_visamp, redchi_vis2,
                                redchi_closure, redchi_visphi]
@@ -1710,6 +1715,10 @@ class GravMFit(GravData, GravPhaseMaps):
             if plotScience:
                 self.plotFitComb(plotdata)
                 self.plotdata = plotdata
+
+            fittab = fittab.append(_fittab, ignore_index=True)
+                
+            
         self.fittab = fittab
         if iopandas is not None and not pdexists:
            fittab.to_pickle(pdname)
