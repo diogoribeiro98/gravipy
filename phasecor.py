@@ -136,7 +136,7 @@ def create_met_files(target='SGRA', create=True, force_new = False,
     s2orbit[:,1:] *= 1e3
     for folder in folders:
         night = folder[-10:]
-        if night in ['2019-03-27', '2022-06-18']:
+        if night in ['2022-06-18']:
             print('Need to fix this night! %s' % night)
             continue
         savedir = folder + '/metrology_files/'
@@ -166,6 +166,7 @@ def create_met_files(target='SGRA', create=True, force_new = False,
                 if h['ESO INS SOBJ NAME'] == target:
                     tfiles.append(file)
         else:
+            reverse = False
             tfiles_off = []
             for file in files:
                 h = fits.open(file)[0].header
@@ -198,17 +199,32 @@ def create_met_files(target='SGRA', create=True, force_new = False,
                             tfiles.append(file)
                     except KeyError:
                         continue
+            if len(tfiles) == 0 and len(tfiles_off) == 0:
+                print('No files available')
+                continue
             if reverse and target == 'S2':
                 tfiles = tfiles_off
             if not reverse and target == 'SGRA':
                 tfiles = tfiles_off
         
-        first = True
+        if len(tfiles) == 0:
+            print('No files available')
+            continue
+        
+        LST = np.array([]).reshape(0)
+        OPD_TELFC_CORR = np.array([]).reshape(0,4,4)
+        OPD_TELFC_MCORR = np.array([]).reshape(0,4)
+        REFANGLE = np.array([]).reshape(0,4)
+        PUPIL = np.array([]).reshape(0,4,2)
+        FIBER = np.array([]).reshape(0,4,2)
+        
         for file in tfiles:
             try:
                 m = fits.open(file)['OI_VIS_MET']
             except KeyError:
+                print('No met extension in %s' % file)
                 continue
+            h = fits.open(file)[0].header
             data0 = np.zeros((len(m.data["OPD_TELFC_CORR"])//4))
             data1 = np.zeros((len(m.data["OPD_TELFC_CORR"])//4, 4, 4))
             data2 = np.zeros((len(m.data["OPD_TELFC_MCORR"])//4, 4))
@@ -220,55 +236,46 @@ def create_met_files(target='SGRA', create=True, force_new = False,
             data0 = time + lst0
             data0 = data0 % 24
         
+            data1 = m.data["OPD_TELFC_CORR"].reshape(-1,4,4)
+            data2 = m.data["OPD_TELFC_MCORR"].reshape(-1,4)
+            data4[:,:,0] = m.data["PUPIL_U"].reshape(-1,4)
+            data4[:,:,1] = m.data["PUPIL_V"].reshape(-1,4)
+            data5[:,:,0] = m.data["FIBER_DU"].reshape(-1,4)
+            data5[:,:,1] = m.data["FIBER_DV"].reshape(-1,4)
+
             for tel in range(4):
-                data1[:,tel,:] = m.data["OPD_TELFC_CORR"][tel::4]
-                data2[:,tel] = m.data["OPD_TELFC_MCORR"][tel::4]
                 data3[:,tel] = get_angle_header_all(h, tel, len(data3))
-                data4[:,tel,0] = m.data["PUPIL_U"][tel::4]
-                data4[:,tel,1] = m.data["PUPIL_V"][tel::4]
-                data5[:,tel,0] = m.data["FIBER_DU"][tel::4]
-                data5[:,tel,1] = m.data["FIBER_DV"][tel::4]
-            if first:
-                LST = data0
-                OPD_TELFC_CORR = data1
-                OPD_TELFC_MCORR = data2
-                REFANGLE = data3
-                PUPIL = data4
-                FIBER = data5
-                first = False
-            else:
-                LST = np.concatenate((LST, data0))
-                OPD_TELFC_CORR = np.concatenate((OPD_TELFC_CORR, data1), 0)
-                OPD_TELFC_MCORR = np.concatenate((OPD_TELFC_MCORR, data2), 0)
-                REFANGLE = np.concatenate((REFANGLE, data3), 0)
-                PUPIL = np.concatenate((PUPIL, data4), 0)
-                FIBER = np.concatenate((FIBER, data5), 0)
+            LST = np.concatenate((LST, data0))
+            OPD_TELFC_CORR = np.concatenate((OPD_TELFC_CORR, data1), 0)
+            OPD_TELFC_MCORR = np.concatenate((OPD_TELFC_MCORR, data2), 0)
+            REFANGLE = np.concatenate((REFANGLE, data3), 0)
+            PUPIL = np.concatenate((PUPIL, data4), 0)
+            FIBER = np.concatenate((FIBER, data5), 0)
     
-        if not first:
-            num_bins = 3600
-            angle_bins = np.linspace(0, 360, num_bins)
-            bin_TELFC_CORR = np.zeros((num_bins-1, 4, 4))
-            bin_TELFC_MCORR = np.zeros((num_bins-1, 4))
-            bin_PUPIL = np.zeros((num_bins-1, 4, 2))
-            bin_FIBER = np.zeros((num_bins-1, 4, 2))
+        num_bins = 3600
+        angle_bins = np.linspace(0, 360, num_bins)
+        bin_TELFC_CORR = np.zeros((num_bins-1, 4, 4))
+        bin_TELFC_MCORR = np.zeros((num_bins-1, 4))
+        bin_PUPIL = np.zeros((num_bins-1, 4, 2))
+        bin_FIBER = np.zeros((num_bins-1, 4, 2))
         
-            for tel in range(4):
-                a = REFANGLE[:,tel]
-                bin_TELFC_MCORR[:,tel] = stats.binned_statistic(a, OPD_TELFC_MCORR[:,tel], 
-                                                                bins=angle_bins, statistic="median")[0]
-                for dio in range(4):
-                    bin_TELFC_CORR[:,tel,dio] = stats.binned_statistic(a, OPD_TELFC_CORR[:,tel,dio], 
-                                                                       bins=angle_bins, statistic="median")[0]
-                for dim in range(2):
-                    bin_PUPIL[:,tel,dim] = stats.binned_statistic(a, PUPIL[:,tel,dim], 
-                                                                  bins=angle_bins, statistic="median")[0]
-                    bin_FIBER[:,tel,dim] = stats.binned_statistic(a, FIBER[:,tel,dim], 
-                                                                  bins=angle_bins, statistic="median")[0]
-            np.save('%s%s_%s_telfcmcorr.npy' % (savedir, target, night), bin_TELFC_MCORR)
-            np.save('%s%s_%s_telfccorr.npy' % (savedir, target, night), bin_TELFC_CORR)
-            np.save('%s%s_%s_angle.npy' % (savedir, target, night), angle_bins)
-            np.save('%s%s_%s_puil.npy' % (savedir, target, night), bin_PUPIL)            
-            np.save('%s%s_%s_fiber.npy' % (savedir, target, night), bin_FIBER)
+        for tel in range(4):
+            a = REFANGLE[:,tel]
+            bin_TELFC_MCORR[:,tel] = stats.binned_statistic(a, OPD_TELFC_MCORR[:,tel], 
+                                                            bins=angle_bins, statistic="median")[0]
+            for dio in range(4):
+                bin_TELFC_CORR[:,tel,dio] = stats.binned_statistic(a, OPD_TELFC_CORR[:,tel,dio], 
+                                                                   bins=angle_bins, statistic="median")[0]
+            for dim in range(2):
+                bin_PUPIL[:,tel,dim] = stats.binned_statistic(a, PUPIL[:,tel,dim], 
+                                                              bins=angle_bins, statistic="median")[0]
+                bin_FIBER[:,tel,dim] = stats.binned_statistic(a, FIBER[:,tel,dim], 
+                                                              bins=angle_bins, statistic="median")[0]
+        np.save('%s%s_%s_telfcmcorr.npy' % (savedir, target, night), bin_TELFC_MCORR)
+        np.save('%s%s_%s_telfccorr.npy' % (savedir, target, night), bin_TELFC_CORR)
+        np.save('%s%s_%s_angle.npy' % (savedir, target, night), angle_bins)
+        np.save('%s%s_%s_puil.npy' % (savedir, target, night), bin_PUPIL)            
+        np.save('%s%s_%s_fiber.npy' % (savedir, target, night), bin_FIBER)
     
     
     
@@ -520,7 +527,7 @@ def read_correction(mcor_files, xscale, list_dim=1, fancy=True,
                 ax.set_yticklabels([])
             else:
                 plt.ylabel('TELFC_MCORR [$\mu$m]')
-            if tel % AttributeError2 != 1:
+            if tel % 2 != 1:
                 ax.set_xticklabels([])
             else:
                 if lst:
