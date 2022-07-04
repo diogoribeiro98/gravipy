@@ -1724,6 +1724,7 @@ class GravPhaseNight():
             if self.verbose:
                 print('Applied poscor: (%.3f,%.3f) mas ' % (dS[0], dS[1]))
                 print('Chi2 of poscor: %.2f \n' % np.sum(f(dS)**2))
+            self.dS = dS
 
             if plot:
                 n = nfiles
