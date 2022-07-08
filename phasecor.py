@@ -1728,19 +1728,27 @@ class GravPhaseNight():
 
             if plot:
                 n = nfiles
-                colors = plt.cm.inferno(np.linspace(0,1,n+2))
+                par = np.linspace(0,np.max(s2_t)+10,100)
+                norm = matplotlib.colors.Normalize(vmin=np.min(par),
+                                                   vmax=np.max(par))
+                c_m = plt.cm.inferno
+                s_m = matplotlib.cm.ScalarMappable(cmap=c_m, norm=norm)
+                s_m.set_array([])
+
                 fitres = np.dot(dB1,dS)*360
                 fitres_r = np.reshape(fitres, (n, 6, len(SpFreq[0, 0])))
                 for idx in range(n):
                     for bl in range(6):
                         plt.errorbar(SpFreq[idx, bl,2:-2]*1000, s2_visphi_fit[idx, bl,2:-2], 
                                      s2_visphi_err_fit[idx, bl,2:-2], 
-                                     ls='', marker='o', color=colors[idx], alpha=0.5)
-                        plt.plot(SpFreq[idx,bl]*1000, fitres_r[idx,bl], color=colors[idx])
-                plt.ylim(-100, 100)
+                                     ls='', marker='o', color=s_m.to_rgba(s2_t[idx]), alpha=0.5)
+                        plt.plot(SpFreq[idx,bl]*1000, fitres_r[idx,bl],
+                                 color=s_m.to_rgba(s2_t[idx]))
+                plt.ylim(-74, 74)
+                plt.colorbar(s_m, label='Time [min]')
                 plt.xlabel('Spatial frequency [1/as]')
                 plt.ylabel('Visibility phase [deg]')
-                plt.title('Poscor')
+                plt.title('Poscor:  (%.3f,%.3f) mas ' % (dS[0], dS[1]))
                 plt.show()
 
             s2_B = np.zeros((s2_u.shape[0], ndit*6, nchannel, 2))
