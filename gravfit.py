@@ -88,6 +88,10 @@ class GravFit(GravData):
     Class which has all the fitting capabilities for:
     unary, binary and triple fit
     """
+    #def __init__(self, data, verbose=False, ignore_tel=[]):
+    #    GravData.__init__(self, data, verbose=verbose)
+    #    self.getIntdata(ignore_tel=ignore_tel)
+    
     ############################################
     ############################################
     ################ Phase Maps ################
@@ -3567,7 +3571,7 @@ class GravFit(GravData):
 
         # Get data from file
         nwave = self.channel
-        self.getIntdata(plot=False, flag=False)
+        #self.getIntdata(plot=False, flag=False)
         MJD = fits.open(self.name)[0].header["MJD-OBS"]
         fullu = self.u
         fullv = self.v
@@ -3831,7 +3835,7 @@ class GravFit(GravData):
                             visphi_flag[bl,:] = True
 
                 if dofit == True:
-                    width = 1e-1
+                    width = 5e-1
                     pos = np.ones((nwalkers,ndim))
                     for par in range(ndim):
                         if par in todel:
@@ -3862,7 +3866,7 @@ class GravFit(GravData):
                             if bequiet:
                                 sampler.run_mcmc(pos, nruns, progress=False)
                             else:
-                                sampler.run_mcmc(pos, nruns, progress=True)
+                                sampler.run_mcmc(pos, nruns, progress=True, skip_initial_state_check=True)
 
                     if not bequiet:
                         print("---------------------------------------")
