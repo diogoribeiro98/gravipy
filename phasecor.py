@@ -944,7 +944,7 @@ def read_correction(mcor_files, xscale, list_dim=1, fancy=True,
 class GravPhaseNight():
     def __init__(self, night=None, verbose=True, usepandas=False,
                  pandasfile=None, reddir=None, datadir='/data/user/forFrank2/',
-                 onlysgra=False, calibrator=None, full_folder=False, s2_offx=0,
+                 onlysgra=False, calibrator=None, full_folder=False, s2_offx=None,
                  ignore_files=[]):
         """
         Package to do the full phase calibration, poscor, and
@@ -969,9 +969,11 @@ class GravPhaseNight():
 
         nights = []
         calibrators = []
+        offsets = []
         for _n in list_nights:
             nights.append(_n['night'])
             calibrators.append(_n['calibrator'])
+            offsets.append(_n['s2off'])
         if night is None:
             print(nights)
             raise ValueError('Night has to be given as argument')
@@ -1025,6 +1027,8 @@ class GravPhaseNight():
             raise ValueError('No files found, most likely something is wrong'
                              ' with the given reduction folder')
 
+        if s2_offx is None:
+            s2_offx = offsets[nights.index(night)]
         s2data = np.load(resource_filename('gravipy', 's2_orbit.npy'))
         if full_folder:
             sg_files = allfiles
