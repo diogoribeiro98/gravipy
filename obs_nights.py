@@ -47,4 +47,6 @@ list_nights = [{'night': '2019-03-27', 'calibrator': 'GRAVI.2019-03-28T08:00:22.
                {'night': '2022-05-22', 'calibrator': 'GRAVI.2022-05-23T04:51:42.408_dualscivis.fits', 's2off': 14.089},
                {'night': '2022-06-19', 'calibrator': 'GRAVI.2022-06-20T07:05:36.095_dualscivis.fits', 's2off': 13.255},
                {'night': '2022-07-17', 'calibrator': 'GRAVI.2022-07-18T02:38:34.410_dualscivis.fits', 's2off': 12.355},
-               {'night': '2022-07-20', 'calibrator': 'GRAVI.2022-07-21T03:48:58.444_dualscivis.fits', 's2off': 12.261}]
+               {'night': '2022-07-20', 'calibrator': 'GRAVI.2022-07-21T03:48:58.444_dualscivis.fits', 's2off': 12.261},
+               {'night': '2022-08-16', 'calibrator': 'GRAVI.2022-08-17T02:38:04.722_dualscivis.fits', 's2off': 11.42},
+               ]
