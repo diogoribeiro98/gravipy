@@ -811,7 +811,7 @@ def _calc_vis_mstars(theta_in, fitarg, fithelp):
     pc_RA = theta[th_rest+2]
     pc_DEC = theta[th_rest+3]
     fr_BH = 10**(theta[th_rest+4])
-
+    
     alpha_bg = 3.
     alpha_stars = 3
 
@@ -2210,6 +2210,7 @@ def _lnlike_night(theta, fitdata, fitarg, fithelp):
 
     for ddx in range(len(todel)):
         theta = np.insert(theta, todel[ddx], fixed[ddx])
+    
     ln_prob_res = 0
     for ndx in range(len_lightcurve):
         _theta = np.zeros(nsource*3+10)
@@ -2284,8 +2285,9 @@ def _lnlike_night(theta, fitdata, fitarg, fithelp):
 
 
 class GravMNightFit(GravNight):
-    def __init__(self, file_list, verbose=False):
+    def __init__(self, file_list, verbose=False, debug=False):
         super().__init__(file_list, verbose=verbose)
+        self.debug = debug
 
     def fitStars(self,
                  ra_list,
@@ -2640,8 +2642,23 @@ class GravMNightFit(GravNight):
                 todel.append(nsource*3-1 + ndx*11 + 3)
             if nocohloss:
                 todel.extend(np.arange(nsource*3-1 + ndx*11 + 5, nsource*3-1 + ndx*11+11))
+                
+        
+        if self.debug:
+            print('\n\n')
+            for idx in range(len(theta)):
+                if idx in todel:
+                    print('%s    %.2f    FIXXED' % (theta_names[idx], theta[idx]))
+                else:
+                    print('%s    %.2f' % (theta_names[idx], theta[idx]))
+            
+            print('\n\n')
+            print(len(theta), todel)
 
-        todel = list(set(todel))
+        if len(theta_names) != len(theta):
+            raise ValueError('Somethign wrong with intitialization of parameter')
+
+        todel = sorted(list(set(todel)))
         self.theta_in = np.copy(theta)
         self.theta_allnames = np.copy(theta_names)
         self.theta_names = theta_names
@@ -2705,7 +2722,16 @@ class GravMNightFit(GravNight):
         upper = np.delete(upper, todel)
         self.fixed = fixed
         self.todel = todel
+        
+        if self.debug:
+            print('\n\n')
+            for idx in range(len(theta)):
+                print('%s    %.2f' % (theta_names[idx], theta[idx]))
+            print('\n\n')
 
+        if len(theta_names) != len(theta):
+            raise ValueError('Somethign wrong with intitialization of parameter')
+        
         ndim = len(theta)
         width = 1e-1
         pos = np.ones((nwalkers, ndim))
@@ -2734,6 +2760,10 @@ class GravMNightFit(GravNight):
                        self.dlambda, self.fixedBHalpha, oneBHalpha,
                        oneBG, todel, fixed, self.phasemaps, None]
 
+        if self.debug:
+            print('\n\n')
+            print(_lnprob_night(theta, fitdata, lower, upper, theta_names, fitarg, fithelp))
+            sys.exit()    
         if nthreads == 1:
             self.sampler = emcee.EnsembleSampler(nwalkers, ndim, _lnprob_night,
                                                  args=(fitdata, lower,
