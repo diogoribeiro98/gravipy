@@ -43,17 +43,23 @@ def find_nearest(array, value):
     return idx
 
 
-def averaging(x, N):
+def averaging(x, N, median=False):
     if x.ndim == 2:
         res = np.zeros((x.shape[0], x.shape[1]//N))
         for idx in range(x.shape[0]):
-            res[idx] = np.nanmean(x[idx].reshape(-1, N), axis=1)
+            if median:
+                res[idx] = np.nanmedian(x[idx].reshape(-1, N), axis=1)
+            else:
+                res[idx] = np.nanmean(x[idx].reshape(-1, N), axis=1)
         return res
     elif x.ndim == 1:
         # pad with nans
         ll = x.shape[0]
         xx = np.pad(x, (0, N - ll % N), constant_values=np.nan)
-        res = np.nanmean(xx.reshape(-1, N), axis=1)
+        if median:
+            res = np.nanmedian(xx.reshape(-1, N), axis=1)
+        else:
+            res = np.nanmean(xx.reshape(-1, N), axis=1)
         return res
 
 
@@ -1029,6 +1035,7 @@ class GravPhaseNight():
 
         if s2_offx is None:
             s2_offx = offsets[nights.index(night)]
+        self.s2_offx = s2_offx
         s2data = np.load(resource_filename('gravipy', 's2_orbit.npy'))
         if full_folder:
             sg_files = allfiles
@@ -1895,9 +1902,9 @@ class GravPhaseNight():
         if save:
             if correction:
                 if type(save) == str:
+                    folder = file[:file.find('GRAVI')] + save
                     if self.verbose:
-                        print("saving string")
-                    folder = save
+                        print("saving folder: %s" % folder)
                 else:
                     if self.verbose:
                         print("saving to default location")
@@ -1935,10 +1942,10 @@ class GravPhaseNight():
                         d.writeto(folder+fname, overwrite=True)
 
             else:
-                if type(save) ==str:
+                if type(save) == str:
+                    folder = file[:file.find('GRAVI')] + save
                     if self.verbose:
-                        print("saving string")
-                    folder = save
+                        print("saving folder: %s" % folder)
                 else:
                     if self.verbose:
                         print("saving to default location")
