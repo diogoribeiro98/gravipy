@@ -44,6 +44,8 @@ def find_nearest(array, value):
 
 
 def averaging(x, N, median=False):
+    if N == 1:
+        return x
     if x.ndim == 2:
         res = np.zeros((x.shape[0], x.shape[1]//N))
         for idx in range(x.shape[0]):
