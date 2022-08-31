@@ -42,6 +42,41 @@ def convert_date(date, mjd=False):
     return date_decimal, date
 
 
+def get_met(file):
+    Volts = fits.open(file)['METROLOGY'].data['VOLT']
+    t = fits.open(file)['METROLOGY'].data['TIME']*1e-6
+    mjd = fits.open(file)[0].header['MJD-OBS']
+    
+    V = np.array([np.convolve(Volts[:, i], np.ones(100), 'same') for i in range(80)]).T
+    VC = V[:, 1::2] + 1j * V[:, ::2]
+    VCT = np.zeros((len(VC), 32), dtype=complex)
+#     First substract the FC, because the fibers are still moving, and FC has higher SNR
+    for i in range(8):
+        VCT[:, 4 * i : 4 * (i + 1)] = (
+            VC[:, 4 * i : 4 * (i + 1)] * np.conj(VC[:, 32 + i])[:, None]
+        )
+#     VCT = VC[:,:-8]
+    # Second np.convolve with time to gain in SNR (400DIT=800ms)
+    VTEL = np.array([np.convolve(VCT[:, i], np.ones(150), "same") for i in range(32)]).T
+    VTELFC = (VTEL[:, :16] * np.conj(VTEL[:, 16:])).reshape(-1,4,4)
+    VTELFT = VTEL[:, :16].reshape(-1,4,4)
+    VTELST = VTEL[:, 16:].reshape(-1,4,4)
+    
+    for i in range(4):
+        for j in range(4):
+            VTELFT[:,i,j]=np.convolve(VTELFT[:,i,j],np.ones(100),'same')
+            VTELST[:,i,j]=np.convolve(VTELST[:,i,j],np.ones(100),'same')
+    VTELFT = (VTELFT) / abs(VTELFT)
+    VTELST = (VTELST) / abs(VTELST)
+    phaseFT = np.unwrap(np.angle(VTELFT * np.conj(VTELFT.mean(axis=0))), axis=0)
+    phaseSC = np.unwrap(np.angle(VTELST * np.conj(VTELST.mean(axis=0))), axis=0)
+    rmsFT = np.std(phaseFT, axis=0)
+    rmsSC = np.std(phaseSC, axis=0)
+    phaseFT = np.angle(VTELFT * np.conj(VTELFT.mean(axis=0)))
+    phaseSC = np.angle(VTELST * np.conj(VTELST.mean(axis=0)))
+    return mjd, t, phaseFT, phaseSC, rmsFT, rmsSC
+
+
 class GravData():
     def __init__(self, data, verbose=True, plot=False):
         """
