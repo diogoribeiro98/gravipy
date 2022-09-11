@@ -1070,34 +1070,34 @@ class GravNight():
 
         if plot:
             av = 100
-            #maxval = []
-            #for tel in range(4):
-                #for dio in range(4):
-                    #maxval.append(np.max(np.abs(averaging(OPD_TEL[:, tel, dio]-np.mean(OPD_TEL[:, tel, dio]), av))))
-            #maxval = np.max(maxval)*1.2
+            maxval = []
+            for tel in range(4):
+                for dio in range(4):
+                    maxval.append(np.max(np.abs(averaging(OPD_TEL[:, tel, dio]-np.mean(OPD_TEL[:, tel, dio]), av))))
+            maxval = np.max(maxval)*1.2
 
-            #gs = gridspec.GridSpec(4,4, wspace=0.05, hspace=0.05)
-            #plt.figure(figsize=(7,7))
-            #for tel in range(4):
-                #for dio in range(4):
-                    #ax = plt.subplot(gs[tel,dio])
-                    #plt.plot(averaging(MJD[:, tel], av), averaging(OPD_TEL[:, tel, dio]-np.mean(OPD_TEL[:, tel, dio]), av), 
-                            #ls='', marker='.', label='UT%i\nDiode %i' % ((4-tel), dio), color=self.colors_tel[tel])
-                    #for m in range(len(self.t_files)):
-                        #plt.axvline(self.t_files[m], ls='--', lw=0.2, color='grey')
-                        #if tel == 0 and dio == 0:
-                            #plt.text(self.t_files[m]+0.5, -maxval*0.9, self.ut_files[m], rotation=90, fontsize=5)
-                    #plt.legend(loc=2)
-                    #plt.ylim(-maxval,maxval)
-                    #if tel != 3:
-                        #ax.set_xticklabels([])
-                    #else:
-                        #plt.xlabel('Time [mins]', fontsize=8)
-                    #if dio != 0:
-                        #ax.set_yticklabels([])
-                    #else:
-                        #plt.ylabel('OPD_TEL [$\mu$m]', fontsize=8)
-            #plt.show()
+            gs = gridspec.GridSpec(4,4, wspace=0.05, hspace=0.05)
+            plt.figure(figsize=(7,7))
+            for tel in range(4):
+                for dio in range(4):
+                    ax = plt.subplot(gs[tel,dio])
+                    plt.plot(averaging(MJD[:, tel], av), averaging(OPD_TEL[:, tel, dio]-np.mean(OPD_TEL[:, tel, dio]), av), 
+                            ls='', marker='.', label='UT%i\nDiode %i' % ((4-tel), dio), color=self.colors_tel[tel])
+                    for m in range(len(self.t_files)):
+                        plt.axvline(self.t_files[m], ls='--', lw=0.2, color='grey')
+                        if tel == 0 and dio == 0:
+                            plt.text(self.t_files[m]+0.5, -maxval*0.9, self.ut_files[m], rotation=90, fontsize=5)
+                    plt.legend(loc=2)
+                    plt.ylim(-maxval,maxval)
+                    if tel != 3:
+                        ax.set_xticklabels([])
+                    else:
+                        plt.xlabel('Time [mins]', fontsize=8)
+                    if dio != 0:
+                        ax.set_yticklabels([])
+                    else:
+                        plt.ylabel('OPD_TEL [$\mu$m]', fontsize=8)
+            plt.show()
 
 
             maxval = []
