@@ -42,13 +42,18 @@ def convert_date(date, mjd=False):
     return date_decimal, date
 
 
-def get_met(file):
-    Volts = fits.open(file)['METROLOGY'].data['VOLT']
-    t = fits.open(file)['METROLOGY'].data['TIME']*1e-6
-    mjd = fits.open(file)[0].header['MJD-OBS']
-    
+def get_met(Volts, fc=False):
     V = np.array([np.convolve(Volts[:, i], np.ones(100), 'same') for i in range(80)]).T
     VC = V[:, 1::2] + 1j * V[:, ::2]
+    
+    if fc:
+        VFCFT, VFCST = VC[:, 32:36], VC[:, 36:]
+        VFCFT = (VFCFT) / abs(VFCFT)
+        VFCST = (VFCST) / abs(VFCST)
+        phaseFT = np.angle(VFCFT * np.conj(VFCFT.mean(axis=0)))
+        phaseSC = np.angle(VFCST * np.conj(VFCST.mean(axis=0)))
+        return phaseFT, phaseSC
+    
     VCT = np.zeros((len(VC), 32), dtype=complex)
 #     First substract the FC, because the fibers are still moving, and FC has higher SNR
     for i in range(8):
@@ -74,7 +79,7 @@ def get_met(file):
     rmsSC = np.std(phaseSC, axis=0)
     phaseFT = np.angle(VTELFT * np.conj(VTELFT.mean(axis=0)))
     phaseSC = np.angle(VTELST * np.conj(VTELST.mean(axis=0)))
-    return mjd, t, phaseFT, phaseSC, rmsFT, rmsSC
+    return phaseFT, phaseSC, rmsFT, rmsSC
 
 
 class GravData():
