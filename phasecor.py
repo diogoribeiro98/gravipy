@@ -1467,10 +1467,11 @@ class GravPhaseNight():
             sg_visphi_err_p1[fdx][np.where(flag1 == True)] = np.nan
             sg_visphi_err_p2[fdx][np.where(flag2 == True)] = np.nan
 
-        self.sg_u_raw = sg_u_raw
-        self.sg_v_raw = sg_v_raw
-        self.wave = wave
-        self.dlambda = dlambda
+        if len(sg_files) > 0:
+            self.sg_u_raw = sg_u_raw
+            self.sg_v_raw = sg_v_raw
+            self.wave = wave
+            self.dlambda = dlambda
 
         s2_visphi_p1 = np.zeros((len(s2_files), ndit*6, nchannel))
         s2_visphi_p2 = np.zeros((len(s2_files), ndit*6, nchannel))
