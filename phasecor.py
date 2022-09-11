@@ -1625,7 +1625,10 @@ class GravPhaseNight():
         self.s2_u_raw = s2_u_raw
         self.s2_v_raw = s2_u_raw
 
-        tstart = np.nanmin((np.nanmin(s2_t), np.nanmin(sg_t)))
+        try:
+            tstart = np.nanmin((np.nanmin(s2_t), np.nanmin(sg_t)))
+        except ValueError:
+            tstart = np.nanmin(s2_t)
         s2_t = (s2_t-tstart)*24*60
         sg_t = (sg_t-tstart)*24*60
 
