@@ -42,7 +42,7 @@ def convert_date(date, mjd=False):
     return date_decimal, date
 
 
-def get_met(Volts, fc=False):
+def get_met(Volts, fc=False, removefc=True):
     V = np.array([np.convolve(Volts[:, i], np.ones(100), 'same') for i in range(80)]).T
     VC = V[:, 1::2] + 1j * V[:, ::2]
     
@@ -55,12 +55,13 @@ def get_met(Volts, fc=False):
         return phaseFT, phaseSC
     
     VCT = np.zeros((len(VC), 32), dtype=complex)
-#     First substract the FC, because the fibers are still moving, and FC has higher SNR
-    for i in range(8):
-        VCT[:, 4 * i : 4 * (i + 1)] = (
-            VC[:, 4 * i : 4 * (i + 1)] * np.conj(VC[:, 32 + i])[:, None]
-        )
-#     VCT = VC[:,:-8]
+    if removefc:
+        for i in range(8):
+            VCT[:, 4 * i : 4 * (i + 1)] = (
+                VC[:, 4 * i : 4 * (i + 1)] * np.conj(VC[:, 32 + i])[:, None]
+            )
+    else:
+        VCT = VC[:,:-8]
     # Second np.convolve with time to gain in SNR (400DIT=800ms)
     VTEL = np.array([np.convolve(VCT[:, i], np.ones(150), "same") for i in range(32)]).T
     VTELFC = (VTEL[:, :16] * np.conj(VTEL[:, 16:])).reshape(-1,4,4)
