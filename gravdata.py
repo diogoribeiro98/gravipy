@@ -1049,7 +1049,7 @@ class GravNight():
                                              * 1e6))
             PHA_TELFC_CORR = np.concatenate((PHA_TELFC_CORR,
                                              d['PHASE_TELFC_CORR'].reshape(-1, 4, 4)
-                                             )
+                                             ))
 
         MJD = (MJD - self.mjd0)*24*60
         self.time = MJD
