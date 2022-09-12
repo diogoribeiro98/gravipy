@@ -1138,6 +1138,10 @@ class GravNight():
         if 'P2VM' not in self.datacatg:
             raise ValueError('Only available for p2vmred files')
         files = self.files
+        if self.polmode == 'SPLIT':
+            fitnum = 11
+        else:
+            fitnum = 10
 
         MJD = np.array([]).reshape(0, 4)
         PUPIL_X = np.array([]).reshape(0, 4)
