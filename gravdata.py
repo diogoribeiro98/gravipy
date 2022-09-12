@@ -1144,22 +1144,22 @@ class GravNight():
             fitnum = 10
 
         MJD = np.array([]).reshape(0, 4)
-        PUPIL_X = np.array([]).reshape(0, 4)
-        PUPIL_Y = np.array([]).reshape(0, 4)
-        PUPIL_Z = np.array([]).reshape(0, 4)
+        PUPIL_U = np.array([]).reshape(0, 4)
+        PUPIL_V = np.array([]).reshape(0, 4)
+        PUPIL_W = np.array([]).reshape(0, 4)
 
         for fdx, file in enumerate(files):
             d = fits.open(file)['OI_VIS_ACQ'].data
             _MJD0 = fits.open(file)[0].header['MJD-OBS']
             MJD = np.concatenate((MJD,
                                   d['TIME'].reshape(-1, 4)/1e6/3600/24 + _MJD0))
-            PUPIL_X = np.concatenate((PUPIL_X, d['PUPIL_U'].reshape(-1, 4)))
-            PUPIL_Y = np.concatenate((PUPIL_Y, d['PUPIL_V'].reshape(-1, 4)))
-            PUPIL_Z = np.concatenate((PUPIL_Z, d['PUPIL_W'].reshape(-1, 4)))
+            PUPIL_U = np.concatenate((PUPIL_U, d['PUPIL_U'].reshape(-1, 4)))
+            PUPIL_V = np.concatenate((PUPIL_V, d['PUPIL_V'].reshape(-1, 4)))
+            PUPIL_W = np.concatenate((PUPIL_W, d['PUPIL_W'].reshape(-1, 4)))
 
         MJD = (MJD - self.mjd0)*24*60
         self.acqtime = MJD
-        self.pupil = np.array([PUPIL_X, PUPIL_Y, PUPIL_Z])
+        self.pupil = np.array([PUPIL_U, PUPIL_V, PUPIL_W])
         self.pupil[self.pupil == 0] = np.nan
         self.mjd_files = []
         self.ut_files = []
@@ -1174,7 +1174,7 @@ class GravNight():
 
         if plot:
             maxval = np.nanmax(np.abs(self.pupil))*0.9
-            pup_name = ['X', 'Y', 'Z']
+            pup_name = ['U', 'V', 'W']
 
             gs = gridspec.GridSpec(3, 4, wspace=0.05, hspace=0.05)
             plt.figure(figsize=(7, 7))
@@ -1201,7 +1201,7 @@ class GravNight():
                     if tel != 0:
                         ax.set_yticklabels([])
                     else:
-                        plt.ylabel('PUPIL %s\n[pix]' % pup_name[pup],
+                        plt.ylabel('PUPIL %s\n[m]' % pup_name[pup],
                                    fontsize=8)
             plt.show()
 
