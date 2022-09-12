@@ -1153,9 +1153,9 @@ class GravNight():
             _MJD0 = fits.open(file)[0].header['MJD-OBS']
             MJD = np.concatenate((MJD,
                                   d['TIME'].reshape(-1, 4)/1e6/3600/24 + _MJD0))
-            PUPIL_X = np.concatenate((PUPIL_X, d['PUPIL_X'].reshape(-1, 4)))
-            PUPIL_Y = np.concatenate((PUPIL_Y, d['PUPIL_Y'].reshape(-1, 4)))
-            PUPIL_Z = np.concatenate((PUPIL_Z, d['PUPIL_Z'].reshape(-1, 4)))
+            PUPIL_X = np.concatenate((PUPIL_X, d['PUPIL_U'].reshape(-1, 4)))
+            PUPIL_Y = np.concatenate((PUPIL_Y, d['PUPIL_V'].reshape(-1, 4)))
+            PUPIL_Z = np.concatenate((PUPIL_Z, d['PUPIL_W'].reshape(-1, 4)))
 
         MJD = (MJD - self.mjd0)*24*60
         self.acqtime = MJD
