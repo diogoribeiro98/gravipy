@@ -1168,9 +1168,9 @@ class GravNight():
             self.ut_files.append(file[a+17:a+22])
             self.lst_files.append(d[0].header['LST'])
         self.t_files = (np.array(self.mjd_files)-self.mjd0)*24*60
-        
+
         if plot:
-            maxval = np.nanmax(np.abs(n.pupil))*1.2
+            maxval = np.nanmax(np.abs(self.pupil))*1.2
             pup_name = ['X', 'Y', 'Z']
 
             gs = gridspec.GridSpec(3, 4, wspace=0.05, hspace=0.05)
@@ -1201,7 +1201,7 @@ class GravNight():
                         plt.ylabel('PUPIL %s\n[pix]' % pup_name[pup],
                                    fontsize=8)
             plt.show()
-        
+
     def getFainttimer(self):
         files = self.files
         onv = np.array([])
