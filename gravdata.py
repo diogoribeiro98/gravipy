@@ -1134,6 +1134,29 @@ class GravNight():
                     plt.ylabel('OPD_TELFC_MCORR \n[$\mu$m]', fontsize=8)
             plt.show()
 
+    def getAcqdata(self):
+        if 'P2VM' not in self.datacatg:
+            raise ValueError('Only available for p2vmred files')
+        files = self.files
+
+        MJD = np.array([]).reshape(0,4)
+        PUPIL_X = np.array([]).reshape(0,4)
+        PUPIL_Y = np.array([]).reshape(0,4)
+        PUPIL_Z = np.array([]).reshape(0,4)
+
+        for fdx, file in enumerate(files):
+            d = fits.open(file)['OI_VIS_ACQ'].data
+            _MJD0 = fits.open(file)[0].header['MJD-OBS']
+            MJD = np.concatenate((MJD,
+                                  d['TIME'].reshape(-1, 4)/1e6/3600/24 + _MJD0))
+            PUPIL_X = np.concatenate((PUPIL_X, d['PUPIL_X'].reshape(-1, 4)*1e6))
+            PUPIL_Y = np.concatenate((PUPIL_Y, d['PUPIL_X'].reshape(-1, 4)*1e6))
+            PUPIL_Z = np.concatenate((PUPIL_Z, d['PUPIL_X'].reshape(-1, 4)*1e6))
+
+        MJD = (MJD - self.mjd0)*24*60
+        self.acqtime = MJD
+        self.pupil = np.array([PUPIL_X, PUPIL_Y, PUPIL_Z])
+
     def getFainttimer(self):
         files = self.files
         onv = np.array([])
