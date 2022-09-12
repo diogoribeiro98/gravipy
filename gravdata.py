@@ -1134,29 +1134,70 @@ class GravNight():
                     plt.ylabel('OPD_TELFC_MCORR \n[$\mu$m]', fontsize=8)
             plt.show()
 
-    def getAcqdata(self):
+    def getAcqdata(self, plot=False):
         if 'P2VM' not in self.datacatg:
             raise ValueError('Only available for p2vmred files')
         files = self.files
 
-        MJD = np.array([]).reshape(0,4)
-        PUPIL_X = np.array([]).reshape(0,4)
-        PUPIL_Y = np.array([]).reshape(0,4)
-        PUPIL_Z = np.array([]).reshape(0,4)
+        MJD = np.array([]).reshape(0, 4)
+        PUPIL_X = np.array([]).reshape(0, 4)
+        PUPIL_Y = np.array([]).reshape(0, 4)
+        PUPIL_Z = np.array([]).reshape(0, 4)
 
         for fdx, file in enumerate(files):
             d = fits.open(file)['OI_VIS_ACQ'].data
             _MJD0 = fits.open(file)[0].header['MJD-OBS']
             MJD = np.concatenate((MJD,
                                   d['TIME'].reshape(-1, 4)/1e6/3600/24 + _MJD0))
-            PUPIL_X = np.concatenate((PUPIL_X, d['PUPIL_X'].reshape(-1, 4)*1e6))
-            PUPIL_Y = np.concatenate((PUPIL_Y, d['PUPIL_X'].reshape(-1, 4)*1e6))
-            PUPIL_Z = np.concatenate((PUPIL_Z, d['PUPIL_X'].reshape(-1, 4)*1e6))
+            PUPIL_X = np.concatenate((PUPIL_X, d['PUPIL_X'].reshape(-1, 4)))
+            PUPIL_Y = np.concatenate((PUPIL_Y, d['PUPIL_X'].reshape(-1, 4)))
+            PUPIL_Z = np.concatenate((PUPIL_Z, d['PUPIL_X'].reshape(-1, 4)))
 
         MJD = (MJD - self.mjd0)*24*60
         self.acqtime = MJD
         self.pupil = np.array([PUPIL_X, PUPIL_Y, PUPIL_Z])
+        self.pupil[self.pupil == 0] = np.nan
+        for idx, file in enumerate(files):
+            d = fits.open(file)
+            self.mjd_files.append(d['OI_VIS', fitnum].data['MJD'][0])
+            a = file.find('GRAVI.20')
+            self.ut_files.append(file[a+17:a+22])
+            self.lst_files.append(d[0].header['LST'])
+        self.t_files = (np.array(self.mjd_files)-self.mjd0)*24*60
+        
+        if plot:
+            maxval = np.nanmax(np.abs(n.pupil))*1.2
+            pup_name = ['X', 'Y', 'Z']
 
+            gs = gridspec.GridSpec(3, 4, wspace=0.05, hspace=0.05)
+            plt.figure(figsize=(7, 7))
+            for pup in range(3):
+                for tel in range(4):
+                    ax = plt.subplot(gs[pup, tel])
+                    plt.plot(self.acqtime[:, tel], self.pupil[pup, :, tel],
+                             ls='', marker='.',  markersize=1,
+                             color=self.colors_tel[tel])
+                    for m in range(len(self.t_files)):
+                        plt.axvline(self.t_files[m], ls='--', lw=0.2,
+                                    color='grey')
+                        if tel == 0 and pup == 0:
+                            plt.text(self.t_files[m]+0.5, -maxval*0.9,
+                                     self.ut_files[m], rotation=90, fontsize=5)
+                    plt.ylim(-maxval, maxval)
+                    plt.axhline(0, ls='--', lw=1, zorder=0, color='grey')
+                    if pup == 0:
+                        plt.title('UT %i' % (4-tel), fontsize=8)
+                    if pup != 2:
+                        ax.set_xticklabels([])
+                    else:
+                        plt.xlabel('Time [mins]', fontsize=8)
+                    if tel != 0:
+                        ax.set_yticklabels([])
+                    else:
+                        plt.ylabel('PUPIL %s\n[pix]' % pup_name[pup],
+                                   fontsize=8)
+            plt.show()
+        
     def getFainttimer(self):
         files = self.files
         onv = np.array([])
