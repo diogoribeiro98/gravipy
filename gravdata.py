@@ -1020,6 +1020,7 @@ class GravNight():
         OPD_TEL = np.array([]).reshape(0,4,4)
         OPD_TEL_CORR = np.array([]).reshape(0,4,4)
         OPD_TELFC_CORR = np.array([]).reshape(0,4,4)
+        PHA_TELFC_CORR = np.array([]).reshape(0,4,4)
         OPD_TELFC_MCORR = np.array([]).reshape(0,4)
         E_U = np.array([]).reshape(0,4,3)
         E_V = np.array([]).reshape(0,4,3)
@@ -1046,6 +1047,9 @@ class GravNight():
             OPD_TELFC_CORR = np.concatenate((OPD_TELFC_CORR,
                                              d['OPD_TELFC_CORR'].reshape(-1, 4, 4)
                                              * 1e6))
+            PHA_TELFC_CORR = np.concatenate((PHA_TELFC_CORR,
+                                             d['PHASE_TELFC_CORR'].reshape(-1, 4, 4)
+                                             )
 
         MJD = (MJD - self.mjd0)*24*60
         self.time = MJD
@@ -1057,6 +1061,7 @@ class GravNight():
         self.opd_tel = OPD_TEL
         self.opd_tel_corr = OPD_TEL_CORR
         self.opd_telfc_corr = OPD_TELFC_CORR
+        self.pha_telfc_corr = PHA_TELFC_CORR
         self.mjd_files = []
         self.ut_files = []
         self.lst_files = []
