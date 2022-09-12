@@ -1154,13 +1154,16 @@ class GravNight():
             MJD = np.concatenate((MJD,
                                   d['TIME'].reshape(-1, 4)/1e6/3600/24 + _MJD0))
             PUPIL_X = np.concatenate((PUPIL_X, d['PUPIL_X'].reshape(-1, 4)))
-            PUPIL_Y = np.concatenate((PUPIL_Y, d['PUPIL_X'].reshape(-1, 4)))
-            PUPIL_Z = np.concatenate((PUPIL_Z, d['PUPIL_X'].reshape(-1, 4)))
+            PUPIL_Y = np.concatenate((PUPIL_Y, d['PUPIL_Y'].reshape(-1, 4)))
+            PUPIL_Z = np.concatenate((PUPIL_Z, d['PUPIL_Z'].reshape(-1, 4)))
 
         MJD = (MJD - self.mjd0)*24*60
         self.acqtime = MJD
         self.pupil = np.array([PUPIL_X, PUPIL_Y, PUPIL_Z])
         self.pupil[self.pupil == 0] = np.nan
+        self.mjd_files = []
+        self.ut_files = []
+        self.lst_files = []
         for idx, file in enumerate(files):
             d = fits.open(file)
             self.mjd_files.append(d['OI_VIS', fitnum].data['MJD'][0])
@@ -1170,7 +1173,7 @@ class GravNight():
         self.t_files = (np.array(self.mjd_files)-self.mjd0)*24*60
 
         if plot:
-            maxval = np.nanmax(np.abs(self.pupil))*1.2
+            maxval = np.nanmax(np.abs(self.pupil))*0.9
             pup_name = ['X', 'Y', 'Z']
 
             gs = gridspec.GridSpec(3, 4, wspace=0.05, hspace=0.05)
