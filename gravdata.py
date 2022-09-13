@@ -1109,7 +1109,7 @@ class GravNight():
                     if dio != 0:
                         ax.set_yticklabels([])
                     else:
-                        plt.ylabel('OPD_TEL [$\mu$m]', fontsize=8)
+                        plt.ylabel('OPD_TEL \n[$\mu$m]', fontsize=8)
             plt.show()
 
             # OPD TEL CORR
@@ -1147,7 +1147,7 @@ class GravNight():
                     if dio != 0:
                         ax.set_yticklabels([])
                     else:
-                        plt.ylabel('OPD_TEL_CORR [$\mu$m]', fontsize=8)
+                        plt.ylabel('OPD_TEL_CORR \n[$\mu$m]', fontsize=8)
             plt.show()
 
             # OPD TEL FC CORR
@@ -1185,7 +1185,7 @@ class GravNight():
                     if dio != 0:
                         ax.set_yticklabels([])
                     else:
-                        plt.ylabel('OPD_TELFC_CORR [$\mu$m]', fontsize=8)
+                        plt.ylabel('OPD_TELFC_CORR \n[$\mu$m]', fontsize=8)
             plt.show()
 
             # OPD_FC
