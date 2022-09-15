@@ -1249,7 +1249,7 @@ class GravNight():
             plt.show()
 
         if plot or plotall:
-            av = 100
+            av = 500
             maxval = []
             for tel in range(4):
                 maxval.append(np.max(np.abs(
