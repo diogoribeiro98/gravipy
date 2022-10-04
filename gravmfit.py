@@ -1291,7 +1291,7 @@ class GravMFit(GravData, GravPhaseMaps):
                 no_fit = True
             except FileNotFoundError:
                 pdexists = False
-        
+
         if no_fit:
             plotCorner = False
             print('Will not fit the data, just print out the results for the '
@@ -1634,7 +1634,8 @@ class GravMFit(GravData, GravPhaseMaps):
                         theta_result = theta
                         fulltheta = np.copy(theta_result)
                         for ddx in range(len(todel)):
-                            fulltheta = np.insert(fulltheta, todel[ddx], fixed[ddx])
+                            fulltheta = np.insert(fulltheta, todel[ddx],
+                                                  fixed[ddx])
 
                 self.theta_result = theta_result
                 (fit_visamp, fit_visphi,
@@ -1710,10 +1711,9 @@ class GravMFit(GravData, GravPhaseMaps):
                         print("\n")
                         print("MCMC Result:")
                         for i in range(0, cldim):
-                            print("%s = %.3f + %.3f - %.3f" % (cllabels[i],
-                                                               percentiles[i,1],
-                                                               percentiles[i,2],
-                                                               percentiles[i,0]))
+                            print("%s = %.3f + %.3f - %.3f"
+                                  % (cllabels[i], percentiles[i, 1],
+                                     percentiles[i, 2], percentiles[i, 0]))
                         print("-----------------------------------")
 
                 if plotScience:
