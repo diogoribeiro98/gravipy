@@ -4,6 +4,10 @@ from astropy import constants as c
 from astropy import wcs
 from scipy.optimize import newton
 from .star_orbits import star_pms, star_orbits
+from datetime import datetime
+import matplotlib.pyplot as plt
+
+from .gravdata import convert_date
 
 
 class GCorbits():
@@ -109,3 +113,63 @@ class GCorbits():
             E0 = np.sign(M) * np.log(2*np.fabs(M)/e+1.8)
             E = newton(f, E0, fp, *args, **kwargs)
         return E
+
+    def plotOrbits(self, t=None, lim=100, long=False):
+        if t is None:
+            d = datetime.utcnow()
+            t = d.strftime("%Y-%m-%dT%H:%M:%S")
+        t = convert_date(t)[0]
+        starpos = []
+        for star in self.star_orbits:
+            _s = self.star_orbits[star]
+            x,y = self.pos_orbit(_s, t)
+            starpos.append([_s['name'], x*1000, y*1000, _s['type'], _s['Kmag']])
+        for star in self.star_pms:
+            _s = self.star_pms[star]
+            x, y = self.pos_pm(_s, t)
+            starpos.append([_s['name'], x*1000, y*1000, _s['type'], _s['Kmag']])
+
+        fig, ax = plt.subplots()
+        for s in starpos:
+            n, x, y, ty, mag = s
+            if np.any(np.abs(x) > lim) or np.any(np.abs(y) > lim):
+                continue
+            if long:
+                if ty == 'e':
+                    plt.scatter(x, y, c='C2', s=10)
+                    plt.text(x-3, y, '%s m$_K$=%.1f' % (n, mag), fontsize=6, color='C2')
+                elif ty == 'l':
+                    plt.scatter(x, y, c='C0', s=10)
+                    plt.text(x-3, y, '%s m$_K$=%.1f' % (n, mag), fontsize=6, color='C0')
+                else:
+                    plt.scatter(x, y, c='C1', s=10)
+                    plt.text(x-3, y, '%s m$_K$=%.1f' % (n, mag), fontsize=6, color='C1')
+            else:
+                if ty == 'e':
+                    plt.scatter(x, y, c='C2', s=10)
+                    plt.text(x-3, y, '%s' % (n), fontsize=6, color='C2')
+                elif ty == 'l':
+                    plt.scatter(x, y, c='C0', s=10)
+                    plt.text(x-3, y, '%s' % (n), fontsize=6, color='C0')
+                else:
+                    plt.scatter(x, y, c='C1', s=10)
+                    plt.text(x-3, y, '%s' % (n), fontsize=6, color='C1')
+
+        plt.axis([lim*1.2, -lim*1.2, -lim*1.2, lim*1.2])
+        plt.gca().set_aspect('equal', adjustable='box')
+
+
+        fiberrad = 70
+        circ = plt.Circle((0,0), radius=fiberrad,facecolor="None", edgecolor='darkblue', linewidth=0.2)
+        ax.add_artist(circ)
+        plt.scatter(0, 0, color='k', s=20, zorder=100)
+        plt.text(0, -78, 'GRAVITY Fiber FoV', fontsize='6', color='darkblue', ha='center')
+        plt.text(-4, -8, 'Sgr A*', fontsize='8')
+
+        plt.text(-80,100,'late type', fontsize=6, color='C0')
+        plt.text(-80,92,'early type', fontsize=6, color='C2')
+        plt.text(-80,84,'unknown', fontsize=6, color='C1')
+
+        plt.xlabel('dRa [mas]')
+        plt.ylabel('dDec [mas]')
+        plt.show()
