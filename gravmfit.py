@@ -1489,9 +1489,9 @@ class GravMFit(GravData, GravPhaseMaps):
                                                                   fitarg,
                                                                   fithelp))
                             if bequiet:
-                                sampler.run_mcmc(pos, nruns, progress=False)
+                                sampler.run_mcmc(pos, nruns, progress=False, skip_initial_state_check=True)
                             else:
-                                sampler.run_mcmc(pos, nruns, progress=True)
+                                sampler.run_mcmc(pos, nruns, progress=True, skip_initial_state_check=True)
                         else:
                             with Pool(processes=nthreads) as pool:
                                 sampler = emcee.EnsembleSampler(nwalkers, ndim,
@@ -1503,9 +1503,9 @@ class GravMFit(GravData, GravPhaseMaps):
                                                                       fithelp),
                                                                 pool=pool)
                                 if bequiet:
-                                    sampler.run_mcmc(pos, nruns, progress=False)
+                                    sampler.run_mcmc(pos, nruns, progress=False, skip_initial_state_check=True)
                                 else:
-                                    sampler.run_mcmc(pos, nruns, progress=True)
+                                    sampler.run_mcmc(pos, nruns, progress=True, skip_initial_state_check=True)
 
                         if not bequiet:
                             print("---------------------------------------")
@@ -2770,9 +2770,9 @@ class GravMNightFit(GravNight):
                                                        upper, theta_names,
                                                        fitarg, fithelp))
             if bequiet:
-                self.sampler.run_mcmc(pos, nruns, progress=False)
+                self.sampler.run_mcmc(pos, nruns, progress=False, skip_initial_state_check=True)
             else:
-                self.sampler.run_mcmc(pos, nruns, progress=True)
+                self.sampler.run_mcmc(pos, nruns, progress=True, skip_initial_state_check=True)
         else:
             with Pool(processes=nthreads) as pool:
                 self.sampler = emcee.EnsembleSampler(nwalkers, ndim,
@@ -2783,9 +2783,9 @@ class GravMNightFit(GravNight):
                                                            fithelp),
                                                      pool=pool)
                 if bequiet:
-                    self.sampler.run_mcmc(pos, nruns, progress=False)
+                    self.sampler.run_mcmc(pos, nruns, progress=False, skip_initial_state_check=True)
                 else:
-                    self.sampler.run_mcmc(pos, nruns, progress=True)
+                    self.sampler.run_mcmc(pos, nruns, progress=True, skip_initial_state_check=True)
 
         self.fitdata = fitdata
         self.fithelp = fithelp
