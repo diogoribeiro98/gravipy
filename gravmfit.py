@@ -1503,9 +1503,11 @@ class GravMFit(GravData, GravPhaseMaps):
                                                                       fithelp),
                                                                 pool=pool)
                                 if bequiet:
-                                    sampler.run_mcmc(pos, nruns, progress=False, skip_initial_state_check=True)
+                                    sampler.run_mcmc(pos, nruns, progress=False,
+                                                     skip_initial_state_check=True)
                                 else:
-                                    sampler.run_mcmc(pos, nruns, progress=True, skip_initial_state_check=True)
+                                    sampler.run_mcmc(pos, nruns, progress=True,
+                                                     skip_initial_state_check=True)
 
                         if not bequiet:
                             print("---------------------------------------")
@@ -1646,13 +1648,19 @@ class GravMFit(GravData, GravPhaseMaps):
 
                 res_visamp = fit_visamp-visamp
                 res_vis2 = fit_vis2-vis2
-                res_closure = np.degrees(np.abs(np.exp(1j*np.radians(fit_closure)) - np.exp(1j*np.radians(closure))))
-                res_visphi = np.degrees(np.abs(np.exp(1j*np.radians(fit_visphi)) - np.exp(1j*np.radians(visphi))))
+                res_closure = np.degrees(np.abs(np.exp(1j*np.radians(fit_closure))
+                                                - np.exp(1j*np.radians(closure))))
+                res_visphi = np.degrees(np.abs(np.exp(1j*np.radians(fit_visphi))
+                                               - np.exp(1j*np.radians(visphi))))
 
-                redchi_visamp = np.sum(res_visamp**2./visamp_error**2.*(1-visamp_flag))
-                redchi_vis2 = np.sum(res_vis2**2./vis2_error**2.*(1-vis2_flag))
-                redchi_closure = np.sum(res_closure**2./closure_error**2.*(1-closure_flag))
-                redchi_visphi = np.sum(res_visphi**2./visphi_error**2.*(1-visphi_flag))
+                redchi_visamp = np.sum(res_visamp**2./visamp_error**2.
+                                       * (1-visamp_flag))
+                redchi_vis2 = np.sum(res_vis2**2./vis2_error**2.
+                                     * (1-vis2_flag))
+                redchi_closure = np.sum(res_closure**2./closure_error**2.
+                                        * (1-closure_flag))
+                redchi_visphi = np.sum(res_visphi**2./visphi_error**2.
+                                       * (1-visphi_flag))
 
                 if redchi2:
                     redchi_visamp /= (visamp.size-np.sum(visamp_flag)-ndof)
@@ -1664,8 +1672,9 @@ class GravMFit(GravData, GravPhaseMaps):
                     chi2string = 'chi2'
 
                 if not onlyphases and not no_fit:
-                    chi2pd = pd.DataFrame({'chi2': [redchi_visamp, redchi_vis2, 
-                                                    redchi_closure, redchi_visphi]
+                    chi2pd = pd.DataFrame({'chi2': [redchi_visamp, redchi_vis2,
+                                                    redchi_closure,
+                                                    redchi_visphi]
                                            })
                     _fittab = pd.concat([_fittab, chi2pd], axis=1)
 
@@ -1702,9 +1711,9 @@ class GravMFit(GravData, GravPhaseMaps):
                         print("MCMC Result:")
                         for i in range(0, cldim):
                             print("%s = %.3f + %.3f - %.3f" % (cllabels[i],
-                                                            percentiles[i,1],
-                                                            percentiles[i,2],
-                                                            percentiles[i,0]))
+                                                               percentiles[i,1],
+                                                               percentiles[i,2],
+                                                               percentiles[i,0]))
                         print("-----------------------------------")
 
                 if plotScience:
@@ -1720,7 +1729,7 @@ class GravMFit(GravData, GravPhaseMaps):
 
         self.fittab = fittab
         if iopandas is not None and not pdexists:
-           fittab.to_pickle(pdname)
+            fittab.to_pickle(pdname)
 
         try:
             fitted = 1-(np.array(self.fit_for) == 0)
