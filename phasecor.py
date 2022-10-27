@@ -2563,7 +2563,8 @@ class GravPhaseNight():
             dra4 = header['ESO QC MET SOBJ DRA4']
             dra = [dra1, dra2, dra3, dra4]
             
-            pmfile = resource_filename('gravipy', 'Datafiles/GRAVITY_SC_MAP_20200306_SM45.fits')
+            pmfile = resource_filename('gravipy',
+                                       'Datafiles/GRAVITY_SC_MAP_20200306_SM45.fits')
             phasemaps = fits.open(pmfile)
             pm_amp = phasemaps['SC_AMP'].data
             pm_pha = phasemaps['SC_PHASE'].data
