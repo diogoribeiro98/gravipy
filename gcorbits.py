@@ -12,6 +12,13 @@ from .gravdata import convert_date
 
 class GCorbits():
     def __init__(self, verbose=True):
+        """
+        Package to get positions of stars at a certain point in time
+        Orbits and proper motions from Stefan
+        Does not contain GR effects and orbits are not necessarily up to date
+
+        Supress outputs with verbose=False
+        """
         self.star_orbits = {}
         self.orbit_stars = []
         for s in star_orbits:
@@ -24,11 +31,19 @@ class GCorbits():
             self.pm_stars.append(s['name'])
         if verbose:
             print('Stars with orbits:')
-            print(self.orbit_stars)
+            print(self.orbit_stars)pm_stars
             print('\nStars with proper motions:')
             print(self.pm_stars)
 
     def pos_orbit(self, star, t, rall=False):
+        """
+        Calculates the position of a star with known orbits
+        star: has to be in the list: orbit_stars
+        time: the time of evaluation, in float format 20xx.xx
+        rall: if true returns also z-position
+        """
+        star = self.star_orbits[star]
+
         M0 = 4.40
         R0 = 8.34
         m_unit = M0*1e6*u.solMass
@@ -36,10 +51,7 @@ class GCorbits():
         t_unit = u.yr
 
         l_unit = a_unit.to(u.rad)*(R0*u.kpc)
-        v_unit = l_unit/t_unit
-
         G = float(c.G.cgs * m_unit*t_unit**2/l_unit**3)
-
         mu = G
         a = star['a']/1000
         n = self.mean_motion(mu, a)
@@ -71,6 +83,12 @@ class GCorbits():
             return np.array([x, y])
 
     def pos_pm(self, star, t):
+        """
+        Calculates the position of a star with proper motion
+        star: has to be in the list: pm_stars
+        time: the time of evaluation, in float format 20xx.xx
+        """
+        star = self.star_pms[star]
         vx = star['vx']/1000
         vy = star['vy']/1000
         x = star['x']/1000
@@ -115,6 +133,12 @@ class GCorbits():
         return E
 
     def plotOrbits(self, t=None, lim=100, long=False):
+        """
+        Plot the inner region around SgrA* at a given TIME
+        t:    time of plot (if None then now)
+        lim:  radius to which stars are plotted
+        long: more information if True
+        """
         if t is None:
             d = datetime.utcnow()
             t = d.strftime("%Y-%m-%dT%H:%M:%S")
