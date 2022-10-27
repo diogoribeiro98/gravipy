@@ -1,1 +1,1 @@
-One GRAVITY python package to rule them all
+Combined Python package for Galactic Center science with GRAVITY
