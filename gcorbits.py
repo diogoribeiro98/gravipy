@@ -146,11 +146,11 @@ class GCorbits():
         starpos = []
         for star in self.star_orbits:
             _s = self.star_orbits[star]
-            x, y = self.pos_orbit(_s, t)
+            x, y = self.pos_orbit(star, t)
             starpos.append([_s['name'], x*1000, y*1000, _s['type'], _s['Kmag']])
         for star in self.star_pms:
             _s = self.star_pms[star]
-            x, y = self.pos_pm(_s, t)
+            x, y = self.pos_pm(star, t)
             starpos.append([_s['name'], x*1000, y*1000, _s['type'], _s['Kmag']])
 
         fig, ax = plt.subplots()
