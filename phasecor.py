@@ -140,7 +140,7 @@ def create_met_files(target='SGRA', create=True, force_new = False,
                      datadir='/data/user/forFrank2/'):
     folders = sorted(glob.glob(datadir + '20??-??-??'))
     
-    s2orbit = np.load(resource_filename('gravipy', 's2_orbit.npy'))
+    s2orbit = np.load(resource_filename('gravipy', 'Datafiles/s2_orbit.npy'))
     s2orbit[:,1:] *= 1e3
     for folder in folders:
         night = folder[-10:]
@@ -1038,7 +1038,7 @@ class GravPhaseNight():
         if s2_offx is None:
             s2_offx = offsets[nights.index(night)]
         self.s2_offx = s2_offx
-        s2data = np.load(resource_filename('gravipy', 's2_orbit.npy'))
+        s2data = np.load(resource_filename('gravipy', 'Datafiles/s2_orbit.npy'))
         if full_folder:
             sg_files = allfiles
             s2_files = allfiles
@@ -1110,7 +1110,7 @@ class GravPhaseNight():
                 if self.verbose:
                     print('Read in pandas')
                 pandasfile = resource_filename('gravipy',
-                                               'GRAVITY_DATA_2019_4_frame_simple.object')
+                                               'Datafiles/GRAVITY_2019data.object')
                 pand = pd.read_pickle(pandasfile)
 
             sg_flux = []
@@ -1133,7 +1133,7 @@ class GravPhaseNight():
                 sg_flux_p2.append(p2)
 
                 ddate = convert_date(obsdate)[0]
-                orbitfile = resource_filename('gravipy', 's2_orbit_082020.txt')
+                orbitfile = resource_filename('gravipy', 'Datafiles/s2_orbit_082020.txt')
                 orbit = np.genfromtxt(orbitfile)
                 s2_pos.append(orbit[find_nearest(orbit[:, 0], ddate)][1:]*1000)
 
@@ -2559,7 +2559,8 @@ class GravPhaseNight():
             dra4 = header['ESO QC MET SOBJ DRA4']
             dra = [dra1, dra2, dra3, dra4]
             
-            pmfile = resource_filename('gravipy', 'GRAVITY_SC_MAP_20200306_SM45.fits')
+            pmfile = resource_filename('gravipy',
+                                       'Datafiles/GRAVITY_SC_MAP_20200306_SM45.fits')
             phasemaps = fits.open(pmfile)
             pm_amp = phasemaps['SC_AMP'].data
             pm_pha = phasemaps['SC_PHASE'].data
