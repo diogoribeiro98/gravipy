@@ -1286,16 +1286,18 @@ class GravMFit(GravData, GravPhaseMaps):
             pdname = './fitresults/' + iopandas + '_' + self.filename[:-4] + 'pd'
             try:
                 fittab = pd.read_pickle(pdname)
-                print('Results exist at %s' % pdname)
                 pdexists = True
                 no_fit = True
+                if self.verbose:
+                    print('Results exist at %s' % pdname)
             except FileNotFoundError:
                 pdexists = False
 
         if no_fit:
             plotCorner = False
-            print('Will not fit the data, just print out the results for the '
-                  'given initial conditions')
+            if self.verbose:
+                print('Will not fit the data, just print out the results for the '
+                      'given initial conditions')
 
         for ddx in sorted(todel, reverse=True):
             del theta_names[ddx]
