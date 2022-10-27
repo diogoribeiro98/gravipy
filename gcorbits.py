@@ -31,7 +31,7 @@ class GCorbits():
             self.pm_stars.append(s['name'])
         if verbose:
             print('Stars with orbits:')
-            print(self.orbit_stars)pm_stars
+            print(self.orbit_stars)
             print('\nStars with proper motions:')
             print(self.pm_stars)
 
