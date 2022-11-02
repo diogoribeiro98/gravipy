@@ -963,7 +963,6 @@ class GravMFit(GravData, GravPhaseMaps):
                  fixedBHalpha=False,
                  fixedBG=False,
                  initial=None,
-                 plotCorner=True,
                  plotScience=True,
                  phasemaps=True,
                  **kwargs):
@@ -995,7 +994,6 @@ class GravMFit(GravData, GravPhaseMaps):
         fit_for:        weight of VA, V2, T3, VP [[0.5,0.5,1.0,0.0]]
         initial:        Initial guess for fit [None]
         fixedBHalpha:   Fit for black hole power law [False]
-        plotCorner:     plot MCMC results [True]
         plotScience:    plot fit result [True]
         phasemaps:      Use Phasemaps for fit [True]
 
@@ -1018,6 +1016,7 @@ class GravMFit(GravData, GravPhaseMaps):
                         available. Give prefix to filename [None]
         fit_phasemaps:  Fit phasemaps at each step, otherwise jsut takes the 
                         initial guess value [False]
+        plotCorner:     plot MCMC results [False, steps, corner, both]
         interppm:       Interpolate Phasemaps [True]
         pmdatayear:     Phasemaps year, 2019 or 2020 [2019]
         smoothkernel:   Size of smoothing kernel in mas [15]
@@ -1728,7 +1727,8 @@ class GravMFit(GravData, GravPhaseMaps):
                 self.plotFitComb(plotdata)
                 self.plotdata = plotdata
 
-        self.fittab = fittab
+        if not no_fit:
+            self.fittab = fittab
         if iopandas is not None and not pdexists:
             fittab.to_pickle(pdname)
 
