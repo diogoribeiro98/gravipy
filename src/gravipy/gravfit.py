@@ -3,20 +3,17 @@ from astropy.convolution import Gaussian2DKernel
 import matplotlib.pyplot as plt
 from matplotlib import gridspec
 import numpy as np
-import scipy as sp
 import emcee
 import corner
 from multiprocessing import Pool
 from fpdf import FPDF
 from PIL import Image
-from scipy import signal, optimize, interpolate
+from scipy import signal, interpolate
 import math
 import mpmath
 from pkg_resources import resource_filename
-from numba import njit, prange
-from datetime import timedelta, datetime
+from datetime import datetime
 import multiprocessing
-import sys
 import os
 
 from .gravdata import *

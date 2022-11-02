@@ -1,7 +1,6 @@
 import numpy as np
 from astropy import units as u
 from astropy import constants as c
-from astropy import wcs
 from scipy.optimize import newton
 from .star_orbits import star_pms, star_orbits
 from datetime import datetime

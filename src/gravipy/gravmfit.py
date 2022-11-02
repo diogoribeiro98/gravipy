@@ -10,7 +10,6 @@ from scipy import signal, interpolate
 import math
 import mpmath
 from pkg_resources import resource_filename
-from numba import njit, prange
 import os
 import pandas as pd
 from joblib import Parallel, delayed
