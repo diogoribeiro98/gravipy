@@ -1030,6 +1030,7 @@ class GravMFit(GravData, GravPhaseMaps):
         coh_loss = kwargs.get('coh_loss', False)
         no_fit = kwargs.get('no_fit', False)
         onlypol = kwargs.get('onlypol', None)
+        plotCorner = kwargs.get('plotCorner', None)
         iopandas = kwargs.get('iopandas', None)
 
         fit_phasemaps = kwargs.get('fit_phasemaps', False)
