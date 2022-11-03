@@ -131,7 +131,7 @@ class GCorbits():
             E = newton(f, E0, fp, *args, **kwargs)
         return E
 
-    def plotOrbits(self, t=None, lim=100, long=False):
+    def plotOrbits(self, t=None, figsize=8, lim=100, long=False):
         """
         Plot the inner region around SgrA* at a given TIME
         t:    time of plot (if None then now)
@@ -154,8 +154,8 @@ class GCorbits():
 
         
         fig, ax = plt.subplots()
-        fig.set_figheight(6)
-        fig.set_figwidth(6)
+        fig.set_figheight(figsize)
+        fig.set_figwidth(figsize)
         for s in starpos:
             n, x, y, ty, mag = s
             if np.any(np.abs(x) > lim) or np.any(np.abs(y) > lim):
