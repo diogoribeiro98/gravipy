@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(name="gravipy",
-      version="1.0",
+      version="1.1",
       author="Felix Widmann",
       description='Package to work with GRAVITY GC data',
       url="https://github.com/widmannf/gravipy",
