@@ -27,5 +27,6 @@ setup(name='gravipy',
         'numba',
         'p2api',
         'selenium',
+        'tqdm',
     ]
 )
