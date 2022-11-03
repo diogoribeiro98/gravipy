@@ -152,7 +152,10 @@ class GCorbits():
             x, y = self.pos_pm(star, t)
             starpos.append([_s['name'], x*1000, y*1000, _s['type'], _s['Kmag']])
 
+        
         fig, ax = plt.subplots()
+        fig.set_figheight(6)
+        fig.set_figwidth(6)
         for s in starpos:
             n, x, y, ty, mag = s
             if np.any(np.abs(x) > lim) or np.any(np.abs(y) > lim):
