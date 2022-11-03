@@ -397,7 +397,7 @@ class GravPhaseMaps():
         np.save(savefile, all_pm)
         savefile = resource_filename('gravipy', savename2)
         np.save(savefile, all_pm_denom)
-
+        self.all_pm = all_pm        
         if plot:
             self.plotPhasemaps(all_pm[len(all_pm)//2])
 
@@ -440,9 +440,9 @@ class GravPhaseMaps():
                     'levels':np.linspace(-180, 180, 19, endpoint=True)}
         pltargsA = {'origin':'lower', 'vmin':0, 'vmax':1,
                     'extent': [fov/2, -fov/2, -fov/2, fov/2]}
-
+        
         for io, img in enumerate(aberration_maps):
-            img = np.flip(img, axis=1)
+            img = np.flip(img, axis=1)[20:-20,20:-20]
             _phase = np.angle(img, deg=True)
             _phase = cut_circle(_phase, fov)
             imP = ax1[io].contourf(_phase, **pltargsP)
