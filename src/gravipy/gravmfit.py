@@ -132,7 +132,7 @@ def procrustes(a, target, padval=0):
 
 
 class GravPhaseMaps():
-    def createPhasemaps(self, nthreads=1, smooth=10, plot=True, datayear=2019):
+    def createPhasemaps(self, nthreads=1, smooth=15, plot=True, datayear=2019):
         if datayear == 2019:
             zerfile = 'phasemap_zernike_20200918_diff_2019data.npy'
         elif datayear == 2020:
@@ -355,14 +355,6 @@ class GravPhaseMaps():
                     all_pm[wdx, GV] = pm_sm
                     all_pm_denom[wdx, GV] = pm_sm_denom
 
-                    if plot and wdx == 0:
-                        plt.imshow(np.abs(pm_sm))
-                        plt.colorbar()
-                        plt.show()
-                        plt.imshow(np.angle(pm_sm))
-                        plt.colorbar()
-                        plt.show()
-
         else:
             def multi_pm(lam):
                 print(lam)
@@ -400,10 +392,77 @@ class GravPhaseMaps():
                         % (self.tel, self.resolution, smooth))
             savename2 = ('Phasemaps/Phasemap_%s_%s_Smooth%i_2020data_denom.npy'
                          % (self.tel, self.resolution, smooth))
+        
         savefile = resource_filename('gravipy', savename)
         np.save(savefile, all_pm)
         savefile = resource_filename('gravipy', savename2)
         np.save(savefile, all_pm_denom)
+
+        if plot:
+            self.plotPhasemaps(all_pm[len(all_pm)//2])
+
+    def plotPhasemaps(self, aberration_maps):
+
+        """
+        Plot phase- and amplitude maps.
+
+        Parameters:
+        ----------
+        aberration_maps (np.array) : one complex 2D map per telescope
+        fov (float)   : extend of the maps
+
+        Returns: a figure object for phase-  and one for amplitude-maps.
+        -------
+        """
+
+        def cut_circle(mapdat, amax):
+            # cut a circtle from a quadratic map with radius=0.5*side length
+            xcoord = np.linspace(-amax, amax, mapdat.shape[-1])
+            yy, xx = np.meshgrid(xcoord, xcoord)
+            rmap = np.sqrt(xx*xx + yy*yy)
+            mapdat[rmap>amax] = np.nan
+            return mapdat
+        
+        fov = 160
+        if self.tel == 'AT':
+            fov *= 4.4
+
+        fs = plt.rcParams['figure.figsize']
+        fig1, ax1 = plt.subplots(2,2, sharex=True, sharey=True,
+                                 figsize=(fs[0], fs[0]))
+        fig2, ax2 = plt.subplots(2,2, sharex=True, sharey=True,
+                                 figsize=(fs[0], fs[0]))
+        ax1 = ax1.flatten()
+        ax2 = ax2.flatten()
+
+        pltargsP = {'origin':'lower', 'cmap':'twilight_shifted',
+                    'extent': [fov/2, -fov/2, -fov/2, fov/2],
+                    'levels':np.linspace(-180, 180, 19, endpoint=True)}
+        pltargsA = {'origin':'lower', 'vmin':0, 'vmax':1,
+                    'extent': [fov/2, -fov/2, -fov/2, fov/2]}
+
+        for io, img in enumerate(aberration_maps):
+            img = np.flip(img, axis=1)
+            _phase = np.angle(img, deg=True)
+            _phase = cut_circle(_phase, fov)
+            imP = ax1[io].contourf(_phase, **pltargsP)
+            _amp = np.abs(img)
+            _amp = cut_circle(_amp, fov)
+            imA = ax2[io].imshow(_amp, **pltargsA)
+            ax1[io].set_aspect('equal')
+            ax2[io].set_aspect('equal')
+            
+        fig1.subplots_adjust(right=0.9)
+        cbar_ax = fig1.add_axes([0.95, 0.25, 0.05, 0.5])
+        fig1.colorbar(imP, cax=cbar_ax, label='Phase [deg]')
+        fig1.supxlabel('Image plane x-cooridnate [mas]')
+        fig1.supylabel('Image plane y-cooridnate [mas]')
+        fig2.subplots_adjust(right=0.9)
+        cbar_ax = fig2.add_axes([0.95, 0.25, 0.05, 0.5])
+        fig2.colorbar(imA, cax=cbar_ax, label='Fiber Throughput')
+        fig2.supxlabel('Image plane x-cooridnate [mas]')
+        fig2.supylabel('Image plane y-cooridnate [mas]')
+        plt.show()
 
     def rotation(self, ang):
         """
