@@ -1048,7 +1048,7 @@ class GravNight():
             OPD_TELFC_CORR = np.concatenate((OPD_TELFC_CORR,
                                              d['OPD_TELFC_CORR'].reshape(-1, 4, 4)
                                              * 1e6))
-            OPD_TELFC_CORR_XY = np.concatenate((OPD_TELFC_CORR,
+            OPD_TELFC_CORR_XY = np.concatenate((OPD_TELFC_CORR_XY,
                                              d['OPD_TELFC_CORR_XY'].reshape(-1, 4, 4)
                                              * 1e6))
             PHA_TELFC_CORR = np.concatenate((PHA_TELFC_CORR,
