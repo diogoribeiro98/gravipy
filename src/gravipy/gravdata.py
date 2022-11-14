@@ -57,33 +57,61 @@ def get_met(Volts, fc=False, removefc=True, returncomplex=False):
     VCT = np.zeros((len(VC), 32), dtype=complex)
     if removefc:
         for i in range(8):
-            VCT[:, 4 * i : 4 * (i + 1)] = (
-                VC[:, 4 * i : 4 * (i + 1)] * np.conj(VC[:, 32 + i])[:, None]
+            VCT[:, 4*i:4*(i+1)] = (
+                VC[:, 4*i:4*(i+1)] * np.conj(VC[:, 32 + i])[:, None]
             )
     else:
         VCT = VC[:,:-8]
     # Second np.convolve with time to gain in SNR (400DIT=800ms)
-    VTEL = np.array([np.convolve(VCT[:, i], np.ones(150)/150, "same") for i in range(32)]).T
-    VTELFC = (VTEL[:, :16] * np.conj(VTEL[:, 16:])).reshape(-1,4,4)
-    VTELFT = VTEL[:, :16].reshape(-1,4,4)
-    VTELST = VTEL[:, 16:].reshape(-1,4,4)
-    
+    VTEL = np.array([np.convolve(VCT[:, i], np.ones(150)/150, "same")
+                     for i in range(32)]).T
+    # VTELFC = (VTEL[:, :16] * np.conj(VTEL[:, 16:])).reshape(-1, 4, 4)
+    VTELFT = VTEL[:, :16].reshape(-1, 4, 4)
+    VTELST = VTEL[:, 16:].reshape(-1, 4, 4)
+
     for i in range(4):
         for j in range(4):
-            VTELFT[:,i,j]=np.convolve(VTELFT[:,i,j],np.ones(100)/100,'same')
-            VTELST[:,i,j]=np.convolve(VTELST[:,i,j],np.ones(100)/100,'same')
-    #VTELFT = (VTELFT) / abs(VTELFT)
-    #VTELST = (VTELST) / abs(VTELST)
+            VTELFT[:, i, j] = np.convolve(VTELFT[:, i, j],
+                                          np.ones(100)/100, 'same')
+            VTELST[:, i, j] = np.convolve(VTELST[:, i, j],
+                                          np.ones(100)/100, 'same')
+    # VTELFT = (VTELFT) / abs(VTELFT)
+    # VTELST = (VTELST) / abs(VTELST)
     if returncomplex:
-        return (VTELFT * np.conj(VTELFT.mean(axis=0))), (VTELST * np.conj(VTELST.mean(axis=0)))
-    
-    phaseFT = np.unwrap(np.angle(VTELFT * np.conj(VTELFT.mean(axis=0))), axis=0)
-    phaseSC = np.unwrap(np.angle(VTELST * np.conj(VTELST.mean(axis=0))), axis=0)
+        return ((VTELFT * np.conj(VTELFT.mean(axis=0))),
+                (VTELST * np.conj(VTELST.mean(axis=0))))
+
+    phaseFT = np.unwrap(np.angle(VTELFT * np.conj(VTELFT.mean(axis=0))),
+                        axis=0)
+    phaseSC = np.unwrap(np.angle(VTELST * np.conj(VTELST.mean(axis=0))),
+                        axis=0)
     rmsFT = np.std(phaseFT, axis=0)
     rmsSC = np.std(phaseSC, axis=0)
     phaseFT = np.angle(VTELFT * np.conj(VTELFT.mean(axis=0)))
     phaseSC = np.angle(VTELST * np.conj(VTELST.mean(axis=0)))
     return phaseFT, phaseSC, rmsFT, rmsSC
+
+
+def get_refangle(header, tel, length):
+    pa1 = header["ESO ISS PARANG START"]
+    pa2 = header["ESO ISS PARANG END"]
+    if (pa1-pa2) > 300:
+        pa1 -= 360
+    elif (pa1-pa2) < -300:
+        pa1 += 360
+    parang = np.linspace(pa1, pa2, length+1)
+    parang = parang[:-1]
+    drottoff = header["ESO INS DROTOFF" + str(4-tel)]
+    try:
+        dx = header["ESO INS SOBJ X"] - header["ESO INS SOBJ OFFX"]
+        dy = header["ESO INS SOBJ Y"] - header["ESO INS SOBJ OFFY"]
+    except KeyError:
+        dx = header["ESO INS SOBJ X"]
+        dy = header["ESO INS SOBJ Y"]
+    posangle = np.arctan2(dx, dy) * 180 / np.pi
+    fangle = - posangle - drottoff + 270
+    angle = fangle + parang + 45.
+    return (angle) % 360
 
 
 class GravData():
