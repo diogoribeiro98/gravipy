@@ -1027,7 +1027,7 @@ class GravNight():
 
     def getTime(self):
         files = self.files
-        MJD = np.array([]).reshape(0,4)
+        MJD = np.array([]).reshape(0, 4)
         for fdx, file in enumerate(files):
             d = fits.open(file)['OI_FLUX'].data
             _MJD0 = fits.open(file)[0].header['MJD-OBS']
@@ -1045,20 +1045,27 @@ class GravNight():
         else:
             fitnum = 10
 
-        MJD = np.array([]).reshape(0,4)
-        OPD_FC = np.array([]).reshape(0,4)
-        OPD_FC_CORR = np.array([]).reshape(0,4)
-        OPD_TEL = np.array([]).reshape(0,4,4)
-        OPD_TEL_CORR = np.array([]).reshape(0,4,4)
-        OPD_TELFC_CORR = np.array([]).reshape(0,4,4)
-        OPD_TELFC_CORR_XY = np.array([]).reshape(0,4,4)
-        PHA_TELFC_CORR = np.array([]).reshape(0,4,4)
-        OPD_TELFC_MCORR = np.array([]).reshape(0,4)
+        MJD = np.array([]).reshape(0, 4)
+        REFANG = np.array([]).reshape(0, 4)
+        OPD_FC = np.array([]).reshape(0, 4)
+        OPD_FC_CORR = np.array([]).reshape(0, 4)
+        OPD_TEL = np.array([]).reshape(0, 4, 4)
+        OPD_TEL_CORR = np.array([]).reshape(0, 4, 4)
+        OPD_TELFC_CORR = np.array([]).reshape(0, 4, 4)
+        OPD_TELFC_CORR_XY = np.array([]).reshape(0, 4, 4)
+        PHA_TELFC_CORR = np.array([]).reshape(0, 4, 4)
+        OPD_TELFC_MCORR = np.array([]).reshape(0, 4)
         E_U = np.array([]).reshape(0,4,3)
         E_V = np.array([]).reshape(0,4,3)
 
         for fdx, file in enumerate(files):
+            h = fits.open(file)[0].header
             d = fits.open(file)['OI_VIS_MET'].data
+            ndata = d['TIME'].reshape(-1, 4).shape[0]
+            _refang = np.zeros((ndata, 4))
+            for tel in range(4):
+                _refang[:, tel] = get_refangle(h, tel, ndata)
+            REFANG = np.concatenate(REFANG, _refang)
             _MJD0 = fits.open(file)[0].header['MJD-OBS']
             MJD = np.concatenate((MJD,
                                   d['TIME'].reshape(-1, 4)/1e6/3600/24 + _MJD0))
@@ -1088,6 +1095,7 @@ class GravNight():
 
         MJD = (MJD - self.mjd0)*24*60
         self.time = MJD
+        self.refang = REFANG
         self.opd_fc = OPD_FC
         self.opd_fc_corr = OPD_FC_CORR
         self.opd_telfc_mcorr = OPD_TELFC_MCORR
