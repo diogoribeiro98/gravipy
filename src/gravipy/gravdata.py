@@ -1065,7 +1065,7 @@ class GravNight():
             _refang = np.zeros((ndata, 4))
             for tel in range(4):
                 _refang[:, tel] = get_refangle(h, tel, ndata)
-            REFANG = np.concatenate(REFANG, _refang)
+            REFANG = np.concatenate((REFANG, _refang))
             _MJD0 = fits.open(file)[0].header['MJD-OBS']
             MJD = np.concatenate((MJD,
                                   d['TIME'].reshape(-1, 4)/1e6/3600/24 + _MJD0))
@@ -1086,12 +1086,15 @@ class GravNight():
             OPD_TELFC_CORR = np.concatenate((OPD_TELFC_CORR,
                                              d['OPD_TELFC_CORR'].reshape(-1, 4, 4)
                                              * 1e6))
-            OPD_TELFC_CORR_XY = np.concatenate((OPD_TELFC_CORR_XY,
+            try:
+                OPD_TELFC_CORR_XY = np.concatenate((OPD_TELFC_CORR_XY,
                                              d['OPD_TELFC_CORR_XY'].reshape(-1, 4, 4)
                                              * 1e6))
-            PHA_TELFC_CORR = np.concatenate((PHA_TELFC_CORR,
+                PHA_TELFC_CORR = np.concatenate((PHA_TELFC_CORR,
                                              d['PHASE_TELFC_CORR'].reshape(-1, 4, 4)
                                              ))
+            except KeyError:
+                pass
 
         MJD = (MJD - self.mjd0)*24*60
         self.time = MJD
