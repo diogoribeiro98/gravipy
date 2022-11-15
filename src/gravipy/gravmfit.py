@@ -25,7 +25,7 @@ from .gravdata import *
 try:
     from generalFunctions import *
     set_style('show')
-except (NameError, ModuleNotFoundError):
+except (ValueError, NameError, ModuleNotFoundError):
     pass
 
 import colorsys

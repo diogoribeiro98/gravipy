@@ -15,7 +15,7 @@ import os
 try:
     from generalFunctions import *
     set_style('show')
-except (NameError, ModuleNotFoundError):
+except (ValueError, NameError, ModuleNotFoundError):
     pass
 
 

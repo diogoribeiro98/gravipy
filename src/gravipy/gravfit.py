@@ -21,7 +21,7 @@ from .gravdata import *
 try:
     from generalFunctions import *
     set_style('show')
-except (NameError, ModuleNotFoundError):
+except (ValueError, NameError, ModuleNotFoundError):
     pass
 
 color1 = '#C02F1D'
