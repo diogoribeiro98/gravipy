@@ -1786,8 +1786,7 @@ class GravMFit(GravData, GravPhaseMaps):
             if plotScience:
                 self.plotFitComb(plotdata)
                 self.plotdata = plotdata
-
-        if not no_fit:
+        if not no_fit or pdexists:
             self.fittab = fittab
         if iopandas is not None and not pdexists:
             fittab.to_pickle(pdname)
