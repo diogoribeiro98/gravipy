@@ -714,8 +714,8 @@ class GravData():
         fitsdata.close()
 
 
-    def getFluxfromRAW(self, flatfile, method, skyfile=None, wavefile=None,
-                       pp_wl=None, flatflux=False):
+    def getFluxfromRAW(self, flatfile, method='preproc', skyfile=None, wavefile=None,
+                       p2vmfile=None, flatflux=False):
         """
         Get the flux values from a raw file
         method has to be 'spectrum', 'preproc', 'p2vmred', 'dualscivis'
@@ -751,12 +751,17 @@ class GravData():
         elif self.polmode == 'COMBINED':
             numspec = 24
 
-        if self.resolution == 'LOW':
-            numchannels = 14
-        elif self.resolution == 'MEDIUM':
-            numchannels = 241
-        else:
-            raise ValueError('High not implemented yet!')
+        flatfits = fits.open(flatfile)
+        fieldstart = flatfits['PROFILE_PARAMS'].header['ESO PRO PROFILE STARTX'] - 1
+        flatchannels = flatfits['PROFILE_PARAMS'].header['ESO PRO PROFILE NX']
+        fieldstop = fieldstart + flatchannels
+
+        #if self.resolution == 'LOW':
+        #    numchannels = 14
+        #elif self.resolution == 'MEDIUM':
+        #    numchannels = 241
+        #else:
+        #    raise ValueError('High not implemented yet!')
 
         ## extract maxpos
         #specpos = []
@@ -767,10 +772,6 @@ class GravData():
             #_speclist[np.argmax(_speclist)-5:np.argmax(_speclist)+6] = 0
         #specpos = sorted(specpos)
 
-        flatfits = fits.open(flatfile)
-        fieldstart = flatfits['PROFILE_PARAMS'].header['ESO PRO PROFILE STARTX'] - 1
-        fieldstop = fieldstart + flatfits['PROFILE_PARAMS'].header['ESO PRO PROFILE NX']
-
         if flatflux:
             flatdata = flatfits['IMAGING_DATA_SC'].data[0]
             flatdata += np.min(flatdata)
@@ -778,7 +779,7 @@ class GravData():
             red[:,:,fieldstart:fieldstop] = red[:,:,fieldstart:fieldstop] / flatdata
 
         # extract spectra with profile
-        red_spectra = np.zeros((tsteps,numspec,numchannels))
+        red_spectra = np.zeros((tsteps,numspec,flatchannels))
         for idx in range(numspec):
             _specprofile = flatfits['PROFILE_DATA'].data['DATA%i' % (idx+1)]
             _specprofile_t = np.tile(_specprofile[0], (tsteps,1,1))
@@ -788,9 +789,13 @@ class GravData():
             return red_spectra
         elif wavefile is None:
             raise ValueError('wavefile needed!')
-        elif pp_wl is None:
+        elif p2vmfile is None:
             raise ValueError('pp_wl needed!')
-
+        
+        if self.polmode == 'SPLIT':
+            pp_wl = fits.open(p2vmfile)['OI_WAVELENGTH',11].data['EFF_WAVE']
+        else:
+            pp_wl = fits.open(p2vmfile)['OI_WAVELENGTH',10].data['EFF_WAVE']
 
         # wl interpolation
         wavefits = fits.open(wavefile)
