@@ -1012,13 +1012,13 @@ class GravNight():
             raise ValueError('Not all input data from same ndit')
 
         if self.verbose:
-            print('Data loaded as:')
-            print('Category: %s' % self.datacatg)
-            print('Telescope: %s' % self.tel)
-            print('Polarization: %s' % self.polmode)
-            print('Resolution: %s' % self.resolution)
-            print('DIT: %f' % self.dit)
-            print('NDIT: %i' % self.ndit)
+            print(f'{len(self.datalist)} files loaded as:')
+            print(f'Category: {self.datacatg}')
+            print(f'Telescope: {self.tel}')
+            print(f'Polarization: {self.polmode}')
+            print(f'Resolution: {self.resolution}')
+            print(f'DIT: {self.dit}')
+            print(f'NDIT: {self.ndit}')
 
         self.mjd = [i.mjd for i in self.datalist]
         self.mjd0 = np.min(np.array(self.mjd))
