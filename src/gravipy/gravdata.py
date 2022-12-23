@@ -1346,7 +1346,8 @@ class GravNight():
         for fdx, file in enumerate(files):
             d = fits.open(file)['FDDL'].data
             _MJD0 = fits.open(file)[0].header['MJD-OBS']
-            MJD = np.concatenate((MJD, d['TIME']/1e6/3600/24 + _MJD0))
+            _t = np.tile(d['TIME'], (4, 1)).T
+            MJD = np.concatenate((MJD, _t/1e6/3600/24 + _MJD0))
             FT_POS = np.concatenate((FT_POS, d['FT_POS']))
             SC_POS = np.concatenate((SC_POS, d['SC_POS']))
         MJD = (MJD - self.mjd0)*24*60
