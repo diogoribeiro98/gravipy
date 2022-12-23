@@ -1365,7 +1365,8 @@ class GravNight():
         self.t_files = (np.array(self.mjd_files)-self.mjd0)*24*60
 
         if plot:
-            maxval = np.nanmax(np.abs(self.fddl))*0.9
+            maxval = np.nanmax(self.fddl)*1.1
+            minval = np.nanmin(self.fddl)*1.1
             fddl_name = ['FT', 'SC']
 
             gs = gridspec.GridSpec(2, 4, wspace=0.05, hspace=0.05)
@@ -1383,8 +1384,7 @@ class GravNight():
                         if tel == 0 and fddl == 0:
                             plt.text(self.t_files[m]+0.5, -maxval*0.9,
                                      self.ut_files[m], rotation=90, fontsize=5)
-                    plt.ylim(-maxval, maxval)
-                    plt.axhline(0, ls='--', lw=1, zorder=0, color='grey')
+                    plt.ylim(minval, maxval)
                     if fddl == 0:
                         plt.title('UT %i' % (4-tel), fontsize=8)
                     if fddl != 1:
