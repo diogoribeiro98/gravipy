@@ -1382,7 +1382,7 @@ class GravNight():
                         plt.axvline(self.t_files[m], ls='--', lw=0.2,
                                     color='grey')
                         if tel == 0 and fddl == 0:
-                            plt.text(self.t_files[m]+0.5, -maxval*0.9,
+                            plt.text(self.t_files[m]+0.5, minval+minval*0.1,
                                      self.ut_files[m], rotation=90, fontsize=5)
                     plt.ylim(minval, maxval)
                     if fddl == 0:
