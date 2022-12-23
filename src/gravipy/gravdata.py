@@ -1331,6 +1331,72 @@ class GravNight():
                     plt.ylabel('OPD_TELFC_MCORR \n[$\mu$m]', fontsize=8)
             plt.show()
 
+    def getFDDLdata(self, plot=False):
+        if 'P2VM' not in self.datacatg:
+            raise ValueError('Only available for p2vmred files')
+        if self.polmode == 'SPLIT':
+            fitnum = 11
+        else:
+            fitnum = 10
+        files = self.files
+        MJD = np.array([]).reshape(0, 4)
+        FT_POS = np.array([]).reshape(0, 4)
+        SC_POS = np.array([]).reshape(0, 4)
+
+        for fdx, file in enumerate(files):
+            d = fits.open(file)['FDDL'].data
+            _MJD0 = fits.open(file)[0].header['MJD-OBS']
+            MJD = np.concatenate((MJD, d['TIME']/1e6/3600/24 + _MJD0))
+            FT_POS = np.concatenate((FT_POS, d['FT_POS']))
+            SC_POS = np.concatenate((SC_POS, d['SC_POS']))
+        MJD = (MJD - self.mjd0)*24*60
+        self.fddltime = MJD
+        self.fddl = np.array([FT_POS, SC_POS])
+        self.mjd_files = []
+        self.ut_files = []
+        self.lst_files = []
+        for idx, file in enumerate(files):
+            d = fits.open(file)
+            self.mjd_files.append(d['OI_VIS', fitnum].data['MJD'][0])
+            a = file.find('GRAVI.20')
+            self.ut_files.append(file[a+17:a+22])
+            self.lst_files.append(d[0].header['LST'])
+        self.t_files = (np.array(self.mjd_files)-self.mjd0)*24*60
+
+        if plot:
+            maxval = np.nanmax(np.abs(self.fddl))*0.9
+            fddl_name = ['FT', 'SC']
+
+            gs = gridspec.GridSpec(2, 4, wspace=0.05, hspace=0.05)
+            plt.figure(figsize=(7, 5))
+            for fddl in range(2):
+                for tel in range(4):
+                    ax = plt.subplot(gs[fddl, tel])
+                    plt.plot(self.fddltime[:, tel],
+                             self.fddl[fddl, :, tel],
+                             ls='', marker='.',  markersize=1,
+                             color=self.colors_tel[tel])
+                    for m in range(len(self.t_files)):
+                        plt.axvline(self.t_files[m], ls='--', lw=0.2,
+                                    color='grey')
+                        if tel == 0 and fddl == 0:
+                            plt.text(self.t_files[m]+0.5, -maxval*0.9,
+                                     self.ut_files[m], rotation=90, fontsize=5)
+                    plt.ylim(-maxval, maxval)
+                    plt.axhline(0, ls='--', lw=1, zorder=0, color='grey')
+                    if fddl == 0:
+                        plt.title('UT %i' % (4-tel), fontsize=8)
+                    if fddl != 1:
+                        ax.set_xticklabels([])
+                    else:
+                        plt.xlabel('Time [mins]', fontsize=8)
+                    if tel != 0:
+                        ax.set_yticklabels([])
+                    else:
+                        plt.ylabel('FDDL %s\n[V]' % fddl_name[fddl],
+                                   fontsize=8)
+            plt.show()
+
     def getAcqdata(self, plot=False):
         if 'P2VM' not in self.datacatg:
             raise ValueError('Only available for p2vmred files')
