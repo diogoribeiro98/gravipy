@@ -729,6 +729,7 @@ class GravData():
             raise TypeError('method not available, should be one of the following: %s' % usableMethods)
 
         raw = fits.open(self.name)['IMAGING_DATA_SC'].data
+        raw[raw>np.percentile(raw,99.9)] = np.nan
         det_gain = 1.984 #e-/ADU
 
         if skyfile is None:
@@ -783,7 +784,7 @@ class GravData():
         for idx in range(numspec):
             _specprofile = flatfits['PROFILE_DATA'].data['DATA%i' % (idx+1)]
             _specprofile_t = np.tile(_specprofile[0], (tsteps,1,1))
-            red_spectra[:,idx] = np.sum(red[:,:,fieldstart:fieldstop]*_specprofile_t, 1)
+            red_spectra[:,idx] = np.nansum(red[:,:,fieldstart:fieldstop]*_specprofile_t, 1)
 
         if method == 'spectrum':
             return red_spectra
@@ -811,7 +812,7 @@ class GravData():
                     print('Extrapolation needed')
 
         if method == 'preproc':
-            return red_spectra_i
+            return pp_wl, red_spectra_i
 
         red_flux_P = np.zeros((tsteps, 4, len(pp_wl)))
         red_flux_S = np.zeros((tsteps, 4, len(pp_wl)))
