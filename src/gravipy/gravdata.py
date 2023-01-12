@@ -729,7 +729,8 @@ class GravData():
             raise TypeError('method not available, should be one of the following: %s' % usableMethods)
 
         raw = fits.open(self.name)['IMAGING_DATA_SC'].data
-        raw[raw>np.percentile(raw,99.9)] = np.nan
+        if self.resolution != 'LOW':
+            raw[raw>np.percentile(raw,99.9)] = np.nan
         det_gain = 1.984 #e-/ADU
 
         if skyfile is None:
@@ -1485,8 +1486,10 @@ class GravNight():
             repe2 = h['ESO INS ANLO3 REPEAT2']
             time1 = h['ESO INS ANLO3 TIMER1']
             time2 = h['ESO INS ANLO3 TIMER2']
-            # volt1 = h['ESO INS ANLO3 VOLTAGE1']
-            # volt2 = h['ESO INS ANLO3 VOLTAGE2']
+            volt1 = h['ESO INS ANLO3 VOLTAGE1']
+            volt2 = h['ESO INS ANLO3 VOLTAGE2']
+            if self.verbose:
+                print(f'Bright period: {rate1*60-(time2-time1):.2f}, Voltage: {volt1:.1f}, {volt2:.1f}')
 
             mt1 = ((time1 / 86400.0) + 2440587.5 - 2400000.5 - self.mjd0)*24*60
             mt2 = ((time2 / 86400.0) + 2440587.5 - 2400000.5 - self.mjd0)*24*60
