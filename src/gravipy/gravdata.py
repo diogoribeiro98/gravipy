@@ -115,7 +115,7 @@ def get_refangle(header, tel, length):
 
 
 class GravData():
-    def __init__(self, data, verbose=True, plot=False):
+    def __init__(self, data, verbose=True, plot=False, datacatg=None):
         """
         """
         self.name = data
@@ -139,23 +139,26 @@ class GravData():
         self.header = header
         self.date = convert_date(date)
         self.raw = False
-
+        
         if 'GRAV' not in header['INSTRUME']:
             raise ValueError('File seems to be not from GRAVITY')
         else:
             datatype = 'RAW' # default data type RAW
         if 'ESO PRO TYPE' in header:
             datatype = header['ESO PRO TYPE']
-        if 'ESO PRO CATG' in header:
-            datacatg = header['ESO PRO CATG']
-            if datacatg not in poscatg:
-                raise ValueError('filetype is %s, which is not supported'
-                                 % datacatg)
-        else:
-            if self.verbose:
-                print('Assume this is a raw file!')
+        if datacatg is None:
+            if 'ESO PRO CATG' in header:
+                datacatg = header['ESO PRO CATG']
+                if datacatg not in poscatg:
+                    raise ValueError('filetype is %s, which is not supported'
+                                     % datacatg)
+            else:
+                if self.verbose:
+                    print('Assume this is a raw file!')
+                datacatg = 'RAW'
+        if datacatg == 'RAW':
             self.raw = True
-            datacatg = 'RAW'
+
 
         self.datacatg = datacatg
         self.polmode = header['ESO INS POLA MODE']
@@ -715,7 +718,7 @@ class GravData():
 
 
     def getFluxfromRAW(self, flatfile, method='preproc', skyfile=None, wavefile=None,
-                       p2vmfile=None, flatflux=False):
+                       p2vmfile=None, flatflux=False, darkfile=None):
         """
         Get the flux values from a raw file
         method has to be 'spectrum', 'preproc', 'p2vmred', 'dualscivis'
@@ -732,6 +735,7 @@ class GravData():
         if self.resolution != 'LOW':
             raw[raw>np.percentile(raw,99.9)] = np.nan
         det_gain = 1.984 #e-/ADU
+
 
         if skyfile is None:
             if self.verbose:
@@ -951,7 +955,7 @@ class GravData():
             self.visphiSC_P2 = self.visphiSC_P2.reshape(-1,self.channel)
 
 class GravNight():
-    def __init__(self, file_list, verbose=True):
+    def __init__(self, file_list, verbose=True, onlymet=False):
         """
         GravNight - the long awaited full night fit class
         """
@@ -961,6 +965,7 @@ class GravNight():
                                          color2, 'darkred', color1])
         self.colors_closure = np.array([color1, 'darkred', 'k', color2])
         self.colors_tel = np.array([color1, 'darkred', 'k', color2])
+        self.onlymet = onlymet
         self.get_files()
 
     def get_files(self):
@@ -990,28 +995,36 @@ class GravNight():
             self.polmode = _pol[0]
         else:
             print(_pol)
-            raise ValueError('Not all input data from same polmode')
+            self.polmode = None
+            if not self.onlymet:
+                raise ValueError('Not all input data from same polmode')
 
         _res = [i.resolution for i in self.datalist]
         if _res.count(_res[0]) == len(_res):
             self.resolution = _res[0]
         else:
             print(_res)
-            raise ValueError('Not all input data from same resolution')
+            self.resolution = None
+            if not self.onlymet:
+                raise ValueError('Not all input data from same resolution')
 
         _dit = [i.dit for i in self.datalist]
         if _dit.count(_dit[0]) == len(_dit):
             self.dit = _dit[0]
         else:
             print(_dit)
-            raise ValueError('Not all input data from same dit')
+            self.dit = None
+            if not self.onlymet:
+                raise ValueError('Not all input data from same dit')
 
         _ndit = [i.ndit for i in self.datalist]
         if _ndit.count(_ndit[0]) == len(_ndit):
             self.ndit = _ndit[0]
         else:
             print(_ndit)
-            raise ValueError('Not all input data from same ndit')
+            self.ndit = None
+            if not self.onlymet:
+                raise ValueError('Not all input data from same ndit')
 
         if self.verbose:
             print(f'{len(self.datalist)} files loaded as:')
@@ -1121,7 +1134,10 @@ class GravNight():
         self.lst_files = []
         for idx, file in enumerate(files):
             d = fits.open(file)
-            self.mjd_files.append(d['OI_VIS', fitnum].data['MJD'][0])
+            try:
+                self.mjd_files.append(d['OI_VIS', 10].data['MJD'][0])
+            except KeyError:
+                self.mjd_files.append(d['OI_VIS', 11].data['MJD'][0])
             a = file.find('GRAVI.20')
             self.ut_files.append(file[a+17:a+22])
             self.lst_files.append(d[0].header['LST'])
