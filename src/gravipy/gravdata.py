@@ -1163,7 +1163,7 @@ class GravNight():
                              averaging(OPD_TEL[:, tel, dio]
                                        - np.mean(OPD_TEL[:, tel, dio]), av),
                              ls='', marker='.', color=self.colors_tel[tel],
-                             label='UT%i\nDiode %i' % ((4-tel), dio))
+                             label='%s%i\nDiode %i' % (self.tel,(4-tel), dio))
                     for m in range(len(self.t_files)):
                         plt.axvline(self.t_files[m], ls='--', lw=0.2,
                                     color='grey')
@@ -1201,7 +1201,7 @@ class GravNight():
                              averaging(OPD_TEL_CORR[:, tel, dio]
                                        - np.mean(OPD_TEL_CORR[:, tel, dio]), av),
                              ls='', marker='.', color=self.colors_tel[tel],
-                             label='UT%i\nDiode %i' % ((4-tel), dio))
+                             label='%s%i\nDiode %i' % (self.tel, (4-tel), dio))
                     for m in range(len(self.t_files)):
                         plt.axvline(self.t_files[m], ls='--', lw=0.2,
                                     color='grey')
@@ -1239,7 +1239,7 @@ class GravNight():
                              averaging(OPD_TELFC_CORR[:, tel, dio]
                                        - np.mean(OPD_TELFC_CORR[:, tel, dio]), av),
                              ls='', marker='.', color=self.colors_tel[tel],
-                             label='UT%i\nDiode %i' % ((4-tel), dio))
+                             label='%s%i\nDiode %i' % (self.tel,(4-tel), dio))
                     for m in range(len(self.t_files)):
                         plt.axvline(self.t_files[m], ls='--', lw=0.2,
                                     color='grey')
@@ -1272,7 +1272,7 @@ class GravNight():
                 plt.plot(averaging(MJD[:, tel], av),
                          averaging(OPD_FC[:, tel]
                                    - np.mean(OPD_FC[:, tel]), av),
-                         ls='', marker='.', label='UT%i' % (4-tel),
+                         ls='', marker='.', label='%s%i' % (self.tel, (4-tel)),
                          color=self.colors_tel[tel])
                 for m in range(len(self.t_files)):
                     plt.axvline(self.t_files[m], ls='--', lw=0.2, color='grey')
@@ -1302,7 +1302,7 @@ class GravNight():
                 plt.plot(averaging(MJD[:, tel], av),
                          averaging(OPD_FC_CORR[:, tel]
                                    - np.mean(OPD_FC_CORR[:, tel]), av),
-                         ls='', marker='.', label='UT%i' % (4-tel),
+                         ls='', marker='.', label='%s%i' % (self.tel, (4-tel)),
                          color=self.colors_tel[tel])
                 for m in range(len(self.t_files)):
                     plt.axvline(self.t_files[m], ls='--', lw=0.2, color='grey')
@@ -1333,7 +1333,7 @@ class GravNight():
                 plt.plot(averaging(MJD[:, tel], av),
                          averaging(OPD_TELFC_MCORR[:, tel]
                                    - np.mean(OPD_TELFC_MCORR[:, tel]), av),
-                         ls='', marker='.', label='UT%i' % (4-tel),
+                         ls='', marker='.', label='%s%i' % (self.tel, (4-tel)),
                          color=self.colors_tel[tel])
                 for m in range(len(self.t_files)):
                     plt.axvline(self.t_files[m], ls='--', lw=0.2, color='grey')
@@ -1404,7 +1404,7 @@ class GravNight():
                                      self.ut_files[m], rotation=90, fontsize=5)
                     plt.ylim(minval, maxval)
                     if fddl == 0:
-                        plt.title('UT %i' % (4-tel), fontsize=8)
+                        plt.title('%s %i' % (self.tel, (4-tel)), fontsize=8)
                     if fddl != 1:
                         ax.set_xticklabels([])
                     else:
@@ -1455,7 +1455,7 @@ class GravNight():
         self.t_files = (np.array(self.mjd_files)-self.mjd0)*24*60
 
         if plot:
-            maxval = np.nanmax(np.abs(self.pupil))*0.9
+            maxval = np.nanmax(np.abs(self.pupil), (1,2))*1.1
             pup_name = ['U', 'V', 'W']
 
             gs = gridspec.GridSpec(3, 4, wspace=0.05, hspace=0.05)
@@ -1470,12 +1470,12 @@ class GravNight():
                         plt.axvline(self.t_files[m], ls='--', lw=0.2,
                                     color='grey')
                         if tel == 0 and pup == 0:
-                            plt.text(self.t_files[m]+0.5, -maxval*0.9,
+                            plt.text(self.t_files[m]+0.5, -maxval[pup]*0.9,
                                      self.ut_files[m], rotation=90, fontsize=5)
-                    plt.ylim(-maxval, maxval)
+                    plt.ylim(-maxval[pup], maxval[pup])
                     plt.axhline(0, ls='--', lw=1, zorder=0, color='grey')
                     if pup == 0:
-                        plt.title('UT %i' % (4-tel), fontsize=8)
+                        plt.title('%s %i' % (self.tel, (4-tel)), fontsize=8)
                     if pup != 2:
                         ax.set_xticklabels([])
                     else:
