@@ -1149,9 +1149,9 @@ class GravNight():
             maxval = []
             for tel in range(4):
                 for dio in range(4):
-                    maxval.append(np.max(np.abs(
+                    maxval.append(np.nanmax(np.abs(
                         averaging(OPD_TEL[:, tel, dio]
-                                  - np.mean(OPD_TEL[:, tel, dio]), av))))
+                                  - np.nanmean(OPD_TEL[:, tel, dio]), av))))
             maxval = np.max(maxval)*1.2
 
             gs = gridspec.GridSpec(4, 4, wspace=0.05, hspace=0.05)
@@ -1187,7 +1187,7 @@ class GravNight():
             maxval = []
             for tel in range(4):
                 for dio in range(4):
-                    maxval.append(np.max(np.abs(
+                    maxval.append(np.nanmax(np.abs(
                         averaging(OPD_TEL_CORR[:, tel, dio]
                                   - np.mean(OPD_TEL_CORR[:, tel, dio]), av))))
             maxval = np.max(maxval)*1.2
@@ -1225,7 +1225,7 @@ class GravNight():
             maxval = []
             for tel in range(4):
                 for dio in range(4):
-                    maxval.append(np.max(np.abs(
+                    maxval.append(np.nanmax(np.abs(
                         averaging(OPD_TELFC_CORR[:, tel, dio]
                                   - np.mean(OPD_TELFC_CORR[:, tel, dio]), av))))
             maxval = np.max(maxval)*1.2
@@ -1261,7 +1261,7 @@ class GravNight():
             # OPD_FC
             maxval = []
             for tel in range(4):
-                maxval.append(np.max(np.abs(
+                maxval.append(np.nanmax(np.abs(
                     averaging(OPD_FC[:, tel]
                               - np.mean(OPD_FC[:, tel]), av))))
             maxval = np.max(maxval)*1.2
@@ -1291,7 +1291,7 @@ class GravNight():
             # OPD_FC_CORR
             maxval = []
             for tel in range(4):
-                maxval.append(np.max(np.abs(
+                maxval.append(np.nanmax(np.abs(
                     averaging(OPD_FC_CORR[:, tel]
                               - np.mean(OPD_FC_CORR[:, tel]), av))))
             maxval = np.max(maxval)*1.2
@@ -1322,7 +1322,7 @@ class GravNight():
             av = 500
             maxval = []
             for tel in range(4):
-                maxval.append(np.max(np.abs(
+                maxval.append(np.nanmax(np.abs(
                     averaging(OPD_TELFC_MCORR[:, tel]
                               - np.mean(OPD_TELFC_MCORR[:, tel]), av))))
             maxval = np.max(maxval)*1.2
@@ -1448,7 +1448,10 @@ class GravNight():
         self.lst_files = []
         for idx, file in enumerate(files):
             d = fits.open(file)
-            self.mjd_files.append(d['OI_VIS', fitnum].data['MJD'][0])
+            try:
+                self.mjd_files.append(d['OI_VIS', 10].data['MJD'][0])
+            except KeyError:
+                self.mjd_files.append(d['OI_VIS', 11].data['MJD'][0])
             a = file.find('GRAVI.20')
             self.ut_files.append(file[a+17:a+22])
             self.lst_files.append(d[0].header['LST'])
