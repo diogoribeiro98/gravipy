@@ -6,7 +6,6 @@ from scipy import interpolate
 from pkg_resources import resource_filename
 from astropy.time import Time
 from datetime import datetime
-from .phasecor import averaging
 
 import os
 
@@ -113,6 +112,89 @@ def get_refangle(header, tel, length):
     fangle = - posangle - drottoff + 270
     angle = fangle + parang + 45.
     return (angle) % 360
+
+
+def find_nearest(array, value):
+    idx = (np.abs(array-value)).argmin()
+    return idx
+
+
+def averaging(x, N, median=False):
+    if N == 1:
+        return x
+    if x.ndim == 2:
+        res = np.zeros((x.shape[0], x.shape[1]//N))
+        for idx in range(x.shape[0]):
+            if median:
+                res[idx] = np.nanmedian(x[idx].reshape(-1, N), axis=1)
+            else:
+                res[idx] = np.nanmean(x[idx].reshape(-1, N), axis=1)
+        return res
+    elif x.ndim == 1:
+        ll = x.shape[0]
+        xx = np.pad(x, (0, N - ll % N), constant_values=np.nan)
+        if median:
+            res = np.nanmedian(xx.reshape(-1, N), axis=1)
+        else:
+            res = np.nanmean(xx.reshape(-1, N), axis=1)
+        return res
+
+
+def averaging_std(x, N):
+    if x.ndim == 2:
+        res = np.zeros((x.shape[0], x.shape[1]//N))
+        for idx in range(x.shape[0]):
+            res[idx] = np.nanstd(x[idx].reshape(-1, N), axis=1)
+        return res
+    elif x.ndim == 1:
+        ll = x.shape[0]
+        xx = np.pad(x, (0, N - ll % N), constant_values=np.nan)
+        res = np.nanstd(xx.reshape(-1, N), axis=1)
+        return res
+
+
+def get_angle_header_all(header, tel, length):
+    pa1 = header["ESO ISS PARANG START"]
+    pa2 = header["ESO ISS PARANG END"]
+    parang = np.linspace(pa1, pa2, length+1)
+    parang = parang[:-1]
+    drottoff = header["ESO INS DROTOFF" + str(4-tel)]
+    dx = header["ESO INS SOBJ X"] - header["ESO INS SOBJ OFFX"]
+    dy = header["ESO INS SOBJ Y"] - header["ESO INS SOBJ OFFY"]
+    posangle = np.arctan2(dx, dy) * 180 / np.pi;
+    fangle = - posangle - drottoff + 270
+    angle = fangle + parang + 45.
+    return angle % 360
+
+
+def get_angle_header_start(header, tel):
+    pa1 = header["ESO ISS PARANG START"]
+    parang = pa1
+    drottoff = header["ESO INS DROTOFF" + str(4-tel)]
+    dx = header["ESO INS SOBJ X"] - header["ESO INS SOBJ OFFX"]
+    dy = header["ESO INS SOBJ Y"] - header["ESO INS SOBJ OFFY"]
+    posangle = np.arctan2(dx, dy) * 180 / np.pi;
+    fangle = - posangle - drottoff + 270
+    angle = fangle + parang + 45.
+    return angle % 360
+
+
+def get_angle_header_mean(header, tel):
+    pa1 = header["ESO ISS PARANG START"]
+    pa2 = header["ESO ISS PARANG END"]
+    parang = (pa1+pa2)/2
+    drottoff = header["ESO INS DROTOFF" + str(4-tel)]
+    dx = header["ESO INS SOBJ X"] - header["ESO INS SOBJ OFFX"]
+    dy = header["ESO INS SOBJ Y"] - header["ESO INS SOBJ OFFY"]
+    posangle = np.arctan2(dx, dy) * 180 / np.pi;
+    fangle = - posangle - drottoff + 270
+    angle = fangle + parang + 45.
+    return angle % 360
+
+
+def rotation(ang):
+    return np.array([[np.cos(ang), np.sin(ang)],
+                     [-np.sin(ang), np.cos(ang)]])
 
 
 class GravData():
