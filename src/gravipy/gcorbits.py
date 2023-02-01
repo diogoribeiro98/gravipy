@@ -152,7 +152,6 @@ class GCorbits():
             x, y = self.pos_pm(star, t)
             starpos.append([_s['name'], x*1000, y*1000, _s['type'], _s['Kmag']])
 
-        
         fig, ax = plt.subplots()
         fig.set_figheight(figsize)
         fig.set_figwidth(figsize)
