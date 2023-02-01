@@ -2,14 +2,12 @@ from astropy.io import fits
 import matplotlib.pyplot as plt
 from matplotlib import gridspec
 import numpy as np
-import scipy as sp
-from scipy import signal, optimize, interpolate
+from scipy import interpolate
 from pkg_resources import resource_filename
 from astropy.time import Time
-from datetime import timedelta, datetime
+from datetime import datetime
 from .phasecor import averaging
 
-import sys
 import os
 
 try:
@@ -23,6 +21,7 @@ color1 = '#C02F1D'
 color2 = '#348ABD'
 color3 = '#F26D21'
 color4 = '#7A68A6'
+
 
 def fiber_coupling(x):
     fiber_coup = np.exp(-1*(2*np.pi*np.sqrt(np.sum(x**2))/280)**2)
@@ -43,9 +42,10 @@ def convert_date(date, mjd=False):
 
 
 def get_met(Volts, fc=False, removefc=True, returncomplex=False):
-    V = np.array([np.convolve(Volts[:, i], np.ones(100)/100, 'same') for i in range(80)]).T
+    V = np.array([np.convolve(Volts[:, i], np.ones(100)/100, 'same')
+                  for i in range(80)]).T
     VC = V[:, 1::2] + 1j * V[:, ::2]
-    
+
     if fc:
         VFCFT, VFCST = VC[:, 32:36], VC[:, 36:]
         VFCFT = (VFCFT) / abs(VFCFT)
@@ -53,7 +53,7 @@ def get_met(Volts, fc=False, removefc=True, returncomplex=False):
         phaseFT = np.angle(VFCFT * np.conj(VFCFT.mean(axis=0)))
         phaseSC = np.angle(VFCST * np.conj(VFCST.mean(axis=0)))
         return phaseFT, phaseSC
-    
+
     VCT = np.zeros((len(VC), 32), dtype=complex)
     if removefc:
         for i in range(8):
@@ -61,7 +61,8 @@ def get_met(Volts, fc=False, removefc=True, returncomplex=False):
                 VC[:, 4*i:4*(i+1)] * np.conj(VC[:, 32 + i])[:, None]
             )
     else:
-        VCT = VC[:,:-8]
+        VCT = VC[:, :-8]
+
     # Second np.convolve with time to gain in SNR (400DIT=800ms)
     VTEL = np.array([np.convolve(VCT[:, i], np.ones(150)/150, "same")
                      for i in range(32)]).T
@@ -139,13 +140,9 @@ class GravData():
         self.header = header
         self.date = convert_date(date)
         self.raw = False
-        
+
         if 'GRAV' not in header['INSTRUME']:
             raise ValueError('File seems to be not from GRAVITY')
-        else:
-            datatype = 'RAW' # default data type RAW
-        if 'ESO PRO TYPE' in header:
-            datatype = header['ESO PRO TYPE']
         if datacatg is None:
             if 'ESO PRO CATG' in header:
                 datacatg = header['ESO PRO CATG']
@@ -158,7 +155,6 @@ class GravData():
                 datacatg = 'RAW'
         if datacatg == 'RAW':
             self.raw = True
-
 
         self.datacatg = datacatg
         self.polmode = header['ESO INS POLA MODE']
@@ -331,20 +327,17 @@ class GravData():
                 self.u = fitsdata['OI_VIS', 11].data.field('UCOORD')
                 self.v = fitsdata['OI_VIS', 11].data.field('VCOORD')
 
-                # spatial frequency
-                spFrequ = np.sqrt(self.u**2.+self.v**2.)
                 wave = self.wlSC_P1
                 self.wave = wave
-                u_as = np.zeros((len(self.u),len(wave)))
-                v_as = np.zeros((len(self.v),len(wave)))
-                for i in range(0,len(self.u)):
+                u_as = np.zeros((len(self.u), len(wave)))
+                v_as = np.zeros((len(self.v), len(wave)))
+                for i in range(0, len(self.u)):
                     u_as[i, :] = (self.u[i] / (wave * 1.e-6)
                                   * np.pi / 180. / 3600.)  # 1/as
                     v_as[i, :] = (self.v[i] / (wave * 1.e-6)
                                   * np.pi / 180. / 3600.)  # 1/as
                 self.spFrequAS = np.sqrt(u_as**2.+v_as**2.)
 
-                # spatial frequency T3
                 magu = np.sqrt(self.u**2.+self.v**2.)
                 max_spf = np.zeros((len(magu)//6*4))
                 for idx in range(len(magu)//6):
@@ -362,15 +355,15 @@ class GravData():
                                                           magu[4 + idx*6]]))
 
                 self.max_spf = max_spf
-                spFrequAS_T3 = np.zeros((len(max_spf),len(wave)))
+                spFrequAS_T3 = np.zeros((len(max_spf), len(wave)))
                 for idx in range(len(max_spf)):
                     spFrequAS_T3[idx] = (max_spf[idx]/(wave*1.e-6)
                                          * np.pi / 180. / 3600.)  # 1/as
                 self.spFrequAS_T3 = spFrequAS_T3
-                self.bispec_ind = np.array([[0,3,1],
-                                            [0,4,2],
-                                            [1,5,2],
-                                            [3,5,4]])
+                self.bispec_ind = np.array([[0, 3, 1],
+                                            [0, 4, 2],
+                                            [1, 5, 2],
+                                            [3, 5, 4]])
                 
                 if not hasattr(self, 'visphiSC_P1') or reload:
                     # Data
@@ -453,36 +446,36 @@ class GravData():
 
                 if plot:
                     if plotTAmp:
-                        gs = gridspec.GridSpec(3,2)
-                        plt.figure(figsize=(15,15))
+                        gs = gridspec.GridSpec(3, 2)
+                        plt.figure(figsize=(15, 15))
                     else:
-                        gs = gridspec.GridSpec(2,2)
-                        plt.figure(figsize=(15,12))
+                        gs = gridspec.GridSpec(2, 2)
+                        plt.figure(figsize=(15, 12))
 
-                    axis = plt.subplot(gs[0,0])
+                    axis = plt.subplot(gs[0, 0])
                     for idx in range(len(self.vis2SC_P1)):
-                        plt.errorbar(self.spFrequAS[idx,:],
-                                     self.visampSC_P1[idx,:],
-                                     self.visamperrSC_P1[idx,:],
+                        plt.errorbar(self.spFrequAS[idx],
+                                     self.visampSC_P1[idx],
+                                     self.visamperrSC_P1[idx],
                                      alpha=0.7, ms=4, lw=0.5, capsize=0,
                                      ls='', marker='o',
                                      color=self.colors_baseline[idx % 6])
                     for idx in range(len(self.vis2SC_P2)):
-                        plt.errorbar(self.spFrequAS[idx,:],
-                                     self.visampSC_P2[idx,:],
-                                     self.visamperrSC_P2[idx,:],
+                        plt.errorbar(self.spFrequAS[idx],
+                                     self.visampSC_P2[idx],
+                                     self.visamperrSC_P2[idx],
                                      alpha=0.7, ms=4, lw=0.5, capsize=0,
                                      ls='', marker='D',
                                      color=self.colors_baseline[idx % 6])
                     plt.axhline(1, ls='--', lw=0.5)
-                    plt.ylim(-0.0,1.1)
+                    plt.ylim(-0.0, 1.1)
                     plt.ylabel('visibility amplitude')
 
-                    axis = plt.subplot(gs[0,1])
+                    axis = plt.subplot(gs[0, 1])
                     for idx in range(len(self.vis2SC_P1)):
-                        plt.errorbar(self.spFrequAS[idx,:],
-                                     self.vis2SC_P1[idx,:],
-                                     self.vis2errSC_P1[idx,:],
+                        plt.errorbar(self.spFrequAS[idx],
+                                     self.vis2SC_P1[idx],
+                                     self.vis2errSC_P1[idx],
                                      alpha=0.7, ms=4, lw=0.5, capsize=0,
                                      ls='', marker='o',
                                      color=self.colors_baseline[idx % 6],
@@ -490,21 +483,21 @@ class GravData():
                         if idx == 5:
                             plt.legend(frameon=True)
                     for idx in range(len(self.vis2SC_P2)):
-                        plt.errorbar(self.spFrequAS[idx,:],
-                                     self.vis2SC_P2[idx,:],
-                                     self.vis2errSC_P2[idx,:],
+                        plt.errorbar(self.spFrequAS[idx],
+                                     self.vis2SC_P2[idx],
+                                     self.vis2errSC_P2[idx],
                                      alpha=0.7, ms=4, lw=0.5, capsize=0,
                                      ls='', marker='D',
                                      color=self.colors_baseline[idx % 6])
                     plt.axhline(1, ls='--', lw=0.5)
-                    plt.ylim(-0.0,1.1)
+                    plt.ylim(-0.0, 1.1)
                     plt.ylabel('visibility squared')
 
-                    axis = plt.subplot(gs[1,0])
+                    axis = plt.subplot(gs[1, 0])
                     for idx in range(len(self.t3SC_P2)):
-                        plt.errorbar(self.spFrequAS_T3[idx,:],
-                                     self.t3SC_P2[idx,:],
-                                     self.t3errSC_P2[idx,:],
+                        plt.errorbar(self.spFrequAS_T3[idx],
+                                     self.t3SC_P2[idx],
+                                     self.t3errSC_P2[idx],
                                      alpha=0.7, ms=4, lw=0.5,
                                      capsize=0, marker='o', ls='',
                                      color=self.colors_closure[idx % 4],
@@ -512,9 +505,9 @@ class GravData():
                         if idx == 3:
                             plt.legend(frameon=True)
                     for idx in range(len(self.t3SC_P2)):
-                        plt.errorbar(self.spFrequAS_T3[idx,:],
-                                     self.t3SC_P1[idx,:],
-                                     self.t3errSC_P1[idx,:],
+                        plt.errorbar(self.spFrequAS_T3[idx],
+                                     self.t3SC_P1[idx],
+                                     self.t3errSC_P1[idx],
                                      alpha=0.7, ms=4, lw=0.5, capsize=0,
                                      marker='D', ls='',
                                      color=self.colors_closure[idx % 4])
@@ -525,15 +518,15 @@ class GravData():
                     axis = plt.subplot(gs[1, 1])
                     if plotTAmp:
                         for idx in range(len(self.t3SC_P2)):
-                            plt.errorbar(self.spFrequAS_T3[idx,:],
-                                         self.t3ampSC_P2[idx,:],
-                                         self.t3amperrSC_P2[idx,:],
+                            plt.errorbar(self.spFrequAS_T3[idx],
+                                         self.t3ampSC_P2[idx],
+                                         self.t3amperrSC_P2[idx],
                                          marker='o', ls='',
                                          color=self.colors_closure[idx % 4])
                         for idx in range(len(self.t3SC_P2)):
-                            plt.errorbar(self.spFrequAS_T3[idx,:],
-                                         self.t3ampSC_P1[idx,:],
-                                         self.t3amperrSC_P1[idx,:],
+                            plt.errorbar(self.spFrequAS_T3[idx],
+                                         self.t3ampSC_P1[idx],
+                                         self.t3amperrSC_P1[idx],
                                          marker='p', ls='',
                                          color=self.colors_closure[idx % 4])
                         plt.axhline(1, ls='--', lw=0.5)
@@ -544,16 +537,16 @@ class GravData():
                         axis = plt.subplot(gs[2, 1])
 
                     for idx in range(len(self.vis2SC_P1)):
-                        plt.errorbar(self.spFrequAS[idx,:],
-                                     self.visphiSC_P1[idx,:],
-                                     self.visphierrSC_P1[idx,:],
+                        plt.errorbar(self.spFrequAS[idx],
+                                     self.visphiSC_P1[idx],
+                                     self.visphierrSC_P1[idx],
                                      alpha=0.7, ms=4, lw=0.5, capsize=0,
                                      ls='', marker='o',
                                      color=self.colors_baseline[idx % 6])
                     for idx in range(len(self.vis2SC_P2)):
-                        plt.errorbar(self.spFrequAS[idx,:],
-                                     self.visphiSC_P2[idx,:],
-                                     self.visphierrSC_P2[idx,:],
+                        plt.errorbar(self.spFrequAS[idx],
+                                     self.visphiSC_P2[idx],
+                                     self.visphierrSC_P2[idx],
                                      alpha=0.7, ms=4, lw=0.5, capsize=0,
                                      ls='', marker='p',
                                      color=self.colors_baseline[idx % 6])
@@ -562,16 +555,16 @@ class GravData():
                     plt.ylabel('visibility phase')
                     plt.show()
 
-        if self.polmode =='COMBINED':
-            if mode =='SC':
+        if self.polmode == 'COMBINED':
+            if mode == 'SC':
                 self.u = fitsdata['OI_VIS', 10].data.field('UCOORD')
                 self.v = fitsdata['OI_VIS', 10].data.field('VCOORD')
 
                 # spatial frequency
                 wave = self.wlSC
                 self.wave = wave
-                u_as = np.zeros((len(self.u),len(wave)))
-                v_as = np.zeros((len(self.v),len(wave)))
+                u_as = np.zeros((len(self.u), len(wave)))
+                v_as = np.zeros((len(self.v), len(wave)))
                 for i in range(0, len(self.u)):
                     u_as[i, :] = (self.u[i]/(wave*1.e-6)
                                   * np.pi / 180. / 3600.)  # 1/as
@@ -580,7 +573,7 @@ class GravData():
                 self.spFrequAS = np.sqrt(u_as**2.+v_as**2.)
 
                 # spatial frequency T3
-                magu = np.sqrt(self.u**2.+self.v**2.)
+                magu = np.sqrt(self.u**2. + self.v**2.)
                 max_spf = np.zeros(int(len(magu)/6*4))
                 for idx in range(len(magu)//6):
                     max_spf[0 + idx*4] = np.max(np.array([magu[0 + idx*6],
@@ -596,7 +589,7 @@ class GravData():
                                                           magu[5 + idx*6],
                                                           magu[4 + idx*6]]))
                 self.max_spf = max_spf
-                spFrequAS_T3 = np.zeros((len(max_spf),len(wave)))
+                spFrequAS_T3 = np.zeros((len(max_spf), len(wave)))
                 for idx in range(len(max_spf)):
                     spFrequAS_T3[idx] = (max_spf[idx]/(wave*1.e-6)
                                          * np.pi / 180. / 3600.)  # 1/as
@@ -667,7 +660,7 @@ class GravData():
                     plt.ylim(-0.0, 1.1)
                     plt.ylabel('visibility amplitude')
 
-                    axis = plt.subplot(gs[0,1])
+                    axis = plt.subplot(gs[0, 1])
                     for idx in range(len(self.vis2SC)):
                         plt.errorbar(self.spFrequAS[idx],
                                      self.vis2SC[idx],
@@ -678,12 +671,11 @@ class GravData():
                     plt.ylim(-0.0, 1.1)
                     plt.ylabel('visibility squared')
 
-
-                    axis = plt.subplot(gs[1,0])
+                    axis = plt.subplot(gs[1, 0])
                     for idx in range(len(self.t3SC)):
                         plt.errorbar(self.spFrequAS_T3[idx],
                                      self.t3SC[idx],
-                                     self.t3errSC[idx,:],
+                                     self.t3errSC[idx],
                                      marker='o', ls='',
                                      color=self.colors_closure[idx % 4])
                     plt.axhline(0, ls='--', lw=0.5)
@@ -697,7 +689,7 @@ class GravData():
                                          self.t3ampSC[idx],
                                          self.t3amperrSC[idx],
                                          marker='o', ls='',
-                                         color=self.colors_closure[idx%4])
+                                         color=self.colors_closure[idx % 4])
                         plt.axhline(1, ls='--', lw=0.5)
                         plt.ylim(-0.0, 1.1)
                         plt.xlabel('spatial frequency (1/arcsec)')
@@ -716,9 +708,9 @@ class GravData():
                     plt.show()
         fitsdata.close()
 
-
-    def getFluxfromRAW(self, flatfile, method='preproc', skyfile=None, wavefile=None,
-                       p2vmfile=None, flatflux=False, darkfile=None):
+    def getFluxfromRAW(self, flatfile, method='preproc', skyfile=None,
+                       wavefile=None, p2vmfile=None, flatflux=False,
+                       darkfile=None):
         """
         Get the flux values from a raw file
         method has to be 'spectrum', 'preproc', 'p2vmred', 'dualscivis'
@@ -733,9 +725,8 @@ class GravData():
 
         raw = fits.open(self.name)['IMAGING_DATA_SC'].data
         if self.resolution != 'LOW':
-            raw[raw>np.percentile(raw,99.9)] = np.nan
-        det_gain = 1.984 #e-/ADU
-
+            raw[raw > np.percentile(raw, 99.9)] = np.nan
+        det_gain = 1.984
 
         if skyfile is None:
             if self.verbose:
@@ -749,7 +740,7 @@ class GravData():
             tsteps = red.shape[0]
 
         # sum over spectra domain to find maxpos
-        _speclist = np.sum(np.mean(red,0),1)
+        _speclist = np.sum(np.mean(red, 0), 1)
         _speclist[np.where(_speclist < 300)] = 0
 
         if self.polmode == 'SPLIT':
@@ -762,34 +753,18 @@ class GravData():
         flatchannels = flatfits['PROFILE_PARAMS'].header['ESO PRO PROFILE NX']
         fieldstop = fieldstart + flatchannels
 
-        #if self.resolution == 'LOW':
-        #    numchannels = 14
-        #elif self.resolution == 'MEDIUM':
-        #    numchannels = 241
-        #else:
-        #    raise ValueError('High not implemented yet!')
-
-        ## extract maxpos
-        #specpos = []
-        #for i in range(48):
-            #if np.max(_speclist) < 100:
-                #raise ValueError('Detection in Noise')
-            #specpos.append(np.argmax(_speclist))
-            #_speclist[np.argmax(_speclist)-5:np.argmax(_speclist)+6] = 0
-        #specpos = sorted(specpos)
-
         if flatflux:
             flatdata = flatfits['IMAGING_DATA_SC'].data[0]
             flatdata += np.min(flatdata)
             flatdata /= np.max(flatdata)
-            red[:,:,fieldstart:fieldstop] = red[:,:,fieldstart:fieldstop] / flatdata
+            red[:, :, fieldstart:fieldstop] = red[:, :, fieldstart:fieldstop] / flatdata
 
         # extract spectra with profile
-        red_spectra = np.zeros((tsteps,numspec,flatchannels))
+        red_spectra = np.zeros((tsteps, numspec, flatchannels))
         for idx in range(numspec):
             _specprofile = flatfits['PROFILE_DATA'].data['DATA%i' % (idx+1)]
-            _specprofile_t = np.tile(_specprofile[0], (tsteps,1,1))
-            red_spectra[:,idx] = np.nansum(red[:,:,fieldstart:fieldstop]*_specprofile_t, 1)
+            _specprofile_t = np.tile(_specprofile[0], (tsteps, 1, 1))
+            red_spectra[:, idx] = np.nansum(red[:, :, fieldstart:fieldstop] * _specprofile_t, 1)
 
         if method == 'spectrum':
             return red_spectra
@@ -797,11 +772,11 @@ class GravData():
             raise ValueError('wavefile needed!')
         elif p2vmfile is None:
             raise ValueError('pp_wl needed!')
-        
+
         if self.polmode == 'SPLIT':
-            pp_wl = fits.open(p2vmfile)['OI_WAVELENGTH',11].data['EFF_WAVE']
+            pp_wl = fits.open(p2vmfile)['OI_WAVELENGTH', 11].data['EFF_WAVE']
         else:
-            pp_wl = fits.open(p2vmfile)['OI_WAVELENGTH',10].data['EFF_WAVE']
+            pp_wl = fits.open(p2vmfile)['OI_WAVELENGTH', 10].data['EFF_WAVE']
 
         # wl interpolation
         wavefits = fits.open(wavefile)
@@ -809,11 +784,11 @@ class GravData():
         for tdx in range(tsteps):
             for idx in range(numspec):
                 try:
-                    red_spectra_i[tdx,idx,:] = interpolate.interp1d(wavefits['WAVE_DATA_SC'].data['DATA%i' % (idx+1)][0],
-                                                                    red_spectra[tdx,idx,:])(pp_wl)
+                    red_spectra_i[tdx, idx,:] = interpolate.interp1d(wavefits['WAVE_DATA_SC'].data['DATA%i' % (idx+1)][0],
+                                                                     red_spectra[tdx, idx])(pp_wl)
                 except ValueError:
-                    red_spectra_i[tdx,idx,:] = interpolate.interp1d(wavefits['WAVE_DATA_SC'].data['DATA%i' % (idx+1)][0],
-                                                                    red_spectra[tdx,idx,:], bounds_error=False, fill_value='extrapolate')(pp_wl)
+                    red_spectra_i[tdx, idx,:] = interpolate.interp1d(wavefits['WAVE_DATA_SC'].data['DATA%i' % (idx+1)][0],
+                                                                     red_spectra[tdx, idx], bounds_error=False, fill_value='extrapolate')(pp_wl)
                     print('Extrapolation needed')
 
         if method == 'preproc':
@@ -822,34 +797,32 @@ class GravData():
         red_flux_P = np.zeros((tsteps, 4, len(pp_wl)))
         red_flux_S = np.zeros((tsteps, 4, len(pp_wl)))
 
-        _red_spec_S = red_spectra_i[:,::2,:]
-        _red_spec_P = red_spectra_i[:,1::2,:]
+        _red_spec_S = red_spectra_i[:, ::2, :]
+        _red_spec_P = red_spectra_i[:, 1::2, :]
         _red_spec_SS = np.zeros((tsteps, 6, len(pp_wl)))
         _red_spec_PS = np.zeros((tsteps, 6, len(pp_wl)))
-        for idx, i in enumerate(range(0,24,4)):
-            _red_spec_SS[:, idx, :] = np.sum(_red_spec_S[:,i:i+4,:],1)
-            _red_spec_PS[:, idx, :] = np.sum(_red_spec_P[:,i:i+4,:],1)
+        for idx, i in enumerate(range(0, 24, 4)):
+            _red_spec_SS[:, idx, :] = np.sum(_red_spec_S[:, i:i+4, :], 1)
+            _red_spec_PS[:, idx, :] = np.sum(_red_spec_P[:, i:i+4, :], 1)
 
-        T2BM = np.array([[0,1,0,1],
-                        [1,0,0,1],
-                        [1,1,0,0],
-                        [0,0,1,1],
-                        [0,1,1,0],
-                        [1,0,1,0]])
+        T2BM = np.array([[0, 1, 0, 1],
+                         [1, 0, 0, 1],
+                         [1, 1, 0, 0],
+                         [0, 0, 1, 1],
+                         [0, 1, 1, 0],
+                         [1, 0, 1, 0]])
         B2TM = np.linalg.pinv(T2BM)
         B2TM /= np.max(B2TM)
 
         for idx in range(tsteps):
-            red_flux_P[idx] = np.dot(B2TM,_red_spec_PS[idx])
-            red_flux_S[idx] = np.dot(B2TM,_red_spec_SS[idx])
+            red_flux_P[idx] = np.dot(B2TM, _red_spec_PS[idx])
+            red_flux_S[idx] = np.dot(B2TM, _red_spec_SS[idx])
 
         if method == 'p2vmred':
             return red_flux_P, red_flux_S
 
         if method == 'dualscivis':
             return np.sum(red_flux_P, 0), np.sum(red_flux_S, 0)
-
-
 
     def getDlambda(self, idel=False):
         """
@@ -858,61 +831,14 @@ class GravData():
         otherwise it is read in from the OI_WAVELENGTH table
         TODO Idel + medium/high resolution needs some work
         """
-        if idel:
-            nwave = self.channel
-            wave = self.wlSC
-            self.wave = wave
-            if nwave in [11, 14]:
-                if self.polmode == 'COMBINED':
-                    R = np.zeros((6,nwave))
-                    if nwave == 11:
-                        R[0,:] = [32.9,20.6,20.3,19.3,19.2,16.1,18.3,20.8,21.2,21.7,23.4]
-                        R[1,:] = [31.8,18.6,17.5,18.5,19.8,16.8,19.8,22.7,22.6,22.8,22.7]
-                        R[2,:] = [31.8,19.1,19.0,18.7,18.9,16.3,19.1,21.6,22.2,22.5,23.6]
-                        R[3,:] = [29.9,18.3,18.6,20.6,23.5,19.5,22.7,25.8,25.4,26.8,26.2]
-                        R[4,:] = [30.8,18.0,17.6,19.3,22.3,19.4,23.3,26.5,26.3,27.7,24.9]
-                        R[5,:] = [29.7,18.1,18.1,18.1,18.6,16.5,19.6,22.4,22.8,22.8,22.3]
-                    elif nwave == 14:
-                        R[0,:] = [28.9,16.5,15.6,16.8,17.6,16.4,15.7,17.5,18.8,20.1,20.2,20.5,22.0,28.3]
-                        R[1,:] = [27.2,15.8,14.9,16.0,16.7,15.7,15.1,16.4,18.2,19.6,20.0,20.3,21.7,25.3]
-                        R[2,:] = [28.3,16.2,15.3,16.7,17.3,16.3,15.7,17.4,18.8,20.2,20.7,21.1,22.4,27.5]
-                        R[3,:] = [29.1,17.0,15.9,16.6,17.1,16.6,15.8,16.9,18.8,20.5,21.0,21.3,22.0,24.4]
-                        R[4,:] = [28.8,16.8,16.1,16.7,17.4,16.7,16.1,17.2,19.0,20.5,21.2,21.6,22.2,25.2]
-                        R[5,:] = [28.0,16.0,15.0,16.2,16.6,15.7,15.3,16.4,17.8,19.3,19.8,20.0,20.8,24.4]
-                elif self.polmode == 'SPLIT':
-                    R = np.zeros((6,nwave))
-                    if nwave == 11:
-                        R[0,:] = [25.0,18.3,20.1,20.7,20.0,16.7,17.9,20.1,20.5,21.3,23.9]
-                        R[1,:] = [24.0,16.5,15.9,17.2,17.6,15.3,17.3,19.7,20.2,20.8,22.4]
-                        R[2,:] = [26.2,19.5,19.8,19.3,18.9,16.1,17.6,19.9,20.7,21.3,23.4]
-                        R[3,:] = [24.6,16.4,15.5,17.2,18.2,16.9,19.5,22.2,22.6,23.0,22.5]
-                        R[4,:] = [26.4,17.5,16.2,17.2,17.9,16.3,18.8,21.4,21.6,21.8,22.1]
-                        R[5,:] = [27.4,18.8,17.5,17.6,17.4,15.2,16.8,19.2,19.8,20.0,21.1]
-                    elif nwave == 14:
-                        R[0,:] = [28.9,16.5,15.6,16.8,17.6,16.4,15.7,17.5,18.8,20.1,20.2,20.5,22.0,28.3]
-                        R[1,:] = [27.2,15.8,14.9,16.0,16.7,15.7,15.1,16.4,18.2,19.6,20.0,20.3,21.7,25.3]
-                        R[2,:] = [28.3,16.2,15.3,16.7,17.3,16.3,15.7,17.4,18.8,20.2,20.7,21.1,22.4,27.5]
-                        R[3,:] = [29.1,17.0,15.9,16.6,17.1,16.6,15.8,16.9,18.8,20.5,21.0,21.3,22.0,24.4]
-                        R[4,:] = [28.8,16.8,16.1,16.7,17.4,16.7,16.1,17.2,19.0,20.5,21.2,21.6,22.2,25.2]
-                        R[5,:] = [28.0,16.0,15.0,16.2,16.6,15.7,15.3,16.4,17.8,19.3,19.8,20.0,20.8,24.4]
-            dlambda = np.zeros((6,nwave))
-            for i in range(0,6):
-                if (nwave==11) or (nwave==14):
-                    dlambda[i,:] = wave/R[i,:]/2
-                elif nwave==233:
-                    dlambda[i,:] = wave/500/2
-                else:
-                    print('High mode, or weird mode')
-                    dlambda[i,:] = 0.03817
-        else:
-            nwave = self.channel
-            if self.polmode == 'COMBINED':
-                effband = fits.open(self.name)['OI_WAVELENGTH', 10].data['EFF_BAND']
-            elif self.polmode == 'SPLIT':
-                effband = fits.open(self.name)['OI_WAVELENGTH', 11].data['EFF_BAND']
-            dlambda = np.zeros((6,nwave))
-            for idx in range(6):
-                dlambda[idx] = effband/2*1e6
+        nwave = self.channel
+        if self.polmode == 'COMBINED':
+            effband = fits.open(self.name)['OI_WAVELENGTH', 10].data['EFF_BAND']
+        elif self.polmode == 'SPLIT':
+            effband = fits.open(self.name)['OI_WAVELENGTH', 11].data['EFF_BAND']
+        dlambda = np.zeros((6, nwave))
+        for idx in range(6):
+            dlambda[idx] = effband/2*1e6
         self.dlambda = dlambda
 
     def av_phases(self, phases, axis=0):
@@ -936,8 +862,8 @@ class GravData():
         cf2 = c['OI_VIS', 12].data['FLAG']
         cP1[cf1] = np.nan
         cP2[cf2] = np.nan
-        cP1 = self.av_phases(cP1.reshape(-1, 6, self.channel))[np.newaxis,:,:]
-        cP2 = self.av_phases(cP2.reshape(-1, 6, self.channel))[np.newaxis,:,:]
+        cP1 = self.av_phases(cP1.reshape(-1, 6, self.channel))[np.newaxis, :, :]
+        cP2 = self.av_phases(cP2.reshape(-1, 6, self.channel))[np.newaxis, :, :]
 
         sP1 = self.visphiSC_P1.reshape(-1, 6, self.channel)
         sP2 = self.visphiSC_P2.reshape(-1, 6, self.channel)
@@ -951,8 +877,9 @@ class GravData():
             self.visphiSC_P1 = self.visphiSC_P1[0]
             self.visphiSC_P2 = self.visphiSC_P2[0]
         else:
-            self.visphiSC_P1 = self.visphiSC_P1.reshape(-1,self.channel)
-            self.visphiSC_P2 = self.visphiSC_P2.reshape(-1,self.channel)
+            self.visphiSC_P1 = self.visphiSC_P1.reshape(-1, self.channel)
+            self.visphiSC_P2 = self.visphiSC_P2.reshape(-1, self.channel)
+
 
 class GravNight():
     def __init__(self, file_list, verbose=True, onlymet=False):
@@ -1043,7 +970,7 @@ class GravNight():
                    ignore_tel=[]):
         for data in self.datalist:
             data.getIntdata(mode=mode, plot=plot, plotTAmp=plotTAmp, flag=flag,
-                             ignore_tel=ignore_tel)
+                            ignore_tel=ignore_tel)
 
     def getTime(self):
         files = self.files
@@ -1529,22 +1456,3 @@ class GravNight():
             except ValueError:
                 self.ofv = np.concatenate((np.array([0]), ofv))
                 self.onv = np.concatenate((onv, np.array([ofv[-1] + ofv[0]])))
-
-        # for num, fi in enumerate(self.file_list):
-        # 
-        #     if num == 0:
-        #         type1_ = fits.getheader(fi)["ESO INS SOBJ X"]
-        #         type2_ = fits.getheader(fi)["ESO INS SOBJ OFFX"]
-        #         self.gravData_list.append(GravData(fi, verbose=self.verbose))
-        #     else:
-        #         if type1_ != fits.getheader(fi)["ESO INS SOBJ X"]:
-        #             raise ValueError("all files need to be the same, but ", fits.getheader(fi)["ESO INS SOBJ X"], " is different from first file: ", type1_)
-        #         if type2_ != fits.getheader(fi)["ESO INS SOBJ OFFX"]:
-        #             raise ValueError("all files need to be the same, but ", fits.getheader(fi)["ESO INS SOBJ OFFX"], " is different from first file: ", type2_)
-        #         self.gravData_list.append(GravData(fi, verbose=self.verbose))
-
-
-
-
-
-
