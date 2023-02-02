@@ -1508,6 +1508,7 @@ class GravNight():
         onv = np.array([])
         ofv = np.array([])
 
+        self.faintprop = []
         for file in files:
             h = fits.open(file)[0].header
             if h['ESO INS MET MODE'] != 'FAINT':
@@ -1522,6 +1523,7 @@ class GravNight():
             volt2 = h['ESO INS ANLO3 VOLTAGE2']
             if self.verbose:
                 print(f'Bright period: {rate1*60-(time2-time1):.2f}, Voltage: {volt1:.1f}, {volt2:.1f}')
+            self.faintprop.append([rate1*60-(time2-time1), volt1, volt2])
 
             mt1 = ((time1 / 86400.0) + 2440587.5 - 2400000.5 - self.mjd0)*24*60
             mt2 = ((time2 / 86400.0) + 2440587.5 - 2400000.5 - self.mjd0)*24*60
