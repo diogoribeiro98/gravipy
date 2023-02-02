@@ -243,7 +243,7 @@ class GravData():
         self.resolution = header['ESO INS SPEC RES']
         self.dit = header['ESO DET2 SEQ1 DIT']
         self.ndit = header['ESO DET2 NDIT']
-        self.mjd = header['MJD-OBS']
+        self.mjd = convert_date(header['DATE-OBS'], mjd=True)
 
         if 'P2VM' in self.datacatg:
             self.p2vm_file = True
@@ -1059,7 +1059,8 @@ class GravNight():
         MJD = np.array([]).reshape(0, 4)
         for fdx, file in enumerate(files):
             d = fits.open(file)['OI_FLUX'].data
-            _MJD0 = fits.open(file)[0].header['MJD-OBS']
+            _MJD0 = convert_date(fits.open(file)[0].header['DATE-OBS'],
+                                 mjd=True)
             MJD = np.concatenate((MJD, d['TIME'].reshape(-1, 4)/1e6/3600/24
                                   + _MJD0))
         MJD = (MJD - self.mjd0)*24*60
@@ -1095,7 +1096,8 @@ class GravNight():
             for tel in range(4):
                 _refang[:, tel] = get_refangle(h, tel, ndata)
             REFANG = np.concatenate((REFANG, _refang))
-            _MJD0 = fits.open(file)[0].header['MJD-OBS']
+            _MJD0 = convert_date(fits.open(file)[0].header['DATE-OBS'],
+                                 mjd=True)
             MJD = np.concatenate((MJD,
                                   d['TIME'].reshape(-1, 4)/1e6/3600/24 + _MJD0))
             OPD_FC = np.concatenate((OPD_FC, d['OPD_FC'].reshape(-1, 4)*1e6))
@@ -1372,7 +1374,8 @@ class GravNight():
 
         for fdx, file in enumerate(files):
             d = fits.open(file)['FDDL'].data
-            _MJD0 = fits.open(file)[0].header['MJD-OBS']
+            _MJD0 = convert_date(fits.open(file)[0].header['DATE-OBS'],
+                                 mjd=True)
             _t = np.tile(d['TIME'], (4, 1)).T
             MJD = np.concatenate((MJD, _t/1e6/3600/24 + _MJD0))
             FT_POS = np.concatenate((FT_POS, d['FT_POS']))
@@ -1441,7 +1444,8 @@ class GravNight():
 
         for fdx, file in enumerate(files):
             d = fits.open(file)['OI_VIS_ACQ'].data
-            _MJD0 = fits.open(file)[0].header['MJD-OBS']
+            _MJD0 = convert_date(fits.open(file)[0].header['DATE-OBS'],
+                                 mjd=True)
             MJD = np.concatenate((MJD,
                                   d['TIME'].reshape(-1, 4)/1e6/3600/24 + _MJD0))
             PUPIL_U = np.concatenate((PUPIL_U, d['PUPIL_U'].reshape(-1, 4)))
