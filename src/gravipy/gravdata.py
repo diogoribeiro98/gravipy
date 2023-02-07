@@ -1059,8 +1059,7 @@ class GravNight():
         MJD = np.array([]).reshape(0, 4)
         for fdx, file in enumerate(files):
             d = fits.open(file)['OI_FLUX'].data
-            _MJD0 = convert_date(fits.open(file)[0].header['DATE-OBS'],
-                                 mjd=True)
+            _MJD0 = fits.open(file)[0].header['MJD-OBS']
             MJD = np.concatenate((MJD, d['TIME'].reshape(-1, 4)/1e6/3600/24
                                   + _MJD0))
         MJD = (MJD - self.mjd0)*24*60
@@ -1070,10 +1069,6 @@ class GravNight():
         if 'P2VM' not in self.datacatg:
             raise ValueError('Only available for p2vmred files')
         files = self.files
-        if self.polmode == 'SPLIT':
-            fitnum = 11
-        else:
-            fitnum = 10
 
         MJD = np.array([]).reshape(0, 4)
         REFANG = np.array([]).reshape(0, 4)
@@ -1374,8 +1369,7 @@ class GravNight():
 
         for fdx, file in enumerate(files):
             d = fits.open(file)['FDDL'].data
-            _MJD0 = convert_date(fits.open(file)[0].header['DATE-OBS'],
-                                 mjd=True)
+            _MJD0 = fits.open(file)[0].header['MJD-OBS']
             _t = np.tile(d['TIME'], (4, 1)).T
             MJD = np.concatenate((MJD, _t/1e6/3600/24 + _MJD0))
             FT_POS = np.concatenate((FT_POS, d['FT_POS']))
@@ -1444,8 +1438,7 @@ class GravNight():
 
         for fdx, file in enumerate(files):
             d = fits.open(file)['OI_VIS_ACQ'].data
-            _MJD0 = convert_date(fits.open(file)[0].header['DATE-OBS'],
-                                 mjd=True)
+            _MJD0 = fits.open(file)[0].header['MJD-OBS']
             MJD = np.concatenate((MJD,
                                   d['TIME'].reshape(-1, 4)/1e6/3600/24 + _MJD0))
             PUPIL_U = np.concatenate((PUPIL_U, d['PUPIL_U'].reshape(-1, 4)))
