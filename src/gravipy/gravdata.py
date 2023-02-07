@@ -1085,8 +1085,8 @@ class GravNight():
         OPD_TELFC_CORR_XY = np.array([]).reshape(0, 4, 4)
         PHA_TELFC_CORR = np.array([]).reshape(0, 4, 4)
         OPD_TELFC_MCORR = np.array([]).reshape(0, 4)
-        E_U = np.array([]).reshape(0,4,3)
-        E_V = np.array([]).reshape(0,4,3)
+        E_U = np.array([]).reshape(0, 4, 3)
+        E_V = np.array([]).reshape(0, 4, 3)
 
         for fdx, file in enumerate(files):
             h = fits.open(file)[0].header
@@ -1096,10 +1096,10 @@ class GravNight():
             for tel in range(4):
                 _refang[:, tel] = get_refangle(h, tel, ndata)
             REFANG = np.concatenate((REFANG, _refang))
-            _MJD0 = convert_date(fits.open(file)[0].header['DATE-OBS'],
-                                 mjd=True)
+            _MJD0 = fits.open(file)[0].header['MJD-OBS']
             MJD = np.concatenate((MJD,
-                                  d['TIME'].reshape(-1, 4)/1e6/3600/24 + _MJD0))
+                                  d['TIME'].reshape(-1, 4)/1e6/3600/24
+                                  + _MJD0))
             OPD_FC = np.concatenate((OPD_FC, d['OPD_FC'].reshape(-1, 4)*1e6))
             OPD_FC_CORR = np.concatenate((OPD_FC_CORR, 
                                           d['OPD_FC_CORR'].reshape(-1, 4)*1e6))
@@ -1522,7 +1522,8 @@ class GravNight():
             volt1 = h['ESO INS ANLO3 VOLTAGE1']
             volt2 = h['ESO INS ANLO3 VOLTAGE2']
             if self.verbose:
-                print(f'Bright period: {rate1*60-(time2-time1):.2f}, Voltage: {volt1:.1f}, {volt2:.1f}')
+                print(f'Bright period: {rate1*60-(time2-time1):.2f}, '
+                      f'Voltage: {volt1:.1f}, {volt2:.1f}')
             self.faintprop.append([rate1*60-(time2-time1), volt1, volt2])
 
             mt1 = ((time1 / 86400.0) + 2440587.5 - 2400000.5 - self.mjd0)*24*60
