@@ -1182,8 +1182,9 @@ class GravPhaseNight():
                 for bl in range(6):
                     s2_visphi_fit[:, bl, :] = s2_visphi_p1[:, bl, :]
                     s2_visphi_fit[:, bl, :] += s2_visphi_p2[:, bl, :]
-                    s2_visphi_err_fit[:, bl, :] = s2_visphi_err_p1[:, bl, :]
-                    s2_visphi_err_fit[:, bl, :] += s2_visphi_err_p2[:, bl, :]
+                    s2_visphi_err_fit[:, bl, :] = (np.sqrt(s2_visphi_err_p1[:, bl, :]**2
+                                                           + s2_visphi_err_p2[:, bl, :]**2)
+                                                   / np.sqrt(2))
             else:
                 for bl in range(6):
                     s2_visphi_fit[:, bl, :] = np.nanmean(s2_visphi_p1[:, bl::6, :],1)
