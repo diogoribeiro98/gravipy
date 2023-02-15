@@ -1350,6 +1350,8 @@ class GravMFit(GravData, GravPhaseMaps):
                     print('Results exist at %s' % pdname)
             except FileNotFoundError:
                 pdexists = False
+        elif no_fit:
+            pdexists = False
 
         if no_fit:
             plotCorner = False
