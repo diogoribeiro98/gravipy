@@ -17,6 +17,11 @@ class GCorbits():
         Does not contain GR effects and orbits are not necessarily up to date
 
         Supress outputs with verbose=False
+
+        Main functions:
+        plot_orbits : plot the stars for a given time
+        pos_orbit : get positions for stars with orbits
+        pos_pm : get positions for stars with proper motions
         """
         self.star_orbits = {}
         self.orbit_stars = []
@@ -131,7 +136,7 @@ class GCorbits():
             E = newton(f, E0, fp, *args, **kwargs)
         return E
 
-    def plotOrbits(self, t=None, figsize=8, lim=100, long=False):
+    def plot_orbits(self, t=None, figsize=8, lim=100, long=False):
         """
         Plot the inner region around SgrA* at a given TIME
         t:    time of plot (if None then now)

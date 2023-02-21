@@ -132,7 +132,26 @@ def procrustes(a, target, padval=0):
 
 
 class GravPhaseMaps():
-    def createPhasemaps(self, nthreads=1, smooth=15, plot=True, datayear=2019):
+    def __init__(self):
+        """
+        GravPhaseMaps: Class to create and load GRAVITY phasemaps
+        for more information on phasemaps see:
+        https://www.aanda.org/articles/aa/full_html/2021/03/aa40208-20/aa40208-20.html
+
+        Class needs attributes from file, should be called from within
+        GravMFit
+
+        Main functions:
+        create_phasemaps : create the phasemaps and saves them in package
+                          (too big to be included by default)
+        plot_phasemaps : plto the created phasemaps
+        load_phasemaps : load the phasemaps from package
+        read_phasemaps : read correction from loaded phasemaps
+        """
+        pass
+
+    def create_phasemaps(self, nthreads=1, smooth=15, plot=True, 
+                         datayear=2019):
         if datayear == 2019:
             zerfile = 'phasemap_zernike_20200918_diff_2019data.npy'
         elif datayear == 2020:
@@ -238,7 +257,7 @@ class GravPhaseMaps():
                 return False
 
             # --- pupil function --- #
-            pupil = r<(stopB/2.)
+            pupil = r < (stopB / 2.)
             if stopS > 0.:
                 pupil = np.logical_and(r < (stopB/2.), r > (stopS/2.))
 
@@ -334,7 +353,7 @@ class GravPhaseMaps():
 
         if nthreads == 1:
             all_pm = np.zeros((len(wave), 4, 201, 201),
-                            dtype=np.complex_)
+                              dtype=np.complex_)
             all_pm_denom = np.zeros((len(wave), 4, 201, 201),
                                     dtype=np.complex_)
             for wdx, wl in enumerate(wave):
@@ -392,17 +411,16 @@ class GravPhaseMaps():
                         % (self.tel, self.resolution, smooth))
             savename2 = ('Phasemaps/Phasemap_%s_%s_Smooth%i_2020data_denom.npy'
                          % (self.tel, self.resolution, smooth))
-        
+
         savefile = resource_filename('gravipy', savename)
         np.save(savefile, all_pm)
         savefile = resource_filename('gravipy', savename2)
         np.save(savefile, all_pm_denom)
-        self.all_pm = all_pm        
+        self.all_pm = all_pm
         if plot:
-            self.plotPhasemaps(all_pm[len(all_pm)//2])
+            self.plot_phasemaps(all_pm[len(all_pm)//2])
 
-    def plotPhasemaps(self, aberration_maps):
-
+    def plot_phasemaps(self, aberration_maps):
         """
         Plot phase- and amplitude maps.
 
@@ -420,29 +438,29 @@ class GravPhaseMaps():
             xcoord = np.linspace(-amax, amax, mapdat.shape[-1])
             yy, xx = np.meshgrid(xcoord, xcoord)
             rmap = np.sqrt(xx*xx + yy*yy)
-            mapdat[rmap>amax] = np.nan
+            mapdat[rmap > amax] = np.nan
             return mapdat
-        
+
         fov = 160
         if self.tel == 'AT':
             fov *= 4.4
 
         fs = plt.rcParams['figure.figsize']
-        fig1, ax1 = plt.subplots(2,2, sharex=True, sharey=True,
+        fig1, ax1 = plt.subplots(2, 2, sharex=True, sharey=True,
                                  figsize=(fs[0], fs[0]))
-        fig2, ax2 = plt.subplots(2,2, sharex=True, sharey=True,
+        fig2, ax2 = plt.subplots(2, 2, sharex=True, sharey=True,
                                  figsize=(fs[0], fs[0]))
         ax1 = ax1.flatten()
         ax2 = ax2.flatten()
 
-        pltargsP = {'origin':'lower', 'cmap':'twilight_shifted',
+        pltargsP = {'origin': 'lower', 'cmap': 'twilight_shifted',
                     'extent': [fov/2, -fov/2, -fov/2, fov/2],
-                    'levels':np.linspace(-180, 180, 19, endpoint=True)}
-        pltargsA = {'origin':'lower', 'vmin':0, 'vmax':1,
+                    'levels': np.linspace(-180, 180, 19, endpoint=True)}
+        pltargsA = {'origin': 'lower', 'vmin': 0, 'vmax': 1,
                     'extent': [fov/2, -fov/2, -fov/2, fov/2]}
-        
+
         for io, img in enumerate(aberration_maps):
-            img = np.flip(img, axis=1)[20:-20,20:-20]
+            img = np.flip(img, axis=1)[20:-20, 20:-20]
             _phase = np.angle(img, deg=True)
             _phase = cut_circle(_phase, fov)
             imP = ax1[io].contourf(_phase, **pltargsP)
@@ -451,7 +469,7 @@ class GravPhaseMaps():
             imA = ax2[io].imshow(_amp, **pltargsA)
             ax1[io].set_aspect('equal')
             ax2[io].set_aspect('equal')
-            
+
         fig1.subplots_adjust(right=0.9)
         cbar_ax = fig1.add_axes([0.95, 0.25, 0.05, 0.5])
         fig1.colorbar(imP, cax=cbar_ax, label='Phase [deg]')
@@ -471,7 +489,7 @@ class GravPhaseMaps():
         return np.array([[np.cos(ang), np.sin(ang)],
                          [-np.sin(ang), np.cos(ang)]])
 
-    def loadPhasemaps(self, interp, tofits=False):
+    def load_phasemaps(self, interp, tofits=False):
         smoothkernel = self.smoothkernel
         datayear = self.datayear
         if datayear == 2019:
@@ -537,9 +555,9 @@ class GravPhaseMaps():
             self.pha_map = pha_map
             self.amp_map_denom = amp_map_denom
 
-    def readPhasemaps(self, ra, dec, fromFits=True,
-                      northangle=None, dra=None, ddec=None,
-                      interp=True, givepos=False):
+    def read_phasemaps(self, ra, dec, fromFits=True,
+                       northangle=None, dra=None, ddec=None,
+                       interp=True, givepos=False):
         """
         Calculates coupling amplitude / phase for given coordinates
         ra,dec: RA, DEC position on sky relative to nominal
@@ -605,9 +623,9 @@ class GravPhaseMaps():
             return cor_amp, cor_pha, cor_int_denom
 
     def phasemap_source(self, x, y, northA, dra, ddec):
-        amp, pha, inten = self.readPhasemaps(x, y, fromFits=False,
-                                             northangle=northA, dra=dra,
-                                             ddec=ddec, interp=self.interppm)
+        amp, pha, inten = self.read_phasemaps(x, y, fromFits=False,
+                                              northangle=northA, dra=dra,
+                                              ddec=ddec, interp=self.interppm)
         pm_amp = np.array([[amp[0], amp[1]],
                            [amp[0], amp[2]],
                            [amp[0], amp[3]],
@@ -638,9 +656,9 @@ def _rotation(ang):
                      [-np.sin(ang), np.cos(ang)]])
 
 
-def _readPhasemaps(ra, dec, northangle, amp_map_int, pha_map_int,
-                   amp_map_denom_int, wave,
-                   dra=np.zeros(4), ddec=np.zeros(4)):
+def _read_phasemaps(ra, dec, northangle, amp_map_int, pha_map_int,
+                    amp_map_denom_int, wave,
+                    dra=np.zeros(4), ddec=np.zeros(4)):
     """
     Calculates coupling amplitude / phase for given coordinates
     ra,dec: RA, DEC position on sky relative to nominal field center = SOBJ [mas]
@@ -707,7 +725,7 @@ def _vis_intensity_approx(s, alpha, lambda0, dlambda):
     return (lambda0/2.2)**(-1-alpha)*2*dlambda*sinc*np.exp(-2.j*np.pi*s/lambda0)
 
 
-#@jit(nopython=False)
+# @jit(nopython=False)
 def _vis_intensity(s, alpha, lambda0, dlambda):
     """
     Analytic solution for Modulated interferometric intensity
@@ -724,7 +742,7 @@ def _vis_intensity(s, alpha, lambda0, dlambda):
             for idx in range(len(lambda0)):
                 if s[idx] == 0 and alpha == 0:
                     res[idx] = _vis_intensity_num(s[idx], alpha,
-                                                        lambda0[idx], dlambda[idx])
+                                                  lambda0[idx], dlambda[idx])
                 else:
                     up = _vis_int_full(s[idx], alpha, x1[idx])
                     low = _vis_int_full(s[idx], alpha, x2[idx])
@@ -734,7 +752,7 @@ def _vis_intensity(s, alpha, lambda0, dlambda):
             for idx in range(len(lambda0)):
                 if s == 0 and alpha == 0:
                     res[idx] = _vis_intensity_num(s, alpha, lambda0[idx],
-                                                        dlambda[idx])
+                                                  dlambda[idx])
                 else:
                     up = _vis_int_full(s, alpha, x1[idx])
                     low = _vis_int_full(s, alpha, x2[idx])
@@ -749,7 +767,7 @@ def _vis_intensity(s, alpha, lambda0, dlambda):
     return res
 
 
-#@jit(nopython=True)
+# @jit(nopython=True)
 def _vis_int_full(s, alpha, difflam):
     if s == 0:
         return -2.2**(1 + alpha)/alpha*difflam**(-alpha)
@@ -760,7 +778,7 @@ def _vis_int_full(s, alpha, difflam):
     return (a*b/c)
 
 
-#@jit(nopython=True)
+# @jit(nopython=True)
 def _visibility_integrator(wave, s, alpha):
     """
     complex integral to be integrated over wavelength
@@ -770,7 +788,7 @@ def _visibility_integrator(wave, s, alpha):
     return (wave/2.2)**(-1-alpha)*np.exp(-2*np.pi*1j*s/wave)
 
 
-#@jit(nopython=True)
+# @jit(nopython=True)
 def _vis_intensity_num(s, alpha, lambda0, dlambda):
     """
     Dull numeric solution for Modulated interferometric intensity
@@ -786,6 +804,9 @@ def _vis_intensity_num(s, alpha, lambda0, dlambda):
 
 
 def _ind_visibility(s, alpha, wave, dlambda, fit_mode):
+    """
+    Selectd the correct visibility calculation based on fit_mode
+    """
     if fit_mode == "approx":
         ind_vis = _vis_intensity_approx(s, alpha, wave, dlambda)
     elif fit_mode == "analytic":
@@ -848,6 +869,9 @@ def _lnlike_mstars(theta, fitdata, fitarg, fithelp):
 
 
 def _calc_vis_mstars(theta_in, fitarg, fithelp):
+    """
+    Calculates the complex visibility of several point sources
+    """
     mas2rad = 1e-3 / 3600 / 180 * np.pi
 
     (nsource, fit_for, bispec_ind, fit_mode, wave, dlambda,
@@ -869,38 +893,42 @@ def _calc_vis_mstars(theta_in, fitarg, fithelp):
     pc_RA = theta[th_rest+2]
     pc_DEC = theta[th_rest+3]
     fr_BH = 10**(theta[th_rest+4])
-    
+
     alpha_bg = 3.
     alpha_stars = 3
 
     if phasemaps:
         if fit_phasemaps:
             pm_sources = []
-            pm_amp_c, pm_pha_c, pm_int_c = _readPhasemaps(pc_RA, pc_DEC, northA,
-                                                          amp_map_int, pha_map_int,
-                                                          amp_map_denom_int,
-                                                          wave, dra, ddec)
+            pm_amp_c, pm_pha_c, pm_int_c = _read_phasemaps(pc_RA, pc_DEC,
+                                                           northA, amp_map_int,
+                                                           pha_map_int,
+                                                           amp_map_denom_int,
+                                                           wave, dra, ddec)
 
             for ndx in range(nsource):
                 if ndx == 0:
-                    pm_amp, pm_pha, pm_int = _readPhasemaps(pc_RA + theta[0],
-                                                            pc_DEC + theta[1],
-                                                            northA, amp_map_int,
-                                                            pha_map_int,
-                                                            amp_map_denom_int,
-                                                            wave, dra, ddec)
+                    pm_amp, pm_pha, pm_int = _read_phasemaps(pc_RA + theta[0],
+                                                             pc_DEC + theta[1],
+                                                             northA,
+                                                             amp_map_int,
+                                                             pha_map_int,
+                                                             amp_map_denom_int,
+                                                             wave, dra, ddec)
                     pm_sources.append([pm_amp, pm_pha, pm_int])
                 else:
-                    pm_amp, pm_pha, pm_int = _readPhasemaps(pc_RA + theta[ndx*3-1],
-                                                            pc_DEC + theta[ndx*3],
-                                                            northA, amp_map_int,
-                                                            pha_map_int,
-                                                            amp_map_denom_int,
-                                                            wave, dra, ddec)
+                    pm_amp, pm_pha, pm_int = _read_phasemaps(pc_RA + theta[ndx*3-1],
+                                                             pc_DEC + theta[ndx*3],
+                                                             northA,
+                                                             amp_map_int,
+                                                             pha_map_int,
+                                                             amp_map_denom_int,
+                                                             wave, dra, ddec)
                     pm_sources.append([pm_amp, pm_pha, pm_int])
         else:
             pm_sources = fix_pm_sources
-            pm_amp_c, pm_pha_c, pm_int_c = fix_pm_amp_c, fix_pm_pha_c, fix_pm_int_c
+            pm_amp_c, pm_pha_c, pm_int_c = (fix_pm_amp_c, fix_pm_pha_c,
+                                            fix_pm_int_c)
 
     vis = np.zeros((6, len(wave))) + 0j
     for i in range(0, 6):
@@ -1005,26 +1033,33 @@ def _calc_vis_mstars(theta_in, fitarg, fithelp):
 
 class GravMFit(GravData, GravPhaseMaps):
     def __init__(self, data, verbose=False, ignore_tel=[]):
-        super().__init__(data, verbose=verbose)
-        self.getIntdata(ignore_tel=ignore_tel)
+        """
+        GravMFit: Class to fit a multiple point source model to GRAVITY data
 
-    def fitStars(self,
-                 ra_list,
-                 de_list,
-                 fr_list,
-                 fit_size=None,
-                 fit_pos=None,
-                 fit_fr=None,
-                 nthreads=1,
-                 nwalkers=301,
-                 nruns=301,
-                 fit_for=np.array([0.5, 0.5, 1.0, 0.0]),
-                 fixedBHalpha=False,
-                 fixedBG=False,
-                 initial=None,
-                 plotScience=True,
-                 phasemaps=True,
-                 **kwargs):
+        Main functions:
+        fit_stars : the function to do the fit
+        plot_fit : plot the data and the fitted model
+        """
+        super().__init__(data, verbose=verbose)
+        self.get_int_data(ignore_tel=ignore_tel)
+
+    def fit_stars(self,
+                  ra_list,
+                  de_list,
+                  fr_list,
+                  fit_size=None,
+                  fit_pos=None,
+                  fit_fr=None,
+                  nthreads=1,
+                  nwalkers=301,
+                  nruns=301,
+                  fit_for=np.array([0.5, 0.5, 1.0, 0.0]),
+                  fixedBHalpha=False,
+                  fixedBG=False,
+                  initial=None,
+                  plotScience=True,
+                  phasemaps=True,
+                  **kwargs):
         '''
         Multi source fit to GRAVITY data
         Function fits a central source and a number of companion sources.
@@ -1128,7 +1163,7 @@ class GravMFit(GravData, GravPhaseMaps):
         self.phasemaps = phasemaps
         self.fit_phasemaps = fit_phasemaps
         if phasemaps:
-            self.loadPhasemaps(interp=interppm)
+            self.load_phasemaps(interp=interppm)
 
             header = fits.open(self.name)[0].header
             northangle1 = header['ESO QC ACQ FIELD1 NORTH_ANGLE']/180*math.pi
@@ -1158,7 +1193,7 @@ class GravMFit(GravData, GravPhaseMaps):
                 phasemaps.datayear = self.datayear
                 phasemaps.wlSC = self.wlSC
                 phasemaps.interppm = interppm
-                phasemaps.loadPhasemaps(interp=interppm)
+                phasemaps.load_phasemaps(interp=interppm)
 
         nsource = len(ra_list)
         if nsource == 0:
@@ -1195,7 +1230,7 @@ class GravMFit(GravData, GravPhaseMaps):
         v = self.v
         wave = self.wlSC
         self.wave = wave
-        self.getDlambda()
+        self.get_dlambda()
 
         results = []
         # Initial guesses
@@ -1325,16 +1360,16 @@ class GravMFit(GravData, GravPhaseMaps):
             if not self.fit_phasemaps:
                 self.pm_sources = []
                 self.pm_amp_c, self.pm_pha_c, self.pm_int_c = self.phasemap_source(0, 0,
-                                                                        self.northangle, self.dra, self.ddec)
+                                                                                   self.northangle, self.dra, self.ddec)
 
                 pm_amp, pm_pha, pm_int = self.phasemap_source(0 + theta[0],
-                                                            0 + theta[1],
-                                                            self.northangle, self.dra, self.ddec)
+                                                              0 + theta[1],
+                                                              self.northangle, self.dra, self.ddec)
                 self.pm_sources.append([pm_amp, pm_pha, pm_int])
                 for ndx in range(1, nsource):
                     pm_amp, pm_pha, pm_int = self.phasemap_source(0 + theta[ndx*3-1],
-                                                                0 + theta[ndx*3],
-                                                                self.northangle, self.dra, self.ddec)
+                                                                  0 + theta[ndx*3],
+                                                                  self.northangle, self.dra, self.ddec)
                     self.pm_sources.append([pm_amp, pm_pha, pm_int])
 
         if iopandas is not None and not no_fit:
@@ -1356,8 +1391,8 @@ class GravMFit(GravData, GravPhaseMaps):
         if no_fit:
             plotCorner = False
             if self.verbose:
-                print('Will not fit the data, just print out the results for the '
-                      'given initial conditions')
+                print('Will not fit the data, just print out the results for '
+                      'the given initial conditions')
 
         for ddx in sorted(todel, reverse=True):
             del theta_names[ddx]
@@ -1551,9 +1586,11 @@ class GravMFit(GravData, GravPhaseMaps):
                                                                   fitarg,
                                                                   fithelp))
                             if bequiet:
-                                sampler.run_mcmc(pos, nruns, progress=False, skip_initial_state_check=True)
+                                sampler.run_mcmc(pos, nruns, progress=False,
+                                                 skip_initial_state_check=True)
                             else:
-                                sampler.run_mcmc(pos, nruns, progress=True, skip_initial_state_check=True)
+                                sampler.run_mcmc(pos, nruns, progress=True,
+                                                 skip_initial_state_check=True)
                         else:
                             with Pool(processes=nthreads) as pool:
                                 sampler = emcee.EnsembleSampler(nwalkers, ndim,
@@ -1786,7 +1823,7 @@ class GravMFit(GravData, GravPhaseMaps):
                     fittab = fittab.append(_fittab, ignore_index=True)
 
             if plotScience:
-                self.plotFitComb(plotdata)
+                self.plot_fit(plotdata)
                 self.plotdata = plotdata
         if not no_fit or pdexists:
             self.fittab = fittab
@@ -1812,7 +1849,7 @@ class GravMFit(GravData, GravPhaseMaps):
         else:
             return results
 
-    def plotFitComb(self, plotdata, nicer=True):
+    def plot_fit(self, plotdata, nicer=True):
         rad2as = 180 / np.pi * 3600
         stname = self.name.find('GRAVI')
         title_name = self.name[stname:-5]
@@ -1836,8 +1873,8 @@ class GravMFit(GravData, GravPhaseMaps):
         u = self.u
         v = self.v
 
-        u_as_model = np.zeros((len(u),len(wave_model)))
-        v_as_model = np.zeros((len(v),len(wave_model)))
+        u_as_model = np.zeros((len(u), len(wave_model)))
+        v_as_model = np.zeros((len(v), len(wave_model)))
         for i in range(0, len(u)):
             u_as_model[i, :] = u[i]/(wave_model*1.e-6) / rad2as
             v_as_model[i, :] = v[i]/(wave_model*1.e-6) / rad2as
@@ -1846,11 +1883,6 @@ class GravMFit(GravData, GravPhaseMaps):
         fitres = []
         for idx in range(nplot):
             theta, fitdata, fitarg, fithelp = plotdata[idx]
-
-            # (visamp, visamp_error, visamp_flag,
-            #  vis2, vis2_error, vis2_flag,
-            #  closure, closure_error, closure_flag,
-            #  visphi, visphi_error, visphi_flag) = fitdata
 
             (nsource, fit_for, bispec_ind, fit_mode, wave, dlambda,
              fixedBHalpha, todel, fixed, phasemaps, northA, dra, ddec, amp_map_int,
@@ -1896,7 +1928,7 @@ class GravMFit(GravData, GravPhaseMaps):
         if self.fit_for[0]:
             if plotsplit:
                 plt.figure(figsize=(10, 5))
-                gs = gridspec.GridSpec(1,2, wspace=0.05)
+                gs = gridspec.GridSpec(1, 2, wspace=0.05)
             else:
                 plt.figure(figsize=(5, 5))
             for idx in range(nplot):
@@ -1914,7 +1946,7 @@ class GravMFit(GravData, GravPhaseMaps):
                                  visamp_error[i, :]*(1-visamp_flag)[i],
                                  color=self.colors_baseline[i],
                                  ls='', lw=1, alpha=0.5, capsize=0)
-                    plt.scatter(magu_as[i,:],
+                    plt.scatter(magu_as[i, :],
                                 visamp[i, :]*(1-visamp_flag)[i],
                                 color=self.colors_baseline[i],
                                 alpha=0.5, label=self.baseline_labels[i])
@@ -1943,7 +1975,7 @@ class GravMFit(GravData, GravPhaseMaps):
         if self.fit_for[1]:
             if plotsplit:
                 plt.figure(figsize=(10, 5))
-                gs = gridspec.GridSpec(1,2, wspace=0.05)
+                gs = gridspec.GridSpec(1, 2, wspace=0.05)
             else:
                 plt.figure(figsize=(5, 5))
             for idx in range(nplot):
@@ -1961,7 +1993,7 @@ class GravMFit(GravData, GravPhaseMaps):
                                  vis2_error[i, :]*(1-vis2_flag)[i],
                                  color=self.colors_baseline[i],
                                  ls='', lw=1, alpha=0.5, capsize=0)
-                    plt.scatter(magu_as[i,:],
+                    plt.scatter(magu_as[i, :],
                                 vis2[i, :]*(1-vis2_flag)[i],
                                 color=self.colors_baseline[i],
                                 alpha=0.5, label=self.baseline_labels[i])
@@ -2002,7 +2034,7 @@ class GravMFit(GravData, GravPhaseMaps):
                 cmax = 180
             if plotsplit:
                 plt.figure(figsize=(10, 5))
-                gs = gridspec.GridSpec(1,2, wspace=0.05)
+                gs = gridspec.GridSpec(1, 2, wspace=0.05)
             else:
                 plt.figure(figsize=(5, 5))
             for idx in range(nplot):
@@ -2014,7 +2046,7 @@ class GravMFit(GravData, GravPhaseMaps):
                 closure_error = plotdata[idx][1][7]
                 closure_flag = plotdata[idx][1][8]
                 model_closure_full = fitres[idx][2]
-                for i in range(0,4):
+                for i in range(0, 4):
                     plt.errorbar(magu_as_T3[i, :],
                                  closure[i, :]*(1-closure_flag)[i],
                                  closure_error[i, :]*(1-closure_flag)[i],
@@ -2035,7 +2067,7 @@ class GravMFit(GravData, GravPhaseMaps):
                     plt.ylabel('Closure Phase (deg)')
                 else:
                     ax.set_yticklabels([])
-                plt.ylim(-cmax,cmax)
+                plt.ylim(-cmax, cmax)
                 if nicer:
                     # ax.set_xticklabels([])
                     ax.set_xticks([])
@@ -2061,7 +2093,7 @@ class GravMFit(GravData, GravPhaseMaps):
                 cmax = 180
             if plotsplit:
                 plt.figure(figsize=(10, 5))
-                gs = gridspec.GridSpec(1,2, wspace=0.05)
+                gs = gridspec.GridSpec(1, 2, wspace=0.05)
             else:
                 plt.figure(figsize=(5, 5))
             for idx in range(nplot):
@@ -2079,7 +2111,7 @@ class GravMFit(GravData, GravPhaseMaps):
                                  visphi_error[i, :]*(1-visphi_flag)[i],
                                  color=self.colors_baseline[i],
                                  ls='', lw=1, alpha=0.5, capsize=0)
-                    plt.scatter(magu_as[i,:],
+                    plt.scatter(magu_as[i, :],
                                 visphi[i, :]*(1-visphi_flag)[i],
                                 color=self.colors_baseline[i],
                                 alpha=0.5, label=self.baseline_labels[i])
@@ -2103,151 +2135,6 @@ class GravMFit(GravData, GravPhaseMaps):
                     plt.xlabel('spatial frequency (1/arcsec)')
             plt.suptitle(title_name, y=0.92)
             plt.show()
-
-    # def plotFit(self, theta, fitdata, fitarg, fithelp, idx=0, createpdf=False):
-    #     """
-    #     Calculates the theoretical interferometric data for the given
-    #     parameters in theta and plots them together with the data in fitdata.
-    #     """
-    #     rad2as = 180 / np.pi * 3600
-    #     stname = self.name.find('GRAVI')
-    #     title_name = self.name[stname:-5]
-    # 
-    #     (visamp, visamp_error, visamp_flag,
-    #      vis2, vis2_error, vis2_flag,
-    #      closure, closure_error, closure_flag,
-    #      visphi, visphi_error, visphi_flag) = fitdata
-    # 
-    #     wave = self.wlSC
-    #     dlambda = self.dlambda
-    #     if self.phasemaps:
-    #         wave_model = wave
-    #     else:
-    #         wave_model = np.linspace(wave[0],wave[len(wave)-1],1000)
-    #     dlambda_model = np.zeros((6,len(wave_model)))
-    #     for i in range(0,6):
-    #         dlambda_model[i,:] = np.interp(wave_model, wave, dlambda[i,:])
-    # 
-    #     # Fit
-    #     u = self.u
-    #     v = self.v
-    #     magu = np.sqrt(u**2.+v**2.)
-    #     self.wave = wave_model
-    #     self.dlambda = dlambda_model
-    # 
-    #     fithelp[4] = wave_model
-    #     fithelp[5] = dlambda_model
-    # 
-    #     (model_visamp_full, model_visphi_full,
-    #     model_closure_full)  = _calc_vis_mstars(theta, fitarg, fithelp)
-    #     self.wave = wave
-    #     self.dlambda = dlambda
-    # 
-    #     model_vis2_full = model_visamp_full**2.
-    # 
-    #     magu_as = self.spFrequAS
-    # 
-    #     u_as_model = np.zeros((len(u),len(wave_model)))
-    #     v_as_model = np.zeros((len(v),len(wave_model)))
-    #     for i in range(0,len(u)):
-    #         u_as_model[i,:] = u[i]/(wave_model*1.e-6) / rad2as
-    #         v_as_model[i,:] = v[i]/(wave_model*1.e-6) / rad2as
-    #     magu_as_model = np.sqrt(u_as_model**2.+v_as_model**2.)
-    # 
-    # 
-    # 
-    #     # Visamp
-    #     if self.fit_for[0]:
-    #         for i in range(0,6):
-    #             plt.errorbar(magu_as[i,:], visamp[i,:]*(1-visamp_flag)[i],
-    #                         visamp_error[i,:]*(1-visamp_flag)[i],
-    #                         color=self.colors_baseline[i],ls='', lw=1, alpha=0.5, capsize=0)
-    #             plt.scatter(magu_as[i,:], visamp[i,:]*(1-visamp_flag)[i],
-    #                         color=self.colors_baseline[i], alpha=0.5, label=self.baseline_labels[i])
-    #             plt.plot(magu_as_model[i,:], model_visamp_full[i,:],
-    #                     color='k', zorder=100)
-    #         plt.ylabel('visibility modulus')
-    #         plt.ylim(-0.1,1.1)
-    #         plt.xlabel('spatial frequency (1/arcsec)')
-    #         plt.legend()
-    #         if createpdf:
-    #             savetime = self.savetime
-    #             plt.title('Polarization %i' % (idx + 1))
-    #             pdfname = '%s_pol%i_5.png' % (savetime, idx)
-    #             plt.savefig(pdfname)
-    #             plt.close()
-    #         else:
-    #             plt.title(title_name)
-    #             plt.show()
-    # 
-    #     # Vis2
-    #     if self.fit_for[1]:
-    #         for i in range(0,6):
-    #             plt.errorbar(magu_as[i,:], vis2[i,:]*(1-vis2_flag)[i],
-    #                         vis2_error[i,:]*(1-vis2_flag)[i],
-    #                         color=self.colors_baseline[i],ls='', lw=1, alpha=0.5, capsize=0)
-    #             plt.scatter(magu_as[i,:], vis2[i,:]*(1-vis2_flag)[i],
-    #                         color=self.colors_baseline[i],alpha=0.5, label=self.baseline_labels[i])
-    #             plt.plot(magu_as_model[i,:], model_vis2_full[i,:],
-    #                     color='k', zorder=100)
-    #         plt.xlabel('spatial frequency (1/arcsec)')
-    #         plt.ylabel('visibility squared')
-    #         plt.ylim(-0.1,1.1)
-    #         plt.legend()
-    #         if createpdf:
-    #             plt.title('Polarization %i' % (idx + 1))
-    #             pdfname = '%s_pol%i_6.png' % (savetime, idx)
-    #             plt.savefig(pdfname)
-    #             plt.close()
-    #         else:
-    #             plt.title(title_name)
-    #             plt.show()
-    # 
-    #     # T3
-    #     if self.fit_for[2]:
-    #         for i in range(0,4):
-    #             max_u_as_model = self.max_spf[i]/(wave_model*1.e-6) / rad2as
-    #             plt.errorbar(self.spFrequAS_T3[i,:], closure[i,:]*(1-closure_flag)[i],
-    #                         closure_error[i,:]*(1-closure_flag)[i],
-    #                         color=self.colors_closure[i],ls='', lw=1, alpha=0.5, capsize=0)
-    #             plt.scatter(self.spFrequAS_T3[i,:], closure[i,:]*(1-closure_flag)[i],
-    #                         color=self.colors_closure[i], alpha=0.5, label=self.closure_labels[i])
-    #             plt.plot(max_u_as_model, model_closure_full[i,:],
-    #                     color='k', zorder=100)
-    #         plt.xlabel('spatial frequency of largest baseline in triangle (1/arcsec)')
-    #         plt.ylabel('closure phase (deg)')
-    #         plt.ylim(-180,180)
-    #         plt.legend()
-    #         if createpdf:
-    #             plt.title('Polarization %i' % (idx + 1))
-    #             pdfname = '%s_pol%i_7.png' % (savetime, idx)
-    #             plt.savefig(pdfname)
-    #             plt.close()
-    #         else:
-    #             plt.title(title_name)
-    #             plt.show()
-    # 
-    #     # VisPhi
-    #     if self.fit_for[3]:
-    #         for i in range(0,6):
-    #             plt.errorbar(magu_as[i,:], visphi[i,:]*(1-visphi_flag)[i],
-    #                         visphi_error[i,:]*(1-visphi_flag)[i],
-    #                         color=self.colors_baseline[i], ls='', lw=1, alpha=0.5, capsize=0)
-    #             plt.scatter(magu_as[i,:], visphi[i,:]*(1-visphi_flag)[i],
-    #                         color=self.colors_baseline[i], alpha=0.5, label=self.baseline_labels[i])
-    #             plt.plot(magu_as_model[i,:], model_visphi_full[i,:],
-    #                     color='k', zorder=100)
-    #         plt.ylabel('visibility phase')
-    #         plt.xlabel('spatial frequency (1/arcsec)')
-    #         plt.legend()
-    #         if createpdf:
-    #             plt.title('Polarization %i' % (idx + 1))
-    #             pdfname = '%s_pol%i_8.png' % (savetime, idx)
-    #             plt.savefig(pdfname)
-    #             plt.close()
-    #         else:
-    #             plt.title(title_name)
-    #             plt.show()
 
 
 def _lnprob_night(theta, fitdata, lower, upper, theta_names, fitarg, fithelp):
@@ -2357,26 +2244,35 @@ def _lnlike_night(theta, fitdata, fitarg, fithelp):
 
 class GravMNightFit(GravNight):
     def __init__(self, file_list, verbose=False, debug=False):
+        """
+        GravMNightFit: Class to fit a multiple point source model
+                       to several GRAVITY datasets at once
+        !!! Need debugging !!!
+
+        Main functions:
+        fit_stars : the function to do the fit
+        plot_fit : plot the data and the fitted model
+        """
         super().__init__(file_list, verbose=verbose)
         self.debug = debug
 
-    def fitStars(self,
-                 ra_list,
-                 de_list,
-                 fr_list=None,
-                 fit_size=None,
-                 fit_pos=None,
-                 fit_fr=None,
-                 nthreads=1,
-                 nwalkers=301,
-                 nruns=301,
-                 fit_for=np.array([0.5, 0.5, 1.0, 0.0]),
-                 fixedBHalpha=False,
-                 oneBHalpha=False,
-                 oneBG=True,
-                 initial=None,
-                 phasemaps=True,
-                 **kwargs):
+    def fit_stars(self,
+                  ra_list,
+                  de_list,
+                  fr_list=None,
+                  fit_size=None,
+                  fit_pos=None,
+                  fit_fr=None,
+                  nthreads=1,
+                  nwalkers=301,
+                  nruns=301,
+                  fit_for=np.array([0.5, 0.5, 1.0, 0.0]),
+                  fixedBHalpha=False,
+                  oneBHalpha=False,
+                  oneBG=True,
+                  initial=None,
+                  phasemaps=True,
+                  **kwargs):
         """
         Multi source fit to GRAVITY data
         Function fits a central source and a number of companion sources.
@@ -2482,8 +2378,8 @@ class GravMNightFit(GravNight):
         MJD = []
         u, v = [], []
         for obj in self.datalist:
-            obj.getIntdata(plot=False, flag=False)
-            obj.getDlambda()
+            obj.get_int_data(plot=False, flag=False)
+            obj.get_dlambda()
 
             MJD.append(fits.open(obj.name)[0].header["MJD-OBS"])
             u.append(obj.u)
@@ -2713,8 +2609,7 @@ class GravMNightFit(GravNight):
                 todel.append(nsource*3-1 + ndx*11 + 3)
             if nocohloss:
                 todel.extend(np.arange(nsource*3-1 + ndx*11 + 5, nsource*3-1 + ndx*11+11))
-                
-        
+
         if self.debug:
             print('\n\n')
             for idx in range(len(theta)):
@@ -2722,7 +2617,7 @@ class GravMNightFit(GravNight):
                     print('%s    %.2f    FIXXED' % (theta_names[idx], theta[idx]))
                 else:
                     print('%s    %.2f' % (theta_names[idx], theta[idx]))
-            
+
             print('\n\n')
             print(len(theta), todel)
 
@@ -2744,7 +2639,7 @@ class GravMNightFit(GravNight):
             phasemaps.datayear = self.datayear
             phasemaps.wlSC = self.datalist[0].wlSC
             phasemaps.interppm = interppm
-            phasemaps.loadPhasemaps(interp=interppm)
+            phasemaps.load_phasemaps(interp=interppm)
 
             header = self.headerlist[0]
             northangle1 = header['ESO QC ACQ FIELD1 NORTH_ANGLE']/180*math.pi
@@ -2863,7 +2758,7 @@ class GravMNightFit(GravNight):
         self.fitarg = fitarg
         self.MJD = MJD
 
-    def getFitResult(self, plot=True, plotcorner=False, ret=False):
+    def get_fit_result(self, plot=True, plotcorner=False, ret=False):
         samples = self.sampler.chain
         self.mostprop = self.sampler.flatchain[np.argmax(self.sampler.flatlnprobability)]
         print("-----------------------------------")
@@ -2890,7 +2785,7 @@ class GravMNightFit(GravNight):
         lnlike = _lnlike_night(self.medianprop, self.fitdata,
                                self.fitarg, self.fithelp)
         print('LogLikelihood: %i' % (lnlike*-1))
-        allfitres = self.getFitVis(self.medianprop, self.fitarg,
+        allfitres = self.get_fit_vis(self.medianprop, self.fitarg,
                                    self.fithelp)
         (visamp, visamp_error, visamp_flag,
          vis2, vis2_error, vis2_flag,
@@ -3002,7 +2897,7 @@ class GravMNightFit(GravNight):
                                 truths=clmostprop, labels=cllabels)
             plt.show()
 
-    def getFitVis(self, fitres, fitarg, fithelp):
+    def get_fit_vis(self, fitres, fitarg, fithelp):
         (len_lightcurve, nsource, fit_for, bispec_ind, fit_mode,
          wave, dlambda, fixedBHalpha, oneBHalpha, oneBG, todel, fixed,
          phasemaps, pm_sources) = fithelp
@@ -3056,7 +2951,7 @@ class GravMNightFit(GravNight):
             allfitres.append([visamp, visamp2, closure, visphi])
         return allfitres
 
-    def plotFitComb(self, plotall=False, mostprop=True, nicer=True):
+    def plot_fit(self, plotall=False, mostprop=True, nicer=True):
         rad2as = 180 / np.pi * 3600
         len_lightcurve = self.nfiles
         if mostprop:
@@ -3082,7 +2977,7 @@ class GravMNightFit(GravNight):
         fithelp_model = np.copy(self.fithelp)
         fithelp_model[5] = wave_model
         fithelp_model[6] = dlambda_model
-        allfitres = self.getFitVis(result, self.fitarg, fithelp_model)
+        allfitres = self.get_fit_vis(result, self.fitarg, fithelp_model)
 
         obj = self.datalist[0]
         plot_quant = ['Visamp', 'Vis2', 'Closure Phase', 'Visibility Phase']

@@ -200,6 +200,14 @@ def rotation(ang):
 class GravData():
     def __init__(self, data, verbose=True, plot=False, datacatg=None):
         """
+        GravData: Class to load GRAVITY datafiles
+
+        Main functions:
+        get_int_data : load all interverometric data into class atributes
+        get_flux_from_RAW : get the flux from the raw detector t_files
+        get_dlambda : loads wavelength and spectral channels
+        av_phases : properly average phases in phasor space
+        calibrate_phi : Calibrate visibility phases
         """
         self.name = data
         self.filename = os.path.basename(data)
@@ -313,7 +321,7 @@ class GravData():
                 if not datacatg == 'ASTROREDUCED':
                     self.wlFT = fits.open(self.name)['OI_WAVELENGTH', 20].data['EFF_WAVE']*1e6
 
-    def getFlux(self, mode='SC', plot=False):
+    def get_flux(self, mode='SC', plot=False):
         """
         Get the flux data
         """
@@ -388,7 +396,7 @@ class GravData():
                     plt.show()
                 return self.fluxtime, self.fluxFT, self.fluxerrFT
 
-    def getIntdata(self, mode='SC', plot=False, plotTAmp=False, flag=False,
+    def get_int_data(self, mode='SC', plot=False, plotTAmp=False, flag=False,
                    reload=False, ignore_tel=[]):
         """
         Reads out all interferometric data and saves it into the class:
@@ -790,9 +798,9 @@ class GravData():
                     plt.show()
         fitsdata.close()
 
-    def getFluxfromRAW(self, flatfile, method='preproc', skyfile=None,
-                       wavefile=None, p2vmfile=None, flatflux=False,
-                       darkfile=None):
+    def get_flux_from_RAW(self, flatfile, method='preproc', skyfile=None,
+                          wavefile=None, p2vmfile=None, flatflux=False,
+                          darkfile=None):
         """
         Get the flux values from a raw file
         method has to be 'spectrum', 'preproc', 'p2vmred', 'dualscivis'
@@ -906,7 +914,7 @@ class GravData():
         if method == 'dualscivis':
             return np.sum(red_flux_P, 0), np.sum(red_flux_S, 0)
 
-    def getDlambda(self, idel=False):
+    def get_dlambda(self, idel=False):
         """
         Get the size of the spectral channels
         if idel it is taken from the hardcoded size of the response functions,
@@ -932,7 +940,7 @@ class GravData():
 
     def calibrate_phi(self, calibrator):
         if not hasattr(self, 'visphiSC_P1'):
-            self.getIntdata()
+            self.get_int_data()
         c = fits.open(calibrator)
         c_channel = len(c['OI_WAVELENGTH', 11].data['EFF_WAVE'])
         if c_channel != self.channel:
@@ -966,7 +974,14 @@ class GravData():
 class GravNight():
     def __init__(self, file_list, verbose=True, onlymet=False):
         """
-        GravNight - the long awaited full night fit class
+        GravNight: Class to load several GRAVITY datafiles
+
+        Main functions:
+        get_int_data : load all interverometric data into class atributes
+        get_met_data : load metrology data
+        get_FDDL_data : load FDDL data
+        get_acq_data : load data from acquisition camera multiprocessing
+        get_faint_timer : get timing from G-Faint files
         """
         self.file_list = file_list
         self.verbose = verbose
@@ -1048,13 +1063,13 @@ class GravNight():
         self.mjd0 = np.min(np.array(self.mjd))
         self.files = [i.name for i in self.datalist]
 
-    def getIntdata(self, mode='SC', plot=False, plotTAmp=False, flag=False,
-                   ignore_tel=[]):
+    def get_int_data(self, mode='SC', plot=False, plotTAmp=False, flag=False,
+                     ignore_tel=[]):
         for data in self.datalist:
-            data.getIntdata(mode=mode, plot=plot, plotTAmp=plotTAmp, flag=flag,
-                            ignore_tel=ignore_tel)
+            data.get_int_data(mode=mode, plot=plot, plotTAmp=plotTAmp,
+                              flag=flag, ignore_tel=ignore_tel)
 
-    def getTime(self):
+    def get_time(self):
         files = self.files
         MJD = np.array([]).reshape(0, 4)
         for fdx, file in enumerate(files):
@@ -1065,7 +1080,7 @@ class GravNight():
         MJD = (MJD - self.mjd0)*24*60
         self.time = MJD
 
-    def getMetdata(self, plot=False, plotall=False):
+    def get_met_data(self, plot=False, plotall=False):
         if 'P2VM' not in self.datacatg:
             raise ValueError('Only available for p2vmred files')
         files = self.files
@@ -1355,7 +1370,7 @@ class GravNight():
                     plt.ylabel('OPD_TELFC_MCORR \n[$\mu$m]', fontsize=8)
             plt.show()
 
-    def getFDDLdata(self, plot=False):
+    def get_FDDL_data(self, plot=False):
         if 'P2VM' not in self.datacatg:
             raise ValueError('Only available for p2vmred files')
         if self.polmode == 'SPLIT':
@@ -1422,7 +1437,7 @@ class GravNight():
                                    fontsize=8)
             plt.show()
 
-    def getAcqdata(self, plot=False):
+    def get_acq_data(self, plot=False):
         if 'P2VM' not in self.datacatg:
             raise ValueError('Only available for p2vmred files')
         files = self.files
@@ -1496,7 +1511,7 @@ class GravNight():
                                    fontsize=8)
             plt.show()
 
-    def getFainttimer(self):
+    def get_faint_timer(self):
         files = self.files
         onv = np.array([])
         ofv = np.array([])
@@ -1532,7 +1547,7 @@ class GravNight():
             self.ofv = np.concatenate((np.array([self.time[0, 0]]), ofv))
         except AttributeError:
             try:
-                self.getMetdata()
+                self.get_met_data()
                 self.onv = np.concatenate((onv, np.array([self.time[-1, 0]])))
                 self.ofv = np.concatenate((np.array([self.time[0, 0]]), ofv))
             except ValueError:
