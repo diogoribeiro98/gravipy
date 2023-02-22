@@ -438,27 +438,31 @@ def read_correction(mcor_files, xscale, list_dim=1, fancy=True,
 
 
 class GravPhaseNight():
-    def __init__(self, night=None, verbose=True, usepandas=False,
-                 pandasfile=None, reddir=None, datadir='/data/user/forFrank2/',
-                 onlysgra=False, calibrator=None, full_folder=False,
-                 s2_offx=None, ignore_files=[]):
+    def __init__(self, night=None, verbose=True,
+                 reddir=None, datadir='/data/user/forFrank2/',
+                 onlysgra=False, calibrator=None,
+                 s2_offx=None, ignore_files=[],
+                 usepandas=False, pandasfile=None,
+                 full_folder=False):
         """
         Package to do the full phase calibration, poscor, and
         metrology correction
 
-        For 2019 data some fitting is available too
-
+        To load the night data several options are available:
         night       : night which shall be used
         verbose     : show printouts [True]
-        usepandas   : if True gets flux values for 2019 data [False]
-        pandasfile  : allows to pick different file if not None [None]
         reddir      : allows to pick a specific reduction directory [None]
         datadir     : pick directory with data [/data/user/forFrank2/]
         onlysgra    : picks only sgra files for science [False]
         calibrator  : the calibrator to use, if None use defaults [None]
-        full_folder : Just load everything (for testing) [False]
-        s2_offx     : SOBJ.OFFX of S2 files [0.0]
+        s2_offx     : SOBJ.OFFX of S2 files, if None use defaults [None]
         ignore_files: List of files to be ignored
+        usepandas   : if True gets flux values for 2019 data [False]
+        pandasfile  : allows to pick different file if not None [None]
+        full_folder : Just load everything (for testing) [False]
+
+        Main functionality is in function:
+        process_night
         """
         self.night = night
         self.verbose = verbose
