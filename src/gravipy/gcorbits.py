@@ -136,7 +136,7 @@ class GCorbits():
             E = newton(f, E0, fp, *args, **kwargs)
         return E
 
-    def plot_orbits(self, t=None, figsize=8, lim=100, long=False):
+    def plot_orbits(self, off=[0,0], t=None, figsize=8, lim=100, long=False):
         """
         Plot the inner region around SgrA* at a given TIME
         t:    time of plot (if None then now)
@@ -147,6 +147,7 @@ class GCorbits():
             d = datetime.utcnow()
             t = d.strftime("%Y-%m-%dT%H:%M:%S")
         t = convert_date(t)[0]
+
         starpos = []
         for star in self.star_orbits:
             _s = self.star_orbits[star]
@@ -162,7 +163,7 @@ class GCorbits():
         fig.set_figwidth(figsize)
         for s in starpos:
             n, x, y, ty, mag = s
-            if np.any(np.abs(x) > lim) or np.any(np.abs(y) > lim):
+            if np.any(np.abs(x-off[0]) > lim) or np.any(np.abs(y-off[1]) > lim):
                 continue
             if long:
                 if ty == 'e':
@@ -188,17 +189,25 @@ class GCorbits():
                     plt.scatter(x, y, c='C1', s=10)
                     plt.text(x-3, y, '%s' % (n), fontsize=6, color='C1')
 
-        plt.axis([lim*1.2, -lim*1.2, -lim*1.2, lim*1.2])
+        plt.axis([lim*1.2+off[0], -lim*1.2+off[0],
+                  -lim*1.2+off[1], lim*1.2+off[1]])
         plt.gca().set_aspect('equal', adjustable='box')
 
         fiberrad = 70
-        circ = plt.Circle((0, 0), radius=fiberrad, facecolor="None",
+        circ = plt.Circle((off), radius=fiberrad, facecolor="None",
                           edgecolor='darkblue', linewidth=0.2)
         ax.add_artist(circ)
-        plt.scatter(0, 0, color='k', s=20, zorder=100)
-        plt.text(0, -78, 'GRAVITY Fiber FoV', fontsize='6', color='darkblue',
+        plt.text(0+off[0], -78+off[1], 'GRAVITY Fiber FoV', fontsize='6', color='darkblue',
                  ha='center')
-        plt.text(-4, -8, 'Sgr A*', fontsize='8')
+        if np.any(np.abs(off[0]) > lim) or np.any(np.abs(off[1]) > lim):
+            pass
+        else:
+            plt.scatter(0, 0, color='k', s=20, zorder=100)
+            plt.text(-4, -8, 'Sgr A*', fontsize='8')
+            
+        if off != [0,0]:
+            plt.scatter(*off, color='k', marker='X', s=20, zorder=100)
+            plt.text(-4+off[0], -8+off[1], 'Pointing*', fontsize='8')
 
         plt.text(-80, 100, 'late type', fontsize=6, color='C0')
         plt.text(-80, 92, 'early type', fontsize=6, color='C2')
