@@ -204,14 +204,14 @@ class GCorbits():
         else:
             plt.scatter(0, 0, color='k', s=20, zorder=100)
             plt.text(-4, -8, 'Sgr A*', fontsize='8')
-            
+
         if off != [0,0]:
             plt.scatter(*off, color='k', marker='X', s=20, zorder=100)
             plt.text(-4+off[0], -8+off[1], 'Pointing*', fontsize='8')
 
-        plt.text(-80, 100, 'late type', fontsize=6, color='C0')
-        plt.text(-80, 92, 'early type', fontsize=6, color='C2')
-        plt.text(-80, 84, 'unknown', fontsize=6, color='C1')
+        plt.text(-80+off[0], 100+off[1], 'late type', fontsize=6, color='C0')
+        plt.text(-80+off[0], 92+off[1], 'early type', fontsize=6, color='C2')
+        plt.text(-80+off[0], 84+off[1], 'unknown', fontsize=6, color='C1')
 
         plt.xlabel('dRa [mas]')
         plt.ylabel('dDec [mas]')

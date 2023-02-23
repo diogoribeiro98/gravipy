@@ -507,8 +507,9 @@ class GravPhaseMaps():
             pm1 = np.load(resource_filename('gravipy', pm1_file))
             pm2 = np.real(np.load(resource_filename('gravipy', pm2_file)))
         except FileNotFoundError:
-            raise ValueError('%s does not exist, you have to create'
-                             'the phasemap first!' % pm1_file)
+            raise ValueError('%s does not exist, you have to create '
+                             'the phasemap first!\nFor this '
+                             'run: GravMFit.create_phasemaps()' % pm1_file)
 
         wave = self.wlSC
         if pm1.shape[0] != len(wave):
