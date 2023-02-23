@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(name='gravipy',
-      version='1.1',
+      version='1.2',
       author='Felix Widmann',
       description='Package to work with GRAVITY GC data',
       url='https://github.com/widmannf/gravipy',
@@ -23,10 +23,7 @@ setup(name='gravipy',
         'mpmath',
         'joblib',
         'lmfit',
-        'fpdf',
         'numba',
         'p2api',
-        'selenium',
-        'tqdm',
     ]
 )
