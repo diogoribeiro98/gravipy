@@ -533,18 +533,18 @@ class GravPhaseNight():
         s2data = np.load(resource_filename('gravipy', 'Datafiles/s2_orbit.npy'))
         if full_folder:
             sg_files = allfiles
-            s2_files = allfiles
+            cal_files = allfiles
         else:
             sg_files = []
-            s2_files = []
+            cal_files = []
             for file in allfiles:
                 h = fits.open(file)[0].header
                 if h['ESO FT ROBJ NAME'] != 'IRS16C':
                     continue
-                if h['ESO INS SOBJ NAME'] == 'S2':
+                if h['ESO INS SOBJ NAME'] in ['S2', 'S4']:
                     if h['ESO INS SOBJ OFFX'] == s2_offx:
                         if file not in ignore_files:
-                            s2_files.append(file)
+                            cal_files.append(file)
                     else:
                         d = convert_date(h['DATE-OBS'])[0]
                         _x, _y = -s2data[find_nearest(s2data[:, 0], d)][1:]*1e3
@@ -575,10 +575,10 @@ class GravPhaseNight():
                             sg_files.append(file)
         if self.verbose:
             print('            %i SGRA files \n            %i S2 files' 
-                  % (len(sg_files), len(s2_files)))
-        self.s2_files = s2_files
+                  % (len(sg_files), len(cal_files)))
+        self.cal_files = cal_files
         self.sg_files = sg_files
-        self.ndit = len(fits.open(self.s2_files[0])['OI_VIS', 11].data['TIME'])//6
+        self.ndit = len(fits.open(self.cal_files[0])['OI_VIS', 11].data['TIME'])//6
         if self.verbose:
             print('NDIT:       %i' % self.ndit)
         try:
