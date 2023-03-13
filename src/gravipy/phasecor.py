@@ -532,10 +532,10 @@ class GravPhaseNight():
         self.cal_offx = cal_offx
         s2data = np.load(resource_filename('gravipy', 'Datafiles/s2_orbit.npy'))
         if full_folder:
-            sg_files = allfiles
+            sci_files = allfiles
             cal_files = allfiles
         else:
-            sg_files = []
+            sci_files = []
             cal_files = []
             for file in allfiles:
                 h = fits.open(file)[0].header
@@ -572,12 +572,12 @@ class GravPhaseNight():
                                               'orbit, will be ignored' % (sobjx, sobjy))
                                     continue
                         if file not in ignore_files:
-                            sg_files.append(file)
+                            sci_files.append(file)
         if self.verbose:
             print('            %i SCI files \n            %i CAL files' 
-                  % (len(sg_files), len(cal_files)))
+                  % (len(sci_files), len(cal_files)))
         self.cal_files = cal_files
-        self.sg_files = sg_files
+        self.sci_files = sci_files
         self.ndit = len(fits.open(self.cal_files[0])['OI_VIS', 11].data['TIME'])//6
         if self.verbose:
             print('NDIT:       %i' % self.ndit)
@@ -605,28 +605,28 @@ class GravPhaseNight():
                                                'Datafiles/GRAVITY_2019data.object')
                 pand = pd.read_pickle(pandasfile)
 
-            sg_flux = []
-            sg_flux_p1 = []
-            sg_flux_p2 = []
-            sg_header = []
-            for fdx, file in enumerate(sg_files):
+            sci_flux = []
+            sci_flux_p1 = []
+            sci_flux_p2 = []
+            sci_header = []
+            for fdx, file in enumerate(sci_files):
                 d = fits.open(file)
                 h = d[0].header
-                sg_header.append(h)
+                sci_header.append(h)
                 obsdate = h['DATE-OBS']
                 p1 = np.mean(pand["flux p1 [%S2]"].loc[pand['DATE-OBS'] == obsdate])
                 p2 = np.mean(pand["flux p2 [%S2]"].loc[pand['DATE-OBS'] == obsdate])
-                sg_fr = (p1+p2)/2
-                if np.isnan(sg_fr):
+                sci_fr = (p1+p2)/2
+                if np.isnan(sci_fr):
                     print('%s has no flux value' % file)
-                sg_flux.append(sg_fr)
-                sg_flux_p1.append(p1)
-                sg_flux_p2.append(p2)
+                sci_flux.append(sci_fr)
+                sci_flux_p1.append(p1)
+                sci_flux_p2.append(p2)
 
-            self.sg_flux = sg_flux
-            self.sg_flux_p1 = sg_flux_p1
-            self.sg_flux_p2 = sg_flux_p2
-            self.sg_header = sg_header
+            self.sci_flux = sci_flux
+            self.sci_flux_p1 = sci_flux_p1
+            self.sci_flux_p2 = sci_flux_p2
+            self.sci_header = sci_header
         if self.verbose:
             print('\n\n')
 
@@ -730,7 +730,7 @@ class GravPhaseNight():
         ndit = self.ndit
 
         cal_files = self.cal_files
-        sg_files = self.sg_files
+        sci_files = self.sci_files
         if mode is None:
             correction = False
             if self.verbose:
@@ -786,43 +786,43 @@ class GravPhaseNight():
             cor_cor = False
 
         try:
-            d = fits.open(sg_files[0])
+            d = fits.open(sci_files[0])
         except IndexError:
             d = fits.open(cal_files[0])
         wave = d['OI_WAVELENGTH', 11].data['EFF_WAVE']
         self.wave = wave
         nchannel = len(wave)
-        sg_visphi_p1 = np.zeros((len(sg_files), ndit*6, nchannel))*np.nan
-        sg_visphi_p2 = np.zeros((len(sg_files), ndit*6, nchannel))*np.nan
-        sg_visphi_err_p1 = np.zeros((len(sg_files), ndit*6, nchannel))*np.nan
-        sg_visphi_err_p2 = np.zeros((len(sg_files), ndit*6, nchannel))*np.nan
-        sg_t = np.zeros((len(sg_files), ndit))*np.nan
-        sg_lst = np.zeros((len(sg_files), ndit))*np.nan
-        sg_ang = np.zeros((len(sg_files), ndit))*np.nan
-        sg_u = np.zeros((len(sg_files), ndit*6, nchannel))*np.nan
-        sg_v = np.zeros((len(sg_files), ndit*6, nchannel))*np.nan
-        sg_u_raw = np.zeros((len(sg_files), ndit*6))*np.nan
-        sg_v_raw = np.zeros((len(sg_files), ndit*6))*np.nan
-        sg_correction = np.zeros((len(sg_files), ndit*6, nchannel))*np.nan
-        sg_correction_wo = np.zeros((len(sg_files), ndit*6, nchannel))*np.nan
+        sci_visphi_p1 = np.zeros((len(sci_files), ndit*6, nchannel))*np.nan
+        sci_visphi_p2 = np.zeros((len(sci_files), ndit*6, nchannel))*np.nan
+        sci_visphi_err_p1 = np.zeros((len(sci_files), ndit*6, nchannel))*np.nan
+        sci_visphi_err_p2 = np.zeros((len(sci_files), ndit*6, nchannel))*np.nan
+        sci_t = np.zeros((len(sci_files), ndit))*np.nan
+        sci_lst = np.zeros((len(sci_files), ndit))*np.nan
+        sci_ang = np.zeros((len(sci_files), ndit))*np.nan
+        sci_u = np.zeros((len(sci_files), ndit*6, nchannel))*np.nan
+        sci_v = np.zeros((len(sci_files), ndit*6, nchannel))*np.nan
+        sci_u_raw = np.zeros((len(sci_files), ndit*6))*np.nan
+        sci_v_raw = np.zeros((len(sci_files), ndit*6))*np.nan
+        sci_correction = np.zeros((len(sci_files), ndit*6, nchannel))*np.nan
+        sci_correction_wo = np.zeros((len(sci_files), ndit*6, nchannel))*np.nan
 
-        for fdx, file in enumerate(sg_files):
+        for fdx, file in enumerate(sci_files):
             d = fits.open(file)
             h = d[0].header
             # if fluxcut > 0:
-            #     if f < self.sg_flux[fdx]:
+            #     if f < self.sci_flux[fdx]:
             #         continue
-            sg_t[fdx] = d['OI_VIS', 12].data['MJD'][::6]
+            sci_t[fdx] = d['OI_VIS', 12].data['MJD'][::6]
             o_ndit = h['ESO DET2 NDIT']
             lst0 = h['LST']/3600
             time = d['OI_VIS', 11].data['TIME'][::6]/3600
             time -= time[0]
-            sg_lst[fdx] = time + lst0
+            sci_lst[fdx] = time + lst0
 
             U = d['OI_VIS', 11].data['UCOORD']
             V = d['OI_VIS', 11].data['VCOORD']
-            sg_u_raw[fdx] = U
-            sg_v_raw[fdx] = V
+            sci_u_raw[fdx] = U
+            sci_v_raw[fdx] = V
             wave = d['OI_WAVELENGTH', 11].data['EFF_WAVE']
             U_as = np.zeros((ndit*6, nchannel))
             V_as = np.zeros((ndit*6, nchannel))
@@ -830,11 +830,11 @@ class GravPhaseNight():
                 for wdx, wl in enumerate(wave):
                     U_as[bl, wdx] = U[bl]/wl * np.pi / 180. / 3600./1000
                     V_as[bl, wdx] = V[bl]/wl * np.pi / 180. / 3600./1000
-            sg_u[fdx] = U_as
-            sg_v[fdx] = V_as
+            sci_u[fdx] = U_as
+            sci_v[fdx] = V_as
 
             angle = [get_angle_header_all(h, i, o_ndit) for i in range(4)]
-            sg_ang[fdx] = np.mean([get_angle_header_all(h, i, ndit)
+            sci_ang[fdx] = np.mean([get_angle_header_all(h, i, ndit)
                                    for i in range(4)], 0)
             wave = d['OI_WAVELENGTH', 12].data['EFF_WAVE']*1e6
             dlambda = d['OI_WAVELENGTH', 11].data['EFF_BAND']/2*1e6
@@ -846,11 +846,11 @@ class GravPhaseNight():
                         if bl_corr:
                             if lst_corr:
                                 if subspacing != 1:
-                                    lstdif = sg_lst[fdx][-1] - sg_lst[fdx][-2]
-                                    lst_s = np.linspace(sg_lst[fdx][0], sg_lst[fdx][-1] + lstdif, len(sg_lst[fdx])*subspacing)
+                                    lstdif = sci_lst[fdx][-1] - sci_lst[fdx][-2]
+                                    lst_s = np.linspace(sci_lst[fdx][0], sci_lst[fdx][-1] + lstdif, len(sci_lst[fdx])*subspacing)
                                     cor = -averaging(interp_list[base](lst_s), subspacing)[:-1]
                                 else:
-                                    cor = -interp_list[base](sg_lst[fdx])
+                                    cor = -interp_list[base](sci_lst[fdx])
                             else:
                                 t1 = self.bl_array[base][0]
                                 t2 = self.bl_array[base][1]
@@ -869,13 +869,13 @@ class GravPhaseNight():
                             t2 = self.bl_array[base][1]
                             if lst_corr:
                                 if subspacing != 1:
-                                    lstdif = sg_lst[fdx][-1] - sg_lst[fdx][-2]
-                                    lst_s = np.linspace(sg_lst[fdx][0], sg_lst[fdx][-1] + lstdif, len(sg_lst[fdx])*subspacing)
+                                    lstdif = sci_lst[fdx][-1] - sci_lst[fdx][-2]
+                                    lst_s = np.linspace(sci_lst[fdx][0], sci_lst[fdx][-1] + lstdif, len(sci_lst[fdx])*subspacing)
                                     cor1 = averaging(interp_list[t1](lst_s), subspacing)[:-1]
                                     cor2 = averaging(interp_list[t2](lst_s), subspacing)[:-1]
                                 else:
-                                    cor1 = interp_list[t1](sg_lst[fdx])
-                                    cor2 = interp_list[t2](sg_lst[fdx])  
+                                    cor1 = interp_list[t1](sci_lst[fdx])
+                                    cor2 = interp_list[t2](sci_lst[fdx])  
                             else:
                                 ang1 = angle[t1]
                                 ang2 = angle[t2]
@@ -900,7 +900,7 @@ class GravPhaseNight():
                         for w in range(len(wave)):
                             wcor[:, w] = cor/wave[w]*360
                         fullcor[base::6] = wcor
-                    sg_correction_wo[fdx] = fullcor
+                    sci_correction_wo[fdx] = fullcor
 
                     if cor_cor:
                         for base in range(6):
@@ -926,28 +926,28 @@ class GravPhaseNight():
                 except ValueError:
                     fullcor = 0
 
-                sg_visphi_p1[fdx] = d['OI_VIS', 11].data['VISPHI'] + fullcor
-                sg_visphi_p2[fdx] = d['OI_VIS', 12].data['VISPHI'] + fullcor
+                sci_visphi_p1[fdx] = d['OI_VIS', 11].data['VISPHI'] + fullcor
+                sci_visphi_p2[fdx] = d['OI_VIS', 12].data['VISPHI'] + fullcor
             else:
-                sg_visphi_p1[fdx] = d['OI_VIS', 11].data['VISPHI']
-                sg_visphi_p2[fdx] = d['OI_VIS', 12].data['VISPHI']
+                sci_visphi_p1[fdx] = d['OI_VIS', 11].data['VISPHI']
+                sci_visphi_p2[fdx] = d['OI_VIS', 12].data['VISPHI']
 
-            sg_correction[fdx] = fullcor
+            sci_correction[fdx] = fullcor
 
             flag1 = d['OI_VIS', 11].data['FLAG']
             flag2 = d['OI_VIS', 12].data['FLAG']
 
-            sg_visphi_err_p1[fdx] = d['OI_VIS', 11].data['VISPHIERR']
-            sg_visphi_err_p2[fdx] = d['OI_VIS', 12].data['VISPHIERR']
+            sci_visphi_err_p1[fdx] = d['OI_VIS', 11].data['VISPHIERR']
+            sci_visphi_err_p2[fdx] = d['OI_VIS', 12].data['VISPHIERR']
 
-            sg_visphi_p1[fdx][np.where(flag1 == True)] = np.nan
-            sg_visphi_p2[fdx][np.where(flag2 == True)] = np.nan
-            sg_visphi_err_p1[fdx][np.where(flag1 == True)] = np.nan
-            sg_visphi_err_p2[fdx][np.where(flag2 == True)] = np.nan
+            sci_visphi_p1[fdx][np.where(flag1 == True)] = np.nan
+            sci_visphi_p2[fdx][np.where(flag2 == True)] = np.nan
+            sci_visphi_err_p1[fdx][np.where(flag1 == True)] = np.nan
+            sci_visphi_err_p2[fdx][np.where(flag2 == True)] = np.nan
 
-        if len(sg_files) > 0:
-            self.sg_u_raw = sg_u_raw
-            self.sg_v_raw = sg_v_raw
+        if len(sci_files) > 0:
+            self.sci_u_raw = sci_u_raw
+            self.sci_v_raw = sci_v_raw
             self.wave = wave
             self.dlambda = dlambda
 
@@ -1104,11 +1104,11 @@ class GravPhaseNight():
         self.cal_v_raw = cal_u_raw
 
         try:
-            tstart = np.nanmin((np.nanmin(cal_t), np.nanmin(sg_t)))
+            tstart = np.nanmin((np.nanmin(cal_t), np.nanmin(sci_t)))
         except ValueError:
             tstart = np.nanmin(cal_t)
         cal_t = (cal_t-tstart)*24*60
-        sg_t = (sg_t-tstart)*24*60
+        sci_t = (sci_t-tstart)*24*60
 
         ##########################
         # Calibrate
@@ -1140,10 +1140,10 @@ class GravPhaseNight():
             cal_p1[dit*6:(dit+1)*6] = mc_p1
             cal_p2[dit*6:(dit+1)*6] = mc_p2
 
-        for fdx, file in enumerate(sg_files):
-            sg_visphi_p1[fdx] = np.angle((np.exp(1j*sg_visphi_p1[fdx]/180*np.pi)
+        for fdx, file in enumerate(sci_files):
+            sci_visphi_p1[fdx] = np.angle((np.exp(1j*sci_visphi_p1[fdx]/180*np.pi)
                                           / cal_p1), deg=True)
-            sg_visphi_p2[fdx] = np.angle((np.exp(1j*sg_visphi_p2[fdx]/180*np.pi)
+            sci_visphi_p2[fdx] = np.angle((np.exp(1j*sci_visphi_p2[fdx]/180*np.pi)
                                           / cal_p2), deg=True)
 
         for fdx, file in enumerate(cal_files):
@@ -1265,18 +1265,18 @@ class GravPhaseNight():
                 B_calib[bl] = np.nanmean(cal_B[calib_file][bl::6], 0)
                 cal_dB[:, bl::6, :, :] = cal_dB[:, bl::6, :, :] - B_calib[bl]
 
-            sg_B = np.zeros((sg_u.shape[0], ndit*6, nchannel, 2))
-            sg_B[:, :, :, 0] = sg_u
-            sg_B[:, :, :, 1] = sg_v
-            sg_dB = np.copy(sg_B)
+            sci_B = np.zeros((sci_u.shape[0], ndit*6, nchannel, 2))
+            sci_B[:, :, :, 0] = sci_u
+            sci_B[:, :, :, 1] = sci_v
+            sci_dB = np.copy(sci_B)
 
             B_calib = np.zeros((6, nchannel, 2))
             for bl in range(6):
                 B_calib[bl] = np.nanmean(cal_B[calib_file][bl::6], 0)
-                sg_dB[:, bl::6, :, :] = sg_dB[:, bl::6, :, :] - B_calib[bl]
+                sci_dB[:, bl::6, :, :] = sci_dB[:, bl::6, :, :] - B_calib[bl]
 
-            sg_visphi_p1 -= np.dot(sg_dB, dS)*360
-            sg_visphi_p2 -= np.dot(sg_dB, dS)*360
+            sci_visphi_p1 -= np.dot(sci_dB, dS)*360
+            sci_visphi_p2 -= np.dot(sci_dB, dS)*360
 
             cal_visphi_p1 -= np.dot(cal_dB, dS)*360
             cal_visphi_p2 -= np.dot(cal_dB, dS)*360
@@ -1289,47 +1289,47 @@ class GravPhaseNight():
                 return a*x + b
 
             for bl in range(6):
-                x = sg_t[fitstart:fitstop].flatten()
-                y = np.nanmean(sg_visphi_p1[fitstart:fitstop, bl::6, 2:-2],2).flatten()
-                yerr = np.mean(sg_visphi_err_p1[fitstart:fitstop, bl::6, 2:-2],2).flatten()
+                x = sci_t[fitstart:fitstop].flatten()
+                y = np.nanmean(sci_visphi_p1[fitstart:fitstop, bl::6, 2:-2],2).flatten()
+                yerr = np.mean(sci_visphi_err_p1[fitstart:fitstop, bl::6, 2:-2],2).flatten()
                 valid = ~(np.isnan(x) | np.isnan(y))
                 popt, pcov = optimize.curve_fit(linreg, x[valid], y[valid],
                                                 sigma=yerr[valid], p0=[0, 0])
                 for wdx in range(len(wave)):
-                    sg_visphi_p1[:, bl::6, wdx] -= linreg(sg_t, *popt)
+                    sci_visphi_p1[:, bl::6, wdx] -= linreg(sci_t, *popt)
 
-                y = np.nanmean(sg_visphi_p2[fitstart:fitstop, bl::6, 2:-2], 2).flatten()
-                yerr = np.mean(sg_visphi_err_p2[fitstart:fitstop, bl::6, 2:-2], 2).flatten()
+                y = np.nanmean(sci_visphi_p2[fitstart:fitstop, bl::6, 2:-2], 2).flatten()
+                yerr = np.mean(sci_visphi_err_p2[fitstart:fitstop, bl::6, 2:-2], 2).flatten()
                 valid = ~(np.isnan(x) | np.isnan(y))
                 popt, pcov = optimize.curve_fit(linreg, x[valid], y[valid],
                                                 sigma=yerr[valid], p0=[0, 0])
                 for wdx in range(len(wave)):
-                    sg_visphi_p2[:, bl::6, wdx] -= linreg(sg_t, *popt)
+                    sci_visphi_p2[:, bl::6, wdx] -= linreg(sci_t, *popt)
 
         ##########################
         # unwrap phases
         ##########################
-        sg_visphi_p1 = ((sg_visphi_p1+180) % 360) - 180
-        sg_visphi_p2 = ((sg_visphi_p2+180) % 360) - 180
+        sci_visphi_p1 = ((sci_visphi_p1+180) % 360) - 180
+        sci_visphi_p2 = ((sci_visphi_p2+180) % 360) - 180
         cal_visphi_p1 = ((cal_visphi_p1+180) % 360) - 180
         cal_visphi_p2 = ((cal_visphi_p2+180) % 360) - 180
 
-        result = [[sg_t, sg_lst, sg_ang, sg_visphi_p1, sg_visphi_err_p1,
-                   sg_visphi_p2, sg_visphi_err_p2],
+        result = [[sci_t, sci_lst, sci_ang, sci_visphi_p1, sci_visphi_err_p1,
+                   sci_visphi_p2, sci_visphi_err_p2],
                   [cal_t, cal_lst, cal_ang, cal_visphi_p1, cal_visphi_err_p1,
                    cal_visphi_p2, cal_visphi_err_p2]]
-        self.sg_visphi_p1 = sg_visphi_p1
-        self.sg_visphi_p2 = sg_visphi_p2
+        self.sci_visphi_p1 = sci_visphi_p1
+        self.sci_visphi_p2 = sci_visphi_p2
 
         if plot and mode is not None:
             fig = plt.figure()
             ax1 = fig.add_subplot(111)
             ax2 = ax1.twiny()
             for idx in range(6):
-                all_t = np.concatenate((sg_lst.flatten(), cal_lst.flatten()))
+                all_t = np.concatenate((sci_lst.flatten(), cal_lst.flatten()))
                 all_t_s = all_t.argsort()
-                all_cor = np.concatenate((np.nanmedian(sg_correction[:,idx::6,2:-2],2).flatten(), np.nanmedian(cal_correction[:,idx::6,2:-2],2).flatten()))
-                all_cor_wo = np.concatenate((np.nanmedian(sg_correction_wo[:,idx::6,2:-2],2).flatten(), 
+                all_cor = np.concatenate((np.nanmedian(sci_correction[:,idx::6,2:-2],2).flatten(), np.nanmedian(cal_correction[:,idx::6,2:-2],2).flatten()))
+                all_cor_wo = np.concatenate((np.nanmedian(sci_correction_wo[:,idx::6,2:-2],2).flatten(), 
                                              np.nanmedian(cal_correction_wo[:,idx::6,2:-2],2).flatten()))
                 all_cor = -all_cor[all_t_s]
                 all_cor_wo = -all_cor_wo[all_t_s]
@@ -1340,8 +1340,8 @@ class GravPhaseNight():
                                               np.nanmedian(cal_visphi_p1[:,idx::6,2:-2],2).flatten())/2+idx*50, 
                              ls='', lw=0.5, marker='D', zorder=10, color=colors_baseline[idx],
                              markersize=2, alpha=0.5, markeredgecolor='k', label='S2 files')
-                    ax1.plot(sg_lst.flatten(), (np.nanmedian(sg_visphi_p1[:,idx::6,2:-2],2).flatten()+
-                                              np.nanmedian(sg_visphi_p2[:,idx::6,2:-2],2).flatten())/2+idx*50, 
+                    ax1.plot(sci_lst.flatten(), (np.nanmedian(sci_visphi_p1[:,idx::6,2:-2],2).flatten()+
+                                              np.nanmedian(sci_visphi_p2[:,idx::6,2:-2],2).flatten())/2+idx*50, 
                              ls='', lw=0.5, marker='o', zorder=10, color=colors_baseline[idx],
                              markersize=2, alpha=0.5, label='Sgr A* files')
                     ax1.plot(all_t, all_cor+idx*50, color='r', zorder=11, alpha=0.8, label='Correction')
@@ -1353,8 +1353,8 @@ class GravPhaseNight():
                                               np.nanmedian(cal_visphi_p1[:,idx::6,2:-2],2).flatten())/2+idx*50, 
                              ls='', lw=0.5, marker='D', zorder=10, color=colors_baseline[idx],
                              markersize=2, alpha=0.5, markeredgecolor='k')
-                    ax1.plot(sg_lst.flatten(), (np.nanmedian(sg_visphi_p1[:,idx::6,2:-2],2).flatten()+
-                                              np.nanmedian(sg_visphi_p2[:,idx::6,2:-2],2).flatten())/2+idx*50, 
+                    ax1.plot(sci_lst.flatten(), (np.nanmedian(sci_visphi_p1[:,idx::6,2:-2],2).flatten()+
+                                              np.nanmedian(sci_visphi_p2[:,idx::6,2:-2],2).flatten())/2+idx*50, 
                              ls='', lw=0.5, marker='o', zorder=10, color=colors_baseline[idx],
                              markersize=2, alpha=0.5)
                     ax1.plot(all_t, all_cor+idx*50, color='r', zorder=11, alpha=0.8)
@@ -1362,13 +1362,13 @@ class GravPhaseNight():
                         ax1.plot(all_t, all_cor_wo+idx*50, color='k', ls='--', zorder=11, alpha=0.8)
                 ax1.axhline(idx*50, lw=0.5, color=colors_baseline[idx])
             if linear_cor:
-                ax1.axvline(np.nanmean(sg_t, 1)[fitstart], ls='--', color='grey', lw=0.5)
-                ax1.axvline(np.nanmean(sg_t, 1)[fitstop-1], ls='--', color='grey', lw=0.5)
+                ax1.axvline(np.nanmean(sci_t, 1)[fitstart], ls='--', color='grey', lw=0.5)
+                ax1.axvline(np.nanmean(sci_t, 1)[fitstop-1], ls='--', color='grey', lw=0.5)
             ax1.set_xlim(15,21)
             locs = ax1.get_xticks()
             labe = ax1.get_xticklabels()
-            all_lst = np.concatenate((sg_lst.flatten(), cal_lst.flatten()))
-            all_ang = np.concatenate((sg_ang.flatten(), cal_ang.flatten()))
+            all_lst = np.concatenate((sci_lst.flatten(), cal_lst.flatten()))
+            all_ang = np.concatenate((sci_ang.flatten(), cal_ang.flatten()))
             ang_loc = []
             for loc in locs:
                 ang_loc.append("%i" % all_ang[find_nearest(loc, all_lst)])
@@ -1410,7 +1410,7 @@ class GravPhaseNight():
                     os.mkdir(folder)
                 if self.verbose:
                     print('Save files in: %s' % folder)
-                for fdx, file in enumerate(sg_files):
+                for fdx, file in enumerate(sci_files):
                     fname = file[file.find('GRAVI'):]
                     visphi_p1 = result[0][3][fdx]
                     visphi_p2 = result[0][5][fdx]
@@ -1455,7 +1455,7 @@ class GravPhaseNight():
                             folder = file[:file.find('GRAVI')] + 'nometcor/'
                 if not os.path.isdir(folder):
                     os.mkdir(folder)
-                for fdx, file in enumerate(sg_files):
+                for fdx, file in enumerate(sci_files):
                     fname = file[file.find('GRAVI'):]
                     visphi_p1 = result[0][3][fdx]
                     visphi_p2 = result[0][5][fdx]
