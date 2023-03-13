@@ -441,7 +441,7 @@ class GravPhaseNight():
     def __init__(self, night=None, verbose=True,
                  reddir=None, datadir='/data/user/forFrank2/',
                  onlysgra=False, calibrator=None,
-                 s2_offx=None, ignore_files=[],
+                 cal_offx=None, ignore_files=[],
                  usepandas=False, pandasfile=None,
                  full_folder=False):
         """
@@ -455,7 +455,7 @@ class GravPhaseNight():
         datadir     : pick directory with data [/data/user/forFrank2/]
         onlysgra    : picks only sgra files for science [False]
         calibrator  : the calibrator to use, if None use defaults [None]
-        s2_offx     : SOBJ.OFFX of S2 files, if None use defaults [None]
+        cal_offx    : SOBJ.OFFX of cal files, if None use defaults [None]
         ignore_files: List of files to be ignored
         usepandas   : if True gets flux values for 2019 data [False]
         pandasfile  : allows to pick different file if not None [None]
@@ -473,7 +473,7 @@ class GravPhaseNight():
         for _n in list_nights:
             nights.append(_n['night'])
             calibrators.append(_n['calibrator'])
-            offsets.append(_n['s2off'])
+            offsets.append(_n['caloff'])
         if night is None:
             print(nights)
             raise ValueError('Night has to be given as argument')
@@ -527,9 +527,9 @@ class GravPhaseNight():
             raise ValueError('No files found, most likely something is wrong'
                              ' with the given reduction folder')
 
-        if s2_offx is None:
-            s2_offx = offsets[nights.index(night)]
-        self.s2_offx = s2_offx
+        if cal_offx is None:
+            cal_offx = offsets[nights.index(night)]
+        self.cal_offx = cal_offx
         s2data = np.load(resource_filename('gravipy', 'Datafiles/s2_orbit.npy'))
         if full_folder:
             sg_files = allfiles
@@ -542,7 +542,7 @@ class GravPhaseNight():
                 if h['ESO FT ROBJ NAME'] != 'IRS16C':
                     continue
                 if h['ESO INS SOBJ NAME'] in ['S2', 'S4']:
-                    if h['ESO INS SOBJ OFFX'] == s2_offx:
+                    if h['ESO INS SOBJ OFFX'] == cal_offx:
                         if file not in ignore_files:
                             cal_files.append(file)
                     else:
@@ -553,7 +553,7 @@ class GravPhaseNight():
                         sobjoffx = h['ESO INS SOBJ OFFX']
                         sobjoffy = h['ESO INS SOBJ OFFY']
                         if onlysgra:
-                            if s2_offx != 0.0:
+                            if cal_offx != 0.0:
                                 if sobjoffx != 0.0 or sobjoffy != 0.0:
                                     if self.verbose:
                                         print('File with separation (%i,%i) not '
@@ -574,7 +574,7 @@ class GravPhaseNight():
                         if file not in ignore_files:
                             sg_files.append(file)
         if self.verbose:
-            print('            %i SGRA files \n            %i S2 files' 
+            print('            %i SCI files \n            %i CAL files' 
                   % (len(sg_files), len(cal_files)))
         self.cal_files = cal_files
         self.sg_files = sg_files
@@ -609,7 +609,6 @@ class GravPhaseNight():
             sg_flux_p1 = []
             sg_flux_p2 = []
             sg_header = []
-            s2_pos = []
             for fdx, file in enumerate(sg_files):
                 d = fits.open(file)
                 h = d[0].header
@@ -730,7 +729,7 @@ class GravPhaseNight():
         """
         ndit = self.ndit
 
-        s2_files = self.s2_files
+        cal_files = self.cal_files
         sg_files = self.sg_files
         if mode is None:
             correction = False
@@ -789,7 +788,7 @@ class GravPhaseNight():
         try:
             d = fits.open(sg_files[0])
         except IndexError:
-            d = fits.open(s2_files[0])
+            d = fits.open(cal_files[0])
         wave = d['OI_WAVELENGTH', 11].data['EFF_WAVE']
         self.wave = wave
         nchannel = len(wave)
@@ -952,35 +951,35 @@ class GravPhaseNight():
             self.wave = wave
             self.dlambda = dlambda
 
-        s2_visphi_p1 = np.zeros((len(s2_files), ndit*6, nchannel))
-        s2_visphi_p2 = np.zeros((len(s2_files), ndit*6, nchannel))
-        s2_visphi_err_p1 = np.zeros((len(s2_files), ndit*6, nchannel))
-        s2_visphi_err_p2 = np.zeros((len(s2_files), ndit*6, nchannel))
-        s2_t = np.zeros((len(s2_files), ndit))
-        s2_lst = np.zeros((len(s2_files), ndit))
-        s2_ang = np.zeros((len(s2_files), ndit))
-        s2_u = np.zeros((len(s2_files), ndit*6, nchannel))
-        s2_v = np.zeros((len(s2_files), ndit*6, nchannel))
-        s2_u_raw = np.zeros((len(s2_files), ndit*6))
-        s2_v_raw = np.zeros((len(s2_files), ndit*6))
-        s2_correction = np.zeros((len(s2_files), ndit*6, nchannel))*np.nan
-        s2_correction_wo = np.zeros((len(s2_files), ndit*6, nchannel))*np.nan
+        cal_visphi_p1 = np.zeros((len(cal_files), ndit*6, nchannel))
+        cal_visphi_p2 = np.zeros((len(cal_files), ndit*6, nchannel))
+        cal_visphi_err_p1 = np.zeros((len(cal_files), ndit*6, nchannel))
+        cal_visphi_err_p2 = np.zeros((len(cal_files), ndit*6, nchannel))
+        cal_t = np.zeros((len(cal_files), ndit))
+        cal_lst = np.zeros((len(cal_files), ndit))
+        cal_ang = np.zeros((len(cal_files), ndit))
+        cal_u = np.zeros((len(cal_files), ndit*6, nchannel))
+        cal_v = np.zeros((len(cal_files), ndit*6, nchannel))
+        cal_u_raw = np.zeros((len(cal_files), ndit*6))
+        cal_v_raw = np.zeros((len(cal_files), ndit*6))
+        cal_correction = np.zeros((len(cal_files), ndit*6, nchannel))*np.nan
+        cal_correction_wo = np.zeros((len(cal_files), ndit*6, nchannel))*np.nan
 
-        for fdx, file in enumerate(s2_files):
+        for fdx, file in enumerate(cal_files):
             d = fits.open(file)
             h = d[0].header
-            s2_t[fdx] = d['OI_VIS', 12].data['MJD'][::6]
+            cal_t[fdx] = d['OI_VIS', 12].data['MJD'][::6]
 
             o_ndit = h['ESO DET2 NDIT']
             lst0 = h['LST']/3600
             time = d['OI_VIS', 11].data['TIME'][::6]/3600
             time -= time[0]
-            s2_lst[fdx] = time + lst0
+            cal_lst[fdx] = time + lst0
 
             U = d['OI_VIS', 11].data['UCOORD']
             V = d['OI_VIS', 11].data['VCOORD']
-            s2_u_raw[fdx] = U
-            s2_v_raw[fdx] = V
+            cal_u_raw[fdx] = U
+            cal_v_raw[fdx] = V
             wave = d['OI_WAVELENGTH', 11].data['EFF_WAVE']
             U_as = np.zeros((ndit*6, nchannel))
             V_as = np.zeros((ndit*6, nchannel))
@@ -988,11 +987,11 @@ class GravPhaseNight():
                 for wdx, wl in enumerate(wave):
                     U_as[bl, wdx] = U[bl]/wl * np.pi / 180. / 3600./1000
                     V_as[bl, wdx] = V[bl]/wl * np.pi / 180. / 3600./1000
-            s2_u[fdx] = U_as
-            s2_v[fdx] = V_as
+            cal_u[fdx] = U_as
+            cal_v[fdx] = V_as
 
             angle = [get_angle_header_all(h, i, o_ndit) for i in range(4)]
-            s2_ang[fdx] = np.mean([get_angle_header_all(h, i, ndit) for i in range(4)], 0)
+            cal_ang[fdx] = np.mean([get_angle_header_all(h, i, ndit) for i in range(4)], 0)
             wave = d['OI_WAVELENGTH', 12].data['EFF_WAVE']*1e6
             fullcor = np.zeros((6*ndit, len(wave)))
 
@@ -1002,11 +1001,11 @@ class GravPhaseNight():
                         if bl_corr:
                             if lst_corr:
                                 if subspacing != 1:
-                                    lstdif = s2_lst[fdx][-1] - s2_lst[fdx][-2]
-                                    lst_s = np.linspace(s2_lst[fdx][0], s2_lst[fdx][-1] + lstdif, len(s2_lst[fdx])*subspacing)
+                                    lstdif = cal_lst[fdx][-1] - cal_lst[fdx][-2]
+                                    lst_s = np.linspace(cal_lst[fdx][0], cal_lst[fdx][-1] + lstdif, len(cal_lst[fdx])*subspacing)
                                     cor = -averaging(interp_list[base](lst_s), subspacing)[:-1]
                                 else:
-                                    cor = -interp_list[base](s2_lst[fdx])
+                                    cor = -interp_list[base](cal_lst[fdx])
                             else:
                                 t1 = self.bl_array[base][0]
                                 t2 = self.bl_array[base][1]
@@ -1025,13 +1024,13 @@ class GravPhaseNight():
                             t2 = self.bl_array[base][1]
                             if lst_corr:
                                 if subspacing != 1:
-                                    lstdif = s2_lst[fdx][-1] - s2_lst[fdx][-2]
-                                    lst_s = np.linspace(s2_lst[fdx][0], s2_lst[fdx][-1] + lstdif, len(s2_lst[fdx])*subspacing)
+                                    lstdif = cal_lst[fdx][-1] - cal_lst[fdx][-2]
+                                    lst_s = np.linspace(cal_lst[fdx][0], cal_lst[fdx][-1] + lstdif, len(cal_lst[fdx])*subspacing)
                                     cor1 = averaging(interp_list[t1](lst_s), subspacing)[:-1]
                                     cor2 = averaging(interp_list[t2](lst_s), subspacing)[:-1]
                                 else:
-                                    cor1 = interp_list[t1](s2_lst[fdx])
-                                    cor2 = interp_list[t2](s2_lst[fdx])  
+                                    cor1 = interp_list[t1](cal_lst[fdx])
+                                    cor2 = interp_list[t2](cal_lst[fdx])  
                             else:
                                 ang1 = angle[t1]
                                 ang2 = angle[t2]
@@ -1057,7 +1056,7 @@ class GravPhaseNight():
                         for w in range(len(wave)):
                             wcor[:, w] = cor/wave[w]*360
                         fullcor[base::6] = wcor
-                    s2_correction_wo[fdx] = fullcor
+                    cal_correction_wo[fdx] = fullcor
 
                     if cor_cor:
                         for base in range(6):
@@ -1082,46 +1081,46 @@ class GravPhaseNight():
                     fullcor[np.isnan(fullcor)] = 0
                 except ValueError:
                     fullcor = 0
-                s2_visphi_p1[fdx] = d['OI_VIS', 11].data['VISPHI'] + fullcor
-                s2_visphi_p2[fdx] = d['OI_VIS', 12].data['VISPHI'] + fullcor
+                cal_visphi_p1[fdx] = d['OI_VIS', 11].data['VISPHI'] + fullcor
+                cal_visphi_p2[fdx] = d['OI_VIS', 12].data['VISPHI'] + fullcor
             else:
-                s2_visphi_p1[fdx] = d['OI_VIS', 11].data['VISPHI']
-                s2_visphi_p2[fdx] = d['OI_VIS', 12].data['VISPHI']
+                cal_visphi_p1[fdx] = d['OI_VIS', 11].data['VISPHI']
+                cal_visphi_p2[fdx] = d['OI_VIS', 12].data['VISPHI']
 
-            s2_correction[fdx] = fullcor
+            cal_correction[fdx] = fullcor
 
             flag1 = d['OI_VIS', 11].data['FLAG']
             flag2 = d['OI_VIS', 12].data['FLAG']
 
-            s2_visphi_err_p1[fdx] = d['OI_VIS', 11].data['VISPHIERR']
-            s2_visphi_err_p2[fdx] = d['OI_VIS', 12].data['VISPHIERR']
+            cal_visphi_err_p1[fdx] = d['OI_VIS', 11].data['VISPHIERR']
+            cal_visphi_err_p2[fdx] = d['OI_VIS', 12].data['VISPHIERR']
 
-            s2_visphi_p1[fdx][np.where(flag1 ==True)] = np.nan
-            s2_visphi_p2[fdx][np.where(flag2 ==True)] = np.nan
-            s2_visphi_err_p1[fdx][np.where(flag1 ==True)] = np.nan
-            s2_visphi_err_p2[fdx][np.where(flag2 ==True)] = np.nan
+            cal_visphi_p1[fdx][np.where(flag1 ==True)] = np.nan
+            cal_visphi_p2[fdx][np.where(flag2 ==True)] = np.nan
+            cal_visphi_err_p1[fdx][np.where(flag1 ==True)] = np.nan
+            cal_visphi_err_p2[fdx][np.where(flag2 ==True)] = np.nan
 
-        self.s2_u_raw = s2_u_raw
-        self.s2_v_raw = s2_u_raw
+        self.cal_u_raw = cal_u_raw
+        self.cal_v_raw = cal_u_raw
 
         try:
-            tstart = np.nanmin((np.nanmin(s2_t), np.nanmin(sg_t)))
+            tstart = np.nanmin((np.nanmin(cal_t), np.nanmin(sg_t)))
         except ValueError:
-            tstart = np.nanmin(s2_t)
-        s2_t = (s2_t-tstart)*24*60
+            tstart = np.nanmin(cal_t)
+        cal_t = (cal_t-tstart)*24*60
         sg_t = (sg_t-tstart)*24*60
 
         ##########################
         # Calibrate
         ##########################
 
-        calib_file = [i for i, s in enumerate(s2_files) if self.calibrator in s]
+        calib_file = [i for i, s in enumerate(cal_files) if self.calibrator in s]
         if len(calib_file) != 1:
             print(calib_file)
             raise ValueError('Something wrong with calib file')
         calib_file = calib_file[0]
-        c_p1 = s2_visphi_p1[calib_file]
-        c_p2 = s2_visphi_p2[calib_file]
+        c_p1 = cal_visphi_p1[calib_file]
+        c_p2 = cal_visphi_p2[calib_file]
 
         mc_p1 = np.zeros((ndit, 6, nchannel))
         mc_p2 = np.zeros((ndit, 6, nchannel))
@@ -1147,62 +1146,62 @@ class GravPhaseNight():
             sg_visphi_p2[fdx] = np.angle((np.exp(1j*sg_visphi_p2[fdx]/180*np.pi)
                                           / cal_p2), deg=True)
 
-        for fdx, file in enumerate(s2_files):
-            s2_visphi_p1[fdx] = np.angle((np.exp(1j*s2_visphi_p1[fdx]/180*np.pi)
+        for fdx, file in enumerate(cal_files):
+            cal_visphi_p1[fdx] = np.angle((np.exp(1j*cal_visphi_p1[fdx]/180*np.pi)
                                           / cal_p1), deg=True)
-            s2_visphi_p2[fdx] = np.angle((np.exp(1j*s2_visphi_p2[fdx]/180*np.pi)
+            cal_visphi_p2[fdx] = np.angle((np.exp(1j*cal_visphi_p2[fdx]/180*np.pi)
                                           / cal_p2), deg=True)
 
         ##########################
         # Poscor
         ##########################
         if poscor:
-            s2_B = np.zeros((s2_u.shape[0], 6, nchannel, 2))
-            SpFreq = np.zeros((s2_u.shape[0], 6, nchannel))
+            cal_B = np.zeros((cal_u.shape[0], 6, nchannel, 2))
+            SpFreq = np.zeros((cal_u.shape[0], 6, nchannel))
             for bl in range(6):
                 if ndit == 1:
-                    s2_B[:, bl, :, 0] = s2_u[:, bl, :]
-                    s2_B[:, bl, :, 1] = s2_v[:, bl, :]
-                    SpFreq[:, bl, :] = np.sqrt(s2_u[:, bl, :]**2
-                                               + s2_v[:, bl, :]**2)
+                    cal_B[:, bl, :, 0] = cal_u[:, bl, :]
+                    cal_B[:, bl, :, 1] = cal_v[:, bl, :]
+                    SpFreq[:, bl, :] = np.sqrt(cal_u[:, bl, :]**2
+                                               + cal_v[:, bl, :]**2)
                 else:
-                    s2_u[s2_u == 0] = np.nan
-                    s2_v[s2_v == 0] = np.nan
-                    s2_B[:, bl, :, 0] = np.nanmean(s2_u[:, bl::6, :], 1)
-                    s2_B[:, bl, :, 1] = np.nanmean(s2_v[:, bl::6, :], 1)
-                    SpFreq[:, bl, :] = np.sqrt(np.nanmean(s2_u[:, bl::6, :], 1)**2
-                                               + np.nanmean(s2_v[:, bl::6, :], 1)**2)
+                    cal_u[cal_u == 0] = np.nan
+                    cal_v[cal_v == 0] = np.nan
+                    cal_B[:, bl, :, 0] = np.nanmean(cal_u[:, bl::6, :], 1)
+                    cal_B[:, bl, :, 1] = np.nanmean(cal_v[:, bl::6, :], 1)
+                    SpFreq[:, bl, :] = np.sqrt(np.nanmean(cal_u[:, bl::6, :], 1)**2
+                                               + np.nanmean(cal_v[:, bl::6, :], 1)**2)
 
-            s2_dB = np.copy(s2_B)
-            s2_dB = s2_dB - s2_B[calib_file]
+            cal_dB = np.copy(cal_B)
+            cal_dB = cal_dB - cal_B[calib_file]
 
-            dB1 = np.transpose([s2_dB[:, :, :, 0].flatten(),
-                                s2_dB[:, :, :, 1].flatten()])
+            dB1 = np.transpose([cal_dB[:, :, :, 0].flatten(),
+                                cal_dB[:, :, :, 1].flatten()])
 
-            nfiles = len(s2_visphi_p1)
-            s2_visphi_fit = np.zeros((nfiles, 6, nchannel))
-            s2_visphi_err_fit = np.zeros((nfiles, 6, nchannel))
+            nfiles = len(cal_visphi_p1)
+            cal_visphi_fit = np.zeros((nfiles, 6, nchannel))
+            cal_visphi_err_fit = np.zeros((nfiles, 6, nchannel))
             if ndit == 1:
                 for bl in range(6):
-                    s2_visphi_fit[:, bl, :] = s2_visphi_p1[:, bl, :]
-                    s2_visphi_fit[:, bl, :] += s2_visphi_p2[:, bl, :]
-                    s2_visphi_err_fit[:, bl, :] = (np.sqrt(s2_visphi_err_p1[:, bl, :]**2
-                                                           + s2_visphi_err_p2[:, bl, :]**2)
+                    cal_visphi_fit[:, bl, :] = cal_visphi_p1[:, bl, :]
+                    cal_visphi_fit[:, bl, :] += cal_visphi_p2[:, bl, :]
+                    cal_visphi_err_fit[:, bl, :] = (np.sqrt(cal_visphi_err_p1[:, bl, :]**2
+                                                           + cal_visphi_err_p2[:, bl, :]**2)
                                                    / np.sqrt(2))
             else:
                 for bl in range(6):
-                    s2_visphi_fit[:, bl, :] = np.nanmean(s2_visphi_p1[:, bl::6, :],1)
-                    s2_visphi_fit[:, bl, :] += np.nanmean(s2_visphi_p2[:, bl::6, :],1)
-                    s2_visphi_err_fit[:, bl, :] = (np.sqrt(np.nanmean(s2_visphi_err_p1[:, bl::6, :], 1)**2
-                                                           + np.nanmean(s2_visphi_err_p2[:, bl::6, :], 1)**2)
+                    cal_visphi_fit[:, bl, :] = np.nanmean(cal_visphi_p1[:, bl::6, :],1)
+                    cal_visphi_fit[:, bl, :] += np.nanmean(cal_visphi_p2[:, bl::6, :],1)
+                    cal_visphi_err_fit[:, bl, :] = (np.sqrt(np.nanmean(cal_visphi_err_p1[:, bl::6, :], 1)**2
+                                                           + np.nanmean(cal_visphi_err_p2[:, bl::6, :], 1)**2)
                                                    / np.sqrt(2))
 
-            s2_visphi_fit /= 2
-            s2_visphi_fit[:, :, :2] = np.nan
-            s2_visphi_fit[:, :, -2:] = np.nan
+            cal_visphi_fit /= 2
+            cal_visphi_fit[:, :, :2] = np.nan
+            cal_visphi_fit[:, :, -2:] = np.nan
 
-            Vphi_err = s2_visphi_err_fit.flatten()
-            Vphi = s2_visphi_fit.flatten()
+            Vphi_err = cal_visphi_err_fit.flatten()
+            Vphi = cal_visphi_fit.flatten()
 
             Vphi2 = Vphi[~np.isnan(Vphi)]/360
             Vphi_err2 = Vphi_err[~np.isnan(Vphi)]/360
@@ -1227,7 +1226,7 @@ class GravPhaseNight():
 
             if plot:
                 n = nfiles
-                par = np.linspace(0, np.max(s2_t)+10, 100)
+                par = np.linspace(0, np.max(cal_t)+10, 100)
                 norm = matplotlib.colors.Normalize(vmin=np.min(par),
                                                    vmax=np.max(par))
                 c_m = plt.cm.inferno
@@ -1239,12 +1238,12 @@ class GravPhaseNight():
                 for idx in range(n):
                     for bl in range(6):
                         if ndit == 1:
-                            _plott = s2_t[idx]
+                            _plott = cal_t[idx]
                         else:
-                            _plott = np.mean(s2_t[idx])
+                            _plott = np.mean(cal_t[idx])
                         plt.errorbar(SpFreq[idx, bl, 2:-2] * 1000,
-                                     s2_visphi_fit[idx, bl, 2:-2],
-                                     s2_visphi_err_fit[idx, bl, 2:-2],
+                                     cal_visphi_fit[idx, bl, 2:-2],
+                                     cal_visphi_err_fit[idx, bl, 2:-2],
                                      ls='', marker='o',
                                      color=s_m.to_rgba(_plott), alpha=0.5)
                         plt.plot(SpFreq[idx, bl]*1000, fitres_r[idx, bl],
@@ -1256,15 +1255,15 @@ class GravPhaseNight():
                 plt.title('Poscor:  (%.3f,%.3f) mas ' % (dS[0], dS[1]))
                 plt.show()
 
-            s2_B = np.zeros((s2_u.shape[0], ndit*6, nchannel, 2))
-            s2_B[:, :, :, 0] = s2_u
-            s2_B[:, :, :, 1] = s2_v
-            s2_dB = np.copy(s2_B)
+            cal_B = np.zeros((cal_u.shape[0], ndit*6, nchannel, 2))
+            cal_B[:, :, :, 0] = cal_u
+            cal_B[:, :, :, 1] = cal_v
+            cal_dB = np.copy(cal_B)
 
             B_calib = np.zeros((6, nchannel, 2))
             for bl in range(6):
-                B_calib[bl] = np.nanmean(s2_B[calib_file][bl::6], 0)
-                s2_dB[:, bl::6, :, :] = s2_dB[:, bl::6, :, :] - B_calib[bl]
+                B_calib[bl] = np.nanmean(cal_B[calib_file][bl::6], 0)
+                cal_dB[:, bl::6, :, :] = cal_dB[:, bl::6, :, :] - B_calib[bl]
 
             sg_B = np.zeros((sg_u.shape[0], ndit*6, nchannel, 2))
             sg_B[:, :, :, 0] = sg_u
@@ -1273,14 +1272,14 @@ class GravPhaseNight():
 
             B_calib = np.zeros((6, nchannel, 2))
             for bl in range(6):
-                B_calib[bl] = np.nanmean(s2_B[calib_file][bl::6], 0)
+                B_calib[bl] = np.nanmean(cal_B[calib_file][bl::6], 0)
                 sg_dB[:, bl::6, :, :] = sg_dB[:, bl::6, :, :] - B_calib[bl]
 
             sg_visphi_p1 -= np.dot(sg_dB, dS)*360
             sg_visphi_p2 -= np.dot(sg_dB, dS)*360
 
-            s2_visphi_p1 -= np.dot(s2_dB, dS)*360
-            s2_visphi_p2 -= np.dot(s2_dB, dS)*360
+            cal_visphi_p1 -= np.dot(cal_dB, dS)*360
+            cal_visphi_p2 -= np.dot(cal_dB, dS)*360
 
         ##########################
         # linear bl fit
@@ -1312,13 +1311,13 @@ class GravPhaseNight():
         ##########################
         sg_visphi_p1 = ((sg_visphi_p1+180) % 360) - 180
         sg_visphi_p2 = ((sg_visphi_p2+180) % 360) - 180
-        s2_visphi_p1 = ((s2_visphi_p1+180) % 360) - 180
-        s2_visphi_p2 = ((s2_visphi_p2+180) % 360) - 180
+        cal_visphi_p1 = ((cal_visphi_p1+180) % 360) - 180
+        cal_visphi_p2 = ((cal_visphi_p2+180) % 360) - 180
 
         result = [[sg_t, sg_lst, sg_ang, sg_visphi_p1, sg_visphi_err_p1,
                    sg_visphi_p2, sg_visphi_err_p2],
-                  [s2_t, s2_lst, s2_ang, s2_visphi_p1, s2_visphi_err_p1,
-                   s2_visphi_p2, s2_visphi_err_p2]]
+                  [cal_t, cal_lst, cal_ang, cal_visphi_p1, cal_visphi_err_p1,
+                   cal_visphi_p2, cal_visphi_err_p2]]
         self.sg_visphi_p1 = sg_visphi_p1
         self.sg_visphi_p2 = sg_visphi_p2
 
@@ -1327,18 +1326,18 @@ class GravPhaseNight():
             ax1 = fig.add_subplot(111)
             ax2 = ax1.twiny()
             for idx in range(6):
-                all_t = np.concatenate((sg_lst.flatten(), s2_lst.flatten()))
+                all_t = np.concatenate((sg_lst.flatten(), cal_lst.flatten()))
                 all_t_s = all_t.argsort()
-                all_cor = np.concatenate((np.nanmedian(sg_correction[:,idx::6,2:-2],2).flatten(), np.nanmedian(s2_correction[:,idx::6,2:-2],2).flatten()))
+                all_cor = np.concatenate((np.nanmedian(sg_correction[:,idx::6,2:-2],2).flatten(), np.nanmedian(cal_correction[:,idx::6,2:-2],2).flatten()))
                 all_cor_wo = np.concatenate((np.nanmedian(sg_correction_wo[:,idx::6,2:-2],2).flatten(), 
-                                             np.nanmedian(s2_correction_wo[:,idx::6,2:-2],2).flatten()))
+                                             np.nanmedian(cal_correction_wo[:,idx::6,2:-2],2).flatten()))
                 all_cor = -all_cor[all_t_s]
                 all_cor_wo = -all_cor_wo[all_t_s]
                 all_t = all_t[all_t_s]
 
                 if idx == 3:
-                    ax1.plot(s2_lst.flatten(), (np.nanmedian(s2_visphi_p1[:,idx::6,2:-2],2).flatten()+
-                                              np.nanmedian(s2_visphi_p1[:,idx::6,2:-2],2).flatten())/2+idx*50, 
+                    ax1.plot(cal_lst.flatten(), (np.nanmedian(cal_visphi_p1[:,idx::6,2:-2],2).flatten()+
+                                              np.nanmedian(cal_visphi_p1[:,idx::6,2:-2],2).flatten())/2+idx*50, 
                              ls='', lw=0.5, marker='D', zorder=10, color=colors_baseline[idx],
                              markersize=2, alpha=0.5, markeredgecolor='k', label='S2 files')
                     ax1.plot(sg_lst.flatten(), (np.nanmedian(sg_visphi_p1[:,idx::6,2:-2],2).flatten()+
@@ -1350,8 +1349,8 @@ class GravPhaseNight():
                         ax1.plot(all_t, all_cor_wo+idx*50, color='k', ls='--', zorder=11, alpha=0.8, 
                                 label='Correction w/o phasecor')
                 else:
-                    ax1.plot(s2_lst.flatten(), (np.nanmedian(s2_visphi_p1[:,idx::6,2:-2],2).flatten()+
-                                              np.nanmedian(s2_visphi_p1[:,idx::6,2:-2],2).flatten())/2+idx*50, 
+                    ax1.plot(cal_lst.flatten(), (np.nanmedian(cal_visphi_p1[:,idx::6,2:-2],2).flatten()+
+                                              np.nanmedian(cal_visphi_p1[:,idx::6,2:-2],2).flatten())/2+idx*50, 
                              ls='', lw=0.5, marker='D', zorder=10, color=colors_baseline[idx],
                              markersize=2, alpha=0.5, markeredgecolor='k')
                     ax1.plot(sg_lst.flatten(), (np.nanmedian(sg_visphi_p1[:,idx::6,2:-2],2).flatten()+
@@ -1368,8 +1367,8 @@ class GravPhaseNight():
             ax1.set_xlim(15,21)
             locs = ax1.get_xticks()
             labe = ax1.get_xticklabels()
-            all_lst = np.concatenate((sg_lst.flatten(), s2_lst.flatten()))
-            all_ang = np.concatenate((sg_ang.flatten(), s2_ang.flatten()))
+            all_lst = np.concatenate((sg_lst.flatten(), cal_lst.flatten()))
+            all_ang = np.concatenate((sg_ang.flatten(), cal_ang.flatten()))
             ang_loc = []
             for loc in locs:
                 ang_loc.append("%i" % all_ang[find_nearest(loc, all_lst)])
@@ -1424,7 +1423,7 @@ class GravPhaseNight():
                         d['OI_VIS', 12].data['VISPHI'] = visphi_p2
                         d.writeto(folder+fname, overwrite=True)
 
-                for fdx, file in enumerate(s2_files):
+                for fdx, file in enumerate(cal_files):
                     fname = file[file.find('GRAVI'):]
                     visphi_p1 = result[1][3][fdx]
                     visphi_p2 = result[1][5][fdx]
@@ -1469,7 +1468,7 @@ class GravPhaseNight():
                         d['OI_VIS', 12].data['VISPHI'] = visphi_p2
                         d.writeto(folder+fname, overwrite=True)
 
-                for fdx, file in enumerate(s2_files):
+                for fdx, file in enumerate(cal_files):
                     fname = file[file.find('GRAVI'):]
                     visphi_p1 = result[1][3][fdx]
                     visphi_p2 = result[1][5][fdx]
