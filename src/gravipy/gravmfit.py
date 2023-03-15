@@ -1327,7 +1327,7 @@ class GravMFit(GravData, GravPhaseMaps):
         theta_names.append('fr BH')
 
         theta[th_rest+5:] = coh_loss_in
-        upper[th_rest+5:] = 1.1
+        upper[th_rest+5:] = 1.5
         lower[th_rest+5:] = 0.1
 
         theta_names.append('CL1')
@@ -1355,7 +1355,8 @@ class GravMFit(GravData, GravPhaseMaps):
             if len(coh_loss) != 6:
                 raise ValueError('If coherence loss is a list needs to have '
                                  '6 boolean values')
-            todel.extend(np.arange(th_rest+5, th_rest+5+6)[~coh_loss])
+            no_coh_loss = [not e for e in coh_loss]
+            todel.extend(np.arange(th_rest+5, th_rest+5+6)[no_coh_loss])
         elif not fixedBG:
             todel.append(th_rest+1)
 
