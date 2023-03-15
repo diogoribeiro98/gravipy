@@ -1100,9 +1100,8 @@ class GravMFit(GravData, GravPhaseMaps):
         redchi2:        Gives redchi2 instead of chi2 [True]
         flagtill:       Flag blue channels, default 3 for LOW, 30 for MED
         flagfrom:       Flag red channels, default 13 for LOW, 200 for MED
-        coh_loss:       If not None, fit for a coherence loss per Basline
-                        Value is initial guess (0-1) [None]
-        no_fit  :       Only gives fitting results for parameters from 
+        coh_loss:       If True, fit for a coherence loss per Basline [False]
+        no_fit  :       Only gives fitting results for parameters from
                         initial guess [False]
         onlypol:        Only fits one polarization for split mode, 
                         either 0 or 1 [None]
@@ -1343,7 +1342,7 @@ class GravMFit(GravData, GravPhaseMaps):
         ndim = len(theta)
         if fixedBHalpha:
             todel.append(th_rest)
-        if fixedBG or coh_loss:
+        if fixedBG:
             todel.append(th_rest+1)
         if fit_for[3] == 0:
             todel.append(th_rest+2)
@@ -1352,6 +1351,14 @@ class GravMFit(GravData, GravPhaseMaps):
             todel.append(th_rest+4)
         if not coh_loss:
             todel.extend(np.arange(th_rest+5, th_rest+5+6))
+        elif type(coh_loss) == list:
+            if len(coh_loss) != 6:
+                raise ValueError('If coherence loss is a list needs to have '
+                                 '6 boolean values')
+            todel.extend(np.arange(th_rest+5, th_rest+5+6)[coh_loss])
+        elif not fixedBG:
+            todel.append(th_rest+1)
+
         ndof = ndim - len(todel)
         self.theta_in = np.copy(theta)
         self.theta_allnames = np.copy(theta_names)
