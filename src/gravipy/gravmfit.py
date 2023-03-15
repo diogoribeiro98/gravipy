@@ -1495,9 +1495,10 @@ class GravMFit(GravData, GravPhaseMaps):
                 closamp_error = closamp_error_P[idx][t3ditstart:t3ditstop]
                 closamp_flag = closamp_flag_P[idx][t3ditstart:t3ditstop]
 
-                if vis_flag:
-                    with np.errstate(invalid='ignore'):
-                        visamp_flag1 = (visamp > 1) | (visamp < 1.e-5)
+                with np.errstate(invalid='ignore'):
+                    visamp_flag1 = (visamp > 1) | (visamp < 1.e-5)
+                if not vis_flag:
+                    visamp_flag1 = np.full_like(visamp_flag1, False)
                 visamp_flag2 = np.isnan(visamp)
                 visamp_flag_final = ((visamp_flag) | (visamp_flag1) | (visamp_flag2))
                 visamp_flag = visamp_flag_final
@@ -1506,9 +1507,10 @@ class GravMFit(GravData, GravPhaseMaps):
                 closamp = np.nan_to_num(closamp)
                 closamp_error[closamp_flag] = 1.
 
-                if vis_flag:
-                    with np.errstate(invalid='ignore'):
-                        vis2_flag1 = (vis2 > 1) | (vis2 < 1.e-5)
+                with np.errstate(invalid='ignore'):
+                    vis2_flag1 = (vis2 > 1) | (vis2 < 1.e-5)
+                if not vis_flag:
+                    vis2_flag1 = np.full_like(vis2_flag1, False)
                 vis2_flag2 = np.isnan(vis2)
                 vis2_flag_final = ((vis2_flag) | (vis2_flag1) | (vis2_flag2))
                 vis2_flag = vis2_flag_final
