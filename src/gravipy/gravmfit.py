@@ -1114,6 +1114,7 @@ class GravMFit(GravData, GravPhaseMaps):
         interppm:       Interpolate Phasemaps [True]
         pmdatayear:     Phasemaps year, 2019 or 2020 [2019]
         smoothkernel:   Size of smoothing kernel in mas [15]
+        vis_flag:       Does flag vis > 1 if True [False]
         '''
         fit_mode = kwargs.get('fit_mode', 'numeric')
         bequiet = kwargs.get('bequiet', False)
@@ -1126,6 +1127,7 @@ class GravMFit(GravData, GravPhaseMaps):
         onlypol = kwargs.get('onlypol', None)
         plotCorner = kwargs.get('plotCorner', None)
         iopandas = kwargs.get('iopandas', None)
+        vis_flag = kwargs.get('vis_flag', False)
 
         fit_phasemaps = kwargs.get('fit_phasemaps', False)
         interppm = kwargs.get('interppm', True)
@@ -1309,7 +1311,7 @@ class GravMFit(GravData, GravPhaseMaps):
 
         pc_size = 5
         lower[th_rest] = -10
-        lower[th_rest+1] = 0.1
+        lower[th_rest+1] = -2
         lower[th_rest+2] = pc_RA_in - pc_size
         lower[th_rest+3] = pc_DEC_in - pc_size
         lower[th_rest+4] = np.log10(0.001)
@@ -1493,9 +1495,9 @@ class GravMFit(GravData, GravPhaseMaps):
                 closamp_error = closamp_error_P[idx][t3ditstart:t3ditstop]
                 closamp_flag = closamp_flag_P[idx][t3ditstart:t3ditstop]
 
-                # further flag if visamp/vis2 if >1 or NaN, and replace NaN with 0
-                with np.errstate(invalid='ignore'):
-                    visamp_flag1 = (visamp > 1) | (visamp < 1.e-5)
+                if vis_flag:
+                    with np.errstate(invalid='ignore'):
+                        visamp_flag1 = (visamp > 1) | (visamp < 1.e-5)
                 visamp_flag2 = np.isnan(visamp)
                 visamp_flag_final = ((visamp_flag) | (visamp_flag1) | (visamp_flag2))
                 visamp_flag = visamp_flag_final
@@ -1504,8 +1506,9 @@ class GravMFit(GravData, GravPhaseMaps):
                 closamp = np.nan_to_num(closamp)
                 closamp_error[closamp_flag] = 1.
 
-                with np.errstate(invalid='ignore'):
-                    vis2_flag1 = (vis2 > 1) | (vis2 < 1.e-5)
+                if vis_flag:
+                    with np.errstate(invalid='ignore'):
+                        vis2_flag1 = (vis2 > 1) | (vis2 < 1.e-5)
                 vis2_flag2 = np.isnan(vis2)
                 vis2_flag_final = ((vis2_flag) | (vis2_flag1) | (vis2_flag2))
                 vis2_flag = vis2_flag_final
