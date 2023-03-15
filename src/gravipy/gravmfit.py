@@ -1114,7 +1114,7 @@ class GravMFit(GravData, GravPhaseMaps):
         interppm:       Interpolate Phasemaps [True]
         pmdatayear:     Phasemaps year, 2019 or 2020 [2019]
         smoothkernel:   Size of smoothing kernel in mas [15]
-        vis_flag:       Does flag vis > 1 if True [False]
+        vis_flag:       Does flag vis > 1 if True [True]
         '''
         fit_mode = kwargs.get('fit_mode', 'numeric')
         bequiet = kwargs.get('bequiet', False)
@@ -1127,7 +1127,7 @@ class GravMFit(GravData, GravPhaseMaps):
         onlypol = kwargs.get('onlypol', None)
         plotCorner = kwargs.get('plotCorner', None)
         iopandas = kwargs.get('iopandas', None)
-        vis_flag = kwargs.get('vis_flag', False)
+        vis_flag = kwargs.get('vis_flag', True)
 
         fit_phasemaps = kwargs.get('fit_phasemaps', False)
         interppm = kwargs.get('interppm', True)
