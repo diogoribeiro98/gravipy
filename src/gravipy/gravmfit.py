@@ -1025,8 +1025,8 @@ def _calc_vis_mstars(theta_in, fitarg, fithelp):
                         + visphi[bispec_ind[idx,1]]
                         - visphi[bispec_ind[idx,2]])
 
-    visphi = visphi + 360.*(visphi < -180.) - 360.*(visphi>180.)
-    closure = closure + 360.*(closure < -180.) - 360.*(closure>180.)
+    visphi = visphi + 360.*(visphi < -180.) - 360.*(visphi > 180.)
+    closure = closure + 360.*(closure < -180.) - 360.*(closure > 180.)
     for i in range(6):
         visamp[i, :] *= theta[th_rest+5+i]
     return visamp, visphi, closure
@@ -1327,7 +1327,7 @@ class GravMFit(GravData, GravPhaseMaps):
         theta_names.append('fr BH')
 
         theta[th_rest+5:] = coh_loss_in
-        upper[th_rest+5:] = 1
+        upper[th_rest+5:] = 1.1
         lower[th_rest+5:] = 0.1
 
         theta_names.append('CL1')
@@ -1355,7 +1355,7 @@ class GravMFit(GravData, GravPhaseMaps):
             if len(coh_loss) != 6:
                 raise ValueError('If coherence loss is a list needs to have '
                                  '6 boolean values')
-            todel.extend(np.arange(th_rest+5, th_rest+5+6)[coh_loss])
+            todel.extend(np.arange(th_rest+5, th_rest+5+6)[~coh_loss])
         elif not fixedBG:
             todel.append(th_rest+1)
 
