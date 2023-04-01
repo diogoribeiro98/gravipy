@@ -101,6 +101,15 @@ def complex_quadrature_num(func, a, b, theta, nsteps=int(1e2)):
     return real_integral + 1j*imag_integral
 
 
+def print_status(number, total):
+    number = number+1
+    if number == total:
+        print("\rComplete: 100%")
+    else:
+        percentage = int((number/total)*100)
+        print("\rComplete: ", percentage, "%", end="")
+
+
 def procrustes(a, target, padval=0):
     try:
         if len(target) != a.ndim:
