@@ -5,7 +5,7 @@ import numpy as np
 from scipy import interpolate
 from pkg_resources import resource_filename
 from astropy.time import Time
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import os
 
@@ -1553,3 +1553,188 @@ class GravNight():
             except ValueError:
                 self.ofv = np.concatenate((np.array([0]), ofv))
                 self.onv = np.concatenate((onv, np.array([ofv[-1] + ofv[0]])))
+
+    def plot_sep_tracking(self, plot=True):
+        def get_data(l, string, mjd0=None):
+            dat = [t for t in l if string in t]
+            pos = np.array([np.fromstring(s[s.find('[mas]')+7:], sep=' ', dtype=float) for s in dat])
+            mjd = [gp.convert_date(s[s.find(nnight[:-2]):s.find(nnight[:-2])+19]
+                                   + '.' + s[s.find(nnight[:-2])+20:s.find(nnight[:-2])+23], mjd=True)
+                           for s in dat]
+            if mjd0 is not None:
+                mjd = [(d - mjd0)*24*60 for d in mjd]
+            return mjd, pos
+
+        def get_rms(l, mjd0=None):
+            pos = []
+            mjd = []
+            for tel in range(4):
+                string = f'Telescope {tel} rms diodes'
+                dat = [t for t in l if string in t]
+
+                pos.append(np.array([np.fromstring(s[s.find('rms diodes')+12:-4], sep=', ', dtype=float) for s in dat]))
+                _mjd = [gp.convert_date(s[s.find(nnight[:-2]):s.find(nnight[:-2])+19]
+                                        + '.' + s[s.find(nnight[:-2])+20:s.find(nnight[:-2])+23], mjd=True)
+                               for s in dat]
+                if mjd0 is not None:
+                    _mjd = [(d - mjd0)*24*60 for d in _mjd]
+                mjd.append(_mjd)
+            return mjd, pos
+
+        d = convert_date(fits.open(self.files[0])[0].header['DATE-OBS'])[1]
+        lognight = str(d + timedelta(hours=12) - timedelta(days=1))[:10]
+        night = str(d + timedelta(hours=12))[:10]
+        start = str(d - timedelta(minutes=5))[11:-3]
+
+        d = convert_date(fits.open(self.files[-1])[0].header['DATE-OBS'])[1]
+        str(d + timedelta(minutes=10))[11:-3]
+
+        log = f'/tera/3/wgvLogFiles/wgv.{lognight}.log'
+        with open(log, 'rb') as f:
+            output = f.readlines()
+        toutput = [str(o)[2:-3] for o in output]
+        toutput = [t for t in toutput if 'gvkalmPyProcessing' in t]
+
+        _sta = [tdx for tdx, t in enumerate(toutput)
+                if f'{night} {start}' in t][0]
+        _sto = [tdx for tdx, t in enumerate(toutput)
+                if f'{night} {stop}' in t][0]
+
+        toutput = toutput[_sta:_sto]
+
+        mjd, _ = get_data(toutput, 'KAL separation X v2')
+
+        mjd0 = mjd[0]
+
+        t_kalX, kalX = get_data(toutput, 'KAL separation X v2', mjd0=mjd0)
+        t_kalY, kalY = get_data(toutput, 'KAL separation Y v2', mjd0=mjd0)
+        t_kalX2, kalX2 = get_data(toutput, 'KAL separation X v3', mjd0=mjd0)
+        t_kalY2, kalY2 = get_data(toutput, 'KAL separation Y v3', mjd0=mjd0)
+
+        t_ctuX, ctuX = get_data(toutput, 'CTU separation X', mjd0=mjd0)
+        t_ctuY, ctuY = get_data(toutput, 'CTU separation Y', mjd0=mjd0)
+
+        t_appX, appX = get_data(toutput, 'Applied Xoffset', mjd0=mjd0)
+        t_appY, appY = get_data(toutput, 'Applied Yoffset', mjd0=mjd0)
+
+        t_meaX, meaX = get_data(toutput, 'Measured Xoffset', mjd0=mjd0)
+        t_meaY, meaY = get_data(toutput, 'Measured Yoffset', mjd0=mjd0)
+
+        t_sep, sep = get_data(toutput, 'Header separation', mjd0=mjd0)
+
+        t_rms, rms = get_rms(toutput,  mjd0=mjd0)
+
+        colors = ['C0', 'C3', 'C2', 'darkblue']
+        plt.figure(figsize=(10,6))
+        gs = gridspec.GridSpec(4,2, hspace=0.05, wspace=0.3)
+        for tel in range(4):
+            ax = plt.subplot(gs[tel,0])
+            plt.plot(t_kalX, kalX[:,tel], color=colors[tel], label=f'Beam {tel+1}')
+            plt.plot(t_kalX2, kalX2[:,tel], color=colors[tel], ls='--', label=f'Beam {tel+1}, w/o astigm')
+            plt.plot(t_ctuX, ctuX[:,tel], color='k', label='CTU')
+            plt.plot(t_sep, sep[:,0]*1e3, color='grey', label='Header val')
+            
+            plt.legend(fontsize=7, frameon=True, loc=4)
+            if tel == 3:
+                plt.xlabel(f'Time since {start} in min')
+            else:
+                ax.set_xticklabels([])
+
+            plt.ylabel('X separation')
+
+            ax = plt.subplot(gs[tel,1])
+            plt.plot(t_kalY, kalY[:,tel], color=colors[tel])
+            plt.plot(t_kalY2, kalY2[:,tel], color=colors[tel])
+            plt.plot(t_ctuY, ctuY[:,tel], color='k')
+            plt.ylabel('Y separation')
+            plt.plot(t_sep, sep[:,1]*1e3, color='grey')
+            if tel == 3:
+                plt.xlabel(f'Time since {start} in min')
+            else:
+                ax.set_xticklabels([])
+        plt.show()
+
+        colors = ['C0', 'C3', 'C2', 'darkblue']
+        plt.figure(figsize=(10,6))
+        gs = gridspec.GridSpec(4,2, hspace=0.05, wspace=0.3)
+        for tel in range(4):
+            ax = plt.subplot(gs[tel,0])
+            plt.plot(t_kalX, kalX[:,tel]-interpolate.interp1d(t_sep, sep[:,0]*1e3, fill_value='extrapolate')(t_kalX),
+                     color=colors[tel], label=f'Beam {tel+1}')
+            plt.plot(t_kalX2, kalX2[:,tel]-interpolate.interp1d(t_sep, sep[:,0]*1e3, fill_value='extrapolate')(t_kalX2),
+                     color=colors[tel], ls='--', label=f'Beam {tel+1}, w/o astigm')
+            plt.plot(t_ctuX, ctuX[:,tel]-interpolate.interp1d(t_sep, sep[:,0]*1e3, fill_value='extrapolate')(t_ctuX),
+                     color='k', label='CTU')
+            plt.legend(fontsize=7, frameon=True, loc=4)
+            if tel == 3:
+                plt.xlabel(f'Time since {start} in min')
+            else:
+                ax.set_xticklabels([])
+            ax.set_ylim(-110,110)
+            plt.ylabel('X separation\nrel. to header')
+
+            ax = plt.subplot(gs[tel,1])
+            plt.plot(t_kalY, kalY[:,tel]-interpolate.interp1d(t_sep, sep[:,1]*1e3, fill_value='extrapolate')(t_kalY),
+                     color=colors[tel], label=f'Beam {tel+1}')
+            plt.plot(t_kalY2, kalY2[:,tel]-interpolate.interp1d(t_sep, sep[:,1]*1e3, fill_value='extrapolate')(t_kalY2),
+                     color=colors[tel], ls='--', label=f'Beam {tel+1}, w/o astigm')
+            plt.plot(t_ctuY, ctuY[:,tel]-interpolate.interp1d(t_sep, sep[:,1]*1e3, fill_value='extrapolate')(t_ctuY),
+                     color='k', label='CTU')
+            plt.ylabel('Y separation\nrel. to header')
+            if tel == 3:
+                plt.xlabel(f'Time since {start} in min')
+            else:
+                ax.set_xticklabels([])
+            ax.set_ylim(-110,110)
+        plt.show()
+
+        gs = gridspec.GridSpec(2,2, hspace=0.05, wspace=0.25
+                              )
+        for tel in range(4):
+            ax = plt.subplot(gs[tel//2,tel%2])
+            _rms = rms[tel]
+            _rms[_rms==0] = np.nan
+            plt.plot(t_rms[tel], rms[tel], color=colors[tel])
+            plt.axhline(1, lw=0.5, ls='--', color='grey')
+            if tel//2 == 1:
+                plt.xlabel(f'Time since {start} in min')
+            else:
+                ax.set_xticklabels([])
+            plt.ylabel(f'RMS Beam {tel+1}')
+            ax.set_ylim(0, 1.9)
+        plt.show()
+
+
+        _appX = np.copy(appX)
+        _appX[_appX == 0] = np.nan
+        _appY = np.copy(appY)
+        _appY[_appY == 0] = np.nan
+
+        _meaX = np.copy(meaX)
+        _meaX[_meaX == 0] = np.nan
+        _meaY = np.copy(meaY)
+        _meaY[_meaY == 0] = np.nan
+
+        off = 0.04
+
+        gs = gridspec.GridSpec(2,1, hspace=0.05)
+        ax = plt.subplot(gs[0,0])
+        for tel in range(4):
+            plt.plot(t_appX, _appX[:,tel]+off*(3-tel), color=colors[tel], marker='o', ms=2, ls='')
+            plt.plot(t_meaX, _meaX[:,tel]+off*(3-tel), color=colors[tel], marker='x', ms=3, ls='')
+            plt.axhline(off*(3-tel), lw=0.5, ls='--', color=colors[tel])
+            plt.text(-5, off*(3-tel)-off/3, f'Beam {tel+1}', fontsize=8, color=colors[tel])
+        ax.set_xticklabels([])
+        plt.ylabel('applied X separation')
+        plt.xlim(left=-10)
+
+        ax = plt.subplot(gs[1,0])
+        for tel in range(4):
+            plt.plot(t_appY, _appY[:,tel]+off*(3-tel), color=colors[tel], marker='o', ms=2, ls='')
+            plt.plot(t_meaY, _meaY[:,tel]+off*(3-tel), color=colors[tel], marker='x', ms=3, ls='')
+            plt.axhline(off*(3-tel), lw=0.5, ls='--', color=colors[tel])
+            plt.text(-5, off*(3-tel)-off/3, f'Beam {tel+1}', fontsize=8, color=colors[tel])
+        plt.xlabel(f'Time since {start} in min')
+        plt.ylabel('applied Y separation')
+        plt.xlim(left=-10)
+        plt.show() 
