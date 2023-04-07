@@ -1558,8 +1558,8 @@ class GravNight():
         def get_data(l, string, mjd0=None):
             dat = [t for t in l if string in t]
             pos = np.array([np.fromstring(s[s.find('[mas]')+7:], sep=' ', dtype=float) for s in dat])
-            mjd = [gp.convert_date(s[s.find(nnight[:-2]):s.find(nnight[:-2])+19]
-                                   + '.' + s[s.find(nnight[:-2])+20:s.find(nnight[:-2])+23], mjd=True)
+            mjd = [convert_date(s[s.find(night[:-2]):s.find(night[:-2])+19]
+                                   + '.' + s[s.find(night[:-2])+20:s.find(night[:-2])+23], mjd=True)
                            for s in dat]
             if mjd0 is not None:
                 mjd = [(d - mjd0)*24*60 for d in mjd]
@@ -1573,8 +1573,8 @@ class GravNight():
                 dat = [t for t in l if string in t]
 
                 pos.append(np.array([np.fromstring(s[s.find('rms diodes')+12:-4], sep=', ', dtype=float) for s in dat]))
-                _mjd = [gp.convert_date(s[s.find(nnight[:-2]):s.find(nnight[:-2])+19]
-                                        + '.' + s[s.find(nnight[:-2])+20:s.find(nnight[:-2])+23], mjd=True)
+                _mjd = [convert_date(s[s.find(night[:-2]):s.find(night[:-2])+19]
+                                        + '.' + s[s.find(night[:-2])+20:s.find(night[:-2])+23], mjd=True)
                                for s in dat]
                 if mjd0 is not None:
                     _mjd = [(d - mjd0)*24*60 for d in _mjd]
@@ -1587,7 +1587,7 @@ class GravNight():
         start = str(d - timedelta(minutes=5))[11:-3]
 
         d = convert_date(fits.open(self.files[-1])[0].header['DATE-OBS'])[1]
-        str(d + timedelta(minutes=10))[11:-3]
+        stop = str(d + timedelta(minutes=10))[11:-3]
 
         log = f'/tera/3/wgvLogFiles/wgv.{lognight}.log'
         with open(log, 'rb') as f:
@@ -1692,9 +1692,13 @@ class GravNight():
                               )
         for tel in range(4):
             ax = plt.subplot(gs[tel//2,tel%2])
-            _rms = rms[tel]
+            _rms = np.copy(rms[tel])
+            _rms_all = np.copy(rms[tel])
             _rms[_rms==0] = np.nan
-            plt.plot(t_rms[tel], rms[tel], color=colors[tel])
+            _rms[_rms>1] = np.nan
+            _rms_all[_rms_all==0] = np.nan
+            plt.plot(t_rms[tel], _rms_all, color=colors[tel], alpha=0.1)
+            plt.plot(t_rms[tel], _rms, color=colors[tel], alpha=0.8)
             plt.axhline(1, lw=0.5, ls='--', color='grey')
             if tel//2 == 1:
                 plt.xlabel(f'Time since {start} in min')
@@ -1727,6 +1731,7 @@ class GravNight():
         ax.set_xticklabels([])
         plt.ylabel('applied X separation')
         plt.xlim(left=-10)
+        plt.ylim(-0.05,0.15)
 
         ax = plt.subplot(gs[1,0])
         for tel in range(4):
@@ -1737,4 +1742,5 @@ class GravNight():
         plt.xlabel(f'Time since {start} in min')
         plt.ylabel('applied Y separation')
         plt.xlim(left=-10)
+        plt.ylim(-0.05,0.15)
         plt.show() 
