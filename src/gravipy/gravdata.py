@@ -198,7 +198,7 @@ def rotation(ang):
 
 
 class GravData():
-    def __init__(self, data, verbose=True, plot=False, datacatg=None):
+    def __init__(self, data, verbose=True, plot=False, datacatg=None, test=False):
         """
         GravData: Class to load GRAVITY datafiles
 
@@ -210,6 +210,7 @@ class GravData():
         calibrate_phi : Calibrate visibility phases
         """
         self.name = data
+        self.test = test
         self.filename = os.path.basename(data)
         self.verbose = verbose
         self.colors_baseline = np.array(['k', 'darkblue', color4,
@@ -264,8 +265,10 @@ class GravData():
         elif tel == 'ESO-VLTI-A1234':
             self.tel = 'AT'
         else:
-            raise ValueError('Telescope not AT or UT, seomtehign '
-                             'wrong with input data')
+            self.tel = 'test'
+            if not self.test:
+                raise ValueError('Telescope not AT or UT, seomtehign '
+                                 'wrong with input data')
 
         # Get BL names
         if self.raw or self.p2vm_file:
@@ -863,9 +866,9 @@ class GravData():
         elif p2vmfile is None:
             raise ValueError('pp_wl needed!')
 
-        if self.polmode == 'SPLIT':
+        try:
             pp_wl = fits.open(p2vmfile)['OI_WAVELENGTH', 11].data['EFF_WAVE']
-        else:
+        except:
             pp_wl = fits.open(p2vmfile)['OI_WAVELENGTH', 10].data['EFF_WAVE']
 
         # wl interpolation

@@ -513,6 +513,7 @@ class GravPhaseNight():
                 self.folder = pl_list[-1]
             else:
                 self.folder = datadir + night + '/' + reddir
+        ignore_files = [self.folder + i for i in ignore_files]
         if self.verbose:
             print('Data from:  %s' % self.folder)
         self.bl_array = np.array([[0, 1],
@@ -523,6 +524,7 @@ class GravPhaseNight():
                                   [2, 3]])
 
         allfiles = sorted(glob.glob(self.folder + '/GRAVI*dualscivis.fits'))
+        allfiles += sorted(glob.glob(self.folder + '/GRAVI*dualsciviscalibrated.fits'))
         if len(allfiles) == 0:
             raise ValueError('No files found, most likely something is wrong'
                              ' with the given reduction folder')
