@@ -471,63 +471,6 @@ class GravPhaseNight():
         calibrators = []
         offsets = []
         filelist = False
-        for _n in list_nights:
-            nights.append(_n['night'])
-            calibrators.append(_n['calibrator'])
-            offsets.append(_n['caloff'])
-        if night is None:
-            if lfile is None or calibrator is None:
-                print(nights)
-                raise ValueError('Night has to be given as argument\n'
-                                 'Or list of files and calibrator has to be given')
-            else:
-                filelist = True
-
-        if full_folder:
-            usepandas = True
-            self.folder = night
-            if calibrator is None:
-                raise ValueError('For full_folder you need to give a calibrator')
-            self.calibrator = calibrator
-
-        else:
-            try:
-                if calibrator is None:
-                    if self.verbose:
-                        print("using default calibrator")
-                    self.calibrator = calibrators[nights.index(night)]
-                else:
-                    if self.verbose:
-                        print("using custom calibrator")
-                    self.calibrator = calibrator
-                if self.verbose:
-                    print('Night:      %s \nCalibrator: %s' % (night,
-                                                               self.calibrator))
-            except ValueError:
-                if self.verbose:
-                    print('Night is not available, try one of those:')
-                    print(nights)
-                raise ValueError('Night is not available')
-            if reddir is None:
-                pl_list = sorted(glob.glob(datadir + night
-                                           + '/reduced_PL????????'))
-                if len(pl_list) < 1:
-                    raise ValueError('Something wrong with given directory '
-                                     'No reduction folder in %s'
-                                     % (datadir + night))
-                self.folder = pl_list[-1]
-            else:
-                self.folder = datadir + night + '/' + reddir
-        ignore_files = [self.folder + i for i in ignore_files]
-        if self.verbose:
-            print('Data from:  %s' % self.folder)
-        allfiles = sorted(glob.glob(self.folder + '/GRAVI*dualscivis.fits'))
-        allfiles += sorted(glob.glob(self.folder + '/GRAVI*dualsciviscalibrated.fits'))
-        if len(allfiles) == 0:
-            raise ValueError('No files found, most likely something is wrong'
-                             ' with the given reduction folder')
-
-
         self.bl_array = np.array([[0, 1],
                                   [0, 2],
                                   [0, 3],
@@ -535,53 +478,114 @@ class GravPhaseNight():
                                   [1, 3],
                                   [2, 3]])
 
+        for _n in list_nights:
+            nights.append(_n['night'])
+            calibrators.append(_n['calibrator'])
+            offsets.append(_n['caloff'])
+        if night is None:
+            if lfiles is None or calibrator is None:
+                print(nights)
+                raise ValueError('Night has to be given as argument\n'
+                                 'Or list of files and calibrator has to be given')
+            else:
+                filelist = True
 
-        if cal_offx is None:
-            cal_offx = offsets[nights.index(night)]
-        self.cal_offx = cal_offx
-        s2data = np.load(resource_filename('gravipy', 'Datafiles/s2_orbit.npy'))
-        if full_folder:
+        if filelist:
+            allfiles = lfiles
             sci_files = allfiles
             cal_files = allfiles
         else:
-            sci_files = []
-            cal_files = []
-            for file in allfiles:
-                h = fits.open(file)[0].header
-                if h['ESO FT ROBJ NAME'] != 'IRS16C':
-                    continue
-                if h['ESO INS SOBJ NAME'] in ['S2', 'S4']:
-                    if h['ESO INS SOBJ OFFX'] == cal_offx:
-                        if file not in ignore_files:
-                            cal_files.append(file)
+            if full_folder:
+                usepandas = True
+                self.folder = night
+                if calibrator is None:
+                    raise ValueError('For full_folder you need to give a calibrator')
+                self.calibrator = calibrator
+
+            else:
+                try:
+                    if calibrator is None:
+                        if self.verbose:
+                            print("using default calibrator")
+                        self.calibrator = calibrators[nights.index(night)]
                     else:
-                        d = convert_date(h['DATE-OBS'])[0]
-                        _x, _y = -s2data[find_nearest(s2data[:, 0], d)][1:]*1e3
-                        sobjx = h['ESO INS SOBJ X']
-                        sobjy = h['ESO INS SOBJ Y']
-                        sobjoffx = h['ESO INS SOBJ OFFX']
-                        sobjoffy = h['ESO INS SOBJ OFFY']
-                        if onlysgra:
-                            if cal_offx != 0.0:
-                                if sobjoffx != 0.0 or sobjoffy != 0.0:
-                                    if self.verbose:
-                                        print('File with separation (%i,%i) not '
-                                              'an SGRA file, will be ignored'
-                                              % (sobjx, sobjy))
-                                    continue
-                            else:
-                                if np.abs(sobjoffx - _x) > 10:
-                                    if self.verbose:
-                                        print('File with separation (%i,%i) not on S2 '
-                                              'orbit, will be ignored' % (sobjx, sobjy))
-                                    continue
-                                if np.abs(sobjoffy - _y) > 10:
-                                    if self.verbose:
-                                        print('File with separation (%i,%i) not on S2 '
-                                              'orbit, will be ignored' % (sobjx, sobjy))
-                                    continue
-                        if file not in ignore_files:
-                            sci_files.append(file)
+                        if self.verbose:
+                            print("using custom calibrator")
+                        self.calibrator = calibrator
+                    if self.verbose:
+                        print('Night:      %s \nCalibrator: %s' % (night,
+                                                                   self.calibrator))
+                except ValueError:
+                    if self.verbose:
+                        print('Night is not available, try one of those:')
+                        print(nights)
+                    raise ValueError('Night is not available')
+                if reddir is None:
+                    pl_list = sorted(glob.glob(datadir + night
+                                               + '/reduced_PL????????'))
+                    if len(pl_list) < 1:
+                        raise ValueError('Something wrong with given directory '
+                                         'No reduction folder in %s'
+                                         % (datadir + night))
+                    self.folder = pl_list[-1]
+                else:
+                    self.folder = datadir + night + '/' + reddir
+            ignore_files = [self.folder + i for i in ignore_files]
+            if self.verbose:
+                print('Data from:  %s' % self.folder)
+            allfiles = sorted(glob.glob(self.folder + '/GRAVI*dualscivis.fits'))
+            allfiles += sorted(glob.glob(self.folder + '/GRAVI*dualsciviscalibrated.fits'))
+
+            if len(allfiles) == 0:
+                raise ValueError('No files found, most likely something is wrong'
+                                 ' with the given reduction folder')
+
+            if cal_offx is None:
+                cal_offx = offsets[nights.index(night)]
+            self.cal_offx = cal_offx
+            s2data = np.load(resource_filename('gravipy', 'Datafiles/s2_orbit.npy'))
+            if full_folder:
+                sci_files = allfiles
+                cal_files = allfiles
+            else:
+                sci_files = []
+                cal_files = []
+                for file in allfiles:
+                    h = fits.open(file)[0].header
+                    if h['ESO FT ROBJ NAME'] != 'IRS16C':
+                        continue
+                    if h['ESO INS SOBJ NAME'] in ['S2', 'S4']:
+                        if h['ESO INS SOBJ OFFX'] == cal_offx:
+                            if file not in ignore_files:
+                                cal_files.append(file)
+                        else:
+                            d = convert_date(h['DATE-OBS'])[0]
+                            _x, _y = -s2data[find_nearest(s2data[:, 0], d)][1:]*1e3
+                            sobjx = h['ESO INS SOBJ X']
+                            sobjy = h['ESO INS SOBJ Y']
+                            sobjoffx = h['ESO INS SOBJ OFFX']
+                            sobjoffy = h['ESO INS SOBJ OFFY']
+                            if onlysgra:
+                                if cal_offx != 0.0:
+                                    if sobjoffx != 0.0 or sobjoffy != 0.0:
+                                        if self.verbose:
+                                            print('File with separation (%i,%i) not '
+                                                  'an SGRA file, will be ignored'
+                                                  % (sobjx, sobjy))
+                                        continue
+                                else:
+                                    if np.abs(sobjoffx - _x) > 10:
+                                        if self.verbose:
+                                            print('File with separation (%i,%i) not on S2 '
+                                                  'orbit, will be ignored' % (sobjx, sobjy))
+                                        continue
+                                    if np.abs(sobjoffy - _y) > 10:
+                                        if self.verbose:
+                                            print('File with separation (%i,%i) not on S2 '
+                                                  'orbit, will be ignored' % (sobjx, sobjy))
+                                        continue
+                            if file not in ignore_files:
+                                sci_files.append(file)
         if self.verbose:
             print('            %i SCI files \n            %i CAL files' 
                   % (len(sci_files), len(cal_files)))
@@ -599,7 +603,7 @@ class GravPhaseNight():
         except ValueError:
             pass
 
-        if usepandas:
+        if usepandas and not filelist:
             ################
             # read in flux from pandas
             ################
