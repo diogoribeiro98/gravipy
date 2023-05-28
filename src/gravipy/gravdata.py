@@ -941,7 +941,7 @@ class GravData():
         phases = np.angle(phases, deg=True)
         return phases
 
-    def calibrate_phi(self, calibrator):
+    def calibrate_phi(self, calibrator, plot=True):
         if not hasattr(self, 'visphiSC_P1'):
             self.get_int_data()
         c = fits.open(calibrator)
@@ -972,6 +972,27 @@ class GravData():
         else:
             self.visphiSC_P1 = self.visphiSC_P1.reshape(-1, self.channel)
             self.visphiSC_P2 = self.visphiSC_P2.reshape(-1, self.channel)
+            
+        if plot:
+            for idx in range(len(self.vis2SC_P1)):
+                plt.errorbar(self.spFrequAS[idx,:],
+                             self.visphiSC_P1[idx,:],
+                             self.visphierrSC_P1[idx,:],
+                             alpha=0.7, ms=4, lw=0.5, capsize=0,
+                             ls='', marker='o',
+                             color=self.colors_baseline[idx % 6])
+            for idx in range(len(self.vis2SC_P2)):
+                plt.errorbar(self.spFrequAS[idx,:],
+                             self.visphiSC_P2[idx,:],
+                             self.visphierrSC_P2[idx,:],
+                             alpha=0.7, ms=4, lw=0.5, capsize=0,
+                             ls='', marker='p',
+                             color=self.colors_baseline[idx % 6])
+            plt.axhline(0, ls='--', lw=0.5)
+            plt.xlabel('spatial frequency (1/arcsec)')
+            plt.ylabel('visibility phase')
+            plt.show()
+
 
 
 class GravNight():

@@ -443,7 +443,7 @@ class GravPhaseNight():
                  onlysgra=False, calibrator=None,
                  cal_offx=None, ignore_files=[],
                  usepandas=False, pandasfile=None,
-                 full_folder=False):
+                 full_folder=False, lfiles=None):
         """
         Package to do the full phase calibration, poscor, and
         metrology correction
@@ -470,13 +470,18 @@ class GravPhaseNight():
         nights = []
         calibrators = []
         offsets = []
+        filelist = False
         for _n in list_nights:
             nights.append(_n['night'])
             calibrators.append(_n['calibrator'])
             offsets.append(_n['caloff'])
         if night is None:
-            print(nights)
-            raise ValueError('Night has to be given as argument')
+            if lfile is None or calibrator is None:
+                print(nights)
+                raise ValueError('Night has to be given as argument\n'
+                                 'Or list of files and calibrator has to be given')
+            else:
+                filelist = True
 
         if full_folder:
             usepandas = True
@@ -516,6 +521,13 @@ class GravPhaseNight():
         ignore_files = [self.folder + i for i in ignore_files]
         if self.verbose:
             print('Data from:  %s' % self.folder)
+        allfiles = sorted(glob.glob(self.folder + '/GRAVI*dualscivis.fits'))
+        allfiles += sorted(glob.glob(self.folder + '/GRAVI*dualsciviscalibrated.fits'))
+        if len(allfiles) == 0:
+            raise ValueError('No files found, most likely something is wrong'
+                             ' with the given reduction folder')
+
+
         self.bl_array = np.array([[0, 1],
                                   [0, 2],
                                   [0, 3],
@@ -523,11 +535,6 @@ class GravPhaseNight():
                                   [1, 3],
                                   [2, 3]])
 
-        allfiles = sorted(glob.glob(self.folder + '/GRAVI*dualscivis.fits'))
-        allfiles += sorted(glob.glob(self.folder + '/GRAVI*dualsciviscalibrated.fits'))
-        if len(allfiles) == 0:
-            raise ValueError('No files found, most likely something is wrong'
-                             ' with the given reduction folder')
 
         if cal_offx is None:
             cal_offx = offsets[nights.index(night)]
