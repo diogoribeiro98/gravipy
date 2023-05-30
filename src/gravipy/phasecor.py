@@ -494,6 +494,7 @@ class GravPhaseNight():
             allfiles = lfiles
             sci_files = allfiles
             cal_files = allfiles
+            self.calibrator = calibrator
         else:
             if full_folder:
                 usepandas = True
@@ -600,7 +601,7 @@ class GravPhaseNight():
                 if self.verbose:
                     print('No flux data in pandas for %i' % year)
                 usepandas = False
-        except ValueError:
+        except (ValueError,TypeError):
             pass
 
         if usepandas and not filelist:
