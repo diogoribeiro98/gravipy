@@ -1379,16 +1379,16 @@ class GravMFit(GravData, GravPhaseMaps):
         if phasemaps:
             if not self.fit_phasemaps:
                 self.pm_sources = []
-                self.pm_amp_c, self.pm_pha_c, self.pm_int_c = self.phasemap_source(0, 0,
+                self.pm_amp_c, self.pm_pha_c, self.pm_int_c = self.phasemap_source(pc_RA_in, pc_DEC_in,
                                                                                    self.northangle, self.dra, self.ddec)
 
-                pm_amp, pm_pha, pm_int = self.phasemap_source(0 + theta[0],
-                                                              0 + theta[1],
+                pm_amp, pm_pha, pm_int = self.phasemap_source(pc_RA_in + theta[0],
+                                                              pc_DEC_in + theta[1],
                                                               self.northangle, self.dra, self.ddec)
                 self.pm_sources.append([pm_amp, pm_pha, pm_int])
                 for ndx in range(1, nsource):
-                    pm_amp, pm_pha, pm_int = self.phasemap_source(0 + theta[ndx*3-1],
-                                                                  0 + theta[ndx*3],
+                    pm_amp, pm_pha, pm_int = self.phasemap_source(pc_RA_in + theta[ndx*3-1],
+                                                                  pc_DEC_in + theta[ndx*3],
                                                                   self.northangle, self.dra, self.ddec)
                     self.pm_sources.append([pm_amp, pm_pha, pm_int])
 
