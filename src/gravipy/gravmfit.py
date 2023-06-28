@@ -6,7 +6,7 @@ import numpy as np
 import emcee
 import corner
 from multiprocessing import Pool
-from scipy import signal, interpolate
+from scipy import signal, interpolate, stats
 import math
 import mpmath
 from pkg_resources import resource_filename
@@ -14,6 +14,8 @@ import os
 import pandas as pd
 from joblib import Parallel, delayed
 from lmfit import minimize, Parameters
+import dynesty
+
 
 try:
     from numba import jit
@@ -1247,9 +1249,11 @@ class GravMFit(GravData, GravPhaseMaps):
         # Initial guesses
         if initial is not None:
             if len(initial) != 6:
-                print('Give: [alpha, fr BG, pc, fr BH, coh. loss]')
-                raise ValueError('Length of initial parameter list is'
-                                 ' not correct')
+                raise ValueError('Length of initial parameter '
+                                 'list is not correct, should be 6: '
+                                 'alpha, fr BG, pc ra, pc dec, fr_BH, '
+                                 'coh. loss')
+
             (alpha_SgrA_in, flux_ratio_bg_in, pc_RA_in, pc_DEC_in,
              flux_ratio_bh, coh_loss_in) = initial
         else:
@@ -2180,6 +2184,21 @@ def _lnprior_night(theta, lower, upper, theta_names):
     return lp
 
 
+def _prior_transform(u, gprior, mean, width):
+    """
+    prior transform for dynesty
+    """
+    v = np.array(u)
+
+    for idx in range(len(v)):
+        if gprior[idx]:
+            v[idx] = stats.norm.ppf(v[idx],
+                                          loc=mean[idx], scale=width[idx])
+        else:
+            v[idx] = v[idx]*width[idx]*2 + (mean[idx]-width[idx])
+    return v
+
+
 def _lnlike_night(theta, fitdata, fitarg, fithelp):
     (len_lightcurve, nsource, fit_for, bispec_ind, fit_mode,
      wave, dlambda, fixedBHalpha, oneBHalpha, oneBG, todel, fixed,
@@ -2343,6 +2362,9 @@ class GravMNightFit(GravNight):
         flagfrom = kwargs.get('flagfrom', None)
         error_scale = kwargs.get('error_scale', 1)
         nocohloss = kwargs.get('nocohloss', False)
+        no_fit = kwargs.get('no_fit', False)
+        nested = kwargs.get('nested', False)
+        self.no_fit = no_fit
 
         interppm = kwargs.get('interppm', True)
         self.datayear = kwargs.get('pmdatayear', 2019)
@@ -2531,16 +2553,16 @@ class GravMNightFit(GravNight):
         if initial is not None:
             if len(initial) != 5:
                 raise ValueError('Length of initial parameter '
-                                 'list is not correct, should be 4: '
-                                 'fr_BH, fr BG, alpha, pc ra, pc dec')
-            (fr_BH, flux_ratio_bg_in,
-             alpha_SgrA_in, pc_RA_in, pc_DEC_in) = initial
+                                 'list is not correct, should be 5: '
+                                 'alpha, fr BG, pc ra, pc dec, fr_BH')
+            (alpha_SgrA_in, flux_ratio_bg_in, pc_RA_in, pc_DEC_in,
+             fr_BH) = initial
         else:
             alpha_SgrA_in = -0.5
             flux_ratio_bg_in = 1
             pc_RA_in = 0
             pc_DEC_in = 0
-            fr_BH = 0
+            fr_BH = 1
         lightcurve_list = np.ones(nfiles)*fr_BH
         fluxBG_list = np.ones(nfiles)*flux_ratio_bg_in
 
@@ -2584,7 +2606,7 @@ class GravMNightFit(GravNight):
             if not bequiet:
                 print('fr %i/1  = %.2f' % ((ndx + 2), fr_list[ndx]))
         if not bequiet:
-            print('fr BH/1 = %.2f' % (10**lightcurve_list[0]))
+            print('fr BH/1 = %.2f' % (lightcurve_list[0]))
             print('fr BG   = %.2f' % (fluxBG_list[0]))
             print('alphaBH = %.2f' % (alpha_SgrA_in))
 
@@ -2605,7 +2627,7 @@ class GravMNightFit(GravNight):
             lower[nsource*3-1 + ndx*11 + 3] = pc_DEC_in - pc_size
             upper[nsource*3-1 + ndx*11 + 3] = pc_DEC_in + pc_size
 
-            theta[nsource*3-1 + ndx*11 + 4] = lightcurve_list[ndx]
+            theta[nsource*3-1 + ndx*11 + 4] = np.log10(lightcurve_list[ndx])
             lower[nsource*3-1 + ndx*11 + 4] = np.log10(0.001)
             upper[nsource*3-1 + ndx*11 + 4] = np.log10(100)
 
@@ -2711,7 +2733,7 @@ class GravMNightFit(GravNight):
         upper = np.delete(upper, todel)
         self.fixed = fixed
         self.todel = todel
-        
+
         if self.debug:
             print('\n\n')
             for idx in range(len(theta)):
@@ -2720,7 +2742,7 @@ class GravMNightFit(GravNight):
 
         if len(theta_names) != len(theta):
             raise ValueError('Somethign wrong with intitialization of parameter')
-        
+
         ndim = len(theta)
         width = 1e-1
         pos = np.ones((nwalkers, ndim))
@@ -2748,68 +2770,137 @@ class GravMNightFit(GravNight):
                        self.bispec_ind, self.fit_mode, self.wave,
                        self.dlambda, self.fixedBHalpha, oneBHalpha,
                        oneBG, todel, fixed, self.phasemaps, None]
-
+        self.fitarg = fitarg
+        self.fitdata = fitdata
+        self.fithelp = fithelp
+        self.MJD = MJD
+        self.theta = theta
         if self.debug:
             print('\n\n')
             print(_lnprob_night(theta, fitdata, lower, upper, theta_names, fitarg, fithelp))
-            sys.exit()    
-        if nthreads == 1:
-            self.sampler = emcee.EnsembleSampler(nwalkers, ndim, _lnprob_night,
-                                                 args=(fitdata, lower,
-                                                       upper, theta_names,
-                                                       fitarg, fithelp))
-            if bequiet:
-                self.sampler.run_mcmc(pos, nruns, progress=False, skip_initial_state_check=True)
-            else:
-                self.sampler.run_mcmc(pos, nruns, progress=True, skip_initial_state_check=True)
-        else:
-            with Pool(processes=nthreads) as pool:
-                self.sampler = emcee.EnsembleSampler(nwalkers, ndim,
-                                                     _lnprob_night,
-                                                     args=(fitdata, lower,
-                                                           upper, theta_names,
-                                                           fitarg,
-                                                           fithelp),
-                                                     pool=pool)
-                if bequiet:
-                    self.sampler.run_mcmc(pos, nruns, progress=False, skip_initial_state_check=True)
-                else:
-                    self.sampler.run_mcmc(pos, nruns, progress=True, skip_initial_state_check=True)
+            sys.exit()
 
-        self.fitdata = fitdata
-        self.fithelp = fithelp
-        self.fitarg = fitarg
-        self.MJD = MJD
+        if not no_fit:
+            gprior = np.zeros_like(theta,  dtype=bool)
+            gidx = [i for i, x in enumerate(theta_names) if 'coh' in x]
+            gprior[gidx] = True
+            mean = (upper+lower)/2
+            width = (upper-lower)/2
+            width[gprior] = 0.05
+
+            if nested:
+                pool = Pool(processes=nthreads)
+                sampler = dynesty.DynamicNestedSampler(_lnlike_night,
+                                                       _prior_transform,
+                                                       ndim,
+                                                       nlive=400,
+                                                       pool=pool,
+                                                       queue_size=nthreads,
+                                                       logl_args=[fitdata, fitarg, fithelp],
+                                                       ptform_args=[gprior, mean, width])
+                return sampler
+                sampler.run_nested(checkpoint_file='dynesty.save', maxcall=50000)
+                res = sampler.results
+                return res
+
+            else:
+                if nthreads == 1:
+                    self.sampler = emcee.EnsembleSampler(nwalkers, ndim,
+                                                         _lnprob_night,
+                                                         args=(fitdata, lower,
+                                                               upper, theta_names,
+                                                               fitarg, fithelp))
+                    if bequiet:
+                        self.sampler.run_mcmc(pos, nruns, progress=False,
+                                              skip_initial_state_check=True)
+                    else:
+                        self.sampler.run_mcmc(pos, nruns, progress=True,
+                                              skip_initial_state_check=True)
+                else:
+                    with Pool(processes=nthreads) as pool:
+                        self.sampler = emcee.EnsembleSampler(nwalkers, ndim,
+                                                             _lnprob_night,
+                                                             args=(fitdata, lower,
+                                                                   upper, theta_names,
+                                                                   fitarg,
+                                                                   fithelp),
+                                                             pool=pool)
+                        if bequiet:
+                            self.sampler.run_mcmc(pos, nruns, progress=False,
+                                                  skip_initial_state_check=True)
+                        else:
+                            self.sampler.run_mcmc(pos, nruns, progress=True,
+                                                  skip_initial_state_check=True)
 
     def get_fit_result(self, plot=True, plotcorner=False, ret=False):
-        samples = self.sampler.chain
-        self.mostprop = self.sampler.flatchain[np.argmax(self.sampler.flatlnprobability)]
-        print("-----------------------------------")
-        print("Mean acceptance fraction: %.2f"
-              % np.mean(self.sampler.acceptance_fraction))
+        if not self.no_fit:
+            samples = self.sampler.chain
+            self.mostprop = self.sampler.flatchain[np.argmax(self.sampler.flatlnprobability)]
+            print("-----------------------------------")
+            print("Mean acceptance fraction: %.2f"
+                  % np.mean(self.sampler.acceptance_fraction))
 
-        clinitial = np.delete(self.theta_in, self.todel)
-        clsamples = samples  # np.delete(samples, self.todel, 2)
-        clmostprop = self.mostprop  # np.delete(self.mostprop, self.todel)
-        cldim = len(clmostprop)
+            clinitial = np.delete(self.theta_in, self.todel)
+            clsamples = samples  # np.delete(samples, self.todel, 2)
+            clmostprop = self.mostprop  # np.delete(self.mostprop, self.todel)
+            cldim = len(clmostprop)
 
-        if self.nruns > 300:
-            fl_samples = samples[:, -200:, :].reshape((-1, self.ndim))
-            fl_clsamples = clsamples[:, -200:, :].reshape((-1, cldim))
-        elif self.nruns > 200:
-            fl_samples = samples[:, -100:, :].reshape((-1, self.ndim))
-            fl_clsamples = clsamples[:, -100:, :].reshape((-1, cldim))
+            if self.nruns > 300:
+                fl_samples = samples[:, -200:, :].reshape((-1, self.ndim))
+                fl_clsamples = clsamples[:, -200:, :].reshape((-1, cldim))
+            elif self.nruns > 200:
+                fl_samples = samples[:, -100:, :].reshape((-1, self.ndim))
+                fl_clsamples = clsamples[:, -100:, :].reshape((-1, cldim))
+            else:
+                fl_samples = samples.reshape((-1, self.ndim))
+                fl_clsamples = clsamples.reshape((-1, cldim))
+            self.fl_clsamples = fl_clsamples
+            self.medianprop = np.percentile(fl_samples, [50], axis=0)[0]
+
+            lnlike = _lnlike_night(self.medianprop, self.fitdata,
+                                   self.fitarg, self.fithelp)
+            print('LogLikelihood: %i' % (lnlike*-1))
+
+            percentiles = np.percentile(fl_clsamples, [16, 50, 84], axis=0).T
+            percentiles[:, 0] = percentiles[:, 1] - percentiles[:, 0]
+            percentiles[:, 2] = percentiles[:, 2] - percentiles[:, 1]
+
+            fittab = pd.DataFrame()
+            fittab["column"] = ["in", "M.L.", "M.P.", "$-\sigma$", "$+\sigma$"]
+            _ct_del = 0
+            _ct_used = 0
+            for idx, name in enumerate(self.theta_allnames):
+                if idx in self.todel:
+                    fittab[name] = pd.Series([self.fixed[_ct_del],
+                                              self.fixed[_ct_del],
+                                              self.fixed[_ct_del],
+                                              0,
+                                              0])
+                    _ct_del += 1
+                else:
+                    fittab[name] = pd.Series([clinitial[_ct_used],
+                                              clmostprop[_ct_used],
+                                              percentiles[_ct_used, 1],
+                                              percentiles[_ct_used, 0],
+                                              percentiles[_ct_used, 2]])
+                    _ct_used += 1
+
+            len_lightcurve = self.nfiles
+            _lightcurve_all = 10**(clmostprop[-(len_lightcurve+self.nsource-1):
+                                              -(self.nsource-1)])
+            self.lightcurve = np.array([_lightcurve_all[::2],
+                                        _lightcurve_all[1::2]])
+            self.fitres = clmostprop
+            self.fittab = fittab
+            keys = fittab.keys()
+            cohkeys = [x for x in keys if 'coh' in x]
+            self.fittab_short = fittab.drop(columns=cohkeys)
+
         else:
-            fl_samples = samples.reshape((-1, self.ndim))
-            fl_clsamples = clsamples.reshape((-1, cldim))
-        self.fl_clsamples = fl_clsamples
-        self.medianprop = np.percentile(fl_samples, [50], axis=0)[0]
+            self.medianprop = self.theta
 
-        lnlike = _lnlike_night(self.medianprop, self.fitdata,
-                               self.fitarg, self.fithelp)
-        print('LogLikelihood: %i' % (lnlike*-1))
         allfitres = self.get_fit_vis(self.medianprop, self.fitarg,
-                                   self.fithelp)
+                                     self.fithelp)
         (visamp, visamp_error, visamp_flag,
          vis2, vis2_error, vis2_flag,
          closure, closure_error, closure_flag,
@@ -2854,42 +2945,7 @@ class GravMNightFit(GravNight):
         print('Visphi RChi2:  %.2f' % (redchi_visphi/tot_ndof[3]))
         print("-----------------------------------")
 
-        percentiles = np.percentile(fl_clsamples, [16, 50, 84], axis=0).T
-        percentiles[:, 0] = percentiles[:, 1] - percentiles[:, 0]
-        percentiles[:, 2] = percentiles[:, 2] - percentiles[:, 1]
-
-        fittab = pd.DataFrame()
-        fittab["column"] = ["in", "M.L.", "M.P.", "$-\sigma$", "$+\sigma$"]
-        _ct_del = 0
-        _ct_used = 0
-        for idx, name in enumerate(self.theta_allnames):
-            if idx in self.todel:
-                fittab[name] = pd.Series([self.fixed[_ct_del],
-                                          self.fixed[_ct_del],
-                                          self.fixed[_ct_del],
-                                          0,
-                                          0])
-                _ct_del += 1
-            else:
-                fittab[name] = pd.Series([clinitial[_ct_used],
-                                          clmostprop[_ct_used],
-                                          percentiles[_ct_used, 1],
-                                          percentiles[_ct_used, 0],
-                                          percentiles[_ct_used, 2]])
-                _ct_used += 1
-
-        len_lightcurve = self.nfiles
-        _lightcurve_all = 10**(clmostprop[-(len_lightcurve+self.nsource-1):
-                                          -(self.nsource-1)])
-        self.lightcurve = np.array([_lightcurve_all[::2],
-                                    _lightcurve_all[1::2]])
-        self.fitres = clmostprop
-        self.fittab = fittab
-        keys = fittab.keys()
-        cohkeys = [x for x in keys if 'coh' in x]
-        self.fittab_short = fittab.drop(columns=cohkeys)
-
-        if plot:
+        if plot and not self.no_fit:
             self.plot_MCMC(plotcorner)
 
         if ret:
@@ -2977,7 +3033,7 @@ class GravMNightFit(GravNight):
     def plot_fit(self, plotall=False, mostprop=True, nicer=True):
         rad2as = 180 / np.pi * 3600
         len_lightcurve = self.nfiles
-        if mostprop:
+        if mostprop and not self.no_fit:
             result = self.mostprop
         else:
             result = self.medianprop
