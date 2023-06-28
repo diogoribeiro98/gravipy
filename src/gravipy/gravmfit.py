@@ -15,6 +15,8 @@ import pandas as pd
 from joblib import Parallel, delayed
 from lmfit import minimize, Parameters
 import dynesty
+from dynesty import plotting as dyplot
+from dynesty import utils as dyfunc
 
 
 try:
@@ -2365,6 +2367,7 @@ class GravMNightFit(GravNight):
         no_fit = kwargs.get('no_fit', False)
         nested = kwargs.get('nested', False)
         self.no_fit = no_fit
+        self.nested = nested
 
         interppm = kwargs.get('interppm', True)
         self.datayear = kwargs.get('pmdatayear', 2019)
@@ -2790,19 +2793,17 @@ class GravMNightFit(GravNight):
 
             if nested:
                 pool = Pool(processes=nthreads)
-                sampler = dynesty.DynamicNestedSampler(_lnlike_night,
-                                                       _prior_transform,
-                                                       ndim,
-                                                       nlive=400,
-                                                       pool=pool,
-                                                       queue_size=nthreads,
-                                                       logl_args=[fitdata, fitarg, fithelp],
-                                                       ptform_args=[gprior, mean, width])
-                return sampler
-                sampler.run_nested(checkpoint_file='dynesty.save', maxcall=50000)
-                res = sampler.results
-                return res
-
+                sampler = dynesty.NestedSampler(_lnlike_night,
+                                                _prior_transform,
+                                                ndim,
+                                                nlive=nwalkers,
+                                                pool=pool,
+                                                queue_size=nthreads,
+                                                logl_args=[fitdata, fitarg, fithelp],
+                                                ptform_args=[gprior, mean, width],
+                                                sample='rwalk')
+                sampler.run_nested(checkpoint_file='dynesty.save')
+                self.sampler = sampler
             else:
                 if nthreads == 1:
                     self.sampler = emcee.EnsembleSampler(nwalkers, ndim,
@@ -2834,67 +2835,118 @@ class GravMNightFit(GravNight):
 
     def get_fit_result(self, plot=True, plotcorner=False, ret=False):
         if not self.no_fit:
-            samples = self.sampler.chain
-            self.mostprop = self.sampler.flatchain[np.argmax(self.sampler.flatlnprobability)]
-            print("-----------------------------------")
-            print("Mean acceptance fraction: %.2f"
-                  % np.mean(self.sampler.acceptance_fraction))
+            if self.nested:
+                r = self.samper.results
+                r.summary()
+                fig, axes = dyplot.runplot(r)
+                plt.show()
+                tfig, taxes = dyplot.traceplot(r, labels=n.theta_names)
+                plt.show()
+                samples, weights = r.samples, r.importance_weights()
+                mean, cov = dyfunc.mean_and_cov(samples, weights)
+                self.medianprop = mean
 
-            clinitial = np.delete(self.theta_in, self.todel)
-            clsamples = samples  # np.delete(samples, self.todel, 2)
-            clmostprop = self.mostprop  # np.delete(self.mostprop, self.todel)
-            cldim = len(clmostprop)
+                lnlike = _lnlike_night(self.medianprop, self.fitdata,
+                                       self.fitarg, self.fithelp)
+                print('LogLikelihood: %i' % (lnlike*-1))
 
-            if self.nruns > 300:
-                fl_samples = samples[:, -200:, :].reshape((-1, self.ndim))
-                fl_clsamples = clsamples[:, -200:, :].reshape((-1, cldim))
-            elif self.nruns > 200:
-                fl_samples = samples[:, -100:, :].reshape((-1, self.ndim))
-                fl_clsamples = clsamples[:, -100:, :].reshape((-1, cldim))
+                # percentiles = np.percentile(fl_clsamples, [16, 50, 84], axis=0).T
+                # percentiles[:, 0] = percentiles[:, 1] - percentiles[:, 0]
+                # percentiles[:, 2] = percentiles[:, 2] - percentiles[:, 1]
+
+                clinitial = np.delete(self.theta_in, self.todel)
+                fittab = pd.DataFrame()
+                fittab["column"] = ["in", "M.L.", "M.P.", "$-\sigma$", "$+\sigma$"]
+                _ct_del = 0
+                _ct_used = 0
+                for idx, name in enumerate(self.theta_allnames):
+                    if idx in self.todel:
+                        fittab[name] = pd.Series([self.fixed[_ct_del],
+                                                  self.fixed[_ct_del],
+                                                  self.fixed[_ct_del],
+                                                  0,
+                                                  0])
+                        _ct_del += 1
+                    else:
+                        fittab[name] = pd.Series([clinitial[_ct_used],
+                                                  clmostprop[_ct_used],
+                                                  mean[_ct_used],
+                                                  1,
+                                                  1])
+                        _ct_used += 1
+
+                len_lightcurve = self.nfiles
+                _lightcurve_all = 10**(mean[-(len_lightcurve+self.nsource-1):
+                                            -(self.nsource-1)])
+                self.lightcurve = np.array([_lightcurve_all[::2],
+                                            _lightcurve_all[1::2]])
+                self.fitres = mean
+                self.fittab = fittab
+                keys = fittab.keys()
+                cohkeys = [x for x in keys if 'coh' in x]
+                self.fittab_short = fittab.drop(columns=cohkeys)
             else:
-                fl_samples = samples.reshape((-1, self.ndim))
-                fl_clsamples = clsamples.reshape((-1, cldim))
-            self.fl_clsamples = fl_clsamples
-            self.medianprop = np.percentile(fl_samples, [50], axis=0)[0]
+                samples = self.sampler.chain
+                self.mostprop = self.sampler.flatchain[np.argmax(self.sampler.flatlnprobability)]
+                print("-----------------------------------")
+                print("Mean acceptance fraction: %.2f"
+                      % np.mean(self.sampler.acceptance_fraction))
 
-            lnlike = _lnlike_night(self.medianprop, self.fitdata,
-                                   self.fitarg, self.fithelp)
-            print('LogLikelihood: %i' % (lnlike*-1))
+                clinitial = np.delete(self.theta_in, self.todel)
+                clsamples = samples  # np.delete(samples, self.todel, 2)
+                clmostprop = self.mostprop  # np.delete(self.mostprop, self.todel)
+                cldim = len(clmostprop)
 
-            percentiles = np.percentile(fl_clsamples, [16, 50, 84], axis=0).T
-            percentiles[:, 0] = percentiles[:, 1] - percentiles[:, 0]
-            percentiles[:, 2] = percentiles[:, 2] - percentiles[:, 1]
-
-            fittab = pd.DataFrame()
-            fittab["column"] = ["in", "M.L.", "M.P.", "$-\sigma$", "$+\sigma$"]
-            _ct_del = 0
-            _ct_used = 0
-            for idx, name in enumerate(self.theta_allnames):
-                if idx in self.todel:
-                    fittab[name] = pd.Series([self.fixed[_ct_del],
-                                              self.fixed[_ct_del],
-                                              self.fixed[_ct_del],
-                                              0,
-                                              0])
-                    _ct_del += 1
+                if self.nruns > 300:
+                    fl_samples = samples[:, -200:, :].reshape((-1, self.ndim))
+                    fl_clsamples = clsamples[:, -200:, :].reshape((-1, cldim))
+                elif self.nruns > 200:
+                    fl_samples = samples[:, -100:, :].reshape((-1, self.ndim))
+                    fl_clsamples = clsamples[:, -100:, :].reshape((-1, cldim))
                 else:
-                    fittab[name] = pd.Series([clinitial[_ct_used],
-                                              clmostprop[_ct_used],
-                                              percentiles[_ct_used, 1],
-                                              percentiles[_ct_used, 0],
-                                              percentiles[_ct_used, 2]])
-                    _ct_used += 1
+                    fl_samples = samples.reshape((-1, self.ndim))
+                    fl_clsamples = clsamples.reshape((-1, cldim))
+                self.fl_clsamples = fl_clsamples
+                self.medianprop = np.percentile(fl_samples, [50], axis=0)[0]
 
-            len_lightcurve = self.nfiles
-            _lightcurve_all = 10**(clmostprop[-(len_lightcurve+self.nsource-1):
-                                              -(self.nsource-1)])
-            self.lightcurve = np.array([_lightcurve_all[::2],
-                                        _lightcurve_all[1::2]])
-            self.fitres = clmostprop
-            self.fittab = fittab
-            keys = fittab.keys()
-            cohkeys = [x for x in keys if 'coh' in x]
-            self.fittab_short = fittab.drop(columns=cohkeys)
+                lnlike = _lnlike_night(self.medianprop, self.fitdata,
+                                       self.fitarg, self.fithelp)
+                print('LogLikelihood: %i' % (lnlike*-1))
+
+                percentiles = np.percentile(fl_clsamples, [16, 50, 84], axis=0).T
+                percentiles[:, 0] = percentiles[:, 1] - percentiles[:, 0]
+                percentiles[:, 2] = percentiles[:, 2] - percentiles[:, 1]
+
+                fittab = pd.DataFrame()
+                fittab["column"] = ["in", "M.L.", "M.P.", "$-\sigma$", "$+\sigma$"]
+                _ct_del = 0
+                _ct_used = 0
+                for idx, name in enumerate(self.theta_allnames):
+                    if idx in self.todel:
+                        fittab[name] = pd.Series([self.fixed[_ct_del],
+                                                  self.fixed[_ct_del],
+                                                  self.fixed[_ct_del],
+                                                  0,
+                                                  0])
+                        _ct_del += 1
+                    else:
+                        fittab[name] = pd.Series([clinitial[_ct_used],
+                                                  clmostprop[_ct_used],
+                                                  percentiles[_ct_used, 1],
+                                                  percentiles[_ct_used, 0],
+                                                  percentiles[_ct_used, 2]])
+                        _ct_used += 1
+
+                len_lightcurve = self.nfiles
+                _lightcurve_all = 10**(clmostprop[-(len_lightcurve+self.nsource-1):
+                                                  -(self.nsource-1)])
+                self.lightcurve = np.array([_lightcurve_all[::2],
+                                            _lightcurve_all[1::2]])
+                self.fitres = clmostprop
+                self.fittab = fittab
+                keys = fittab.keys()
+                cohkeys = [x for x in keys if 'coh' in x]
+                self.fittab_short = fittab.drop(columns=cohkeys)
 
         else:
             self.medianprop = self.theta
