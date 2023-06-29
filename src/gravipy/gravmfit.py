@@ -1658,6 +1658,7 @@ class GravMFit(GravData, GravPhaseMaps):
                                 ax = axes[i]
                                 ax.plot(clsamples[:, :, i].T, "k", alpha=0.3)
                                 ax.set_ylabel(theta_names[i])
+                                ax.axhline(clmostprop[i], color='C0', alpha=0.5)
                                 ax.yaxis.set_label_coords(-0.1, 0.5)
                             axes[-1].set_xlabel("step number")
                             plt.show()
@@ -2230,7 +2231,7 @@ def _lnlike_night(theta, fitdata, fitarg, fithelp):
             else:
                 _theta[th_rest] = theta[nsource*3-1 + ndx*11]
             if oneBG:
-                _theta[th_rest+1] = theta[nsource*3-1 + 1]
+                _theta[th_rest+1] = theta[nsource*3-1 + ndx*11 + 1]
             else:
                 _theta[th_rest+1] = theta[nsource*3-1 + ndx*11 + 1]
             _theta[th_rest+2] = theta[nsource*3-1 + ndx*11 + 2]
@@ -2789,7 +2790,7 @@ class GravMNightFit(GravNight):
             gprior[gidx] = True
             mean = (upper+lower)/2
             width = (upper-lower)/2
-            width[gprior] = 0.1
+            width[gprior] = 0.05
 
             if nested:
                 pool = Pool(processes=nthreads)
@@ -2836,13 +2837,12 @@ class GravMNightFit(GravNight):
     def get_fit_result(self, plot=True, plotcorner=False, ret=False):
         if not self.no_fit:
             if self.nested:
-                r = self.sampler.results
+                r = self.samper.results
                 r.summary()
-                if plot:
-                    fig, axes = dyplot.runplot(r)
-                    plt.show()
-                    tfig, taxes = dyplot.traceplot(r, labels=self.theta_names)
-                    plt.show()
+                fig, axes = dyplot.runplot(r)
+                plt.show()
+                tfig, taxes = dyplot.traceplot(r, labels=n.theta_names)
+                plt.show()
                 samples, weights = r.samples, r.importance_weights()
                 mean, cov = dyfunc.mean_and_cov(samples, weights)
                 self.medianprop = mean
@@ -2870,7 +2870,7 @@ class GravMNightFit(GravNight):
                         _ct_del += 1
                     else:
                         fittab[name] = pd.Series([clinitial[_ct_used],
-                                                  mean[_ct_used],
+                                                  clmostprop[_ct_used],
                                                   mean[_ct_used],
                                                   1,
                                                   1])
@@ -2998,7 +2998,7 @@ class GravMNightFit(GravNight):
         print('Visphi RChi2:  %.2f' % (redchi_visphi/tot_ndof[3]))
         print("-----------------------------------")
 
-        if plot and not self.no_fit and not self.nested:
+        if plot and not self.no_fit:
             self.plot_MCMC(plotcorner)
 
         if ret:
@@ -3086,7 +3086,7 @@ class GravMNightFit(GravNight):
     def plot_fit(self, plotall=False, mostprop=True, nicer=True):
         rad2as = 180 / np.pi * 3600
         len_lightcurve = self.nfiles
-        if mostprop and not self.no_fit and not self.nested:
+        if mostprop and not self.no_fit:
             result = self.mostprop
         else:
             result = self.medianprop
