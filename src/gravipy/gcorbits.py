@@ -5,12 +5,13 @@ from scipy.optimize import newton
 from .star_orbits import star_pms, star_orbits
 from datetime import datetime
 import matplotlib.pyplot as plt
+from pkg_resources import resource_filename
 
 from .gravdata import convert_date
 
 
 class GCorbits():
-    def __init__(self, verbose=True):
+    def __init__(self, t=None, verbose=True):
         """
         Package to get positions of stars at a certain point in time
         Orbits and proper motions from Stefan
@@ -33,19 +34,57 @@ class GCorbits():
         for s in star_pms:
             self.star_pms[s['name']] = s
             self.pm_stars.append(s['name'])
+        if t is None:
+            d = datetime.utcnow()
+            t = d.strftime("%Y-%m-%dT%H:%M:%S")
+        try:
+            t = convert_date(t)[0]
+        except ValueError:
+            raise ValueError('t has to be given as YYYY-MM-DDTHH:MM:SS')
+        self.t = t
         if verbose:
+            print(f'Evaluating for {t:.4f}\n')
             print('Stars with orbits:')
             print(self.orbit_stars)
             print('\nStars with proper motions:')
             print(self.pm_stars)
 
-    def pos_orbit(self, star, t, rall=False):
+        # updating stars from stefan
+        for star in self.orbit_stars:
+            try:
+                _s = resource_filename('gravipy', f'Datafiles/s{star[1:]}.dat')
+                _s = np.genfromtxt(_s, skip_header=7, max_rows=14, comments=';')[:,0]
+            except OSError:
+                continue
+            self.star_orbits[star]['a'] = _s[0]*1e3
+            self.star_orbits[star]['e'] = _s[1]
+            self.star_orbits[star]['P'] = _s[2]
+            self.star_orbits[star]['T'] = _s[3]
+            self.star_orbits[star]['i'] = _s[4]/180*np.pi
+            self.star_orbits[star]['CapitalOmega'] = _s[5]/180*np.pi
+            self.star_orbits[star]['Omega'] = _s[6]/180*np.pi
+            print(f'{star} updated from Stefans orbits')
+
+    def star_pos(self, star):
+        try:
+            return self.pos_orbit(star)
+        except KeyError:
+            return self.pos_pm(star)
+
+    def star_kmag(self, star):
+        try:
+            return self.star_orbits[star]['Kmag']
+        except KeyError:
+            return self.star_pms[star]['Kmag']
+
+    def pos_orbit(self, star, rall=False):
         """
         Calculates the position of a star with known orbits
         star: has to be in the list: orbit_stars
         time: the time of evaluation, in float format 20xx.xx
         rall: if true returns also z-position
         """
+        t = self.t
         star = self.star_orbits[star]
 
         M0 = 4.40
@@ -78,20 +117,17 @@ class GCorbits():
         y = r*(cO*(co*cf-so*sf)-sO*(so*cf+co*sf)*ci)
         z = r*(so*cf+co*sf)*si
 
-        # vx = v*((star['e']+cf)*(ci*co*cO-sO*so)-sf*(co*sO+ci*so*cO))
-        # vy = v*((star['e']+cf)*(-ci*co*sO-cO*so)-sf*(co*cO-ci*so*sO))
-        # vz = v*((star['e']+cf)*co*si-sf*si*so)
         if rall:
             return np.array([x, y, z])
         else:
             return np.array([x, y])
 
-    def pos_pm(self, star, t):
+    def pos_pm(self, star):
         """
         Calculates the position of a star with proper motion
         star: has to be in the list: pm_stars
-        time: the time of evaluation, in float format 20xx.xx
         """
+        t = self.t
         star = self.star_pms[star]
         vx = star['vx']/1000
         vy = star['vy']/1000
@@ -136,26 +172,20 @@ class GCorbits():
             E = newton(f, E0, fp, *args, **kwargs)
         return E
 
-    def plot_orbits(self, off=[0,0], t=None, figsize=8, lim=100, long=False):
+    def plot_orbits(self, off=[0, 0], t=None, figsize=8, lim=100, long=False):
         """
         Plot the inner region around SgrA* at a given TIME
-        t:    time of plot (if None then now)
         lim:  radius to which stars are plotted
         long: more information if True
         """
-        if t is None:
-            d = datetime.utcnow()
-            t = d.strftime("%Y-%m-%dT%H:%M:%S")
-        t = convert_date(t)[0]
-
         starpos = []
         for star in self.star_orbits:
             _s = self.star_orbits[star]
-            x, y = self.pos_orbit(star, t)
+            x, y = self.pos_orbit(star)
             starpos.append([_s['name'], x*1000, y*1000, _s['type'], _s['Kmag']])
         for star in self.star_pms:
             _s = self.star_pms[star]
-            x, y = self.pos_pm(star, t)
+            x, y = self.pos_pm(star)
             starpos.append([_s['name'], x*1000, y*1000, _s['type'], _s['Kmag']])
 
         fig, ax = plt.subplots()
