@@ -716,7 +716,7 @@ class GravPhaseNight():
             print(corrections_dict.keys())
         return corrections_dict
 
-    def process_night(self, mode,  fluxcut=0.0, subspacing=1,
+    def process_night(self, mode=None,  fluxcut=0.0, subspacing=1,
                       poscor=True, plot=False,
                       fitstart=0, fitstop=-1, linear_cor=False,
                       save=False, ret=False, phasecorrection=None):
