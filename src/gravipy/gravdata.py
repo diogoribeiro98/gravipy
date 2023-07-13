@@ -1188,7 +1188,7 @@ class GravNight():
             self.lst_files.append(d[0].header['LST'])
         self.t_files = (np.array(self.mjd_files)-self.mjd0)*24*60
 
-        if plotall:
+        if plotall or plot == 'TEL':
             # OPD TEL
             av = 100
             maxval = []
@@ -1227,6 +1227,7 @@ class GravNight():
                         plt.ylabel('OPD_TEL \n[$\mu$m]', fontsize=8)
             plt.show()
 
+        if plotall or plot == 'TEL_CORR':
             # OPD TEL CORR
             av = 100
             maxval = []
@@ -1265,6 +1266,7 @@ class GravNight():
                         plt.ylabel('OPD_TEL_CORR \n[$\mu$m]', fontsize=8)
             plt.show()
 
+        if plotall or plot == 'TELFC_CORR':
             # OPD TEL FC CORR
             av = 100
             maxval = []
@@ -1303,6 +1305,7 @@ class GravNight():
                         plt.ylabel('OPD_TELFC_CORR \n[$\mu$m]', fontsize=8)
             plt.show()
 
+        if plotall or plot == 'FC':
             # OPD_FC
             maxval = []
             for tel in range(4):
@@ -1334,6 +1337,7 @@ class GravNight():
             plt.show()
 
             # OPD_FC_CORR
+        if plotall or plot == 'FC_CORR':
             maxval = []
             for tel in range(4):
                 maxval.append(np.nanmax(np.abs(
