@@ -1,12 +1,12 @@
 from setuptools import setup, find_packages
 
-setup(name='gravipy',
-      version='1.2',
+setup(name='mygravipy',
+      version='1.3',
       author='Felix Widmann',
       description='Package to work with GRAVITY GC data',
-      url='https://github.com/widmannf/gravipy',
+      url='https://github.com/widmannf/mygravipy',
       python_requires='>=3.7',
-      packages=['gravipy'],
+      packages=['mygravipy'],
       package_dir={'':'src'},
       package_data={'gravipy': ['Phasemaps/*.npy',
                                 'Datafiles/*',
