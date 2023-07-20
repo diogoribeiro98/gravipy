@@ -36,7 +36,7 @@ def create_met_files(target='SGRA', create=True, force_new=False,
                      datadir='/data/user/forFrank2/'):
     folders = sorted(glob.glob(datadir + '20??-??-??'))
 
-    s2orbit = np.load(resource_filename('gravipy', 'Datafiles/s2_orbit.npy'))
+    s2orbit = np.load(resource_filename('mygravipy', 'Datafiles/s2_orbit.npy'))
     s2orbit[:, 1:] *= 1e3
     for folder in folders:
         night = folder[-10:]
@@ -544,7 +544,7 @@ class GravPhaseNight():
             if cal_offx is None:
                 cal_offx = offsets[nights.index(night)]
             self.cal_offx = cal_offx
-            s2data = np.load(resource_filename('gravipy', 'Datafiles/s2_orbit.npy'))
+            s2data = np.load(resource_filename('mygravipy', 'Datafiles/s2_orbit.npy'))
             if full_folder:
                 sci_files = allfiles
                 cal_files = allfiles
@@ -615,7 +615,7 @@ class GravPhaseNight():
             else:
                 if self.verbose:
                     print('Read in pandas')
-                pandasfile = resource_filename('gravipy',
+                pandasfile = resource_filename('mygravipy',
                                                'Datafiles/GRAVITY_2019data.object')
                 pand = pd.read_pickle(pandasfile)
 
@@ -645,7 +645,7 @@ class GravPhaseNight():
             print('\n\n')
 
     def get_corrections(self, bequiet=False):
-        folder = resource_filename('gravipy', 'met_corrections/')
+        folder = resource_filename('mygravipy', 'met_corrections/')
         corr_ang = sorted(glob.glob(folder + 'correction*'))
         corr_lst = sorted(glob.glob(folder + 'lst_correction*'))
         corr_bl = sorted(glob.glob(folder + 'bl_correction*'))
@@ -696,7 +696,7 @@ class GravPhaseNight():
         return corrections_dict
 
     def get_phasecorrections(self, bequiet=False):
-        folder = resource_filename('gravipy', 'met_corrections/')
+        folder = resource_filename('mygravipy', 'met_corrections/')
         corr_ang = sorted(glob.glob(folder + 'phasecorrection*'))
         corrections_dict = {} 
         for cor in corr_ang:

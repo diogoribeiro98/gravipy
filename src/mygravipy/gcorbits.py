@@ -52,7 +52,7 @@ class GCorbits():
         # updating stars from stefan
         for star in self.orbit_stars:
             try:
-                _s = resource_filename('gravipy', f'Datafiles/s{star[1:]}.dat')
+                _s = resource_filename('mygravipy', f'Datafiles/s{star[1:]}.dat')
                 _s = np.genfromtxt(_s, skip_header=7, max_rows=14, comments=';')[:,0]
             except OSError:
                 continue

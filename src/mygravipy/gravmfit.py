@@ -333,7 +333,7 @@ class GravPhaseMaps():
                                                      * np.exp(1j*phase)))
             return complexPsf[cc, cc]/np.abs(complexPsf[cc, cc]).max()
 
-        zernikefile = resource_filename('gravipy', 'Phasemaps/' + zerfile)
+        zernikefile = resource_filename('mygravipy', 'Phasemaps/' + zerfile)
         zer = np.load(zernikefile, allow_pickle=True).item()
 
         wave = self.wlSC
@@ -425,9 +425,9 @@ class GravPhaseMaps():
             savename2 = ('Phasemaps/Phasemap_%s_%s_Smooth%i_2020data_denom.npy'
                          % (self.tel, self.resolution, smooth))
 
-        savefile = resource_filename('gravipy', savename)
+        savefile = resource_filename('mygravipy', savename)
         np.save(savefile, all_pm)
-        savefile = resource_filename('gravipy', savename2)
+        savefile = resource_filename('mygravipy', savename2)
         np.save(savefile, all_pm_denom)
         self.all_pm = all_pm
         if plot:
@@ -517,8 +517,8 @@ class GravPhaseMaps():
                         % (self.tel, self.resolution, smoothkernel))
 
         try:
-            pm1 = np.load(resource_filename('gravipy', pm1_file))
-            pm2 = np.real(np.load(resource_filename('gravipy', pm2_file)))
+            pm1 = np.load(resource_filename('mygravipy', pm1_file))
+            pm2 = np.real(np.load(resource_filename('mygravipy', pm2_file)))
         except FileNotFoundError:
             raise ValueError('%s does not exist, you have to create '
                              'the phasemap first!\nFor this '
@@ -548,10 +548,10 @@ class GravPhaseMaps():
                 hlist.append(fits.ImageHDU(pha_map[:, tel],
                                            name='SC_PHA UT%i' % (4-tel)))
             hdul = fits.HDUList(hlist)
-            hdul.writeto(resource_filename('gravipy', 'testfits.fits'),
+            hdul.writeto(resource_filename('mygravipy', 'testfits.fits'),
                          overwrite=True)
             print('Saving phasemaps as fits file to: %s'
-                  % resource_filename('gravipy', 'testfits.fits'))
+                  % resource_filename('mygravipy', 'testfits.fits'))
 
         if interp:
             x = np.arange(201)
