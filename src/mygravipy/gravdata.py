@@ -1008,6 +1008,7 @@ class GravNight():
         get_faint_timer : get timing from G-Faint files
         """
         self.file_list = file_list
+        self.nfiles = len(file_list)
         self.verbose = verbose
         self.colors_baseline = np.array(['k', 'darkblue', color4, 
                                          color2, 'darkred', color1])
@@ -1770,5 +1771,100 @@ class GravNight():
         plt.xlabel(f'Time since {start} in min')
         plt.ylabel('applied Y separation')
         plt.xlim(left=-10)
-        plt.ylim(-0.05,0.15)
-        plt.show() 
+        plt.ylim(-0.05, 0.15)
+        plt.show()
+
+    def plot_visphi(self, nicer=True):
+        self.get_int_data()
+
+        gs = gridspec.GridSpec(self.nfiles, 2, hspace=0.05,
+                               wspace=0.05)
+
+        # maybe make this for all, for now it's only phase
+        plot_quant = ['Visamp', 'Vis2', 'Closure Phase', 'Visibility Phase']
+        plot_closure = [0, 0, 1, 0]
+        plot_min = [-0.03, -0.03, -180, -180]
+        plot_max = [1.1, 1.1, 180, 180]
+        plot_text = [-0.07, -0.07, -180*1.06, -180*1.06]
+        pdx = 3
+
+        for ndx in range(self.nfiles):
+            obj = self.datalist[ndx]
+            spf = obj.spFrequAS
+
+            if nicer:
+                bl_sort = [2, 3, 5, 0, 4, 1]
+                nchannel = len(spf[0])
+                for bl in range(6):
+                    spf[bl] = (np.linspace(nchannel, 0, nchannel)
+                               + bl_sort[bl]*(nchannel+nchannel//2))
+
+            ax = plt.subplot(gs[ndx, 0])
+            x = spf
+            val = obj.visphiSC_P1
+            err = obj.visphierrSC_P1
+            flag = obj.visphiflagSC_P1
+
+            colors = obj.colors_baseline
+            labels = obj.baseline_labels
+            prange = 6
+            for i in range(prange):
+                plt.errorbar(x[i, :],
+                             val[i, :]*(1-flag)[i],
+                             err[i, :]*(1-flag)[i],
+                             color=colors[i],
+                             ls='', lw=1, alpha=0.5, capsize=0)
+                plt.scatter(x[i, :],
+                            val[i, :]*(1-flag)[i],
+                            color=colors[i],
+                            alpha=0.5)
+                if nicer and ndx == self.nfiles - 1:
+                    plt.text(x[i, :].mean(), plot_text[pdx],
+                             labels[i],
+                             color=colors[i],
+                             ha='center', va='center')
+            plt.ylabel(plot_quant[pdx])
+            plt.text(0.98, 0.92, '%i/%i' % (ndx, self.nfiles),
+                     transform=ax.transAxes, fontsize=8,
+                     horizontalalignment='right')
+            plt.ylim(plot_min[pdx], plot_max[pdx])
+            if nicer:
+                # ax.set_xticklabels([])
+                ax.set_xticks([])
+            else:
+                if ndx > self.nfiles - 1:
+                    plt.xlabel('spatial frequency (1/arcsec)')
+                else:
+                    ax.set_xticks([])
+
+            ax = plt.subplot(gs[ndx, 1])
+            val = obj.visphiSC_P2
+            err = obj.visphierrSC_P2
+            flag = obj.visphiflagSC_P2
+
+            for i in range(prange):
+                plt.errorbar(x[i, :],
+                             val[i, :]*(1-flag)[i],
+                             err[i, :]*(1-flag)[i],
+                             color=colors[i],
+                             ls='', lw=1, alpha=0.5, capsize=0)
+                plt.scatter(x[i, :],
+                            val[i, :]*(1-flag)[i],
+                            color=colors[i],
+                            alpha=0.5)
+                if nicer and ndx == self.nfiles - 1:
+                    plt.text(x[i, :].mean(), plot_text[pdx],
+                             labels[i],
+                             color=colors[i],
+                             ha='center', va='center')
+            ax.set_yticklabels([])
+            plt.ylim(plot_min[pdx], plot_max[pdx])
+            if nicer:
+                # ax.set_xticklabels([])
+                ax.set_xticks([])
+            else:
+                if ndx > self.nfiles - 1:
+                    plt.xlabel('spatial frequency (1/arcsec)')
+                else:
+                    ax.set_xticks([])
+        plt.show()
