@@ -1774,22 +1774,25 @@ class GravNight():
         plt.ylim(-0.05, 0.15)
         plt.show()
 
-    def plot_visphi(self, nicer=True):
+    def plot_visphi(self, nicer=True, ymin=None, ymax=None):
         self.get_int_data()
-
+        plt.figure(figsize=(8, self.nfiles*1))
         gs = gridspec.GridSpec(self.nfiles, 2, hspace=0.05,
-                               wspace=0.05)
+                               wspace=0.01)
 
         # maybe make this for all, for now it's only phase
         plot_quant = ['Visamp', 'Vis2', 'Closure Phase', 'Visibility Phase']
         plot_closure = [0, 0, 1, 0]
         plot_min = [-0.03, -0.03, -180, -180]
         plot_max = [1.1, 1.1, 180, 180]
-        plot_text = [-0.07, -0.07, -180*1.06, -180*1.06]
+        plot_text = [-0.07, -0.07, -180*1.06, -180*1.3]
         pdx = 3
+        if ymin is None: ymin = plot_min[pdx]
+        if ymax is None: ymax = plot_max[pdx]
 
         for ndx in range(self.nfiles):
             obj = self.datalist[ndx]
+            _fn = obj.filename
             spf = obj.spFrequAS
 
             if nicer:
@@ -1813,25 +1816,31 @@ class GravNight():
                              val[i, :]*(1-flag)[i],
                              err[i, :]*(1-flag)[i],
                              color=colors[i],
-                             ls='', lw=1, alpha=0.5, capsize=0)
-                plt.scatter(x[i, :],
-                            val[i, :]*(1-flag)[i],
-                            color=colors[i],
-                            alpha=0.5)
+                             marker='.',
+                             ls='', lw=1, alpha=1, capsize=0)
+                #plt.scatter(x[i, :],
+                #            val[i, :]*(1-flag)[i],
+                #            color=colors[i],
+                #            alpha=0.5)
                 if nicer and ndx == self.nfiles - 1:
-                    plt.text(x[i, :].mean(), plot_text[pdx],
+                    plt.text(x[i, :].mean(), ymin*1.3,
                              labels[i],
                              color=colors[i],
-                             ha='center', va='center')
-            plt.ylabel(plot_quant[pdx])
-            plt.text(0.98, 0.92, '%i/%i' % (ndx, self.nfiles),
-                     transform=ax.transAxes, fontsize=8,
-                     horizontalalignment='right')
-            plt.ylim(plot_min[pdx], plot_max[pdx])
+                             ha='center', va='center',
+                             fontsize=8)
+            plt.text(0.02, 0.88, f'File {ndx+1}/{self.nfiles}, {_fn[_fn.find("T")+1:_fn.find("T")+6]}',
+                     transform=ax.transAxes, fontsize=7,
+                     horizontalalignment='left')
+            plt.axhline(0, lw=0.5, ls='--', color='grey')
+            plt.yticks(fontsize=6)
+            plt.ylim(ymin, ymax)
             if nicer:
                 # ax.set_xticklabels([])
                 ax.set_xticks([])
+                if ndx == 0:
+                    plt.title(f'{plot_quant[pdx]}, P1', fontsize=9)
             else:
+                plt.ylabel(plot_quant[pdx])
                 if ndx > self.nfiles - 1:
                     plt.xlabel('spatial frequency (1/arcsec)')
                 else:
@@ -1847,22 +1856,29 @@ class GravNight():
                              val[i, :]*(1-flag)[i],
                              err[i, :]*(1-flag)[i],
                              color=colors[i],
-                             ls='', lw=1, alpha=0.5, capsize=0)
-                plt.scatter(x[i, :],
-                            val[i, :]*(1-flag)[i],
-                            color=colors[i],
-                            alpha=0.5)
+                             marker='.',
+                             ls='', lw=1, alpha=1, capsize=0)
+                #plt.scatter(x[i, :],
+                #            val[i, :]*(1-flag)[i],
+                #            color=colors[i],
+                #            alpha=0.5)
                 if nicer and ndx == self.nfiles - 1:
-                    plt.text(x[i, :].mean(), plot_text[pdx],
+                    plt.text(x[i, :].mean(), ymin*1.3,
                              labels[i],
                              color=colors[i],
-                             ha='center', va='center')
+                             ha='center', va='center',
+                             fontsize=8)
+            plt.axhline(0, lw=0.5, ls='--', color='grey')
             ax.set_yticklabels([])
-            plt.ylim(plot_min[pdx], plot_max[pdx])
+            plt.yticks(fontsize=8)
+            plt.ylim(ymin, ymax)
             if nicer:
                 # ax.set_xticklabels([])
                 ax.set_xticks([])
+                if ndx == 0:
+                    plt.title(f'{plot_quant[pdx]}, P2', fontsize=9)
             else:
+                plt.ylabel(plot_quant[pdx])
                 if ndx > self.nfiles - 1:
                     plt.xlabel('spatial frequency (1/arcsec)')
                 else:
