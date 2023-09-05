@@ -17,12 +17,7 @@ from lmfit import minimize, Parameters
 import dynesty
 from dynesty import plotting as dyplot
 from dynesty import utils as dyfunc
-
-
-try:
-    from numba import jit
-except ModuleNotFoundError:
-    print("can't import numba, please install it via pip or conda")
+from numba import jit
 
 from .gravdata import *
 
@@ -145,7 +140,7 @@ def procrustes(a, target, padval=0):
 
 
 class GravPhaseMaps():
-    def __init__(self):
+    def __init__(self, loglevel='INFO'):
         """
         GravPhaseMaps: Class to create and load GRAVITY phasemaps
         for more information on phasemaps see:
@@ -161,7 +156,17 @@ class GravPhaseMaps():
         load_phasemaps : load the phasemaps from package
         read_phasemaps : read correction from loaded phasemaps
         """
-        pass
+        self.get_int_data(ignore_tel=ignore_tel)
+        log_level = log_level_mapping.get(loglevel, logging.INFO)
+        logger = logging.getLogger(__name__)
+        logger.setLevel(log_level)
+        ch = logging.StreamHandler()
+        # ch.setLevel(logging.DEBUG) # not sure if needed
+        formatter = logging.Formatter('%(levelname)s: %(name)s - %(message)s')
+        ch.setFormatter(formatter)
+        if not logger.hasHandlers():
+            logger.addHandler(ch)
+        self.logger = logger
 
     def create_phasemaps(self, nthreads=1, smooth=15, plot=True, 
                          datayear=2019):
@@ -171,7 +176,7 @@ class GravPhaseMaps():
             zerfile = 'phasemap_zernike_20200922_diff_2020data.npy'
         else:
             raise ValueError('Datayear has to be 2019 or 2020')
-        print('Used file: %s' % zerfile)
+        self.logger.info('Used file: %s' % zerfile)
 
         def phase_screen(A00, A1m1, A1p1, A2m2, A2p2, A20, A3m1, A3p1, A3m3,
                          A3p3, A4m2, A4p2, A4m4, A4p4, A40,  A5m1, A5p1, A5m3,
@@ -266,7 +271,7 @@ class GravPhaseMaps():
             hmapN = int(amax/dalpha)
             cc = slice(int(totN/2)-hmapN, int(totN/2)+hmapN+1)
             if 2*hmapN > totN:
-                print('Requested map sizes too large')
+                self.logger.error('Requested map sizes too large')
                 return False
 
             # --- pupil function --- #
@@ -358,11 +363,11 @@ class GravPhaseMaps():
 
         kernel = Gaussian2DKernel(x_stddev=smooth)
 
-        print('Creating phasemaps:')
-        print('StopB : %.2f' % stopB)
-        print('StopS : %.2f' % stopS)
-        print('Smooth: %.2f' % set_smooth)
-        print('amax: %i' % amax)
+        self.logger.info('Creating phasemaps')
+        self.logger.debug('StopB : %.2f' % stopB)
+        self.logger.debug('StopS : %.2f' % stopS)
+        self.logger.debug('Smooth: %.2f' % set_smooth)
+        self.logger.debug('amax: %i' % amax)
 
         if nthreads == 1:
             all_pm = np.zeros((len(wave), 4, 201, 201),
@@ -377,8 +382,8 @@ class GravPhaseMaps():
                                       stopS=stopS, dalpha=dalpha, totN=totN,
                                       amax=amax)
                     if pm.shape != (201, 201):
-                        print(pm.shape)
-                        print('Need to convert to (201,201) shape')
+                        self.logger.warning(pm.shape)
+                        self.logger.warning('Need to convert to (201,201) shape')
                         pm = procrustes(pm, (201, 201), padval=0)
                     pm_sm = signal.convolve2d(pm, kernel, mode='same')
                     pm_sm_denom = signal.convolve2d(np.abs(pm)**2, 
@@ -389,7 +394,6 @@ class GravPhaseMaps():
 
         else:
             def multi_pm(lam):
-                print(lam)
                 m_all_pm = np.zeros((4, 201, 201), dtype=np.complex_)
                 m_all_pm_denom = np.zeros((4, 201, 201), dtype=np.complex_)
                 for GV in range(4):
@@ -399,8 +403,8 @@ class GravPhaseMaps():
                                       amax=amax)
 
                     if pm.shape != (201, 201):
-                        print('Need to convert to (201,201) shape')
-                        print(pm.shape)
+                        self.logger.warning(pm.shape)
+                        self.logger.warning('Need to convert to (201,201) shape')
                         pm = procrustes(pm, (201,201), padval=0)
 
                     pm_sm = signal.convolve2d(pm, kernel, mode='same')
@@ -526,8 +530,8 @@ class GravPhaseMaps():
 
         wave = self.wlSC
         if pm1.shape[0] != len(wave):
-            print(pm1_file)
-            print(pm1.shape[0], len(wave))
+            self.logger.error(pm1_file)
+            self.logger.error(pm1.shape[0], len(wave))
             raise ValueError('Phasemap and data have different num of channels')
 
         amp_map = np.abs(pm1)
@@ -550,7 +554,7 @@ class GravPhaseMaps():
             hdul = fits.HDUList(hlist)
             hdul.writeto(resource_filename('mygravipy', 'testfits.fits'),
                          overwrite=True)
-            print('Saving phasemaps as fits file to: %s'
+            self.logger.info('Saving phasemaps as fits file to: %s'
                   % resource_filename('mygravipy', 'testfits.fits'))
 
         if interp:
@@ -1046,7 +1050,7 @@ def _calc_vis_mstars(theta_in, fitarg, fithelp):
 
 
 class GravMFit(GravData, GravPhaseMaps):
-    def __init__(self, data, verbose=False, ignore_tel=[]):
+    def __init__(self, data, loglevel='INFO', ignore_tel=[]):
         """
         GravMFit: Class to fit a multiple point source model to GRAVITY data
 
@@ -1054,8 +1058,19 @@ class GravMFit(GravData, GravPhaseMaps):
         fit_stars : the function to do the fit
         plot_fit : plot the data and the fitted model
         """
-        super().__init__(data, verbose=verbose)
+        super().__init__(data, loglevel=loglevel)
         self.get_int_data(ignore_tel=ignore_tel)
+        log_level = log_level_mapping.get(loglevel, logging.INFO)
+        logger = logging.getLogger(__name__)
+        logger.setLevel(log_level)
+        ch = logging.StreamHandler()
+        # ch.setLevel(logging.DEBUG) # not sure if needed
+        formatter = logging.Formatter('%(levelname)s: %(name)s - %(message)s')
+        ch.setFormatter(formatter)
+        if not logger.hasHandlers():
+            logger.addHandler(ch)
+        self.logger = logger
+
 
     def fit_stars(self,
                   ra_list,
@@ -1071,7 +1086,7 @@ class GravMFit(GravData, GravPhaseMaps):
                   fixedBHalpha=False,
                   fixedBG=False,
                   initial=None,
-                  plotScience=True,
+                  plot_science=True,
                   phasemaps=True,
                   **kwargs):
         '''
@@ -1102,7 +1117,7 @@ class GravMFit(GravData, GravPhaseMaps):
         fit_for:        weight of VA, V2, T3, VP [[0.5,0.5,1.0,0.0]]
         initial:        Initial guess for fit [None]
         fixedBHalpha:   Fit for black hole power law [False]
-        plotScience:    plot fit result [True]
+        plot_science:    plot fit result [True]
         phasemaps:      Use Phasemaps for fit [True]
 
         Optional unnamed arguments (can be given via kwargs):
@@ -1123,14 +1138,13 @@ class GravMFit(GravData, GravPhaseMaps):
                         available. Give prefix to filename [None]
         fit_phasemaps:  Fit phasemaps at each step, otherwise jsut takes the 
                         initial guess value [False]
-        plotCorner:     plot MCMC results [False, steps, corner, both]
+        plot_corner:     plot MCMC results [False, steps, corner, both]
         interppm:       Interpolate Phasemaps [True]
         pmdatayear:     Phasemaps year, 2019 or 2020 [2019]
         smoothkernel:   Size of smoothing kernel in mas [15]
         vis_flag:       Does flag vis > 1 if True [True]
         '''
         fit_mode = kwargs.get('fit_mode', 'numeric')
-        bequiet = kwargs.get('bequiet', False)
         bestchi = kwargs.get('bestchi', True)
         redchi2 = kwargs.get('redchi2', True)
         flagtill = kwargs.get('flagtill', None)
@@ -1138,7 +1152,7 @@ class GravMFit(GravData, GravPhaseMaps):
         coh_loss = kwargs.get('coh_loss', False)
         no_fit = kwargs.get('no_fit', False)
         onlypol = kwargs.get('onlypol', None)
-        plotCorner = kwargs.get('plotCorner', None)
+        plot_corner = kwargs.get('plot_corner', None)
         iopandas = kwargs.get('iopandas', None)
         vis_flag = kwargs.get('vis_flag', True)
 
@@ -1174,7 +1188,6 @@ class GravMFit(GravData, GravPhaseMaps):
         self.coh_loss = coh_loss
         self.interppm = interppm
         self.fit_mode = fit_mode
-        self.bequiet = bequiet
         self.phasemaps = phasemaps
         self.fit_phasemaps = fit_phasemaps
         if phasemaps:
@@ -1407,18 +1420,16 @@ class GravMFit(GravData, GravPhaseMaps):
                 fittab = pd.read_pickle(pdname)
                 pdexists = True
                 no_fit = True
-                if self.verbose:
-                    print('Results exist at %s' % pdname)
+                self.logger.info('Results exist at %s' % pdname)
             except FileNotFoundError:
                 pdexists = False
         elif no_fit:
             pdexists = False
 
         if no_fit:
-            plotCorner = False
-            if self.verbose:
-                print('Will not fit the data, just print out the results for '
-                      'the given initial conditions')
+            plot_corner = False
+            self.logger.info('Will not fit the data, just print out the results for '
+                    'the given initial conditions')
 
         for ddx in sorted(todel, reverse=True):
             del theta_names[ddx]
@@ -1452,8 +1463,8 @@ class GravMFit(GravData, GravPhaseMaps):
             closamp_flag_P = [self.t3ampflagSC_P1, self.t3ampflagSC_P2]
 
             ndit = np.shape(self.visampSC_P1)[0]//6
-            if not bequiet:
-                print('NDIT = %i' % ndit)
+            if ndit > 1:
+                self.logger.info('NDIT = %i' % ndit)
             if onlypol is not None:
                 polnom = [onlypol]
             else:
@@ -1481,13 +1492,15 @@ class GravMFit(GravData, GravPhaseMaps):
             closamp_flag_P = [self.t3ampflagSC]
 
             ndit = np.shape(self.visampSC)[0]//6
-            if not bequiet:
-                print('NDIT = %i' % ndit)
+            if ndit > 1:
+                self.logger.info('NDIT = %i' % ndit)
             polnom = [0]
 
         for dit in range(ndit):
-            if not bequiet and not no_fit:
-                print('Run MCMC for DIT %i' % (dit+1))
+            if not no_fit:
+                if ndit > 1:
+                    self.logger.info('')
+                    self.logger.info(f'Run MCMC for DIT {dit+1}')
             ditstart = dit*6
             ditstop = ditstart + 6
             t3ditstart = dit*4
@@ -1543,8 +1556,7 @@ class GravMFit(GravData, GravPhaseMaps):
                     p = flagtill
                     t = flagfrom
                     if idx == 0 and dit == 0:
-                        if not bequiet:
-                            print('using channels from #%i to #%i' % (p, t))
+                        self.logger.info('using channels from #%i to #%i' % (p, t))
                     visamp_flag[:, 0:p] = True
                     vis2_flag[:, 0:p] = True
                     visphi_flag[:, 0:p] = True
@@ -1564,11 +1576,12 @@ class GravMFit(GravData, GravPhaseMaps):
                     pos[:, par] = (theta[par]
                                    + width*np.random.randn(nwalkers))
 
-                if not bequiet:
-                    if not no_fit:
-                        print('Run MCMC for Pol %i' % (idx+1))
-                    else:
-                        print('Pol %i' % (idx+1))
+                if not no_fit:
+                    self.logger.info('')
+                    self.logger.info(f'Run MCMC for Pol {idx+1}')
+                else:
+                    self.logger.info('')
+                    self.logger.info(f'Pol {idx+1}')
 
                 fitdata = [visamp, visamp_error, visamp_flag,
                            vis2, vis2_error, vis2_flag,
@@ -1605,6 +1618,7 @@ class GravMFit(GravData, GravPhaseMaps):
                                None, None, None, None, None, None]
 
                 if not no_fit:
+                    level = self.logger.level
                     if not onlyphases:
                         if nthreads == 1:
                             sampler = emcee.EnsembleSampler(nwalkers, ndim,
@@ -1614,7 +1628,7 @@ class GravMFit(GravData, GravPhaseMaps):
                                                                   upper,
                                                                   fitarg,
                                                                   fithelp))
-                            if bequiet:
+                            if level > logging.INFO:
                                 sampler.run_mcmc(pos, nruns, progress=False,
                                                  skip_initial_state_check=True)
                             else:
@@ -1630,18 +1644,19 @@ class GravMFit(GravData, GravPhaseMaps):
                                                                       fitarg,
                                                                       fithelp),
                                                                 pool=pool)
-                                if bequiet:
+                                if level > logging.INFO:
                                     sampler.run_mcmc(pos, nruns, progress=False,
                                                      skip_initial_state_check=True)
                                 else:
                                     sampler.run_mcmc(pos, nruns, progress=True,
                                                      skip_initial_state_check=True)
 
-                        if not bequiet:
-                            print("---------------------------------------")
-                            print("Mean acceptance fraction: %.2f"
-                                  % np.mean(sampler.acceptance_fraction))
-                            print("---------------------------------------")
+                        ac_fraction = np.mean(sampler.acceptance_fraction)
+                        if ac_fraction < 0.25 or ac_fraction > 0.5:
+                            self.logger.warning(f'Mean acceptance fraction: {ac_fraction:.2}')
+                            self.logger.warning('Should be between 0.25 and 0.5')
+                        else:
+                            self.logger.info(f'Mean acceptance fraction: {ac_fraction:.2}')
 
                         samples = sampler.chain
                         mostprop = sampler.flatchain[np.argmax(sampler.flatlnprobability)]
@@ -1651,7 +1666,7 @@ class GravMFit(GravData, GravPhaseMaps):
                         clmostprop = mostprop
 
                         cldim = len(cllabels)
-                        if plotCorner in ['steps', 'both']:
+                        if plot_corner in ['steps', 'both']:
                             fig, axes = plt.subplots(cldim, figsize=(8, cldim/1.5),
                                                      sharex=True)
                             for i in range(cldim):
@@ -1670,7 +1685,7 @@ class GravMFit(GravData, GravPhaseMaps):
                         else:
                             fl_samples = samples.reshape((-1, ndim))
 
-                        if plotCorner in ['corner', 'both']:
+                        if plot_corner in ['corner', 'both']:
                             fig = corner.corner(fl_samples,
                                                 quantiles=[0.16, 0.5, 0.84],
                                                 truths=mostprop,
@@ -1817,14 +1832,11 @@ class GravMFit(GravData, GravPhaseMaps):
                                redchi_closure, redchi_visphi]
                     self.redchi1 = redchi1
 
-                if not bequiet:
-                    print('\n')
-                    print('ndof: %i' % (vis2.size-np.sum(vis2_flag)-ndof))
-                    print(chi2string + " for visamp: %.2f" % redchi_visamp)
-                    print(chi2string + " for vis2: %.2f" % redchi_vis2)
-                    print(chi2string + " for visphi: %.2f" % redchi_visphi)
-                    print(chi2string + " for closure: %.2f" % redchi_closure)
-                    print('\n')
+                self.logger.info('ndof: %i' % (vis2.size-np.sum(vis2_flag)-ndof))
+                self.logger.info(f'{chi2string} for visamp: {redchi_visamp:.2}')
+                self.logger.info(f'{chi2string} for vis2: {redchi_vis2:.2}')
+                self.logger.info(f'{chi2string} for visphi: {redchi_visphi:.2}')
+                self.logger.info(f'{chi2string} for closure: {redchi_closure:.2}')
 
                 if not no_fit and not onlyphases:
                     percentiles = np.percentile(fl_samples,
@@ -1832,27 +1844,23 @@ class GravMFit(GravData, GravPhaseMaps):
                     percentiles[:, 0] = percentiles[:, 1] - percentiles[:, 0]
                     percentiles[:, 2] = percentiles[:, 2] - percentiles[:, 1]
 
-                    if not bequiet:
-                        print("-----------------------------------")
-                        print("Best chi2 result:")
-                        for i in range(0, cldim):
-                            print("%s = %.3f" % (cllabels[i], clmostprop[i]))
-                        print("\n")
-                        print("MCMC Result:")
-                        for i in range(0, cldim):
-                            print("%s = %.3f + %.3f - %.3f"
-                                  % (cllabels[i], percentiles[i, 1],
-                                     percentiles[i, 2], percentiles[i, 0]))
-                        print("-----------------------------------")
+                    self.logger.info("Best chi2 result:")
+                    for i in range(0, cldim):
+                        self.logger.info("%s = %.3f" % (cllabels[i], clmostprop[i]))
+                    self.logger.info("MCMC Result:")
+                    for i in range(0, cldim):
+                        self.logger.info("%s = %.3f + %.3f - %.3f"
+                            % (cllabels[i], percentiles[i, 1],
+                                percentiles[i, 2], percentiles[i, 0]))
 
-                if plotScience:
+                if plot_science:
                     if idx == 0:
                         plotdata = []
                     plotdata.append([theta_result, fitdata, fitarg, fithelp])
                 if not no_fit:
-                    fittab = fittab.append(_fittab, ignore_index=True)
+                    fittab = pd.concat([fittab, _fittab], ignore_index=True)
 
-            if plotScience:
+            if plot_science:
                 self.plot_fit(plotdata)
                 self.plotdata = plotdata
         if not no_fit or pdexists:
@@ -1867,13 +1875,11 @@ class GravMFit(GravData, GravPhaseMaps):
                 redchi1 = np.zeros_like(redchi0)
             redchi1_f = np.sum(redchi1*fitted)
             redchi_f = redchi0_f + redchi1_f
-            if not bequiet:
-                print('Combined %s of fitted data: %.3f' % (chi2string,
-                                                            redchi_f))
+            self.logger.info(f'Combined {chi2string} of fitted data: {redchi_f:.3}')
         except UnboundLocalError:
             pass
         except:
-            print("could not compute reduced chi2")
+            self.logger.error("could not compute reduced chi2")
         if onlypol is not None and ndit == 1:
             return theta_result
         else:
@@ -2834,7 +2840,7 @@ class GravMNightFit(GravNight):
                             self.sampler.run_mcmc(pos, nruns, progress=True,
                                                   skip_initial_state_check=True)
 
-    def get_fit_result(self, plot=True, plotcorner=False, ret=False):
+    def get_fit_result(self, plot=True, plot_corner=False, ret=False):
         if not self.no_fit:
             if self.nested:
                 r = self.samper.results
@@ -2999,12 +3005,12 @@ class GravMNightFit(GravNight):
         print("-----------------------------------")
 
         if plot and not self.no_fit:
-            self.plot_MCMC(plotcorner)
+            self.plot_MCMC(plot_corner)
 
         if ret:
             return self.medianprop
 
-    def plot_MCMC(self, plotcorner=False):
+    def plot_MCMC(self, plot_corner=False):
         # clsamples = np.delete(self.sampler.chain, self.todel, 2)
         # cllabels = np.delete(self.theta_names, self.todel)
         # clmostprop = np.delete(self.mostprop, self.todel)
@@ -3024,7 +3030,7 @@ class GravMNightFit(GravNight):
         axes[-1].set_xlabel("step number")
         plt.show()
 
-        if plotcorner:
+        if plot_corner:
             fig = corner.corner(self.fl_clsamples, quantiles=[0.16, 0.5, 0.84],
                                 truths=clmostprop, labels=cllabels)
             plt.show()

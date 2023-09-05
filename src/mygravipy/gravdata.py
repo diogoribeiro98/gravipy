@@ -2,6 +2,7 @@ from astropy.io import fits
 import matplotlib.pyplot as plt
 from matplotlib import gridspec
 import numpy as np
+import logging
 from scipy import interpolate
 from pkg_resources import resource_filename
 from astropy.time import Time
@@ -20,6 +21,14 @@ color1 = '#C02F1D'
 color2 = '#348ABD'
 color3 = '#F26D21'
 color4 = '#7A68A6'
+
+log_level_mapping = {
+    "DEBUG": logging.DEBUG,
+    "INFO": logging.INFO,
+    "WARNING": logging.WARNING,
+    "ERROR": logging.ERROR,
+    "CRITICAL": logging.CRITICAL,
+}
 
 
 def fiber_coupling(x):
@@ -198,7 +207,8 @@ def rotation(ang):
 
 
 class GravData():
-    def __init__(self, data, verbose=True, plot=False, datacatg=None, test=False):
+    def __init__(self, data, loglevel='INFO', plot=False,
+                 datacatg=None, test=False):
         """
         GravData: Class to load GRAVITY datafiles
 
@@ -209,10 +219,20 @@ class GravData():
         av_phases : properly average phases in phasor space
         calibrate_phi : Calibrate visibility phases
         """
+        log_level = log_level_mapping.get(loglevel, logging.INFO)
+        logger = logging.getLogger(__name__)
+        logger.setLevel(log_level)
+        ch = logging.StreamHandler()
+        # ch.setLevel(logging.DEBUG) # not sure if needed
+        formatter = logging.Formatter('%(levelname)s: %(name)s - %(message)s')
+        ch.setFormatter(formatter)
+        if not logger.hasHandlers():
+            logger.addHandler(ch)
+        self.logger = logger
+
         self.name = data
         self.test = test
         self.filename = os.path.basename(data)
-        self.verbose = verbose
         self.colors_baseline = np.array(['k', 'darkblue', color4,
                                          color2, 'darkred', color1])
         self.colors_closure = np.array([color1, 'darkred', 'k', color2])
@@ -241,8 +261,7 @@ class GravData():
                     raise ValueError('filetype is %s, which is not supported'
                                      % datacatg)
             else:
-                if self.verbose:
-                    print('Assume this is a raw file!')
+                logger.info('Assume this is a raw file!')
                 datacatg = 'RAW'
         if datacatg == 'RAW':
             self.raw = True
@@ -300,13 +319,12 @@ class GravData():
             self.closure_labels = np.array(closure_labels)
             self.baseline_labels = np.array(baseline_labels)
 
-        if self.verbose:
-            print('Category: %s' % self.datacatg)
-            print('Telescope: %s' % self.tel)
-            print('Polarization: %s' % self.polmode)
-            print('Resolution: %s' % self.resolution)
-            print('DIT: %f' % self.dit)
-            print('NDIT: %i' % self.ndit)
+        logger.info(f'Category: {self.datacatg}')
+        logger.info(f'Telescope: {self.tel}')
+        logger.info(f'Polarization: {self.polmode}')
+        logger.info(f'Resolution: {self.resolution}')
+        logger.info(f'DIT: {self.dit}')
+        logger.info(f'NDIT: {self.ndit}')
 
         if not self.raw:
             if self.polmode == 'SPLIT':
@@ -822,8 +840,7 @@ class GravData():
         det_gain = 1.984
 
         if skyfile is None:
-            if self.verbose:
-                print('No skyfile given')
+            self.logger.info('No skyfile given')
             red = raw*det_gain
         else:
             sky = fits.open(skyfile)['IMAGING_DATA_SC'].data
@@ -882,7 +899,7 @@ class GravData():
                 except ValueError:
                     red_spectra_i[tdx, idx,:] = interpolate.interp1d(wavefits['WAVE_DATA_SC'].data['DATA%i' % (idx+1)][0],
                                                                      red_spectra[tdx, idx], bounds_error=False, fill_value='extrapolate')(pp_wl)
-                    print('Extrapolation needed')
+                    self.logger.warning('Extrapolation needed')
 
         if method == 'preproc':
             return pp_wl, red_spectra_i
@@ -996,7 +1013,7 @@ class GravData():
 
 
 class GravNight():
-    def __init__(self, file_list, verbose=True, onlymet=False):
+    def __init__(self, file_list, loglevel='INFO', onlymet=False):
         """
         GravNight: Class to load several GRAVITY datafiles
 
@@ -1007,9 +1024,21 @@ class GravNight():
         get_acq_data : load data from acquisition camera multiprocessing
         get_faint_timer : get timing from G-Faint files
         """
+        log_level = log_level_mapping.get(loglevel, logging.INFO)
+        self.log_level = log_level
+
+        logger = logging.getLogger(__name__)
+        logger.setLevel(log_level)
+        ch = logging.StreamHandler()
+        # ch.setLevel(logging.DEBUG) # not sure if needed
+        formatter = logging.Formatter('%(levelname)s: %(name)s - %(message)s')
+        ch.setFormatter(formatter)
+        if not logger.hasHandlers():
+            logger.addHandler(ch)
+        self.logger = logger
+
         self.file_list = file_list
         self.nfiles = len(file_list)
-        self.verbose = verbose
         self.colors_baseline = np.array(['k', 'darkblue', color4, 
                                          color2, 'darkred', color1])
         self.colors_closure = np.array([color1, 'darkred', 'k', color2])
@@ -1022,28 +1051,29 @@ class GravNight():
         self.headerlist = []
 
         for num, fi in enumerate(self.file_list):
-            self.datalist.append(GravData(fi, verbose=False))
+            self.datalist.append(GravData(fi, loglevel='ERROR'))
             self.headerlist.append(fits.open(fi)[0].header)
+        self.logger.setLevel(self.log_level)
 
         _catg = [i.datacatg for i in self.datalist]
         if _catg.count(_catg[0]) == len(_catg):
             self.datacatg = _catg[0]
         else:
-            print(_catg)
+            self.logger.error(_catg)
             raise ValueError('Not all input data from same category')
 
         _tel = [i.tel for i in self.datalist]
         if _tel.count(_tel[0]) == len(_tel):
             self.tel = _tel[0]
         else:
-            print(_tel)
+            self.logger.error(_tel)
             raise ValueError('Not all input data from same tel')
 
         _pol = [i.polmode for i in self.datalist]
         if _pol.count(_pol[0]) == len(_pol):
             self.polmode = _pol[0]
         else:
-            print(_pol)
+            self.logger.error(_pol)
             self.polmode = None
             if not self.onlymet:
                 raise ValueError('Not all input data from same polmode')
@@ -1052,7 +1082,7 @@ class GravNight():
         if _res.count(_res[0]) == len(_res):
             self.resolution = _res[0]
         else:
-            print(_res)
+            self.logger.error(_res)
             self.resolution = None
             if not self.onlymet:
                 raise ValueError('Not all input data from same resolution')
@@ -1061,7 +1091,7 @@ class GravNight():
         if _dit.count(_dit[0]) == len(_dit):
             self.dit = _dit[0]
         else:
-            print(_dit)
+            self.logger.error(_dit)
             self.dit = None
             if not self.onlymet:
                 raise ValueError('Not all input data from same dit')
@@ -1070,19 +1100,18 @@ class GravNight():
         if _ndit.count(_ndit[0]) == len(_ndit):
             self.ndit = _ndit[0]
         else:
-            print(_ndit)
+            self.logger.error(_ndit)
             self.ndit = None
             if not self.onlymet:
                 raise ValueError('Not all input data from same ndit')
 
-        if self.verbose:
-            print(f'{len(self.datalist)} files loaded as:')
-            print(f'Category: {self.datacatg}')
-            print(f'Telescope: {self.tel}')
-            print(f'Polarization: {self.polmode}')
-            print(f'Resolution: {self.resolution}')
-            print(f'DIT: {self.dit}')
-            print(f'NDIT: {self.ndit}')
+        self.logger.info(f'{len(self.datalist)} files loaded as:')
+        self.logger.info(f'Category: {self.datacatg}')
+        self.logger.info(f'Telescope: {self.tel}')
+        self.logger.info(f'Polarization: {self.polmode}')
+        self.logger.info(f'Resolution: {self.resolution}')
+        self.logger.info(f'DIT: {self.dit}')
+        self.logger.info(f'NDIT: {self.ndit}')
 
         self.mjd = [i.mjd for i in self.datalist]
         self.mjd0 = np.min(np.array(self.mjd))
@@ -1558,9 +1587,9 @@ class GravNight():
             time2 = h['ESO INS ANLO3 TIMER2']
             volt1 = h['ESO INS ANLO3 VOLTAGE1']
             volt2 = h['ESO INS ANLO3 VOLTAGE2']
-            if self.verbose:
-                print(f'Bright period: {rate1*60-(time2-time1):.2f}, '
-                      f'Voltage: {volt1:.1f}, {volt2:.1f}')
+            
+            self.logger.info(f'Bright period: {rate1*60-(time2-time1):.2f}, '
+                             f'Voltage: {volt1:.1f}, {volt2:.1f}')
             self.faintprop.append([rate1*60-(time2-time1), volt1, volt2])
 
             mt1 = ((time1 / 86400.0) + 2440587.5 - 2400000.5 - self.mjd0)*24*60

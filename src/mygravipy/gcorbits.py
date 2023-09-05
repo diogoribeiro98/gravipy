@@ -6,12 +6,12 @@ from .star_orbits import star_pms, star_orbits
 from datetime import datetime
 import matplotlib.pyplot as plt
 from pkg_resources import resource_filename
-
-from .gravdata import convert_date
+import logging
+from .gravdata import convert_date, log_level_mapping
 
 
 class GCorbits():
-    def __init__(self, t=None, verbose=True):
+    def __init__(self, t=None, loglevel='INFO'):
         """
         Package to get positions of stars at a certain point in time
         Orbits and proper motions from Stefan
@@ -24,6 +24,17 @@ class GCorbits():
         pos_orbit : get positions for stars with orbits
         pos_pm : get positions for stars with proper motions
         """
+        log_level = log_level_mapping.get(loglevel, logging.INFO)
+        logger = logging.getLogger(__name__)
+        logger.setLevel(log_level)
+        ch = logging.StreamHandler()
+        # ch.setLevel(logging.DEBUG) # not sure if needed
+        formatter = logging.Formatter('%(levelname)s: %(name)s - %(message)s')
+        ch.setFormatter(formatter)
+        if not logger.hasHandlers():
+            logger.addHandler(ch)
+        self.logger = logger
+
         self.star_orbits = {}
         self.orbit_stars = []
         for s in star_orbits:
@@ -42,12 +53,12 @@ class GCorbits():
         except ValueError:
             raise ValueError('t has to be given as YYYY-MM-DDTHH:MM:SS')
         self.t = t
-        if verbose:
-            print(f'Evaluating for {t:.4f}\n')
-            print('Stars with orbits:')
-            print(self.orbit_stars)
-            print('\nStars with proper motions:')
-            print(self.pm_stars)
+        logger.info(f'Evaluating for {t:.4f}\n')
+        logger.debug('Stars with orbits:')
+        logger.debug(self.orbit_stars)
+        logger.debug('')
+        logger.debug('Stars with proper motions:')
+        logger.debug(self.pm_stars)
 
         # updating stars from stefan
         for star in self.orbit_stars:
@@ -63,7 +74,7 @@ class GCorbits():
             self.star_orbits[star]['i'] = _s[4]/180*np.pi
             self.star_orbits[star]['CapitalOmega'] = _s[5]/180*np.pi
             self.star_orbits[star]['Omega'] = _s[6]/180*np.pi
-            print(f'{star} updated from Stefans orbits')
+            logger.info(f'{star} updated from Stefans orbits')
 
     def star_pos(self, star):
         try:
