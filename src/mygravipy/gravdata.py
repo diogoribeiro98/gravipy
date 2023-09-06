@@ -555,6 +555,19 @@ class GravData():
                     self.visphiSC_P2[self.visphiflagSC_P2] = np.nan
                     self.visphierrSC_P2[self.visphiflagSC_P2] = np.nan
 
+                self.int_data = [[self.visampSC_P1, self.visampSC_P2,
+                                  self.vis2SC_P1, self.vis2SC_P2,
+                                  self.t3SC_P1, self.t3SC_P2,
+                                  self.visphiSC_P1, self.visphiSC_P2],
+                                 [self.visamperrSC_P1, self.visamperrSC_P2,
+                                  self.vis2errSC_P1, self.vis2errSC_P2,
+                                  self.t3errSC_P1, self.t3errSC_P2,
+                                  self.visphierrSC_P1, self.visphierrSC_P2],
+                                 [self.visampflagSC_P1, self.visampflagSC_P2,
+                                  self.vis2flagSC_P1, self.vis2flagSC_P2,
+                                  self.t3flagSC_P1, self.t3flagSC_P2,
+                                  self.visphiflagSC_P1, self.visphiflagSC_P2]]
+
                 if plot:
                     if plotTAmp:
                         gs = gridspec.GridSpec(3, 2)
