@@ -1,19 +1,23 @@
 import sys
 import numpy as np
-# from PyQt6.QtWidgets import (QApplication, QMainWindow,
-#                              QPushButton, QMessageBox,
-#                              QFileDialog, QLineEdit)
-
-from PyQt6.QtWidgets import (QApplication, QMainWindow,
-                             QPushButton, QMessageBox,
-                             QFileDialog, QLineEdit,
-                             QComboBox, QLabel,
-                             QTextEdit,
-                             QVBoxLayout, 
-                             QWidget
-                            )
-
-from matplotlib.figure import Figure
+try:
+    from PyQt6.QtWidgets import (QApplication, QMainWindow,
+                                QPushButton, QMessageBox,
+                                QFileDialog, QLineEdit,
+                                QComboBox, QLabel,
+                                QTextEdit,
+                                QVBoxLayout, 
+                                QWidget
+                                )
+except ImportError:
+    from PyQt5.QtWidgets import (QApplication, QMainWindow,
+                                QPushButton, QMessageBox,
+                                QFileDialog, QLineEdit,
+                                QComboBox, QLabel,
+                                QTextEdit,
+                                QVBoxLayout, 
+                                QWidget
+                                )
 from gui_utils import PlotData, LoggingHandler, LoadData
 import logging
 
@@ -104,7 +108,8 @@ class GRAVITYfitGUI(QMainWindow):
         # Calculate widget sizes and positions based on the window size
         window_width = self.width()
         window_height = self.height()
-        logging.info(f"Window size: {window_width} x {window_height}")
+
+        logging.debug(f"Window size: {window_width} x {window_height}")
 
         self.file_path_edit.setGeometry(200, 20, 
                                         window_width-220, 30)
@@ -118,29 +123,6 @@ class GRAVITYfitGUI(QMainWindow):
         self.canvas2.setGeometry(20, 150+can_height,
                                  can_width, can_height)
 
-        # # Adjust the file path edit position and size
-        # edit_x = window_width * 0.4
-        # edit_y = window_height * 0.05
-        # edit_width = window_width * 0.5
-        # edit_height = window_height * 0.05
-        # self.file_path_edit.setGeometry(edit_x, edit_y, edit_width, edit_height)
-
-        # # Adjust the combo box position and size
-        # combo_x = window_width * 0.1
-        # combo_y = window_height * 0.2
-        # combo_width = window_width * 0.2
-        # combo_height = window_height * 0.05
-        # self.data_source_combo.setGeometry(combo_x, combo_y, combo_width, combo_height)
-
-        # # Adjust the canvas position and size
-        # canvas_x = window_width * 0.05
-        # canvas_y = window_height * 0.3
-        # canvas_width = window_width * 0.9
-        # canvas_height = window_height * 0.6
-        # self.canvas.setGeometry(canvas_x, canvas_y, canvas_width, canvas_height)
-
-        # # Redraw the plot
-        # self.updatePlot()
 
 def main():
     app = QApplication(sys.argv)
