@@ -1100,6 +1100,9 @@ class GravMFit(GravData, GravPhaseMaps):
         if stars is None:
             self.logger.error('No stars found in pointing')
             raise ValueError('No stars found in pointing')
+        if len(stars) < 2:
+            self.logger.error('Only one star found in pointing')
+            raise ValueError('Only one star found in pointing')
         self.stars=stars
 
         if offs == (0, 0):
@@ -1831,9 +1834,10 @@ class GravMFit(GravData, GravPhaseMaps):
                             
                             if out.success:
                                 self.logger.info('Fit successful')
+                                self.logger.info('Fit message: %s' % out.message)
                             else:
                                 self.logger.warning('Fit not successful')
-                            self.logger.info('Fit message: %s' % out.message)
+                                self.logger.warning('Fit message: %s' % out.message)
                             
                             theta_result = []
                             for tdx, th in enumerate(theta_names):
