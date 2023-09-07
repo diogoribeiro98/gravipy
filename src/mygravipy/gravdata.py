@@ -246,10 +246,11 @@ class GravData():
                    'DUAL_SCI_P2VMRED']
 
         header = fits.open(self.name)[0].header
-        date = header['DATE-OBS']
+        date_obs = header['DATE-OBS']
 
         self.header = header
-        self.date = convert_date(date)
+        self.date_obs = date_obs
+        self.date = convert_date(date_obs)
         self.raw = False
 
         if 'GRAV' not in header['INSTRUME']:

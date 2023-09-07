@@ -7,7 +7,7 @@ from datetime import datetime
 import matplotlib.pyplot as plt
 from pkg_resources import resource_filename
 import logging
-from .gravdata import convert_date, log_level_mapping
+from .gravdata import convert_date, log_level_mapping, fiber_coupling
 
 
 class GCorbits():
@@ -78,7 +78,7 @@ class GCorbits():
         
         # calculate starpos
         starpos = []
-        starpos.append(['SGRA', 0, 0, '', ''])
+        starpos.append(['SGRA', 0, 0, '', 15.7])
         for star in self.star_orbits:
             _s = self.star_orbits[star]
             x, y = self.pos_orbit(star)
@@ -208,20 +208,24 @@ class GCorbits():
         starpos = self.starpos
         stars = []
         for s in starpos:
-            n, sx, sy, ty, mag = s
-            if np.sqrt((sx-x)**2+(sy-y)**2) < fiberrad:
-                stars.append(s)
+            n, sx, sy, _, mag = s
+            dist = np.sqrt((sx-x)**2+(sy-y)**2)
+            if dist < fiberrad:
+                dmag = -2.5*np.log10(fiber_coupling(dist))
+                stars.append([n, sx-x, sy-y, dist, mag, mag + dmag])
                 self.logger.info(f'{n} at a distance of [{sx-x:.2f} {sy-y:.2f}]')
 
         if plot:
             fig, ax = plt.subplots()
             for s in starpos:
-                n, sx, sy, ty, mag = s
+                n, sx, sy, _, _ = s
                 if np.any(np.abs(sx) > plotlim) or np.any(np.abs(sy) > plotlim):
                     continue
                 color = 'grey'
-                if s in stars:
-                    color = 'C0'
+                # check if n in stars[:,0]
+                for s in stars:
+                    if n == s[0]:
+                        color = 'C0'
                 plt.scatter(sx, sy, c=color, s=7)
                 plt.text(sx-3, sy, '%s' % (n), fontsize=5, color=color)
             plt.axis([plotlim*1.2, -plotlim*1.2,

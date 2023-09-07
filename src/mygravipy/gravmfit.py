@@ -20,6 +20,7 @@ from dynesty import utils as dyfunc
 from numba import jit
 
 from .gravdata import *
+from .gcorbits import GCorbits
 
 try:
     from generalFunctions import *
@@ -840,17 +841,17 @@ def _ind_visibility(s, alpha, wave, dlambda, fit_mode):
 def _lnprob_mstars(theta, fitdata, lower, upper, fitarg, fithelp):
     if np.any(theta < lower) or np.any(theta > upper):
         return -np.inf
-    return _lnlike_mstars(theta, fitdata, fitarg, fithelp)
+    return _lnlike_mstars(theta, fitdata, fitarg, fithelp, loglike=True)
 
 
 def _leastsq_mstars(params, theta1, theta2, fitdata, fitarg, fithelp):
     pcRa = params['pcRa']
     pcDec = params['pcDec']
     theta = np.concatenate((theta1, np.array([pcRa, pcDec]), theta2))
-    return -2*_lnlike_mstars(theta, fitdata, fitarg, fithelp)
+    return _lnlike_mstars(theta, fitdata, fitarg, fithelp, loglike=False)
 
 
-def _lnlike_mstars(theta, fitdata, fitarg, fithelp):
+def _lnlike_mstars(theta, fitdata, fitarg, fithelp, loglike=False):
     (nsource, fit_for, bispec_ind, fit_mode, wave, dlambda,
      fixedBHalpha, todel, fixed, phasemaps, northA, dra, ddec, amp_map_int,
      pha_map_int, amp_map_denom_int, fit_phasemaps, fix_pm_sources,
@@ -868,22 +869,29 @@ def _lnlike_mstars(theta, fitdata, fitarg, fithelp):
         closure, closure_error, closure_flag,
         visphi, visphi_error, visphi_flag) = fitdata
 
-    res_visamp = np.sum(-(model_visamp-visamp)**2/visamp_error**2*(1-visamp_flag))
-    res_vis2 = np.sum(-(model_vis2-vis2)**2./vis2_error**2.*(1-vis2_flag))
+    res_visamp = np.sum((model_visamp-visamp)**2/visamp_error**2*(1-visamp_flag))
+    res_vis2 = np.sum((model_vis2-vis2)**2./vis2_error**2.*(1-vis2_flag))
 
     res_closure = np.degrees(np.abs(np.exp(1j*np.radians(model_closure))
                                     - np.exp(1j*np.radians(closure))))
-    res_clos = np.sum(-res_closure**2./closure_error**2.*(1-closure_flag))
+    res_clos = np.sum(res_closure**2./closure_error**2.*(1-closure_flag))
 
     res_visphi = np.degrees(np.abs(np.exp(1j*np.radians(model_visphi))
                                    - np.exp(1j*np.radians(visphi))))
-    res_phi = np.sum(-res_visphi**2./visphi_error**2.*(1-visphi_flag))
+    res_phi = np.sum(res_visphi**2./visphi_error**2.*(1-visphi_flag))
 
-    ln_prob_res = 0.5 * (res_visamp * fit_for[0]
-                         + res_vis2 * fit_for[1]
-                         + res_clos * fit_for[2]
-                         + res_phi * fit_for[3])
-    return ln_prob_res
+    if loglike:
+        ln_prob_res = -0.5 * (res_visamp * fit_for[0]
+                             + res_vis2 * fit_for[1]
+                             + res_clos * fit_for[2]
+                             + res_phi * fit_for[3])
+        return ln_prob_res
+    else:
+        least_sqr =(res_visamp * fit_for[0]
+                    + res_vis2 * fit_for[1]
+                    + res_clos * fit_for[2]
+                    + res_phi * fit_for[3])
+        return least_sqr
 
 
 def _calc_vis_mstars(theta_in, fitarg, fithelp):
@@ -1071,6 +1079,100 @@ class GravMFit(GravData, GravPhaseMaps):
             logger.addHandler(ch)
         self.logger = logger
 
+    def flux_ratio(self, mag1, mag2):
+        """
+        Calculate flux ratio from magnitudes
+        """
+        return 10**((mag1-mag2)/2.5)
+
+    def prep_fit(self, fit=False, plot=True, *args, **kwargs):
+        """
+        Prepare the fit by finding stars in the pointing and
+        returning the RA, Dec, fr and initial values for the fit
+
+        if fit = True the fit is done        
+        """
+        orb = GCorbits(t=self.date_obs)
+        offs = (self.header['ESO INS SOBJ OFFX'],
+                self.header['ESO INS SOBJ OFFY'])
+
+        stars = orb.find_stars(*offs, plot=plot)
+        if stars is None:
+            self.logger.error('No stars found in pointing')
+            raise ValueError('No stars found in pointing')
+        self.stars=stars
+
+        if offs == (0, 0):
+            self.logger.info('SgrA* file')
+            pc = [0, 0]
+            initial = [-1, 1, *pc, 0.5, 1]
+            stars = stars[1:]
+            star_names = [s[0] for s in stars]
+            stars = np.asarray([s[1:] for s in stars])
+
+            # sort both based on stars[:,4]
+            star_names = [x for _, x in sorted(zip(stars[:, 4], star_names))]
+            stars = np.asarray([x for _, x in sorted(zip(stars[:, 4], stars))])
+            
+            ra_list = stars[:, 0]
+            de_list = stars[:, 1]
+            mag = stars[:, 3]
+            fr_list = self.flux_ratio(mag[0], mag[1:])
+            star_names = ['SGRA'] + star_names
+
+
+        else:
+            self.logger.info('Star field file')
+            star_names = [s[0] for s in stars]
+            stars = np.asarray([s[1:] for s in stars])
+
+            if np.any(stars[:,2] < 2):
+                star_names = [x for _, x in sorted(zip(stars[:, 2], star_names))]
+                stars = np.asarray([x for _, x in sorted(zip(stars[:, 2], stars))])
+
+                center = stars[0]
+                center_name = star_names[0]
+
+                r_star_names = [x for _, x in sorted(zip(stars[1:, 4], star_names[1:]))]
+                r_stars = np.asarray([x for _, x in sorted(zip(stars[1:, 4], stars[1:]))])
+
+                stars = np.concatenate((center.reshape(1, -1), r_stars))
+                star_names = [center_name] + r_star_names
+            else:
+                star_names = [x for _, x in sorted(zip(stars[:, 4], star_names))]
+                stars = np.asarray([x for _, x in sorted(zip(stars[:, 4], stars))])
+
+            center = stars[0]
+            pc = center[:2]
+            stars = stars[1:]
+            ra_list = stars[:, 0]
+            de_list = stars[:, 1]
+            mag = stars[:, 3]
+            fr_list = self.flux_ratio(mag[0], mag[1:])
+
+            initial = [-1, 0.5, *pc,
+                       self.flux_ratio(mag[0], center[3]),
+                       1]
+
+        self.logger.info(f'Fitting for: {star_names}')
+        self.logger.info(f'PC on SGRA, flux ratio rel. to {star_names[1]}')           
+        pr_ra_list = [f'{x:.3f}' for x in ra_list]
+        pr_de_list = [f'{x:.3f}' for x in de_list]
+        pr_fr_list = [f'{x:.3f}' for x in fr_list]
+        self.logger.info(f'RA: {pr_ra_list}')
+        self.logger.info(f'DEC: {pr_de_list}')
+        self.logger.info(f'Flux ratio: {pr_fr_list}')        
+        
+        if fit:
+            self.logger.info('Fitting for stars')
+            initial = self.fit_stars(ra_list,
+                                     de_list,
+                                     fr_list,
+                                     initial = initial,
+                                     *args, **kwargs)
+        else:
+            return ra_list, de_list, fr_list, initial
+
 
     def fit_stars(self,
                   ra_list,
@@ -1145,6 +1247,8 @@ class GravMFit(GravData, GravPhaseMaps):
         vis_flag:       Does flag vis > 1 if True [True]
         '''
         fit_mode = kwargs.get('fit_mode', 'numeric')
+        minimizer = kwargs.get('minimizer', 'emcee')
+        minmethod = kwargs.get('minmethod', 'leastsq')
         bestchi = kwargs.get('bestchi', True)
         redchi2 = kwargs.get('redchi2', True)
         flagtill = kwargs.get('flagtill', None)
@@ -1350,11 +1454,11 @@ class GravMFit(GravData, GravPhaseMaps):
         upper[th_rest+3] = pc_DEC_in + pc_size
         upper[th_rest+4] = np.log10(100.)
 
-        theta_names.append('alpha BH')
-        theta_names.append('f BG')
-        theta_names.append('pc RA')
-        theta_names.append('pc Dec')
-        theta_names.append('fr BH')
+        theta_names.append('alpha_BH')
+        theta_names.append('f_BG')
+        theta_names.append('pc_RA')
+        theta_names.append('pc_Dec')
+        theta_names.append('fr_BH')
 
         theta[th_rest+5:] = coh_loss_in
         upper[th_rest+5:] = 1.5
@@ -1578,7 +1682,7 @@ class GravMFit(GravData, GravPhaseMaps):
 
                 if not no_fit:
                     self.logger.info('')
-                    self.logger.info(f'Run MCMC for Pol {idx+1}')
+                    self.logger.info(f'Run Fit for Pol {idx+1}')
                 else:
                     self.logger.info('')
                     self.logger.info(f'Pol {idx+1}')
@@ -1620,101 +1724,138 @@ class GravMFit(GravData, GravPhaseMaps):
                 if not no_fit:
                     level = self.logger.level
                     if not onlyphases:
-                        if nthreads == 1:
-                            sampler = emcee.EnsembleSampler(nwalkers, ndim,
-                                                            _lnprob_mstars,
-                                                            args=(fitdata,
-                                                                  lower,
-                                                                  upper,
-                                                                  fitarg,
-                                                                  fithelp))
-                            if level > logging.INFO:
-                                sampler.run_mcmc(pos, nruns, progress=False,
-                                                 skip_initial_state_check=True)
-                            else:
-                                sampler.run_mcmc(pos, nruns, progress=True,
-                                                 skip_initial_state_check=True)
-                        else:
-                            with Pool(processes=nthreads) as pool:
+                        if minimizer == 'emcee':
+                            if nthreads == 1:
                                 sampler = emcee.EnsembleSampler(nwalkers, ndim,
                                                                 _lnprob_mstars,
                                                                 args=(fitdata,
-                                                                      lower,
-                                                                      upper,
-                                                                      fitarg,
-                                                                      fithelp),
-                                                                pool=pool)
+                                                                    lower,
+                                                                    upper,
+                                                                    fitarg,
+                                                                    fithelp))
                                 if level > logging.INFO:
                                     sampler.run_mcmc(pos, nruns, progress=False,
-                                                     skip_initial_state_check=True)
+                                                    skip_initial_state_check=True)
                                 else:
                                     sampler.run_mcmc(pos, nruns, progress=True,
-                                                     skip_initial_state_check=True)
+                                                    skip_initial_state_check=True)
+                            else:
+                                with Pool(processes=nthreads) as pool:
+                                    sampler = emcee.EnsembleSampler(nwalkers, ndim,
+                                                                    _lnprob_mstars,
+                                                                    args=(fitdata,
+                                                                        lower,
+                                                                        upper,
+                                                                        fitarg,
+                                                                        fithelp),
+                                                                    pool=pool)
+                                    if level > logging.INFO:
+                                        sampler.run_mcmc(pos, nruns, progress=False,
+                                                        skip_initial_state_check=True)
+                                    else:
+                                        sampler.run_mcmc(pos, nruns, progress=True,
+                                                        skip_initial_state_check=True)
 
-                        ac_fraction = np.mean(sampler.acceptance_fraction)
-                        if ac_fraction < 0.25 or ac_fraction > 0.5:
-                            self.logger.warning(f'Mean acceptance fraction: {ac_fraction:.2}')
-                            self.logger.warning('Should be between 0.25 and 0.5')
+                            ac_fraction = np.mean(sampler.acceptance_fraction)
+                            if ac_fraction < 0.25 or ac_fraction > 0.5:
+                                self.logger.warning(f'Mean acceptance fraction: {ac_fraction:.2}')
+                                self.logger.warning('Should be between 0.25 and 0.5')
+                            else:
+                                self.logger.info(f'Mean acceptance fraction: {ac_fraction:.2}')
+
+                            samples = sampler.chain
+                            mostprop = sampler.flatchain[np.argmax(sampler.flatlnprobability)]
+
+                            clsamples = samples
+                            cllabels = theta_names
+                            clmostprop = mostprop
+
+                            cldim = len(cllabels)
+                            if plot_corner in ['steps', 'both']:
+                                fig, axes = plt.subplots(cldim, figsize=(8, cldim/1.5),
+                                                        sharex=True)
+                                for i in range(cldim):
+                                    ax = axes[i]
+                                    ax.plot(clsamples[:, :, i].T, "k", alpha=0.3)
+                                    ax.set_ylabel(theta_names[i])
+                                    ax.axhline(clmostprop[i], color='C0', alpha=0.5)
+                                    ax.yaxis.set_label_coords(-0.1, 0.5)
+                                axes[-1].set_xlabel("step number")
+                                plt.show()
+
+                            if nruns > 300:
+                                fl_samples = samples[:, -200:, :].reshape((-1, ndim))
+                            elif nruns > 200:
+                                fl_samples = samples[:, -100:, :].reshape((-1, ndim))
+                            else:
+                                fl_samples = samples.reshape((-1, ndim))
+
+                            if plot_corner in ['corner', 'both']:
+                                fig = corner.corner(fl_samples,
+                                                    quantiles=[0.16, 0.5, 0.84],
+                                                    truths=mostprop,
+                                                    labels=theta_names)
+                                plt.show()
+
+                            # get the actual fit
+                            theta_fit = np.percentile(fl_samples, [50],
+                                                    axis=0).T.flatten()
+                            percentiles = np.percentile(fl_samples, [16, 50, 84],
+                                                        axis=0).T
+                            mostlike_m = percentiles[:, 1] - percentiles[:, 0]
+                            mostlike_p = percentiles[:, 2] - percentiles[:, 1]
+                            if bestchi:
+                                theta_result = mostprop
+                            else:
+                                theta_result = theta_fit
+
+                            results.append(theta_result)
+                            fulltheta = np.copy(theta_result)
+                            all_mostprop = np.copy(mostprop)
+                            all_mostlike = np.copy(theta_fit)
+
                         else:
-                            self.logger.info(f'Mean acceptance fraction: {ac_fraction:.2}')
+                            params = Parameters()
+                            for tdx, th in enumerate(theta):
+                                params.add(theta_names[tdx], 
+                                           value=th,
+                                           min=lower[tdx],
+                                           max=upper[tdx])
 
-                        samples = sampler.chain
-                        mostprop = sampler.flatchain[np.argmax(sampler.flatlnprobability)]
+                            out = minimize(_lnlike_mstars, params,
+                                           args=(fitdata,
+                                                 fitarg, fithelp),
+                                           method=minmethod,
+                                        #    max_nfev=40000
+                                           )
+                            
+                            if out.success:
+                                self.logger.info('Fit successful')
+                            else:
+                                self.logger.warning('Fit not successful')
+                            self.logger.info('Fit message: %s' % out.message)
+                            
+                            theta_result = []
+                            for tdx, th in enumerate(theta_names):
+                                theta_result.append(out.params[th].value)
 
-                        clsamples = samples
-                        cllabels = theta_names
-                        clmostprop = mostprop
+                            results.append(theta_result)
+                            fulltheta = np.copy(theta_result)
+                            all_mostprop = np.copy(theta_result)
+                            all_mostlike = np.copy(np.zeros_like(theta_result))
+                            mostlike_m = np.copy(np.zeros_like(theta_result))
+                            mostlike_p = np.copy(np.zeros_like(theta_result))
+                            cllabels = theta_names
+                            clmostprop = theta_result
+                            cldim = len(cllabels)
 
-                        cldim = len(cllabels)
-                        if plot_corner in ['steps', 'both']:
-                            fig, axes = plt.subplots(cldim, figsize=(8, cldim/1.5),
-                                                     sharex=True)
-                            for i in range(cldim):
-                                ax = axes[i]
-                                ax.plot(clsamples[:, :, i].T, "k", alpha=0.3)
-                                ax.set_ylabel(theta_names[i])
-                                ax.axhline(clmostprop[i], color='C0', alpha=0.5)
-                                ax.yaxis.set_label_coords(-0.1, 0.5)
-                            axes[-1].set_xlabel("step number")
-                            plt.show()
-
-                        if nruns > 300:
-                            fl_samples = samples[:, -200:, :].reshape((-1, ndim))
-                        elif nruns > 200:
-                            fl_samples = samples[:, -100:, :].reshape((-1, ndim))
-                        else:
-                            fl_samples = samples.reshape((-1, ndim))
-
-                        if plot_corner in ['corner', 'both']:
-                            fig = corner.corner(fl_samples,
-                                                quantiles=[0.16, 0.5, 0.84],
-                                                truths=mostprop,
-                                                labels=theta_names)
-                            plt.show()
-
-                        # get the actual fit
-                        theta_fit = np.percentile(fl_samples, [50],
-                                                  axis=0).T.flatten()
-                        percentiles = np.percentile(fl_samples, [16, 50, 84],
-                                                    axis=0).T
-                        mostlike_m = percentiles[:, 1] - percentiles[:, 0]
-                        mostlike_p = percentiles[:, 2] - percentiles[:, 1]
-                        if bestchi:
-                            theta_result = mostprop
-                        else:
-                            theta_result = theta_fit
-
-                        results.append(theta_result)
-                        fulltheta = np.copy(theta_result)
-                        all_mostprop = np.copy(mostprop)
-                        all_mostlike = np.copy(theta_fit)
                         for ddx in range(len(todel)):
                             fulltheta = np.insert(fulltheta, todel[ddx],
-                                                  fixed[ddx])
+                                                fixed[ddx])
                             all_mostprop = np.insert(all_mostprop, todel[ddx],
-                                                     fixed[ddx])
+                                                    fixed[ddx])
                             all_mostlike = np.insert(all_mostlike, todel[ddx],
-                                                     fixed[ddx])
+                                                    fixed[ddx])
                             mostlike_m = np.insert(mostlike_m, todel[ddx], 0)
                             mostlike_p = np.insert(mostlike_p, todel[ddx], 0)
 
@@ -1722,16 +1863,18 @@ class GravMFit(GravData, GravPhaseMaps):
                             fittab = pd.DataFrame()
                         _fittab = pd.DataFrame()
                         _fittab["column"] = ["in P%i_%i" % (idx, dit),
-                                             "M.L. P%i_%i" % (idx, dit),
-                                             "M.P. P%i_%i" % (idx, dit),
-                                             "$-\sigma$ P%i_%i" % (idx, dit),
-                                             "$+\sigma$ P%i_%i" % (idx, dit)]
+                                            "M.L. P%i_%i" % (idx, dit),
+                                            "M.P. P%i_%i" % (idx, dit),
+                                            "$-\sigma$ P%i_%i" % (idx, dit),
+                                            "$+\sigma$ P%i_%i" % (idx, dit)]
                         for ndx, name in enumerate(self.theta_allnames):
                             _fittab[name] = pd.Series([self.theta_in[ndx],
-                                                       all_mostprop[ndx],
-                                                       all_mostlike[ndx],
-                                                       mostlike_m[ndx],
-                                                       mostlike_p[ndx]])
+                                                    all_mostprop[ndx],
+                                                    all_mostlike[ndx],
+                                                    mostlike_m[ndx],
+                                                    mostlike_p[ndx]])
+
+
 
                     else:
                         _pc_idx = theta_names.index('pc RA')
@@ -1839,19 +1982,21 @@ class GravMFit(GravData, GravPhaseMaps):
                 self.logger.info(f'{chi2string} for closure: {redchi_closure:.2}')
 
                 if not no_fit and not onlyphases:
-                    percentiles = np.percentile(fl_samples,
-                                                [16, 50, 84], axis=0).T
-                    percentiles[:, 0] = percentiles[:, 1] - percentiles[:, 0]
-                    percentiles[:, 2] = percentiles[:, 2] - percentiles[:, 1]
 
                     self.logger.info("Best chi2 result:")
                     for i in range(0, cldim):
                         self.logger.info("%s = %.3f" % (cllabels[i], clmostprop[i]))
-                    self.logger.info("MCMC Result:")
-                    for i in range(0, cldim):
-                        self.logger.info("%s = %.3f + %.3f - %.3f"
-                            % (cllabels[i], percentiles[i, 1],
-                                percentiles[i, 2], percentiles[i, 0]))
+                    
+                    if minimizer == 'emcee':
+                        percentiles = np.percentile(fl_samples,
+                                                    [16, 50, 84], axis=0).T
+                        percentiles[:, 0] = percentiles[:, 1] - percentiles[:, 0]
+                        percentiles[:, 2] = percentiles[:, 2] - percentiles[:, 1]
+                        self.logger.info("MCMC Result:")
+                        for i in range(0, cldim):
+                            self.logger.info("%s = %.3f + %.3f - %.3f"
+                                % (cllabels[i], percentiles[i, 1],
+                                    percentiles[i, 2], percentiles[i, 0]))
 
                 if plot_science:
                     if idx == 0:
