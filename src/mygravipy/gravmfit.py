@@ -1248,7 +1248,7 @@ class GravMFit(GravData, GravPhaseMaps):
         '''
         fit_mode = kwargs.get('fit_mode', 'numeric')
         minimizer = kwargs.get('minimizer', 'emcee')
-        minmethod = kwargs.get('minmethod', 'leastsq')
+        minmethod = kwargs.get('minmethod', 'least_squares')
         bestchi = kwargs.get('bestchi', True)
         redchi2 = kwargs.get('redchi2', True)
         flagtill = kwargs.get('flagtill', None)
@@ -1814,7 +1814,7 @@ class GravMFit(GravData, GravPhaseMaps):
                             all_mostprop = np.copy(mostprop)
                             all_mostlike = np.copy(theta_fit)
 
-                        else:
+                        elif minimizer == 'leastsq':
                             params = Parameters()
                             for tdx, th in enumerate(theta):
                                 params.add(theta_names[tdx], 
@@ -1848,6 +1848,9 @@ class GravMFit(GravData, GravPhaseMaps):
                             cllabels = theta_names
                             clmostprop = theta_result
                             cldim = len(cllabels)
+                        else:
+                            self.logger.error('minimizer not recognized, has to be emcee or leastsq')
+                            raise ValueError('minimizer not recognized, has to be emcee or leastsq')
 
                         for ddx in range(len(todel)):
                             fulltheta = np.insert(fulltheta, todel[ddx],
