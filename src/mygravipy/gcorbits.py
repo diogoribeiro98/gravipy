@@ -53,7 +53,7 @@ class GCorbits():
         except ValueError:
             raise ValueError('t has to be given as YYYY-MM-DDTHH:MM:SS')
         self.t = t
-        logger.info(f'Evaluating for {t:.4f}\n')
+        logger.info(f'Evaluating for {t:.4f}')
         logger.debug('Stars with orbits:')
         logger.debug(self.orbit_stars)
         logger.debug('')
@@ -74,7 +74,21 @@ class GCorbits():
             self.star_orbits[star]['i'] = _s[4]/180*np.pi
             self.star_orbits[star]['CapitalOmega'] = _s[5]/180*np.pi
             self.star_orbits[star]['Omega'] = _s[6]/180*np.pi
-            logger.info(f'{star} updated from Stefans orbits')
+            logger.debug(f'{star} updated from Stefans orbits')
+        
+        # calculate starpos
+        starpos = []
+        starpos.append(['SGRA', 0, 0, '', ''])
+        for star in self.star_orbits:
+            _s = self.star_orbits[star]
+            x, y = self.pos_orbit(star)
+            starpos.append([_s['name'], x*1000, y*1000, _s['type'], _s['Kmag']])
+        for star in self.star_pms:
+            _s = self.star_pms[star]
+            x, y = self.pos_pm(star)
+            starpos.append([_s['name'], x*1000, y*1000, _s['type'], _s['Kmag']])
+        self.starpos = starpos
+
 
     def star_pos(self, star):
         try:
@@ -183,22 +197,53 @@ class GCorbits():
             E = newton(f, E0, fp, *args, **kwargs)
         return E
 
+    def find_stars(self, x, y, fiberrad=70, plot=False, plotlim=400):
+        """
+        find all stars whcih are within one fiberad from x, y
+        returns a list of stars
+        if plot is True, plots the stars in the inner region
+        plotlim: radius of the plot
+        """
+        self.logger.info(f'Finding stars within {fiberrad} mas from {x}, {y}')
+        starpos = self.starpos
+        stars = []
+        for s in starpos:
+            n, sx, sy, ty, mag = s
+            if np.sqrt((sx-x)**2+(sy-y)**2) < fiberrad:
+                stars.append(s)
+                self.logger.info(f'{n} at a distance of [{sx-x:.2f} {sy-y:.2f}]')
+
+        if plot:
+            fig, ax = plt.subplots()
+            for s in starpos:
+                n, sx, sy, ty, mag = s
+                if np.any(np.abs(sx) > plotlim) or np.any(np.abs(sy) > plotlim):
+                    continue
+                color = 'grey'
+                if s in stars:
+                    color = 'C0'
+                plt.scatter(sx, sy, c=color, s=7)
+                plt.text(sx-3, sy, '%s' % (n), fontsize=5, color=color)
+            plt.axis([plotlim*1.2, -plotlim*1.2,
+                      -plotlim*1.2, plotlim*1.2])
+            circ = plt.Circle([x, y], radius=fiberrad, facecolor="None",
+                            edgecolor='C0', linewidth=0.2)
+            ax.add_artist(circ)
+            plt.gca().set_aspect('equal', adjustable='box')
+            plt.xlabel('dRa [mas]')
+            plt.ylabel('dDec [mas]')
+            plt.show()
+        return stars
+
+
+
     def plot_orbits(self, off=[0, 0], t=None, figsize=8, lim=100, long=False):
         """
         Plot the inner region around SgrA* at a given TIME
         lim:  radius to which stars are plotted
         long: more information if True
         """
-        starpos = []
-        for star in self.star_orbits:
-            _s = self.star_orbits[star]
-            x, y = self.pos_orbit(star)
-            starpos.append([_s['name'], x*1000, y*1000, _s['type'], _s['Kmag']])
-        for star in self.star_pms:
-            _s = self.star_pms[star]
-            x, y = self.pos_pm(star)
-            starpos.append([_s['name'], x*1000, y*1000, _s['type'], _s['Kmag']])
-
+        starpos = self.starpos
         fig, ax = plt.subplots()
         fig.set_figheight(figsize)
         fig.set_figwidth(figsize)
