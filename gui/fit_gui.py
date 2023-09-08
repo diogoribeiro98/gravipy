@@ -5,19 +5,21 @@ try:
                                 QPushButton, QMessageBox,
                                 QFileDialog, QLineEdit,
                                 QComboBox, QLabel,
-                                QTextEdit,
-                                QVBoxLayout, 
-                                QWidget
+                                QTextEdit, QFormLayout,
+                                QVBoxLayout, QHBoxLayout,
+                                QWidget, QCheckBox,
                                 )
+    from PyQt6.QtCore import Qt
 except ImportError:
     from PyQt5.QtWidgets import (QApplication, QMainWindow,
                                 QPushButton, QMessageBox,
                                 QFileDialog, QLineEdit,
                                 QComboBox, QLabel,
-                                QTextEdit,
-                                QVBoxLayout, 
-                                QWidget
+                                QTextEdit, QFormLayout,
+                                QVBoxLayout, QHBoxLayout,
+                                QWidget, QCheckBox,
                                 )
+    from PyQt5.QtCore import Qt
 from gui_utils import PlotData, LoggingHandler, LoadData
 import logging
 
@@ -31,8 +33,6 @@ class GRAVITYfitGUI(QMainWindow):
     def initUI(self):
         # Set window properties
         self.setWindowTitle("GRAVITY multi source fitting")
-        # q: what are the parameters of setGeometry?
-        # a: x, y, width, height
         self.setGeometry(100, 100, 1700, 1000)
 
         # Create a button to open the file dialog
@@ -46,10 +46,10 @@ class GRAVITYfitGUI(QMainWindow):
         self.file_path_edit.setPlaceholderText("Selected File")
 
         # Create a combo box (dropdown) to select the data source
-        self.label = QLabel("Plot Quantity:", self)
-        self.label.setGeometry(20, 80, 150, 30)
+        self.plotlabel = QLabel("Plot Quantity:", self)
+        self.plotlabel.setGeometry(0, 0, 0, 0)
         self.data_source_combo = QComboBox(self)
-        self.data_source_combo.setGeometry(20, 110, 150, 30)
+        self.data_source_combo.setGeometry(0, 0, 0, 0)
         self.data_source_combo.addItems(["Vis Amp", "Vis 2", "Closure", "Vis Phi"])
         self.data_source_combo.currentIndexChanged.connect(self.updatePlot)
         
@@ -68,6 +68,40 @@ class GRAVITYfitGUI(QMainWindow):
         self.log_handler.setLevel(logging.INFO)
         logging.getLogger().addHandler(self.log_handler)
         logging.getLogger().setLevel(logging.INFO)
+
+        self.fitlabel = QLabel("Fitting options:", self)
+        self.fitlabel.setGeometry(20, 80, 150, 30)
+
+        # # Create input boxes and a dictionary to store their values
+        # self.input_dict = {}
+        # input_labels = ["RA", "Dec", "Flux Ratio"]
+        # for i, label_text in enumerate(input_labels):
+        #     input_box = QLineEdit(self)
+        #     input_box.setGeometry(20, 100 + i * 30, 100, 30)
+        #     input_box.textChanged.connect(self.inputTextChanged)
+        #     self.input_dict[label_text] = "0.0"  # Initialize as empty string
+
+        # # Create checkboxes with labels and a dictionary to store their states
+        # self.checkbox_dict = {}
+        # checkbox_labels = ["Checkbox 1", "Checkbox 2", "Checkbox 3"]
+        # for label_text in checkbox_labels:
+        #     checkbox_layout = QHBoxLayout()
+        #     checkbox = QCheckBox(label_text, self)
+        #     checkbox.stateChanged.connect(self.checkboxStateChanged)
+        #     checkbox_layout.addWidget(checkbox)
+        #     self.checkbox_dict[label_text] = False  # Initialize as unchecked
+        #     self.addLayout(checkbox_layout)
+
+        # # Create input boxes and a dictionary to store their values
+        # self.input_dict = {}
+        # input_labels = ["Input 1", "Input 2", "Input 3"]
+        # for label_text in input_labels:
+        #     input_layout = QFormLayout()
+        #     input_box = QLineEdit(self)
+        #     input_box.textChanged.connect(self.inputTextChanged)
+        #     input_layout.addRow(label_text, input_box)
+        #     self.input_dict[label_text] = ""  # Initialize as empty string
+        #     self.addLayout(input_layout)
 
         # resize in cae of window resize
         self.resizeEvent = self.adjustWidgetSizes
@@ -111,18 +145,34 @@ class GRAVITYfitGUI(QMainWindow):
 
         logging.debug(f"Window size: {window_width} x {window_height}")
 
+
         self.file_path_edit.setGeometry(200, 20, 
                                         window_width-220, 30)
-        self.log_text_edit.setGeometry(20, window_height-180, 
+        self.log_text_edit.setGeometry(window_width//2 + 20, window_height-180, 
                                        window_width//2-40, 150)
 
+        self.plotlabel.setGeometry(window_width//2 + 20, 80, 150, 30)
+        self.data_source_combo.setGeometry(window_width//2 + 20, 110, 150, 30)
+        
         can_width = (window_width//2-40)
         can_height = (window_height-350) // 2
-        self.canvas1.setGeometry(20, 150,
+        self.canvas1.setGeometry(window_width//2 + 20, 150,
                                  can_width, can_height)
-        self.canvas2.setGeometry(20, 150+can_height,
+        self.canvas2.setGeometry(window_width//2 + 20, 150+can_height,
                                  can_width, can_height)
+        
+    def checkboxStateChanged(self, state):
+        sender = self.sender()
+        label_text = sender.text()
+        checked = state == 2  # 2 corresponds to checked state in Qt
+        self.checkbox_dict[label_text] = checked
+        logging.info(f"Checkbox state changed: {label_text} is checked: {checked}")
 
+    def inputTextChanged(self, text):
+        sender = self.sender().parentWidget()  # Get the parent layout
+        label_text = sender.itemAt(0).widget().text()  # Get the label text
+        self.input_dict[label_text] = text
+        logging.info(f"Input text changed: {label_text} value: {text}")
 
 def main():
     app = QApplication(sys.argv)
