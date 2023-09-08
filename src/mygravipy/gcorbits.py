@@ -34,10 +34,6 @@ class GCorbits():
             ch.setFormatter(formatter)
             gcorb_logger.addHandler(ch)
         self.gcorb_logger = gcorb_logger
-        gcorb_logger.debug('Initializing GCorbits')
-        gcorb_logger.info('Initializing GCorbits')
-        gcorb_logger.warning('Initializing GCorbits')
-        gcorb_logger.error('Initializing GCorbits')
 
         self.star_orbits = {}
         self.orbit_stars = []
