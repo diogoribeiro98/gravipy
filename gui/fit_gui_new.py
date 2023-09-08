@@ -18,7 +18,7 @@ except ImportError:
                                 QComboBox, QLabel,
                                 QTextEdit, QFormLayout,
                                 QVBoxLayout, QHBoxLayout,
-                                QWidget, QCheckBox,
+                                QWidget, QCheckBox, QGridLayout
                                 )
     from PyQt5.QtCore import Qt
     from PyQt5.QtGui import QFont
