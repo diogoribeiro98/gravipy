@@ -25,15 +25,19 @@ class GCorbits():
         pos_pm : get positions for stars with proper motions
         """
         log_level = log_level_mapping.get(loglevel, logging.INFO)
-        logger = logging.getLogger(__name__)
-        logger.setLevel(log_level)
-        ch = logging.StreamHandler()
-        # ch.setLevel(logging.DEBUG) # not sure if needed
-        formatter = logging.Formatter('%(levelname)s: %(name)s - %(message)s')
-        ch.setFormatter(formatter)
-        if not logger.hasHandlers():
-            logger.addHandler(ch)
-        self.logger = logger
+        gcorb_logger = logging.getLogger(__name__)
+        gcorb_logger.setLevel(log_level)
+        if not gcorb_logger.hasHandlers():
+            ch = logging.StreamHandler()
+            # ch.setLevel(log_level)
+            formatter = logging.Formatter('%(levelname)s: %(name)s - %(message)s')
+            ch.setFormatter(formatter)
+            gcorb_logger.addHandler(ch)
+        self.gcorb_logger = gcorb_logger
+        gcorb_logger.debug('Initializing GCorbits')
+        gcorb_logger.info('Initializing GCorbits')
+        gcorb_logger.warning('Initializing GCorbits')
+        gcorb_logger.error('Initializing GCorbits')
 
         self.star_orbits = {}
         self.orbit_stars = []
@@ -53,12 +57,12 @@ class GCorbits():
         except ValueError:
             raise ValueError('t has to be given as YYYY-MM-DDTHH:MM:SS')
         self.t = t
-        logger.info(f'Evaluating for {t:.4f}')
-        logger.debug('Stars with orbits:')
-        logger.debug(self.orbit_stars)
-        logger.debug('')
-        logger.debug('Stars with proper motions:')
-        logger.debug(self.pm_stars)
+        gcorb_logger.info(f'Evaluating for {t:.4f}')
+        gcorb_logger.debug('Stars with orbits:')
+        gcorb_logger.debug(self.orbit_stars)
+        gcorb_logger.debug('')
+        gcorb_logger.debug('Stars with proper motions:')
+        gcorb_logger.debug(self.pm_stars)
 
         # updating stars from stefan
         for star in self.orbit_stars:
@@ -74,7 +78,7 @@ class GCorbits():
             self.star_orbits[star]['i'] = _s[4]/180*np.pi
             self.star_orbits[star]['CapitalOmega'] = _s[5]/180*np.pi
             self.star_orbits[star]['Omega'] = _s[6]/180*np.pi
-            logger.debug(f'{star} updated from Stefans orbits')
+            gcorb_logger.debug(f'{star} updated from Stefans orbits')
         
         # calculate starpos
         starpos = []
@@ -204,7 +208,7 @@ class GCorbits():
         if plot is True, plots the stars in the inner region
         plotlim: radius of the plot
         """
-        self.logger.info(f'Finding stars within {fiberrad} mas from {x}, {y}')
+        self.gcorb_logger.info(f'Finding stars within {fiberrad} mas from {x}, {y}')
         starpos = self.starpos
         stars = []
         for s in starpos:
@@ -213,7 +217,7 @@ class GCorbits():
             if dist < fiberrad:
                 dmag = -2.5*np.log10(fiber_coupling(dist))
                 stars.append([n, sx-x, sy-y, dist, mag, mag + dmag])
-                self.logger.info(f'{n} at a distance of [{sx-x:.2f} {sy-y:.2f}]')
+                self.gcorb_logger.info(f'{n} at a distance of [{sx-x:.2f} {sy-y:.2f}]')
 
         if plot:
             fig, ax = plt.subplots()

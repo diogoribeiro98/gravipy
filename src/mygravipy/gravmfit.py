@@ -18,6 +18,7 @@ import dynesty
 from dynesty import plotting as dyplot
 from dynesty import utils as dyfunc
 from numba import jit
+import time
 
 from .gravdata import *
 from .gcorbits import GCorbits
@@ -1078,6 +1079,7 @@ class GravMFit(GravData, GravPhaseMaps):
         if not logger.hasHandlers():
             logger.addHandler(ch)
         self.logger = logger
+        self.loglevel = loglevel
 
     def flux_ratio(self, mag1, mag2):
         """
@@ -1092,7 +1094,7 @@ class GravMFit(GravData, GravPhaseMaps):
 
         if fit = True the fit is done        
         """
-        orb = GCorbits(t=self.date_obs)
+        orb = GCorbits(t=self.date_obs, loglevel=self.loglevel)
         offs = (self.header['ESO INS SOBJ OFFX'],
                 self.header['ESO INS SOBJ OFFY'])
 
@@ -1251,7 +1253,7 @@ class GravMFit(GravData, GravPhaseMaps):
         '''
         fit_mode = kwargs.get('fit_mode', 'numeric')
         minimizer = kwargs.get('minimizer', 'emcee')
-        minmethod = kwargs.get('minmethod', 'least_squares')
+        minmethod = kwargs.get('minmethod', 'lbfgsb')
         bestchi = kwargs.get('bestchi', True)
         redchi2 = kwargs.get('redchi2', True)
         flagtill = kwargs.get('flagtill', None)
@@ -1825,12 +1827,15 @@ class GravMFit(GravData, GravPhaseMaps):
                                            min=lower[tdx],
                                            max=upper[tdx])
 
+                            start_time = time.time()
                             out = minimize(_lnlike_mstars, params,
                                            args=(fitdata,
                                                  fitarg, fithelp),
                                            method=minmethod,
                                         #    max_nfev=40000
                                            )
+                            end_time = time.time()
+                            elapsed_time = end_time - start_time
                             
                             if out.success:
                                 self.logger.info('Fit successful')
@@ -1838,7 +1843,8 @@ class GravMFit(GravData, GravPhaseMaps):
                             else:
                                 self.logger.warning('Fit not successful')
                                 self.logger.warning('Fit message: %s' % out.message)
-                            
+                            self.logger.debug(f"Elapsed time for fit: {elapsed_time:.2f} s")
+
                             theta_result = []
                             for tdx, th in enumerate(theta_names):
                                 theta_result.append(out.params[th].value)
