@@ -158,7 +158,7 @@ class GravPhaseMaps():
         load_phasemaps : load the phasemaps from package
         read_phasemaps : read correction from loaded phasemaps
         """
-        self.get_int_data(ignore_tel=ignore_tel)
+        self.get_int_data()
         log_level = log_level_mapping.get(loglevel, logging.INFO)
         logger = logging.getLogger(__name__)
         logger.setLevel(log_level)
@@ -623,11 +623,12 @@ class GravPhaseMaps():
             pos = np.array([ra + dra[tel], dec + ddec[tel]])
             if self.tel == 'AT':
                 pos /= 4.4
-            try:
-                pos[0] += self.pm_pos_off[0]
-                pos[1] += self.pm_pos_off[1]
-            except (NameError, AttributeError):
-                pass
+            # pm_pos_off is never defined?
+            # try:
+            #     pos[0] += self.pm_pos_off[0]
+            #     pos[1] += self.pm_pos_off[1]
+            # except (NameError, AttributeError):
+            #     pass
             pos_rot = np.dot(self.rotation(northangle[tel]), pos) + 100
             readout_pos[readout_pos[:, 1] == tel, 2] = pos_rot[1]
             readout_pos[readout_pos[:, 1] == tel, 3] = pos_rot[0]
@@ -676,8 +677,8 @@ def _rotation(ang):
                      [-np.sin(ang), np.cos(ang)]])
 
 
-def _read_phasemaps(ra, dec, northangle, amp_map_int, pha_map_int,
-                    amp_map_denom_int, wave,
+def _read_phasemaps(ra, dec, northangle, amp_map_int,
+                    pha_map_int, amp_map_denom_int, wave,
                     dra=np.zeros(4), ddec=np.zeros(4)):
     """
     Calculates coupling amplitude / phase for given coordinates
@@ -696,11 +697,12 @@ def _read_phasemaps(ra, dec, northangle, amp_map_int, pha_map_int,
 
     for tel in range(4):
         pos = np.array([ra + dra[tel], dec + ddec[tel]])
-        try:
-            pos[0] += self.pm_pos_off[0]
-            pos[1] += self.pm_pos_off[1]
-        except (NameError, AttributeError):
-            pass
+        # # pm_pos_off is never defined?
+        # try:
+        #     pos[0] += self.pm_pos_off[0]
+        #     pos[1] += self.pm_pos_off[1]
+        # except (NameError, AttributeError):
+        #     pass
         pos_rot = np.dot(_rotation(northangle[tel]), pos) + 100
         readout_pos[readout_pos[:, 1] == tel, 2] = pos_rot[1]
         readout_pos[readout_pos[:, 1] == tel, 3] = pos_rot[0]
@@ -2011,16 +2013,15 @@ class GravMFit(GravData, GravPhaseMaps):
                                 % (cllabels[i], percentiles[i, 1],
                                     percentiles[i, 2], percentiles[i, 0]))
 
-                if plot_science:
-                    if idx == 0:
-                        plotdata = []
-                    plotdata.append([theta_result, fitdata, fitarg, fithelp])
+                if idx == 0:
+                    plotdata = []
+                plotdata.append([theta_result, fitdata, fitarg, fithelp])
                 if not no_fit:
                     fittab = pd.concat([fittab, _fittab], ignore_index=True)
 
             if plot_science:
                 self.plot_fit(plotdata)
-                self.plotdata = plotdata
+            self.plotdata = plotdata
         if not no_fit or pdexists:
             self.fittab = fittab
         if iopandas is not None and not pdexists:
