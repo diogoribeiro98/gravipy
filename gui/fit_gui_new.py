@@ -43,23 +43,28 @@ class GRAVITYfitGUI(QMainWindow):
 
 
         button_layout = QHBoxLayout()
-        # Create a button to open the file dialog
         button_load = QPushButton("Open File", self)
         button_load.setMaximumSize(100, 30)
         button_load.clicked.connect(self.showFileDialog)
         button_layout.addWidget(button_load)
 
-        # Create a button to open the file dialog
         button_guess = QPushButton("Get fitting guess from header", self)
         button_guess.setMaximumSize(250, 30)
         button_guess.clicked.connect(self.loadguesses)
         button_layout.addWidget(button_guess)
 
-        # Create a button to open the file dialog
-        button_guess = QPushButton("Show field", self)
-        button_guess.setMaximumSize(150, 30)
-        button_guess.clicked.connect(lambda: self.loadguesses(plot=True))
-        button_layout.addWidget(button_guess)
+        button_show = QPushButton("Show field", self)
+        button_show.setMaximumSize(150, 30)
+        button_show.clicked.connect(lambda: self.loadguesses(plot=True))
+        button_layout.addWidget(button_show)
+
+        button_fit = QPushButton("Fit", self)
+        button_fit.setMaximumSize(100, 30)
+        button_fit.clicked.connect(self.fit)
+        button_layout.addWidget(button_fit)
+
+
+
 
 
 
@@ -308,9 +313,10 @@ class GRAVITYfitGUI(QMainWindow):
 
     def loadguesses(self, plot=False):
         try:
-            self.data
+            self.mfit
         except AttributeError:
             logging.error("Cannot load guess, no data loaded")
+            return 0
         try:
             ra_list, de_list, fr_list, initial = self.mfit.prep_fit(plot=plot)
         except ValueError:
@@ -320,26 +326,79 @@ class GRAVITYfitGUI(QMainWindow):
             return 0
         
         self.nsources = len(ra_list) + 1
-        print(self.input_dict)
-
         for idx in range(self.nsources-1):
             self.input_dict[f"RA {idx+1}"] = f'{ra_list[idx]:.3f}'
             self.input_dict[f"Dec {idx+1}"] = f'{de_list[idx]:.3f}'
             if idx > 0:
                 self.input_dict[f"fr {idx+1}"] = f'{fr_list[idx-1]:.3f}'
-        
         self.input_dict["alphaBH"] = f'{initial[0]:.3f}'
         self.input_dict["frBG"] = f'{initial[1]:.3f}'
         self.input_dict["pcRA"] = f'{initial[2]:.3f}'
         self.input_dict["pcDec"] = f'{initial[3]:.3f}'
         self.input_dict["frBH"] = f'{initial[4]:.3f}'
-
-
-
         self.createSourceLayout()
         
-    
+    def fit(self):
+        try:
+            self.mfit
+        except AttributeError:
+            logging.error("Cannot load guess, no data loaded")
+            return 0
+        ra_list = []
+        de_list = []
+        fr_list = []
+        fit_pos = []
+        fit_fr = []
+        for idx in range(self.nsources-1):
+            ra_list.append(float(self.input_dict[f"RA {idx+1}"]))
+            de_list.append(float(self.input_dict[f"Dec {idx+1}"]))
+            fit_pos.append(self.checkbox_dict[f"pos {idx+1}"])
+            if idx > 0:
+                fr_list.append(float(self.input_dict[f"fr {idx+1}"]))
+                fit_fr.append(self.checkbox_dict[f"fr {idx+1}"])
 
+        initial = [float(self.input_dict["alphaBH"]),
+                   float(self.input_dict["frBG"]),
+                   float(self.input_dict["pcRA"]),
+                   float(self.input_dict["pcDec"]),
+                   float(self.input_dict["frBH"]),
+                   1]
+        
+        logging.warning('Fit is running')
+        logging.debug('Fitting input')
+        logging.debug(f'ra list: {ra_list}')
+        logging.debug(f'de list: {de_list}')
+        logging.debug(f'fr list: {fr_list}')
+        logging.debug(f'fit pos: {fit_pos}')
+        logging.debug(f'fit fr: {fit_fr}')
+        logging.debug(f'initial: {initial}')
+
+        if self.minimizer == 'Least Sqr':
+            logging.info('Fitting with Least Sqr')
+            res = self.mfit.fit_stars(ra_list,
+                                      de_list,
+                                      fr_list,
+                                      fit_pos = fit_pos,
+                                      fit_fr = fit_fr,
+                                      initial = initial,
+                                      minimizer = 'leastsq',
+                                      plot_science = False
+                                      )
+        else:
+            res = self.mfit.fit_stars(ra_list,
+                                      de_list,
+                                      fr_list,
+                                      fit_pos = fit_pos,
+                                      fit_fr = fit_fr,
+                                      initial = initial,
+                                      minimizer = 'emcee',
+                                      nthreads = int(self.input_dict["nthreads"]),
+                                      nwalkers = int(self.input_dict["nwalkers"]),
+                                      nsteps = int(self.input_dict["nsteps"]),
+                                      plot_science = False
+                                      )
+        logging.warning('Fit done')
+        self.updatePlot()
 
     def checkboxStateChanged(self, state):
         sender = self.sender()
