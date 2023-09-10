@@ -32,15 +32,36 @@ class GRAVITYfitGUI(QMainWindow):
 
         self.initUI()
 
+    # get a button to pull the fit initial guess
+    # button to fit
+    # plot the fit
+
     def initUI(self):
         # Set window properties
         self.setWindowTitle("GRAVITY multi source fitting")
         self.setGeometry(100, 100, 1700, 1000)
 
+
+        button_layout = QHBoxLayout()
         # Create a button to open the file dialog
-        self.button = QPushButton("Open File", self)
-        self.button.setMaximumSize(100, 30)
-        self.button.clicked.connect(self.showFileDialog)
+        button_load = QPushButton("Open File", self)
+        button_load.setMaximumSize(100, 30)
+        button_load.clicked.connect(self.showFileDialog)
+        button_layout.addWidget(button_load)
+
+        # Create a button to open the file dialog
+        button_guess = QPushButton("Get fitting guess from header", self)
+        button_guess.setMaximumSize(250, 30)
+        button_guess.clicked.connect(self.loadguesses)
+        button_layout.addWidget(button_guess)
+
+        # Create a button to open the file dialog
+        button_guess = QPushButton("Show field", self)
+        button_guess.setMaximumSize(150, 30)
+        button_guess.clicked.connect(lambda: self.loadguesses(plot=True))
+        button_layout.addWidget(button_guess)
+
+
 
         # Create a QLineEdit widget to display the selected file path
         self.file_path_edit = QLineEdit(self)
@@ -61,6 +82,7 @@ class GRAVITYfitGUI(QMainWindow):
         self.log_text_edit = QTextEdit(self)
         self.log_text_edit.setReadOnly(True)
         self.log_text_edit.setPlaceholderText("Log Messages")
+        self.log_text_edit.setMinimumSize(500,150)
         self.log_handler = LoggingHandler(self.log_text_edit)
         self.log_handler.setFormatter(logging.Formatter('%(levelname)s: %(name)s - %(message)s'))
         self.log_handler.setLevel(logging.INFO)
@@ -81,11 +103,11 @@ class GRAVITYfitGUI(QMainWindow):
         self.left_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         self.createSourceLayout()
 
-        main_layout.addWidget(self.button, 0, 0,
-                              alignment=Qt.AlignmentFlag.AlignRight)
-        main_layout.addWidget(self.file_path_edit, 0, 1)
-        main_layout.addLayout(right_layout, 1, 1)
-        main_layout.addLayout(self.left_layout, 1, 0,
+        main_layout.addLayout(button_layout, 0, 1,
+                              alignment=Qt.AlignmentFlag.AlignLeft)
+        main_layout.addWidget(self.file_path_edit, 1, 1)
+        main_layout.addLayout(right_layout, 2, 1)
+        main_layout.addLayout(self.left_layout, 2, 0,
                               alignment=Qt.AlignmentFlag.AlignTop)
 
         # Create a central widget and set the main layout
@@ -122,59 +144,74 @@ class GRAVITYfitGUI(QMainWindow):
         font.setBold(True)    # Make the font bold
         fitlabel.setFont(font)        
         input_layout.addWidget(fitlabel, 0, 0)
-        
+
+
         source_label = QLabel('Number of sources')
         source_label.setMaximumSize(200, 30)
         source_label.setAlignment(Qt.AlignmentFlag.AlignRight)
         source_label.setContentsMargins(0, 5, 0, 0)
-        input_layout.addWidget(source_label, 1, 0)
+        input_layout.addWidget(source_label, 2, 0)
 
         source_combo = QComboBox(self)
         source_combo.setMaximumSize(150, 30)
         source_combo.addItems(["2", "3", "4", "5"])
         try:
-            source_combo.setCurrentText(str(self.nsoures))
+            source_combo.setCurrentText(str(self.nsources))
         except AttributeError:
             source_combo.setCurrentText("3")
-        input_layout.addWidget(source_combo, 1, 1)
-        source_combo.currentIndexChanged.connect(self.updateNsources)
+        input_layout.addWidget(source_combo, 2, 1)
+        source_combo.currentIndexChanged.connect(self.updateInputFields)
         self.source_combo = source_combo
 
-        # self.source_combo = source_combo
-        self.nsoures = int(source_combo.currentText())
-        logging.info(f"Number of sources: {self.nsoures}")
+        self.nsources = int(source_combo.currentText())
+        logging.info(f"Number of sources: {self.nsources}")
+        for ndx in range(self.nsources-1):
+            star_label = QLabel(f"Source {ndx+2}")
+            star_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            star_label.setMaximumSize(100, 30)
+            input_layout.addWidget(star_label, 4, ndx+1)
 
-        self.input_dict = {}
-        input_labels = ["RA", "Dec", "Flux Ratio"]
-        nsources = self.nsoures
+        try:
+            self.input_dict
+        except AttributeError:
+            self.input_dict = {}
+        self.input_mapping = {}
+        input_labels = ["Sep. RA", "Sep. Dec", "Flux Ratio"]
+        input_labels_dic = ["RA", "Dec", "fr"]
+        input_init_val = ["0.0", "0.0", "1.0"]
+        nsources = self.nsources
         for ldx, label_text in enumerate(input_labels):
             input_label = QLabel(label_text)
             input_label.setMaximumSize(200, 30)
             input_label.setAlignment(Qt.AlignmentFlag.AlignRight)
             input_label.setContentsMargins(0, 5, 0, 0)
-            input_layout.addWidget(input_label, ldx+4, 0)
-            for i in range(nsources-1):  # Create three input boxes for each label
+            input_layout.addWidget(input_label, ldx+5, 0)
+            for i in range(nsources-1):
                 if i == 0 and ldx == 2:
                     continue
                 input_box = QLineEdit(self)
-                input_box.textChanged.connect(self.inputTextChanged)
+                self.input_mapping[input_box] = f"{input_labels_dic[ldx]} {i+1}"
+                input_box.textChanged.connect(self.updateDictionary)
+                if f'{input_labels_dic[ldx]} {i+1}' not in self.input_dict:
+                    self.input_dict[f"{input_labels_dic[ldx]} {i+1}"] = f"{input_init_val[ldx]}"
+                input_box.setText(self.input_dict[f"{input_labels_dic[ldx]} {i+1}"] )
                 input_box.setMaximumSize(100, 30)
-                self.input_dict[f"{label_text} {i+1}"] = ""  # Initialize as empty string
-                input_layout.addWidget(input_box, ldx+4, i+1)
-        
-        for ndx in range(nsources-1):
-            star_label = QLabel(f"Source {ndx+2}")
-            star_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            star_label.setMaximumSize(100, 30)
-            input_layout.addWidget(star_label, 3, ndx+1)
-        
+                input_layout.addWidget(input_box, ldx+5, i+1)
+
+        try:
+            self.checkbox_dict
+        except AttributeError:
+            self.checkbox_dict = {}
+        self.checkbox_mapping = {}
+
         fit_labels = ["Fit Position", "Fit Flux Ratio"]
+        fit_labels_dic = ["pos", "fr"]
         for ldx, label_text in enumerate(fit_labels):
             fit_label = QLabel(label_text)
             fit_label.setMaximumSize(200, 30)
             fit_label.setAlignment(Qt.AlignmentFlag.AlignRight)
             fit_label.setContentsMargins(0, 5, 0, 0)
-            input_layout.addWidget(fit_label, ldx+7, 0)
+            input_layout.addWidget(fit_label, ldx+8, 0)
             for i in range(nsources-1):
                 if i == 0 and ldx == 1:
                     continue
@@ -182,29 +219,38 @@ class GRAVITYfitGUI(QMainWindow):
                     continue
                 checkbox = QCheckBox()
                 checkbox.setFixedSize(100, 30)
-                checkbox.setChecked(True)
+                self.checkbox_mapping[checkbox] = f"{fit_labels_dic[ldx]} {i+1}"
                 checkbox.stateChanged.connect(self.checkboxStateChanged)
-                input_layout.addWidget(checkbox, ldx+7, i+1)
+                if f'{fit_labels_dic[ldx]} {i+1}' not in self.checkbox_dict:
+                    self.checkbox_dict[f"{fit_labels_dic[ldx]} {i+1}"] = True
+                checkbox.setChecked(self.checkbox_dict[f"{fit_labels_dic[ldx]} {i+1}"])
+                input_layout.addWidget(checkbox, ldx+8, i+1)
         
-        init_labels = ["pc RA", "pc Dec", "alpha central source",
-                       "fr Source 1 / Source 2", "flux BG"]
+        init_labels = ["pc RA (Source 1 pos)", "pc Dec (Source 1 pos)",
+                       "Power law index (Sou. 1)",
+                       "fr Source 1 / Source 2", "Flux BG"]
+        init_labels_dic = ["pcRA", "pcDec", "alphaBH", "frBH", "frBG"]
+        init_init_val = ["0.0", "0.0", "3.0", "1.0", "1.0"]
         for ldx, label_text in enumerate(init_labels):
             init_label = QLabel(label_text)
             init_label.setMaximumSize(200, 30)
             init_label.setAlignment(Qt.AlignmentFlag.AlignRight)
             init_label.setContentsMargins(0, 5, 0, 0)
-            input_layout.addWidget(init_label, ldx+9, 0)
+            input_layout.addWidget(init_label, ldx+10, 0)
             init_box = QLineEdit(self)
-            init_box.textChanged.connect(self.inputTextChanged)
             init_box.setMaximumSize(100, 30)
-            self.input_dict[f"{label_text} {i+1}"] = ""  # Initialize as empty string
-            input_layout.addWidget(init_box, ldx+9, 1)
+            self.input_mapping[init_box] = f"{init_labels_dic[ldx]}"
+            init_box.textChanged.connect(self.updateDictionary)
+            if f'{init_labels_dic[ldx]}' not in self.input_dict:
+                self.input_dict[f"{init_labels_dic[ldx]}"] = f"{init_init_val[ldx]}""" 
+            init_box.setText(self.input_dict[f"{init_labels_dic[ldx]}"] )
+            input_layout.addWidget(init_box, ldx+10, 1)
 
         mode_label = QLabel('Fitting Mode')
         mode_label.setMaximumSize(200, 30)
         mode_label.setAlignment(Qt.AlignmentFlag.AlignRight)
         mode_label.setContentsMargins(0, 5, 0, 0)
-        input_layout.addWidget(mode_label, 14, 0)
+        input_layout.addWidget(mode_label, 15, 0)
 
         mode_combo = QComboBox(self)
         mode_combo.setMaximumSize(150, 30)
@@ -214,29 +260,33 @@ class GRAVITYfitGUI(QMainWindow):
         except AttributeError:
             mode_combo.setCurrentIndex(0)
         self.minimizer = mode_combo.currentText()
-        input_layout.addWidget(mode_combo, 14, 1)
-        mode_combo.currentIndexChanged.connect(self.updateNsources)
+        input_layout.addWidget(mode_combo, 15, 1)
+        mode_combo.currentIndexChanged.connect(self.updateInputFields)
         self.mode_combo = mode_combo
 
         if self.minimizer == "MCMC":
             mcmc_labels = ["nthreads", "nwalkers", "nsteps"]
+            mcmc_init_val = ["4", "300", "300"]
             for ldx, label_text in enumerate(mcmc_labels):
                 mcmc_label = QLabel(label_text)
                 mcmc_label.setMaximumSize(200, 30)
                 mcmc_label.setAlignment(Qt.AlignmentFlag.AlignRight)
                 mcmc_label.setContentsMargins(0, 5, 0, 0)
-                input_layout.addWidget(mcmc_label, ldx+15, 0)
+                input_layout.addWidget(mcmc_label, ldx+16, 0)
                 mcmc_box = QLineEdit(self)
-                mcmc_box.textChanged.connect(self.inputTextChanged)
                 mcmc_box.setMaximumSize(100, 30)
-                self.input_dict[f"{label_text} {i+1}"] = ""  # Initialize as empty string
-                input_layout.addWidget(mcmc_box, ldx+15, 1)
+                self.input_mapping[mcmc_box] = f"{label_text}"
+                mcmc_box.textChanged.connect(self.updateDictionary)
+                if f'{label_text}' not in self.input_dict:
+                    self.input_dict[f"{label_text}"] = f"{mcmc_init_val[ldx]}"
+                mcmc_box.setText(self.input_dict[f"{label_text}"] )
+                input_layout.addWidget(mcmc_box, ldx+16, 1)
 
         self.input_layout = input_layout
         self.left_layout.addLayout(self.input_layout, 0, 0)
 
-    def updateNsources(self):
-        self.nsoures = int(self.source_combo.currentText())
+    def updateInputFields(self):
+        self.nsources = int(self.source_combo.currentText())
         self.minimizer = self.mode_combo.currentText()
         self.createSourceLayout()
         
@@ -251,30 +301,60 @@ class GRAVITYfitGUI(QMainWindow):
             self.file_path_edit.setText("\n".join(file_paths))
         try:
             self.data = LoadData(file_paths[0])
+            self.mfit = self.data.data
         except IndexError:
             pass
         self.updatePlot()
 
+    def loadguesses(self, plot=False):
+        try:
+            self.data
+        except AttributeError:
+            logging.error("Cannot load guess, no data loaded")
+        try:
+            ra_list, de_list, fr_list, initial = self.mfit.prep_fit(plot=plot)
+        except ValueError:
+            logging.error("Cannot load guess, only one source in field")
+            return 0
+        if plot:
+            return 0
+        
+        self.nsources = len(ra_list) + 1
+        print(self.input_dict)
+
+        for idx in range(self.nsources-1):
+            self.input_dict[f"RA {idx+1}"] = f'{ra_list[idx]:.3f}'
+            self.input_dict[f"Dec {idx+1}"] = f'{de_list[idx]:.3f}'
+            if idx > 0:
+                self.input_dict[f"fr {idx+1}"] = f'{fr_list[idx-1]:.3f}'
+        
+        self.input_dict["alphaBH"] = f'{initial[0]:.3f}'
+        self.input_dict["frBG"] = f'{initial[1]:.3f}'
+        self.input_dict["pcRA"] = f'{initial[2]:.3f}'
+        self.input_dict["pcDec"] = f'{initial[3]:.3f}'
+        self.input_dict["frBH"] = f'{initial[4]:.3f}'
+
+
+
+        self.createSourceLayout()
+        
+    
+
+
     def checkboxStateChanged(self, state):
         sender = self.sender()
-        label_text = sender.text()
-        checked = state == 2  # 2 corresponds to checked state in Qt
-        self.checkbox_dict[label_text] = checked
-        logging.info(f"Checkbox state changed: {label_text} is checked: {checked}")
+        if sender in self.checkbox_mapping:
+            key = self.checkbox_mapping[sender]
+            checked = state == 2  # 2 corresponds to checked state in Qt
+            self.checkbox_dict[key] = checked
+            logging.debug(f"Checkbox {key} state changed to {checked}")
 
-
-    def inputTextChanged_old(self, text):
+    def updateDictionary(self, new_text):
         sender = self.sender()
-        label_text = self.input_dict.keys()[list(self.input_dict.values()).index(sender.text())]
-        self.input_dict[label_text] = text
-        logging.info(f"Input text changed: {label_text} value: {text}")
-
-    def inputTextChanged(self, text):
-        sender = self.sender()
-        for key, value in self.input_dict.items():
-            if self.input_dict[key] != sender.text():
-                self.input_dict[key] = sender.text()
-                print(key, sender.text())
+        if sender in self.input_mapping:
+            key = self.input_mapping[sender]
+            self.input_dict[key] = new_text
+            logging.debug(f"{key} value changed to {new_text}")
 
 def main():
     app = QApplication(sys.argv)

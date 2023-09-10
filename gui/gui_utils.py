@@ -17,7 +17,7 @@ class LoggingHandler(logging.Handler):
 
 class LoadData:
     def __init__(self, filename):
-        data = gp.GravData(filename)
+        data = gp.GravMFit(filename)
         data.get_int_data()
         self.data = data
         self.polmode = data.polmode
