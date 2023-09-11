@@ -4,7 +4,12 @@ from matplotlib.figure import Figure
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 import logging
 from mygravipy.gravmfit import _calc_vis_mstars
+from astropy.io import fits
 
+try:
+    from PyQt6.QtCore import QThread, pyqtSignal
+except ImportError:
+    from PyQt5.QtCore import QThread, pyqtSignal
 
 class LoggingHandler(logging.Handler):
     def __init__(self, text_edit):
@@ -16,12 +21,128 @@ class LoggingHandler(logging.Handler):
         self.text_edit.append(log_message)
 
 
-class LoadData:
+class LoadFiles(QThread):
+    finished = pyqtSignal()
+    update_progress = pyqtSignal(int)
+
+    def __init__(self, file_names):
+        super().__init__()
+        self.file_names = file_names
+        self.files = []
+        self.offs = []
+
+    def run(self):
+        for fdx, file in enumerate(self.file_names):
+            # check if file is a fits file
+            if file[-5:] != '.fits':
+                logging.error(f'File {file} is not a fits file')
+                continue
+            h = fits.open(file)[0].header
+            try:
+                self.offs.append((h['ESO INS SOBJ OFFX'], h['ESO INS SOBJ OFFY']))
+            except KeyError:
+                logging.error(f'File {file} does not have OFFX/OFFY in header')
+                continue
+            self.files.append(file)
+            self.update_progress.emit(fdx)
+        self.finished.emit()
+
+
+class LoadData(QThread):
+    finished = pyqtSignal()
+    update_progress = pyqtSignal(int)
+
     def __init__(self, filename):
-        data = gp.GravMFit(filename)
+        super().__init__()
+        self.filename = filename
+        self.data = None
+
+    def run(self):
+        data = gp.GravMFit(self.filename)
         data.get_int_data()
         self.data = data
-        self.polmode = data.polmode
+        #     self.update_progress.emit(fdx)
+        self.finished.emit()
+
+
+class LoadDataList(QThread):
+    finished = pyqtSignal()
+    update_progress = pyqtSignal(int)
+
+    def __init__(self, filenames):
+        super().__init__()
+        self.filenames = filenames
+        self.data = []
+
+    def run(self):
+        for fdx, filename in enumerate(self.filenames):
+            data = gp.GravMFit(filename, loglevel='WARNING')
+            self.data.append(data)
+            self.update_progress.emit(fdx)
+        self.finished.emit()
+
+
+class FitWorker(QThread):
+    finished = pyqtSignal()
+    update_progress = pyqtSignal(int)
+
+    def __init__(self, data, input_dict, checkbox_dict, minimizer, nsources):
+        super().__init__()
+        self.data = data
+        self.input_dict = input_dict
+        self.checkbox_dict = checkbox_dict
+        self.minimizer = minimizer
+        self.nsources = nsources
+        self.res = []
+
+    def run(self):
+        ra_list = []
+        de_list = []
+        fr_list = []
+        fit_pos = []
+        fit_fr = []
+        for idx in range(self.nsources-1):
+            ra_list.append(float(self.input_dict[f"RA {idx+1}"]))
+            de_list.append(float(self.input_dict[f"Dec {idx+1}"]))
+            fit_pos.append(self.checkbox_dict[f"pos {idx+1}"])
+            if idx > 0:
+                fr_list.append(float(self.input_dict[f"fr {idx+1}"]))
+                fit_fr.append(self.checkbox_dict[f"fr {idx+1}"])
+
+        initial = [float(self.input_dict["alphaBH"]),
+                   float(self.input_dict["frBG"]),
+                   float(self.input_dict["pcRA"]),
+                   float(self.input_dict["pcDec"]),
+                   float(self.input_dict["frBH"]),
+                   1]
+        
+        for fdx, data in enumerate(self.data):
+            if self.minimizer == 'Least Sqr':
+                res = data.fit_stars(ra_list,
+                                        de_list,
+                                        fr_list,
+                                        fit_pos = fit_pos,
+                                        fit_fr = fit_fr,
+                                        initial = initial,
+                                        minimizer = 'leastsq',
+                                        plot_science = False
+                                        )
+            else:
+                res = data.fit_stars(ra_list,
+                                        de_list,
+                                        fr_list,
+                                        fit_pos = fit_pos,
+                                        fit_fr = fit_fr,
+                                        initial = initial,
+                                        minimizer = 'emcee',
+                                        nthreads = int(self.input_dict["nthreads"]),
+                                        nwalkers = int(self.input_dict["nwalkers"]),
+                                        nsteps = int(self.input_dict["nsteps"]),
+                                        plot_science = False
+                                      )
+            # self.res.append(data)
+            self.update_progress.emit(fdx)
+        self.finished.emit()
 
 
 class PlotData(FigureCanvas):

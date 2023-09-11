@@ -229,7 +229,6 @@ class GravData():
         if not logger.hasHandlers():
             logger.addHandler(ch)
         self.logger = logger
-
         self.name = data
         self.test = test
         self.filename = os.path.basename(data)
@@ -320,12 +319,12 @@ class GravData():
             self.closure_labels = np.array(closure_labels)
             self.baseline_labels = np.array(baseline_labels)
 
-        logger.info(f'Category: {self.datacatg}')
-        logger.info(f'Telescope: {self.tel}')
-        logger.info(f'Polarization: {self.polmode}')
-        logger.info(f'Resolution: {self.resolution}')
-        logger.info(f'DIT: {self.dit}')
-        logger.info(f'NDIT: {self.ndit}')
+        logger.debug(f'Category: {self.datacatg}')
+        logger.debug(f'Telescope: {self.tel}')
+        logger.debug(f'Polarization: {self.polmode}')
+        logger.debug(f'Resolution: {self.resolution}')
+        logger.debug(f'DIT: {self.dit}')
+        logger.debug(f'NDIT: {self.ndit}')
 
         if not self.raw:
             if self.polmode == 'SPLIT':

@@ -3006,7 +3006,7 @@ class GravMNightFit(GravNight):
                 r.summary()
                 fig, axes = dyplot.runplot(r)
                 plt.show()
-                tfig, taxes = dyplot.traceplot(r, labels=n.theta_names)
+                tfig, taxes = dyplot.traceplot(r, labels=self.theta_names)
                 plt.show()
                 samples, weights = r.samples, r.importance_weights()
                 mean, cov = dyfunc.mean_and_cov(samples, weights)

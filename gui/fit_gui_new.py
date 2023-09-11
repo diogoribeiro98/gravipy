@@ -2,75 +2,94 @@ import sys
 import numpy as np
 try:
     from PyQt6.QtWidgets import (QApplication, QMainWindow,
-                                QPushButton, QMessageBox,
+                                QPushButton,
                                 QFileDialog, QLineEdit,
                                 QComboBox, QLabel,
-                                QTextEdit, QFormLayout,
+                                QTextEdit, 
                                 QVBoxLayout, QHBoxLayout,
-                                QWidget, QCheckBox, QGridLayout
+                                QWidget, QCheckBox, QGridLayout,
+                                QProgressBar,
                                 )
     from PyQt6.QtCore import Qt
     from PyQt6.QtGui import QFont
 except ImportError:
     from PyQt5.QtWidgets import (QApplication, QMainWindow,
-                                QPushButton, QMessageBox,
+                                QPushButton,
                                 QFileDialog, QLineEdit,
                                 QComboBox, QLabel,
-                                QTextEdit, QFormLayout,
+                                QTextEdit, 
                                 QVBoxLayout, QHBoxLayout,
-                                QWidget, QCheckBox, QGridLayout
+                                QWidget, QCheckBox, QGridLayout,
+                                QProgressBar
                                 )
     from PyQt5.QtCore import Qt
     from PyQt5.QtGui import QFont
-from gui_utils import PlotData, LoggingHandler, LoadData
+
+from gui_utils import PlotData, LoggingHandler, LoadDataList, FitWorker, LoadFiles
 import logging
+from astropy.io import fits
+import time
 
 
 class GRAVITYfitGUI(QMainWindow):
     def __init__(self):
         super().__init__()
-
         self.initUI()
-
-    # get a button to pull the fit initial guess
-    # button to fit
-    # plot the fit
 
     def initUI(self):
         # Set window properties
         self.setWindowTitle("GRAVITY multi source fitting")
         self.setGeometry(100, 100, 1700, 1000)
-
-
+        
+        # Top line of right panel
+        # Create a button widget to open a file dialog
         button_layout = QHBoxLayout()
-        button_load = QPushButton("Open File", self)
+        button_load = QPushButton("Open Files", self)
         button_load.setMaximumSize(100, 30)
         button_load.clicked.connect(self.showFileDialog)
         button_layout.addWidget(button_load)
 
-        button_guess = QPushButton("Get fitting guess from header", self)
-        button_guess.setMaximumSize(250, 30)
-        button_guess.clicked.connect(self.loadguesses)
-        button_layout.addWidget(button_guess)
+        # Create a combo box to select the OFFX/OFFY to use
+        self.data_select = QLabel("Chose files with OFFX/OFFY:", self)
+        self.data_select_combo = QComboBox(self)
+        self.data_select_combo.setFixedSize(150, 30)        
+        self.data_select_combo.currentIndexChanged.connect(self.updateFileList)
+        button_layout.addWidget(self.data_select)
+        button_layout.addWidget(self.data_select_combo)
 
+        button_fit_layout = QHBoxLayout()
+        button_fit_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        # Button to show field
         button_show = QPushButton("Show field", self)
-        button_show.setMaximumSize(150, 30)
+        button_show.setFixedSize(100, 30)
         button_show.clicked.connect(lambda: self.loadguesses(plot=True))
-        button_layout.addWidget(button_show)
+        button_fit_layout.addWidget(button_show)
 
+        # Button to get guesses from header
+        button_guess = QPushButton("Get fitting guess from header", self)
+        button_guess.setFixedSize(250, 30)
+        button_guess.clicked.connect(self.loadguesses)
+        button_fit_layout.addWidget(button_guess)
+
+        # Button to run the fit
         button_fit = QPushButton("Fit", self)
-        button_fit.setMaximumSize(100, 30)
+        button_fit.setFixedSize(100, 30)
         button_fit.clicked.connect(self.fit)
-        button_layout.addWidget(button_fit)
+        button_fit_layout.addWidget(button_fit)
 
-
-
-
-
-
-        # Create a QLineEdit widget to display the selected file path
-        self.file_path_edit = QLineEdit(self)
-        self.file_path_edit.setPlaceholderText("Selected File")
+        # Layout to choose between files
+        file_layout = QHBoxLayout()
+        prev_button = QPushButton("⬅️")
+        next_button = QPushButton("➡️")
+        prev_button.setFixedSize(30, 30)
+        next_button.setFixedSize(30, 30)
+        prev_button.clicked.connect(self.prev_file)
+        next_button.clicked.connect(self.next_file)
+        file_layout.addWidget(prev_button)
+        file_layout.addWidget(next_button)
+        self.current_index = 0
+        self.file_label = QLabel('Selected File')
+        file_layout.addWidget(self.file_label)
 
         # Create a combo box (dropdown) to select the data source
         self.plotlabel = QLabel("Plot Quantity:", self)
@@ -82,6 +101,15 @@ class GRAVITYfitGUI(QMainWindow):
 
         self.canvas1 = PlotData(self)
         self.canvas2 = PlotData(self)
+        
+        progress_layout = QHBoxLayout()
+        self.progress_label = QLabel("", self)
+        progress_layout.addWidget(self.progress_label,
+                                  alignment=Qt.AlignmentFlag.AlignRight)
+        self.progress_bar = QProgressBar(self)
+        self.progress_bar.setFixedSize(150, 20)
+        self.progress_bar.setVisible(False)
+        progress_layout.addWidget(self.progress_bar)
 
         # Create a QTextEdit widget to display log messages
         self.log_text_edit = QTextEdit(self)
@@ -97,6 +125,8 @@ class GRAVITYfitGUI(QMainWindow):
         main_layout = QGridLayout()
         right_widget = QWidget(self)
         right_layout = QVBoxLayout()
+        right_layout.addLayout(file_layout)
+        right_layout.addLayout(button_fit_layout)
         right_layout.addWidget(self.plotlabel)
         right_layout.addWidget(self.data_source_combo)
         right_layout.addWidget(self.canvas1)
@@ -110,27 +140,16 @@ class GRAVITYfitGUI(QMainWindow):
 
         main_layout.addLayout(button_layout, 0, 1,
                               alignment=Qt.AlignmentFlag.AlignLeft)
-        main_layout.addWidget(self.file_path_edit, 1, 1)
         main_layout.addLayout(right_layout, 2, 1)
         main_layout.addLayout(self.left_layout, 2, 0,
                               alignment=Qt.AlignmentFlag.AlignTop)
+        main_layout.addLayout(progress_layout, 3, 1,
+                              alignment=Qt.AlignmentFlag.AlignRight)
 
         # Create a central widget and set the main layout
         central_widget = QWidget(self)
         central_widget.setLayout(main_layout)
         self.setCentralWidget(central_widget)
-
-    def updatePlot(self):
-        selected_data_source = self.data_source_combo.currentText()
-        try:
-            logging.info(f"Selected data source: {selected_data_source}")
-            if self.data.polmode == 'SPLIT':
-                self.canvas1.plot_data(selected_data_source, self.data.data, lowest_plot=False, pol_idx=0)
-                self.canvas2.plot_data(selected_data_source, self.data.data, lowest_plot=True, pol_idx=1)
-            else:
-                self.canvas1.plot_data(selected_data_source, self.data.data, lowest_plot=True, pol_idx=0)
-        except Exception as e:
-            logging.error(f"Error updating plot: {str(e)}")
 
     def createSourceLayout(self):
         try:
@@ -169,7 +188,12 @@ class GRAVITYfitGUI(QMainWindow):
         self.source_combo = source_combo
 
         self.nsources = int(source_combo.currentText())
-        logging.info(f"Number of sources: {self.nsources}")
+        try:
+            if self.nsources != self.nsources_prev:
+                logging.info(f"Number of sources: {self.nsources}")
+        except AttributeError:
+            pass
+        self.nsources_prev = self.nsources
         for ndx in range(self.nsources-1):
             star_label = QLabel(f"Source {ndx+2}")
             star_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -251,6 +275,7 @@ class GRAVITYfitGUI(QMainWindow):
             init_box.setText(self.input_dict[f"{init_labels_dic[ldx]}"] )
             input_layout.addWidget(init_box, ldx+10, 1)
 
+
         mode_label = QLabel('Fitting Mode')
         mode_label.setMaximumSize(200, 30)
         mode_label.setAlignment(Qt.AlignmentFlag.AlignRight)
@@ -298,22 +323,119 @@ class GRAVITYfitGUI(QMainWindow):
     def showFileDialog(self):
         # Create a file dialog and set its properties
         file_dialog = QFileDialog(self)
-        file_dialog.setWindowTitle("Open File")
+        file_dialog.setWindowTitle("Open Files")
         # Show the file dialog and get the selected file(s)
-        file_paths, _ = file_dialog.getOpenFileNames(self, "Open File", "", "All Files (*);;Text Files (*.txt)")
-        if file_paths:
-            # Display the selected file(s) in the QLineEdit widget
-            self.file_path_edit.setText("\n".join(file_paths))
-        try:
-            self.data = LoadData(file_paths[0])
-            self.mfit = self.data.data
-        except IndexError:
-            pass
+        file_paths, test = file_dialog.getOpenFileNames(self, "Open File", "", "Fits files (*.fits);;All Files (*)")
+
+        if not file_paths:
+            return
+
+        self.progress_bar.setMaximum(len(file_paths))
+        self.progress_bar.setValue(0)
+        self.progress_bar.setVisible(True)
+        self.progress_label.setText(f"Loading files: ")
+
+        self.loader = LoadFiles(file_paths)
+        self.loader.update_progress.connect(self.update_progress)
+        self.loader.finished.connect(self.showFileDialog_save)
+        self.loader.start()
+
+    def showFileDialog_save(self):
+        self.files = self.loader.files
+        self.offs = self.loader.offs
+        self.offs = list(set(self.offs))
+        offs_str = [str(i)[1:-1] for i in self.offs]
+        self.data_select_combo.clear()
+        self.progress_bar.setVisible(False)
+        self.progress_label.setText("")
+        self.data_select_combo.addItems(offs_str)
+
+
+
+    def update_progress(self, value):
+        current_value = self.progress_bar.value() + 1
+        self.progress_bar.setValue(current_value)
+
+    def updateFileList(self):
+        # get index of data_select_combo
+        selectec_off = self.data_select_combo.currentIndex()
+        _off = self.offs[selectec_off]
+        self.sel_files = []
+        self.sel_files_names = []
+        for file in self.files:
+            h = fits.open(file)[0].header
+            if (h['ESO INS SOBJ OFFX'], h['ESO INS SOBJ OFFY']) == _off:
+                self.sel_files.append(file)
+                self.sel_files_names.append(file[file.rfind('GRAVI'):])
+        self.len_sel_files = len(self.sel_files)
+        self.current_index = 0
+        
+        self.progress_bar.setMaximum(self.len_sel_files)
+        self.progress_bar.setValue(0)
+        self.progress_bar.setVisible(True)
+        self.progress_label.setText(f"Loading files: ")            
+
+        self.loader_data = LoadDataList(self.sel_files)
+        self.loader_data.update_progress.connect(self.update_progress)
+        self.loader_data.start()
+        self.loader_data.finished.connect(self.updateFileList_save)
+
+
+    def updateFileList_save(self):
+        logging.info("Files loaded")
+        self.data = self.loader_data.data
+        self.polmode = self.data[0].polmode
+        self.progress_bar.setVisible(False)
+        self.progress_label.setText("")
+        self.file_label.setText(f'Selected File '
+                                f'{self.current_index+1}/{self.len_sel_files}: '
+                                f'{self.sel_files_names[self.current_index]}')
         self.updatePlot()
+
+
+    def prev_file(self):
+        try:
+            self.sel_files
+        except AttributeError:
+            logging.error("No data loaded")
+            return 0
+        if self.current_index > 0:
+            self.current_index -= 1
+            self.update_sel_file()
+            self.updatePlot()
+
+    def next_file(self):
+        try:
+            self.sel_files
+        except AttributeError:
+            logging.error("No data loaded")
+            return 0
+        if self.current_index < self.len_sel_files - 1:
+            self.current_index += 1
+            self.update_sel_file()
+            self.updatePlot()
+
+    def update_sel_file(self):
+        self.file_label.setText(f'Selected File '
+                                f'{self.current_index+1}/{self.len_sel_files}: '
+                                f'{self.sel_files_names[self.current_index]}')
+
+    def updatePlot(self):
+        selected_data_source = self.data_source_combo.currentText()
+        data = self.data[self.current_index]
+        try:
+            logging.info(f"Selected data source: {selected_data_source}")
+            if data.polmode == 'SPLIT':
+                self.canvas1.plot_data(selected_data_source, data, lowest_plot=False, pol_idx=0)
+                self.canvas2.plot_data(selected_data_source, data, lowest_plot=True, pol_idx=1)
+            else:
+                self.canvas1.plot_data(selected_data_source, data, lowest_plot=True, pol_idx=0)
+        except Exception as e:
+            logging.error(f"Error updating plot: {str(e)}")
 
     def loadguesses(self, plot=False):
         try:
-            self.mfit
+            self.mfit = self.data[self.current_index]
         except AttributeError:
             logging.error("Cannot load guess, no data loaded")
             return 0
@@ -340,10 +462,11 @@ class GRAVITYfitGUI(QMainWindow):
         
     def fit(self):
         try:
-            self.mfit
+            self.data
         except AttributeError:
-            logging.error("Cannot load guess, no data loaded")
+            logging.error("Cannot fit, no data loaded")
             return 0
+
         ra_list = []
         de_list = []
         fr_list = []
@@ -373,32 +496,50 @@ class GRAVITYfitGUI(QMainWindow):
         logging.debug(f'fit fr: {fit_fr}')
         logging.debug(f'initial: {initial}')
 
-        if self.minimizer == 'Least Sqr':
-            logging.info('Fitting with Least Sqr')
-            res = self.mfit.fit_stars(ra_list,
-                                      de_list,
-                                      fr_list,
-                                      fit_pos = fit_pos,
-                                      fit_fr = fit_fr,
-                                      initial = initial,
-                                      minimizer = 'leastsq',
-                                      plot_science = False
-                                      )
-        else:
-            res = self.mfit.fit_stars(ra_list,
-                                      de_list,
-                                      fr_list,
-                                      fit_pos = fit_pos,
-                                      fit_fr = fit_fr,
-                                      initial = initial,
-                                      minimizer = 'emcee',
-                                      nthreads = int(self.input_dict["nthreads"]),
-                                      nwalkers = int(self.input_dict["nwalkers"]),
-                                      nsteps = int(self.input_dict["nsteps"]),
-                                      plot_science = False
-                                      )
-        logging.warning('Fit done')
+        self.progress_bar.setMaximum(self.len_sel_files)
+        self.progress_bar.setValue(0)
+        self.progress_bar.setVisible(True)
+        self.progress_label.setText(f"Fitting files: ")
+        self.loader_fit = FitWorker(self.data, self.input_dict, self.checkbox_dict,
+                                    self.minimizer, self.nsources)
+        self.loader_fit.update_progress.connect(self.update_progress)
+        self.loader_fit.start()
+        self.loader_fit.finished.connect(self.fit_save)
+
+
+        # for _idx, _ind_data in enumerate(self.data):
+        #     logging.info(f'Fitting file {_idx+1}/{self.len_sel_files}')
+        #     self.worker = FitWorker(_ind_data.data, self.input_dict, self.checkbox_dict,
+        #                             self.minimizer, self.nsources)
+        #     self.worker.moveToThread(self.thread)
+        #     self.thread.started.connect(self.worker.run)
+
+        #     self.worker.finished.connect(self.thread.quit)
+        #     self.worker.finished.connect(self.worker.deleteLater)
+        #     self.thread.finished.connect(self.thread.deleteLater)
+
+        #     self.thread.start()
+        #     self.worker.run()
+
+        # self.updatePlot()
+
+     
+
+    #     self.loader_data = LoadDataList(self.sel_files)
+    #     self.loader_data.update_progress.connect(self.update_progress)
+    #     self.loader_data.start()
+    #     self.loader_data.finished.connect(self.updateFileList_save)
+
+
+    def fit_save(self):
+        self.progress_bar.setVisible(False)
+        self.progress_label.setText("")
+        time.sleep(1)
         self.updatePlot()
+
+
+
+
 
     def checkboxStateChanged(self, state):
         sender = self.sender()
