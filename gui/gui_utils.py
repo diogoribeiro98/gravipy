@@ -1,15 +1,21 @@
 import mygravipy as gp
 import numpy as np
+import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
+from matplotlib import gridspec, colors
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 import logging
 from mygravipy.gravmfit import _calc_vis_mstars
 from astropy.io import fits
+from astropy.stats import mad_std as mad
 
 try:
     from PyQt6.QtCore import QThread, pyqtSignal
+    from PyQt6.QtWidgets import QVBoxLayout, QWidget, QLabel, QMainWindow
 except ImportError:
     from PyQt5.QtCore import QThread, pyqtSignal
+    from PyQt5.QtWidgets import QVBoxLayout, QWidget, QLabel, QMainWindow
+
 
 class LoggingHandler(logging.Handler):
     def __init__(self, text_edit):
@@ -86,13 +92,14 @@ class FitWorker(QThread):
     finished = pyqtSignal()
     update_progress = pyqtSignal(int)
 
-    def __init__(self, data, input_dict, checkbox_dict, minimizer, nsources):
+    def __init__(self, data, input_dict, checkbox_dict, minimizer, nsources, fit_for):
         super().__init__()
         self.data = data
         self.input_dict = input_dict
         self.checkbox_dict = checkbox_dict
         self.minimizer = minimizer
         self.nsources = nsources
+        self.fit_for = fit_for
         self.res = []
 
     def run(self):
@@ -125,6 +132,7 @@ class FitWorker(QThread):
                                         fit_fr = fit_fr,
                                         initial = initial,
                                         minimizer = 'leastsq',
+                                        fit_for = self.fit_for,
                                         plot_science = False
                                         )
             else:
@@ -138,6 +146,7 @@ class FitWorker(QThread):
                                         nthreads = int(self.input_dict["nthreads"]),
                                         nwalkers = int(self.input_dict["nwalkers"]),
                                         nsteps = int(self.input_dict["nsteps"]),
+                                        fit_for = self.fit_for,
                                         plot_science = False
                                       )
             # self.res.append(data)
@@ -146,8 +155,12 @@ class FitWorker(QThread):
 
 
 class PlotData(FigureCanvas):
-    def __init__(self, parent=None, dpi=150):
-        self.fig = Figure(dpi=dpi)
+    def __init__(self, parent=None, dpi=150, figsize=None):
+        if figsize is None:
+            self.fig = Figure(dpi=dpi)
+        else:
+            self.fig = Figure(dpi=dpi,
+                              figsize=(figsize[0], figsize[1]))
         super().__init__(self.fig)
         self.setParent(parent)
 
@@ -157,6 +170,122 @@ class PlotData(FigureCanvas):
                     "Closure": 2,
                     "Vis Phi": 3,
                 }
+        
+    def plot_results(self, allfitres, dict_input, dict_checked):
+        _res = allfitres[0]
+        # check how many sources were fitted
+        nsources = 0
+        for idx in range(1, 10):
+            try:
+                _res[f'dRA{idx}']
+            except KeyError:
+                break
+            nsources += 1
+
+        fit_pos = [dict_checked[f'pos {i}'] 
+                   for i in range(1, nsources+1)]
+        nplot = sum(fit_pos) + 2
+
+        gs = gridspec.GridSpec(1, nplot,
+                               wspace=0.2,
+                               width_ratios=[1]*(nplot-1) + [0.05],)
+        pcolors = np.linspace((1,1),
+                             (len(allfitres),len(allfitres)),
+                             len(allfitres))
+        cmap = plt.cm.turbo
+        norm = colors.BoundaryNorm(np.arange(0.5, len(allfitres)+1, 1),
+                                   cmap.N)
+        ndx = 0
+        for idx in range(1, nsources+1):
+            if not fit_pos[idx-1]: continue
+            dRA = [[r[f'dRA{idx}'][1],
+                    r[f'dRA{idx}'][6]]  for r in allfitres]
+            dDEC = [[r[f'dDEC{idx}'][1],
+                     r[f'dDEC{idx}'][6]]  for r in allfitres]
+            mra1 = np.nanmedian(dRA)
+            dra1 = mad(dRA)
+            mde1 = np.nanmedian(dDEC)
+            dde1 = mad(dDEC)
+
+            gRa = float(dict_input[f'RA {idx}'])
+            gDec = float(dict_input[f'Dec {idx}'])
+
+            ax = self.fig.add_subplot(gs[0, ndx])
+            ax.scatter(dRA, dDEC, c=pcolors, cmap=cmap, norm=norm)
+            ax.errorbar(mra1, mde1, dde1, dra1,
+                        color='k',
+                        label=f'Ra:  {mra1:.2f} +- {dra1:.2f}\n'
+                            f'Dec: {mde1:.2f} +- {dde1:.2f}')
+            ax.axvline(gRa, ls='--', lw=0.5, color='grey', zorder=0)
+            ax.axhline(gDec, ls='--', lw=0.5, color='grey', zorder=0)
+            ax.set_aspect('equal', 'box')
+            x_limits = ax.get_xlim()
+            y_limits = ax.get_ylim()
+            x_range = max(x_limits) - min(x_limits)
+            y_range = max(y_limits) - min(y_limits)
+
+            max_range = max(x_range, y_range)
+            if max_range < 0.5: max_range = 0.5
+            ax.set_xlim(np.mean(x_limits) + max_range/2,
+                        np.mean(x_limits) - max_range/2)
+            ax.set_ylim(np.mean(y_limits) - max_range/2,
+                        np.mean(y_limits) + max_range/2)
+            ax.set_title(f'Separation Source {idx}', fontsize=8)
+            ax.set_xlabel('RA [mas]', fontsize=8)
+            if ndx == 0:
+                ax.set_ylabel('Dec [mas]', fontsize=8)
+            ax.legend(fontsize=6, loc=1, frameon=True, fancybox=True)
+            ax.tick_params(axis='both', which='major', labelsize=6)
+            ax.tick_params(axis='both', which='minor', labelsize=6)
+            ndx += 1
+
+        dRA = [[r[f'pc_RA'][1],
+                r[f'pc_RA'][6]]  for r in allfitres]
+        dDEC = [[r[f'pc_Dec'][1],
+                 r[f'pc_Dec'][6]]  for r in allfitres]
+        mra1 = np.nanmedian(dRA)
+        dra1 = mad(dRA)
+        mde1 = np.nanmedian(dDEC)
+        dde1 = mad(dDEC)
+
+        gRa = float(dict_input['pcRA'])
+        gDec = float(dict_input['pcDec'])
+
+        ax = self.fig.add_subplot(gs[0, ndx])
+        cbar = ax.scatter(dRA, dDEC, c=pcolors, cmap=cmap, norm=norm)
+        ax.errorbar(mra1, mde1, dde1, dra1,
+                    color='k',
+                    label=f'Ra:  {mra1:.2f} +- {dra1:.2f}\n'
+                        f'Dec: {mde1:.2f} +- {dde1:.2f}')
+        ax.axvline(gRa, ls='--', lw=0.5, color='grey', zorder=0)
+        ax.axhline(gDec, ls='--', lw=0.5, color='grey', zorder=0)
+        ax.legend(fontsize=6, loc=1, frameon=True, fancybox=True)
+        ax.tick_params(axis='both', which='major', labelsize=6)
+        ax.tick_params(axis='both', which='minor', labelsize=6)
+        ax.set_aspect('equal', 'box')
+        x_limits = ax.get_xlim()
+        y_limits = ax.get_ylim()
+        x_range = max(x_limits) - min(x_limits)
+        y_range = max(y_limits) - min(y_limits)
+        max_range = max(x_range, y_range)
+        if max_range < 0.5: max_range = 0.5
+        ax.set_xlim(np.mean(x_limits) + max_range/2,
+                    np.mean(x_limits) - max_range/2)
+        ax.set_ylim(np.mean(y_limits) - max_range/2,
+                    np.mean(y_limits) + max_range/2)
+        ax.set_title('Central Source', fontsize=8)
+        ax.set_xlabel('RA [mas]', fontsize=8)
+        if ndx == 0:
+            ax.set_ylabel('Dec [mas]', fontsize=8)
+        ndx += 1
+
+        cbaxes = self.fig.add_subplot(gs[0, ndx])
+        cb = self.fig.colorbar(cbar, cax=cbaxes)
+        cb.set_label('# File', fontsize=6)
+
+        cb.set_ticks(np.arange(1, len(allfitres)+1, 1))
+        cb.ax.tick_params(labelsize=6)
+        self.draw()
 
     def plot_data(self, quant, data, lowest_plot=True, pol_idx=0):
         if quant not in ["Vis Amp", "Vis 2", "Closure", "Vis Phi"]:
@@ -185,7 +314,6 @@ class PlotData(FigureCanvas):
             plotdata = data.plotdata
         except AttributeError:
             plot_fit = False
-            logging.warning('No fit data to plot')
 
         if plot_fit:
             theta, fitdata, fitarg, fithelp = plotdata[pol_idx]
@@ -263,3 +391,20 @@ class PlotData(FigureCanvas):
         else:
             self.fig.subplots_adjust(left=0.12, right=0.99, top=0.95, bottom=0.05)
         self.draw()
+
+
+class PlotResults(QMainWindow):
+    def __init__(self, allres, input_dict, checked_dict, figsize=None):
+        super().__init__()
+        layout = QVBoxLayout()
+        self.label = QLabel("Fitting results")
+        layout.addWidget(self.label)
+
+        central_widget = QWidget(self)
+        central_widget.setLayout(layout)
+        self.setCentralWidget(central_widget)
+
+        p = PlotData(self, dpi=160, figsize=figsize)
+        layout.addWidget(p)
+        p.plot_results(allres, input_dict, checked_dict)
+
