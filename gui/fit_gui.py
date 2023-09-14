@@ -2,10 +2,9 @@ import sys
 import numpy as np
 try:
     from PyQt6.QtWidgets import (QApplication, QMainWindow,
-                                QPushButton,
+                                QPushButton, QTextEdit,
                                 QFileDialog, QLineEdit,
                                 QComboBox, QLabel,
-                                QTextEdit,
                                 QVBoxLayout, QHBoxLayout,
                                 QWidget, QCheckBox, QGridLayout,
                                 QProgressBar, QSpacerItem,
@@ -15,13 +14,13 @@ try:
     from PyQt6.QtGui import QFont
 except ImportError:
     from PyQt5.QtWidgets import (QApplication, QMainWindow,
-                                QPushButton,
+                                QPushButton, QTextEdit,
                                 QFileDialog, QLineEdit,
                                 QComboBox, QLabel,
-                                QTextEdit, 
                                 QVBoxLayout, QHBoxLayout,
                                 QWidget, QCheckBox, QGridLayout,
-                                QProgressBar, QSpacerItem
+                                QProgressBar, QSpacerItem,
+                                QTableWidgetItem, QTableWidget
                                 )
     from PyQt5.QtCore import Qt
     from PyQt5.QtGui import QFont

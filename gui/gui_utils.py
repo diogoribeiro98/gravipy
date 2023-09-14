@@ -11,10 +11,12 @@ from astropy.stats import mad_std as mad
 
 try:
     from PyQt6.QtCore import QThread, pyqtSignal
-    from PyQt6.QtWidgets import QVBoxLayout, QWidget, QLabel, QMainWindow
+    from PyQt6.QtWidgets import (QVBoxLayout, QWidget,
+                                 QLabel, QMainWindow)
 except ImportError:
     from PyQt5.QtCore import QThread, pyqtSignal
-    from PyQt5.QtWidgets import QVBoxLayout, QWidget, QLabel, QMainWindow
+    from PyQt5.QtWidgets import (QVBoxLayout, QWidget,
+                                 QLabel, QMainWindow)
 
 
 class LoggingHandler(logging.Handler):
