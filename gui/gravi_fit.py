@@ -567,7 +567,6 @@ class GRAVITYfitGUI(QMainWindow):
             except KeyError:
                 break
             nsources += 1
-        logging.info(f"Number of sources: {nsources}")
         
         self.fitheader = QHBoxLayout()
         self.fitheader.setAlignment(Qt.AlignmentFlag.AlignBottom)
