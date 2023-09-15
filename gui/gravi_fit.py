@@ -1,38 +1,48 @@
+#!/usr/bin/env python3
+
 import sys
 import numpy as np
-try:
-    from PyQt6.QtWidgets import (QApplication, QMainWindow,
-                                QPushButton, QTextEdit,
-                                QFileDialog, QLineEdit,
-                                QComboBox, QLabel,
-                                QVBoxLayout, QHBoxLayout,
-                                QWidget, QCheckBox, QGridLayout,
-                                QProgressBar, QSpacerItem,
-                                QTableWidgetItem, QTableWidget
-                                )
-    from PyQt6.QtCore import Qt
-    from PyQt6.QtGui import QFont
-except ImportError:
-    from PyQt5.QtWidgets import (QApplication, QMainWindow,
-                                QPushButton, QTextEdit,
-                                QFileDialog, QLineEdit,
-                                QComboBox, QLabel,
-                                QVBoxLayout, QHBoxLayout,
-                                QWidget, QCheckBox, QGridLayout,
-                                QProgressBar, QSpacerItem,
-                                QTableWidgetItem, QTableWidget
-                                )
-    from PyQt5.QtCore import Qt
-    from PyQt5.QtGui import QFont
+# try:
+#     from PyQt6.QtWidgets import (QApplication, QMainWindow,
+#                                 QPushButton, QTextEdit,
+#                                 QFileDialog, QLineEdit,
+#                                 QComboBox, QLabel,
+#                                 QVBoxLayout, QHBoxLayout,
+#                                 QWidget, QCheckBox, QGridLayout,
+#                                 QProgressBar, QSpacerItem,
+#                                 QTableWidgetItem, QTableWidget
+#                                 )
+#     from PyQt6.QtCore import Qt
+#     from PyQt6.QtGui import QFont, QColor
+#     six = True
+# except ImportError:
+from PyQt5.QtWidgets import (QApplication, QMainWindow,
+                            QPushButton, QTextEdit,
+                            QFileDialog, QLineEdit,
+                            QComboBox, QLabel,
+                            QVBoxLayout, QHBoxLayout,
+                            QWidget, QCheckBox, QGridLayout,
+                            QProgressBar, QSpacerItem,
+                            QTableWidgetItem, QTableWidget
+                            )
+from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QFont
 
 from gui_utils import (PlotData, LoggingHandler,
                        LoadDataList, FitWorker,
-                       LoadFiles, PlotResults)
+                       LoadFiles, PlotResults,
+                       PlotStarPos, PlotWalker)
 import logging
 from astropy.io import fits
 import time
+import pandas as pd
+import resources_rc
 
 MAIN_COLOR = '#a1d99b'
+SECOND_COLOR = '#74c476'
+THIRD_COLOR = '#31a354'
+FOURTH_COLOR = '#006d2c'
+FIFTH_COLOR = '#00441b'
 DEFAULT_STYLE = """
 QProgressBar{
     border: 2px solid grey;
@@ -53,9 +63,95 @@ class GRAVITYfitGUI(QMainWindow):
         self.initUI()
 
     def initUI(self):
+        self.setStyleSheet("background-color: #e9e9e9;")
+
         self.color_clicked = MAIN_COLOR
         self.plot_window = None
+        
+        self.input_style = """
+            QLineEdit {
+                background-color: #dcdcdc;
+                border: 1px solid #dcdcdc;
+                color: black;
+                border-radius: 10px;
+                padding: 1px 10px 1px 10px;
+                text-align: right;  
+            }
+        """
 
+        self.button_style = """
+            QPushButton {
+                background-color: #dcdcdc;
+                color: black;
+                border: 1px solid #dcdcdc;
+                border-radius: 10px;
+            }
+            QPushButton:checked {
+                background-color: #d3d3d3;
+                border: 1px solid #d3d3d3;
+                border-radius: 10px;
+            }
+        """
+
+        self.push_button_style = """
+            QPushButton {
+                background-color: #dcdcdc;
+                color: black;
+                border: 1px solid #dcdcdc;
+                border-radius: 10px;
+            }
+            QPushButton:checked {
+                background-color: #31a354;
+                color: black;
+                border: 1px solid #31a354;
+            }            
+            QPushButton:unchecked {
+                background-color: blue;
+                color: white;
+            }            
+        """
+
+        self.checkbox_style = """
+        QCheckBox {
+                background-color: #e9e9e9;
+                border: 1px solid #e9e9e9;
+                border-radius: 15px;
+                padding: 20px;
+                height: 10px;
+            }
+            QCheckBox::indicator {
+                width: 50px;
+                height: 25px;
+            }
+            QCheckBox::indicator:unchecked {
+                image: url(:/png/check_no.png);
+            }
+            
+            QCheckBox::indicator:checked {
+                image: url(:/png/check_yes.png);
+            }
+        """
+
+        self.combo_style = """
+            QComboBox {
+                background-color: #dcdcdc;
+                border: 1px solid #dcdcdc;
+                color: black;
+                border-radius: 10px;
+                padding: 1px 18px 1px 10px;
+            }
+            QComboBox::drop-down {
+                subcontrol-origin: padding;
+                subcontrol-position: top right;
+                width: 20px;
+                border: none; 
+            }
+            QComboBox::down-arrow {
+                image: url(:/png/combo_down.png);
+                width: 20px; height: 16px;
+            }
+            """        
+        
         # Set window properties
         self.setWindowTitle("GRAVITY multi source fitting")
         self.setGeometry(100, 100, 1700, 1100)
@@ -103,11 +199,13 @@ class GRAVITYfitGUI(QMainWindow):
         # Top line of right panel
         self.button_layout = QHBoxLayout()
         button_load = QPushButton("Open Files", self)
-        button_load.setMaximumSize(100, 30)
+        button_load.setStyleSheet(self.button_style)
+        button_load.setFixedSize(100, 30)
         button_load.clicked.connect(self.show_file_dialog)
         self.button_layout.addWidget(button_load)
         self.data_select = QLabel("   Chose files with OFFX/OFFY:", self)
         self.data_select_combo = QComboBox(self)
+        self.data_select_combo.setStyleSheet(self.combo_style)
         self.data_select_combo.setFixedSize(150, 30)        
         self.data_select_combo.currentIndexChanged.connect(self.update_file_list)
         self.button_layout.addWidget(self.data_select)
@@ -119,6 +217,8 @@ class GRAVITYfitGUI(QMainWindow):
         file_layout = QHBoxLayout()
         prev_button = QPushButton("⬅️")
         next_button = QPushButton("➡️")
+        next_button.setStyleSheet(self.button_style)
+        prev_button.setStyleSheet(self.button_style)
         prev_button.setFixedSize(30, 30)
         next_button.setFixedSize(30, 30)
         prev_button.clicked.connect(self.prev_file)
@@ -133,32 +233,41 @@ class GRAVITYfitGUI(QMainWindow):
         button_fit_layout = QHBoxLayout()
         button_fit_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
         button_show = QPushButton("Show field", self)
+        button_show.setStyleSheet(self.button_style)
         button_show.setFixedSize(100, 30)
-        # button_show.clicked.connect(lambda: self.load_guesses(plot=True))
+        button_show.clicked.connect(self.plot_position)
         button_fit_layout.addWidget(button_show)
         button_guess = QPushButton("Get fitting guess from header", self)
-        button_guess.setFixedSize(250, 30)
+        button_guess.setFixedSize(230, 30)
+
+        button_guess.setStyleSheet(self.button_style)
+        # button_guess.setFlat(True)
         button_guess.clicked.connect(self.load_guesses)
         button_fit_layout.addWidget(button_guess)
         button_fit = QPushButton("Fit", self)
+        button_fit.setStyleSheet(self.button_style)
         button_fit.setFixedSize(100, 30)
         button_fit.clicked.connect(self.fit)
         button_fit_layout.addWidget(button_fit)
 
         # Plotting
-        plotlabel = QLabel("Plot Quantity:", self)
+        plotlabel = QLabel(" ", self)
         self.data_source = QHBoxLayout()
         self.data_source.setAlignment(Qt.AlignmentFlag.AlignLeft)
         prev_data = QPushButton("⬅️")
         next_data = QPushButton("➡️")
         prev_data.setFixedSize(30, 30)
         next_data.setFixedSize(30, 30)
+        prev_data.setStyleSheet(self.button_style)
+        next_data.setStyleSheet(self.button_style)
         prev_data.clicked.connect(self.prev_data)
         next_data.clicked.connect(self.next_data)
         self.data_source.addWidget(prev_data)
         self.data_source_combo = QComboBox(self)
-        self.data_source_combo.setMaximumSize(100, 30)
-        self.data_source_combo.addItems(["Vis Amp", "Vis 2", "Closure", "Vis Phi"])
+        self.data_source_combo.setStyleSheet(self.combo_style)
+        self.data_source_combo.setFixedSize(150, 30)
+        self.data_source_combo.addItems(["Vis Amp", "Vis 2",
+                                         "Closure", "Vis Phi"])
         self.data_source_combo.currentIndexChanged.connect(self.update_plots)
         self.data_source.addWidget(self.data_source_combo)
         self.data_source.addWidget(next_data)
@@ -167,6 +276,7 @@ class GRAVITYfitGUI(QMainWindow):
 
         # Log messages
         self.log_text_edit = QTextEdit(self)
+        self.log_text_edit.setStyleSheet("border: none;")
         self.log_text_edit.setReadOnly(True)
         self.log_text_edit.setPlaceholderText("Log Messages")
         self.log_text_edit.setMinimumSize(500,150)
@@ -243,15 +353,12 @@ class GRAVITYfitGUI(QMainWindow):
             checkbox_button = QPushButton(fitfor)
             checkbox_button.setCheckable(True)
             checkbox_button.setFixedSize(100, 30)
+            checkbox_button.setStyleSheet(self.push_button_style)
             self.checkbox_mapping[checkbox_button] = f"{self.fit_labels_dic[ldx]}"
             checkbox_button.clicked.connect(self.checkbox_state_changed)
             if f'{self.fit_labels_dic[ldx]}' not in self.checkbox_dict:
                 self.checkbox_dict[f"{self.fit_labels_dic[ldx]}"] = True
             checkbox_button.setChecked(self.checkbox_dict[f"{self.fit_labels_dic[ldx]}"])
-            if checkbox_button.isChecked():
-                checkbox_button.setStyleSheet(f"background-color: {self.color_clicked};")
-            else:
-                checkbox_button.setStyleSheet("background-color: white;")
             input_layout.addWidget(checkbox_button, hdx, 1+ldx)
             self.fit_label_buttons.append(checkbox_button)
 
@@ -263,7 +370,8 @@ class GRAVITYfitGUI(QMainWindow):
         input_layout.addWidget(source_label, hdx, 0)
 
         source_combo = QComboBox(self)
-        source_combo.setMaximumSize(150, 30)
+        source_combo.setStyleSheet(self.combo_style)
+        source_combo.setFixedSize(100, 30)
         source_combo.addItems(["2", "3", "4", "5"])
         try:
             source_combo.setCurrentText(str(self.nsources))
@@ -307,12 +415,14 @@ class GRAVITYfitGUI(QMainWindow):
                 if i == 0 and ldx == 2:
                     continue
                 input_box = QLineEdit(self)
+                input_box.setStyleSheet(self.input_style)
+                input_box.setAlignment(Qt.AlignmentFlag.AlignRight)
                 self.input_mapping[input_box] = f"{input_labels_dic[ldx]} {i+1}"
                 input_box.textChanged.connect(self.update_dictionary)
                 if f'{input_labels_dic[ldx]} {i+1}' not in self.input_dict:
                     self.input_dict[f"{input_labels_dic[ldx]} {i+1}"] = f"{input_init_val[ldx]}"
                 input_box.setText(self.input_dict[f"{input_labels_dic[ldx]} {i+1}"] )
-                input_box.setMaximumSize(100, 30)
+                input_box.setFixedSize(100, 25)
                 input_layout.addWidget(input_box, ldx+hdx, i+1)
 
         hdx += 3
@@ -330,13 +440,14 @@ class GRAVITYfitGUI(QMainWindow):
                 if nsources == 2 and i == 1:
                     continue
                 checkbox = QCheckBox()
-                checkbox.setFixedSize(100, 30)
+                checkbox.setFixedSize(80, 25)
+                checkbox.setStyleSheet(self.checkbox_style)
                 self.checkbox_mapping[checkbox] = f"{fit_labels_dic[ldx]} {i+1}"
                 checkbox.stateChanged.connect(self.checkbox_state_changed)
                 if f'{fit_labels_dic[ldx]} {i+1}' not in self.checkbox_dict:
                     self.checkbox_dict[f"{fit_labels_dic[ldx]} {i+1}"] = True
                 checkbox.setChecked(self.checkbox_dict[f"{fit_labels_dic[ldx]} {i+1}"])
-                input_layout.addWidget(checkbox, ldx+hdx, i+1)
+                input_layout.addWidget(checkbox, ldx+hdx, i+1,)
         
         hdx += 2 
         init_labels = ["pc RA (Source 1 pos)", "pc Dec (Source 1 pos)",
@@ -351,7 +462,9 @@ class GRAVITYfitGUI(QMainWindow):
             init_label.setContentsMargins(0, 5, 0, 0)
             input_layout.addWidget(init_label, ldx+hdx, 0)
             init_box = QLineEdit(self)
-            init_box.setMaximumSize(100, 30)
+            init_box.setStyleSheet(self.input_style)
+            init_box.setAlignment(Qt.AlignmentFlag.AlignRight)
+            init_box.setFixedSize(100, 25)
             self.input_mapping[init_box] = f"{init_labels_dic[ldx]}"
             init_box.textChanged.connect(self.update_dictionary)
             if f'{init_labels_dic[ldx]}' not in self.input_dict:
@@ -367,7 +480,8 @@ class GRAVITYfitGUI(QMainWindow):
         input_layout.addWidget(mode_label, hdx, 0)
 
         mode_combo = QComboBox(self)
-        mode_combo.setMaximumSize(150, 30)
+        mode_combo.setStyleSheet(self.combo_style)
+        mode_combo.setFixedSize(100, 30)
         mode_combo.addItems(["Least Sqr", "MCMC"])
         try:
             mode_combo.setCurrentText(str(self.minimizer))
@@ -389,7 +503,9 @@ class GRAVITYfitGUI(QMainWindow):
                 mcmc_label.setContentsMargins(0, 5, 0, 0)
                 input_layout.addWidget(mcmc_label, ldx+hdx-3, 2)
                 mcmc_box = QLineEdit(self)
-                mcmc_box.setMaximumSize(100, 30)
+                mcmc_box.setStyleSheet(self.input_style)
+                mcmc_box.setAlignment(Qt.AlignmentFlag.AlignRight)
+                mcmc_box.setFixedSize(100, 25)
                 self.input_mapping[mcmc_box] = f"{label_text}"
                 mcmc_box.textChanged.connect(self.update_dictionary)
                 if f'{label_text}' not in self.input_dict:
@@ -400,16 +516,18 @@ class GRAVITYfitGUI(QMainWindow):
         self.save_layout = QHBoxLayout()
         if self.minimizer == "MCMC":
             folder_button = QPushButton('I/O folder for MCMC')
-            # folder_button.clicked.connect(self.open_folder_dialog)
+            folder_button.setStyleSheet(self.button_style)
+            folder_button.clicked.connect(self.open_folder_dialog)
             folder_button.setFixedSize(160, 30)
             self.save_layout.addWidget(folder_button)
-            self.folder_text = QLineEdit()
+            self.folder_text = QTextEdit()
             self.folder_text.setReadOnly(True)
             self.folder_text.setMaximumSize(420, 30)
+            self.folder_text.setStyleSheet("border: none;")
             try:
                 self.folder_text.setText(self.save_folder)
             except AttributeError:
-                self.folder_text.setText('Pick folder')
+                self.folder_text.setText('')
             self.save_layout.addWidget(self.folder_text)
 
         self.input_layout = input_layout
@@ -417,6 +535,7 @@ class GRAVITYfitGUI(QMainWindow):
         self.left_layout.addLayout(self.save_layout, 1, 0)
 
     def create_result_layout(self):
+        no_fit = False
         try:
             for i in reversed(range(self.fitheader.count())):
                 widget = self.fitheader.itemAt(i).widget()
@@ -435,14 +554,24 @@ class GRAVITYfitGUI(QMainWindow):
             data = self.data[self.current_index]
         except AttributeError:
             return 0
+        
         try:
             fitres = data.fittab.copy()
         except (AttributeError, UnboundLocalError):
             return 0
+            
+        nsources = 0
+        for idx in range(1, 10):
+            try:
+                fitres[f'dRA{idx}']
+            except KeyError:
+                break
+            nsources += 1
+        logging.info(f"Number of sources: {nsources}")
         
         self.fitheader = QHBoxLayout()
         self.fitheader.setAlignment(Qt.AlignmentFlag.AlignBottom)
-        fitlabel = QLabel("Fitting results   ", self)
+        fitlabel = QLabel("Fitting results  ", self)
         fitlabel.setMaximumSize(200, 30)
         font = QFont()
         font.setPointSize(16)  # Set the font size to 16
@@ -451,10 +580,41 @@ class GRAVITYfitGUI(QMainWindow):
         self.fitheader.addWidget(fitlabel)
 
         button_show = QPushButton("Plot fit results", self)
-        button_show.setFixedSize(150, 30)
+        button_show.setFixedSize(130, 30)
+        button_show.setStyleSheet(self.button_style)
         button_show.clicked.connect(self.plot_results)
         self.fitheader.addWidget(button_show)
+
+        if self.minimizer == "MCMC":
+            data = self.data[self.current_index]
+            file = data.filename
+            sname = f'{self.save_folder}/Fit_'
+            try:
+                file = data.filename[:-5]
+                sname = f'{self.save_folder}/Fit_{file}_mcmc_P1.npy'
+                # check if file exists
+                np.load(sname)
+                button_show = QPushButton("MCMC Walker", self)
+                button_show.setFixedSize(130, 30)
+                button_show.setStyleSheet(self.button_style)
+                button_show.clicked.connect(self.plot_walker)
+                self.fitheader.addWidget(button_show)
+
+                refit_button = QPushButton('Re-Fit')
+                refit_button.setCheckable(True)
+                refit_button.setFixedSize(130, 30)
+                refit_button.setStyleSheet(self.push_button_style)
+                self.checkbox_mapping[refit_button] = f"refit"
+                refit_button.clicked.connect(self.checkbox_state_changed)
+                if 'refit' not in self.checkbox_dict:
+                    self.checkbox_dict["refit"] = False
+                refit_button.setChecked(self.checkbox_dict["refit"])
+                self.fitheader.addWidget(refit_button)
+            except FileNotFoundError:
+                pass
+
         self.result_layout.addLayout(self.fitheader)
+
 
         table_widget = QTableWidget()
         table_widget.setStyleSheet("border: none;")
@@ -465,16 +625,34 @@ class GRAVITYfitGUI(QMainWindow):
         table_widget.setColumnWidth(2, 100)
         
         table_text = []
-        for sdx in range(1,self.nsources):
-            table_text.append([f'Sep. RA {sdx-1}:', f'{fitres[f"dRA{sdx}"][1]:.3f}', f'{fitres[f"dRA{sdx}"][6]:.3f}'])
-            table_text.append([f'Sep. Dec {sdx-1}:', f'{fitres[f"dDEC{sdx}"][1]:.3f}', f'{fitres[f"dDEC{sdx}"][6]:.3f}'])
+        for sdx in range(1, nsources+1):
+            table_text.append([f'Sep. RA {sdx-1}',
+                               f'{fitres[f"dRA{sdx}"][2]:.3f}',
+                               # in case I want to add an error
+                            #    f'\u00B1{(fitres[f"dRA{sdx}"][3]+fitres[f"dRA{sdx}"][4])/2:.3f}',
+                               f'{fitres[f"dRA{sdx}"][7]:.3f}'])
+            table_text.append([f'Sep. Dec {sdx-1}',
+                               f'{fitres[f"dDEC{sdx}"][2]:.3f}',
+                               f'{fitres[f"dDEC{sdx}"][7]:.3f}'])
             if sdx > 1:
-                table_text.append([f'Flux Ratio {sdx-1}:', f'{fitres[f"fr{sdx}"][1]:.3f}', f'{fitres[f"fr{sdx}"][6]:.3f}'])
-        table_text.append([f'pc RA (Source 1 pos):', f'{fitres["pc_RA"][1]:.3f}', f'{fitres["pc_RA"][6]:.3f}'])
-        table_text.append([f'pc Dec (Source 1 pos):', f'{fitres["pc_Dec"][1]:.3f}', f'{fitres["pc_Dec"][6]:.3f}'])
-        table_text.append([f'Power law index:', f'{fitres["alpha_BH"][1]:.3f}', f'{fitres["alpha_BH"][6]:.3f}'])
-        table_text.append([f'fr Source 1 / Source 2:', f'{fitres["fr_BH"][1]:.3f}', f'{fitres["fr_BH"][6]:.3f}'])
-        table_text.append([f'Flux BG:', f'{fitres["f_BG"][1]:.3f}', f'{fitres["f_BG"][6]:.3f}'])
+                table_text.append([f'Flux Ratio {sdx-1}',
+                                   f'{fitres[f"fr{sdx}"][2]:.3f}',
+                                   f'{fitres[f"fr{sdx}"][7]:.3f}'])
+        table_text.append([f'pc RA (Source 1 pos)',
+                           f'{fitres["pc_RA"][2]:.3f}',
+                           f'{fitres["pc_RA"][7]:.3f}'])
+        table_text.append([f'pc Dec (Source 1 pos)',
+                           f'{fitres["pc_Dec"][2]:.3f}',
+                           f'{fitres["pc_Dec"][7]:.3f}'])
+        table_text.append([f'Power law index',
+                           f'{fitres["alpha_BH"][2]:.3f}',
+                           f'{fitres["alpha_BH"][7]:.3f}'])
+        table_text.append([f'fr Source 1 / Source 2',
+                           f'{fitres["fr_BH"][2]:.3f}',
+                           f'{fitres["fr_BH"][7]:.3f}'])
+        table_text.append([f'Flux BG',
+                           f'{fitres["f_BG"][2]:.3f}',
+                           f'{fitres["f_BG"][7]:.3f}'])
 
         table_widget.setRowCount(len(table_text)) 
         for row_index, row_data in enumerate(table_text):
@@ -523,6 +701,8 @@ class GRAVITYfitGUI(QMainWindow):
         if folder_path:
             self.folder_text.setText(folder_path)
             self.save_folder = folder_path
+            self.load_fitres()
+            self.update_plots()
     
     def prev_file(self):
         try:
@@ -556,13 +736,28 @@ class GRAVITYfitGUI(QMainWindow):
         if cur < self.data_source_combo.count()-1:
             self.data_source_combo.setCurrentIndex(cur+1)
 
+    def load_fitres(self):
+        for data in self.data:
+            try:
+                data.fittab
+            except AttributeError:
+                try:
+                    file = data.filename[:-4]
+                    sname = f'{self.save_folder}/Fit_{file}'
+                    fitres = pd.read_pickle(f'{sname}pd')
+                    data.fittab = fitres
+                    logging.info('Loading fit from saved MCMC fit')
+                except (AttributeError, FileNotFoundError):
+                    continue
+
+
     def update_progress(self, value):
         current_value = self.progress_bar.value() + 1
         self.progress_bar.setValue(current_value)
 
     def update_file_list(self):
-        selectec_off = self.data_select_combo.currentIndex()
-        _off = self.offs[selectec_off]
+        self.selectec_off = self.data_select_combo.currentIndex()
+        _off = self.offs[self.selectec_off]
         self.sel_files = []
         self.sel_files_names = []
         for file in self.files:
@@ -586,6 +781,7 @@ class GRAVITYfitGUI(QMainWindow):
     def update_file_list_save(self):
         logging.info("Files loaded")
         self.data = self.loader_data.data
+        self.load_fitres()
         self.polmode = self.data[0].polmode
         self.progress_bar.setVisible(False)
         self.progress_label.setText("")
@@ -606,6 +802,7 @@ class GRAVITYfitGUI(QMainWindow):
         except AttributeError:
             logging.error("Cannot plot, no data loaded")
             return 0
+        self.create_result_layout()
         try:
             logging.debug(f"Selected data source: {selected_data_source}")
             if data.polmode == 'SPLIT':
@@ -615,7 +812,6 @@ class GRAVITYfitGUI(QMainWindow):
                 self.canvas1.plot_data(selected_data_source, data, lowest_plot=True, pol_idx=0)
         except Exception as e:
             logging.error(f"Error updating plot: {str(e)}")
-        self.create_result_layout()
 
     def update_input_fields(self):
         self.nsources = int(self.source_combo.currentText())
@@ -659,13 +855,8 @@ class GRAVITYfitGUI(QMainWindow):
         sender = self.sender()
         if sender in self.checkbox_mapping:
             key = self.checkbox_mapping[sender]
-            if key in self.fit_labels_dic:
+            if key in self.fit_labels_dic or key == 'refit':
                 checked = state
-                pdx = self.fit_labels_dic.index(key)
-                if checked:
-                    self.fit_label_buttons[pdx].setStyleSheet(f"background-color: {self.color_clicked};")
-                else:
-                    self.fit_label_buttons[pdx].setStyleSheet("background-color: white;")
             else:
                 checked = state == 2  # 2 corresponds to checked state in Qt
             self.checkbox_dict[key] = checked
@@ -680,13 +871,22 @@ class GRAVITYfitGUI(QMainWindow):
         except AttributeError:
             logging.error("Cannot fit, no data loaded")
             return 0
-
+        try:
+            self.save_folder
+        except AttributeError:
+            self.save_folder = None
+        try:
+            self.checkbox_dict['refit']
+        except KeyError:
+            self.checkbox_dict['refit'] = False
         self.progress_bar.setMaximum(self.len_sel_files)
         self.progress_bar.setValue(0)
         self.progress_bar.setVisible(True)
         self.progress_label.setText(f"Fitting files: ")
-        self.loader_fit = FitWorker(self.data, self.input_dict, self.checkbox_dict,
-                                    self.minimizer, self.nsources, self.fit_for)
+        self.loader_fit = FitWorker(self.data, self.input_dict,
+                                    self.checkbox_dict, self.minimizer,
+                                    self.nsources, self.fit_for,
+                                    self.save_folder)
         self.loader_fit.update_progress.connect(self.update_progress)
         self.loader_fit.start()
         self.loader_fit.finished.connect(self.fit_save)
@@ -698,10 +898,33 @@ class GRAVITYfitGUI(QMainWindow):
         self.update_plots()
         self.create_result_layout()
         logging.info('Fit done')
+        
+
+    def plot_position(self):
+        try:
+            self.data
+        except AttributeError:
+            logging.error("Cannot plot, no data loaded")
+            return 0
+        try:
+            data = self.data[self.current_index]
+        except AttributeError:
+            logging.error("Cannot plot, no data loaded")
+            return 0
+        if self.plot_window is not None:
+            self.plot_window.close()
+            self.plot_window = None
+
+        t = data.date_obs
+        off = self.offs[self.selectec_off]
+        try:
+            self.plot_window = PlotStarPos(t, off)
+            self.plot_window.show()
+        except Exception as e:
+            logging.error(f"Error updating starplot: {str(e)}")
 
     def plot_results(self):
-        logging.info('Plotting results')
-        
+        logging.debug('Plotting results')        
         # for all elements of data, check if fittab exists and plot all fittab['dRA1']
         try:
             self.data
@@ -725,13 +948,35 @@ class GRAVITYfitGUI(QMainWindow):
         fit_pos = [self.checkbox_dict[f'pos {i}']
                    for i in range(1, self.nsources)]
         nplot = sum(fit_pos) + 2
-        self.plot_window = PlotResults(allfitres,
-                                       self.input_dict,
-                                       self.checkbox_dict,
-                                       figsize=[nplot*2.5, 3]
-                                       )
-        self.plot_window.show()
-        
+        try:
+            self.plot_window = PlotResults(allfitres,
+                                        self.input_dict,
+                                        self.checkbox_dict,
+                                        figsize=[nplot*2.5, 3]
+                                        )
+            self.plot_window.show()
+        except Exception as e:
+            logging.error(f"Error updating plot results: {str(e)}")
+                
+    def plot_walker(self):
+        try:
+            data = self.data[self.current_index]
+            file = data.filename[:-5]
+            sname = f'{self.save_folder}/Fit_{file}_mcmc_P'
+            walker1 = np.load(f'{sname}1.npy')
+            walker2 = np.load(f'{sname}2.npy')
+            fitname = np.loadtxt(f'{sname}1.txt', dtype=str)
+
+            if self.plot_window is not None:
+                self.plot_window.close()
+                self.plot_window = None
+            self.plot_window = PlotWalker(walker1, walker2, fitname)
+            self.plot_window.show()
+        except Exception as e:
+            logging.error(f"Error loading walker: {str(e)}")
+
+
+
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = GRAVITYfitGUI()

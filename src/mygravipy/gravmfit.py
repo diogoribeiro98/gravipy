@@ -1100,7 +1100,7 @@ class GravMFit(GravData, GravPhaseMaps):
         offs = (self.header['ESO INS SOBJ OFFX'],
                 self.header['ESO INS SOBJ OFFY'])
 
-        stars = orb.find_stars(*offs, plot=plot)
+        stars, _ = orb.find_stars(*offs, plot=plot)
         if stars is None:
             self.logger.error('No stars found in pointing')
             raise ValueError('No stars found in pointing')
@@ -1180,6 +1180,49 @@ class GravMFit(GravData, GravPhaseMaps):
         else:
             return ra_list, de_list, fr_list, initial
 
+    def phasemap_attributes(self,
+                            interp=True,
+                            smoothkernel=15,
+                            datayear=2019):
+        self.smoothkernel = smoothkernel
+        self.datayear = datayear
+        self.interppm = interp
+        self.load_phasemaps(interp=interp)
+
+        header = fits.open(self.name)[0].header
+        northangle1 = header['ESO QC ACQ FIELD1 NORTH_ANGLE']/180*math.pi
+        northangle2 = header['ESO QC ACQ FIELD2 NORTH_ANGLE']/180*math.pi
+        northangle3 = header['ESO QC ACQ FIELD3 NORTH_ANGLE']/180*math.pi
+        northangle4 = header['ESO QC ACQ FIELD4 NORTH_ANGLE']/180*math.pi
+        self.northangle = [northangle1, northangle2, 
+                            northangle3, northangle4]
+
+        ddec1 = header['ESO QC MET SOBJ DDEC1']
+        ddec2 = header['ESO QC MET SOBJ DDEC2']
+        ddec3 = header['ESO QC MET SOBJ DDEC3']
+        ddec4 = header['ESO QC MET SOBJ DDEC4']
+        self.ddec = [ddec1, ddec2, ddec3, ddec4]
+
+        dra1 = header['ESO QC MET SOBJ DRA1']
+        dra2 = header['ESO QC MET SOBJ DRA2']
+        dra3 = header['ESO QC MET SOBJ DRA3']
+        dra4 = header['ESO QC MET SOBJ DRA4']
+        self.dra = [dra1, dra2, dra3, dra4]
+
+    def phasemap_positions(self,
+                           ra_list,
+                           de_list,
+                           pc):
+        self.phasemap_attributes()
+        self.pm_sources = []
+        self.pm_amp_c, self.pm_pha_c, self.pm_int_c = self.phasemap_source(*pc, self.northangle, self.dra, self.ddec)
+
+        nsources = len(ra_list)
+        for ndx in range(nsources):
+            pm_amp, pm_pha, pm_int = self.phasemap_source(pc[0] + ra_list[ndx],
+                                                          pc[1] + de_list[ndx],
+                                                          self.northangle, self.dra, self.ddec)
+            self.pm_sources.append([pm_amp, pm_pha, pm_int])
 
     def fit_stars(self,
                   ra_list,
@@ -1265,6 +1308,8 @@ class GravMFit(GravData, GravPhaseMaps):
         onlypol = kwargs.get('onlypol', None)
         plot_corner = kwargs.get('plot_corner', None)
         iopandas = kwargs.get('iopandas', None)
+        savemcmc = kwargs.get('savemcmc', None)
+        refit = kwargs.get('refit', False)
         vis_flag = kwargs.get('vis_flag', True)
 
         fit_phasemaps = kwargs.get('fit_phasemaps', False)
@@ -1274,7 +1319,7 @@ class GravMFit(GravData, GravPhaseMaps):
 
         if flagtill is None and flagfrom is None:
             if self.resolution == 'LOW':
-                flagtill = 3
+                flagtill = 2
                 flagfrom = 13
             elif self.resolution == 'MEDIUM':
                 flagtill = 30
@@ -1521,12 +1566,20 @@ class GravMFit(GravData, GravPhaseMaps):
                                                                   pc_DEC_in + theta[ndx*3],
                                                                   self.northangle, self.dra, self.ddec)
                     self.pm_sources.append([pm_amp, pm_pha, pm_int])
+        if savemcmc is not None:
+            # check if savemcmc is a string
+            if type(savemcmc) != str:
+                raise ValueError('savemcmc needs to be a string')
+            savefolder = savemcmc + '/'
+            iopandas = 'Fit'
+        elif iopandas is not None:
+            savefolder = './fitresults/'
 
         if iopandas is not None and not no_fit:
-            isExist = os.path.exists('./fitresults/')
+            isExist = os.path.exists(savefolder)
             if not isExist:
-                os.makedirs('./fitresults/')
-            pdname = './fitresults/' + iopandas + '_' + self.filename[:-4] + 'pd'
+                os.makedirs(savefolder)
+            pdname = f'{savefolder}{iopandas}_{self.filename[:-4]}pd'
             try:
                 fittab = pd.read_pickle(pdname)
                 pdexists = True
@@ -1534,6 +1587,9 @@ class GravMFit(GravData, GravPhaseMaps):
                 self.logger.info('Results exist at %s' % pdname)
             except FileNotFoundError:
                 pdexists = False
+            if refit:
+                pdexists = False
+                no_fit = False
         elif no_fit:
             pdexists = False
 
@@ -1771,6 +1827,11 @@ class GravMFit(GravData, GravPhaseMaps):
                                 self.logger.info(f'Mean acceptance fraction: {ac_fraction:.2}')
 
                             samples = sampler.chain
+                            if savemcmc is not None:
+                                mcname = f'{pdname[:-3]}_mcmc_P{idx+1}'
+                                np.save(mcname, samples)
+                                np.savetxt(f'{mcname}.txt', theta_names, fmt='%s')
+
                             mostprop = sampler.flatchain[np.argmax(sampler.flatlnprobability)]
 
                             clsamples = samples
@@ -1834,7 +1895,6 @@ class GravMFit(GravData, GravPhaseMaps):
                                            args=(fitdata,
                                                  fitarg, fithelp),
                                            method=minmethod,
-                                        #    max_nfev=40000
                                            )
                             end_time = time.time()
                             elapsed_time = end_time - start_time
@@ -1848,15 +1908,17 @@ class GravMFit(GravData, GravPhaseMaps):
                             self.logger.debug(f"Elapsed time for fit: {elapsed_time:.2f} s")
 
                             theta_result = []
+                            theta_err = []
                             for tdx, th in enumerate(theta_names):
                                 theta_result.append(out.params[th].value)
+                                theta_err.append(out.params[th].stderr)
 
                             results.append(theta_result)
                             fulltheta = np.copy(theta_result)
                             all_mostprop = np.copy(theta_result)
-                            all_mostlike = np.copy(np.zeros_like(theta_result))
-                            mostlike_m = np.copy(np.zeros_like(theta_result))
-                            mostlike_p = np.copy(np.zeros_like(theta_result))
+                            all_mostlike = np.copy(theta_result)
+                            mostlike_m = theta_err
+                            mostlike_p = theta_err
                             cllabels = theta_names
                             clmostprop = theta_result
                             cldim = len(cllabels)

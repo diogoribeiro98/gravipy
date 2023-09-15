@@ -237,7 +237,7 @@ class GCorbits():
             plt.xlabel('dRa [mas]')
             plt.ylabel('dDec [mas]')
             plt.show()
-        return stars
+        return stars, starpos
 
 
 
