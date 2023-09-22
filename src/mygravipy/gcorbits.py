@@ -7,6 +7,8 @@ from datetime import datetime
 import matplotlib.pyplot as plt
 from pkg_resources import resource_filename
 import logging
+import glob
+import re
 from .gravdata import convert_date, log_level_mapping, fiber_coupling
 
 
@@ -35,16 +37,6 @@ class GCorbits():
             gcorb_logger.addHandler(ch)
         self.gcorb_logger = gcorb_logger
 
-        self.star_orbits = {}
-        self.orbit_stars = []
-        for s in star_orbits:
-            self.star_orbits[s['name']] = s
-            self.orbit_stars.append(s['name'])
-        self.star_pms = {}
-        self.pm_stars = []
-        for s in star_pms:
-            self.star_pms[s['name']] = s
-            self.pm_stars.append(s['name'])
         if t is None:
             d = datetime.utcnow()
             t = d.strftime("%Y-%m-%dT%H:%M:%S")
@@ -53,35 +45,138 @@ class GCorbits():
         except ValueError:
             raise ValueError('t has to be given as YYYY-MM-DDTHH:MM:SS')
         self.t = t
+
+        self.star_poly = {}
+        self.poly_stars = []
+        self.star_orbits = {}
+        self.orbit_stars = []
+        self.star_pms = {}
+        self.pm_stars = []
+
+        _s = resource_filename('mygravipy', f'Datafiles/s*.dat')
+        dfiles = sorted(glob.glob(_s))
+
+        for d in dfiles:
+            _d = d[-8:-4]
+            snum = int(_d[_d.find('/s')+2:])
+            _data = []
+            with open(d, 'r') as file:
+                for line in file:
+                    # Process each line
+                    l = line.strip()
+                    l = l.replace('\t', ' ')
+                    if l == '; position data date RA delta RA DEC delta DEC':
+                        break
+                    _data.append(l)
+
+            # Check for polynomial
+            ra_s = None
+            de_s = None
+            for _s in _data:
+                if 'polyFitResultRA' in _s:
+                    ra_s = _s
+                elif 'polyFitResultDec' in _s:
+                    de_s = _s
+            if ra_s is not None and de_s is not None:
+                gcorb_logger.debug(f'Polynomial found for S{snum}')
+                
+                ra = [float(m) for m in re.findall(r'-?\d+\.\d+', ra_s)]
+                de = [float(m) for m in re.findall(r'-?\d+\.\d+', de_s)]
+                tref = ra[0]
+                ra = ra[1:]
+                de = de[1:]
+                npol = (len(ra))//2
+                
+                s = {'name': f'S{snum}',
+                     'type': '',
+                     'Kmag': 20,
+                     'ra': ra,
+                     'de': de,
+                     'tref': tref,
+                     'npol': npol}
+                self.star_poly[f'S{snum}'] = s
+                self.poly_stars.append(f'S{snum}')
+            
+            # Check for orbit
+            else:
+                sdx = -1
+                for _sdx, _s in enumerate(_data):
+                    if _s == '; best fitting orbit paramters':
+                        sdx = _sdx + 1
+                        break
+                if sdx == -1:
+                    gcorb_logger.warning(f'No orbit or polynomial found for S{snum}')
+                    continue          
+                data_new = []
+                for _s in _data[sdx:]:
+                    data_new.append(_s[:_s.find(' ; ')])
+                data_new = [
+                    [float(m) for m in re.findall(r'-?\d+\.\d+', line)][0]
+                     for line in data_new]
+                data_new = np.array(data_new)
+                
+                if len(data_new) != 14:
+                    gcorb_logger.debug(f'No orbit or polynomial found for S{snum}')
+                    continue
+
+                s = {'name': f'S{snum}',
+                     'type': '',
+                     'a': data_new[0]*1e3,
+                     'e': data_new[1],
+                     'P': data_new[2],
+                     'T': data_new[3],
+                     'i': data_new[4]/180*np.pi,
+                     'CapitalOmega': data_new[5]/180*np.pi,
+                     'Omega': data_new[6]/180*np.pi,
+                     'Kmag': 20,
+                     'type': ''}
+                self.star_orbits[f'S{snum}'] = s
+                self.orbit_stars.append(f'S{snum}')
+                
+
+        for s in star_orbits:
+            if s['name'] in self.star_orbits:
+                self.star_orbits[s['name']]['type'] = s['type']
+                self.star_orbits[s['name']]['Kmag'] = s['Kmag']
+            else:
+                self.star_orbits[s['name']] = s
+                self.orbit_stars.append(s['name'])
+                gcorb_logger.debug(f'Added {s["name"]} from old orbits')
+
+        for s in star_pms:
+            if s['name'] in self.star_orbits:
+                self.star_orbits[s['name']]['type'] = s['type']
+                self.star_orbits[s['name']]['Kmag'] = s['Kmag']
+            elif s['name'] in self.star_poly:
+                self.star_poly[s['name']]['type'] = s['type']
+                self.star_poly[s['name']]['Kmag'] = s['Kmag']
+            else:
+                self.star_pms[s['name']] = s
+                self.pm_stars.append(s['name'])
+                gcorb_logger.debug(f'Added {s["name"]} from old pm stars')
+
         gcorb_logger.info(f'Evaluating for {t:.4f}')
         gcorb_logger.debug('Stars with orbits:')
         gcorb_logger.debug(self.orbit_stars)
         gcorb_logger.debug('')
+        gcorb_logger.debug('Stars with polynomias:')
+        gcorb_logger.debug(self.poly_stars)
+        gcorb_logger.debug('')
         gcorb_logger.debug('Stars with proper motions:')
         gcorb_logger.debug(self.pm_stars)
 
-        # updating stars from stefan
-        for star in self.orbit_stars:
-            try:
-                _s = resource_filename('mygravipy', f'Datafiles/s{star[1:]}.dat')
-                _s = np.genfromtxt(_s, skip_header=7, max_rows=14, comments=';')[:,0]
-            except OSError:
-                continue
-            self.star_orbits[star]['a'] = _s[0]*1e3
-            self.star_orbits[star]['e'] = _s[1]
-            self.star_orbits[star]['P'] = _s[2]
-            self.star_orbits[star]['T'] = _s[3]
-            self.star_orbits[star]['i'] = _s[4]/180*np.pi
-            self.star_orbits[star]['CapitalOmega'] = _s[5]/180*np.pi
-            self.star_orbits[star]['Omega'] = _s[6]/180*np.pi
-            gcorb_logger.debug(f'{star} updated from Stefans orbits')
-        
+
         # calculate starpos
         starpos = []
         starpos.append(['SGRA', 0, 0, '', 15.7])
         for star in self.star_orbits:
             _s = self.star_orbits[star]
             x, y = self.pos_orbit(star)
+            starpos.append([_s['name'], x*1000, y*1000,
+                            _s['type'], _s['Kmag']])
+        for star in self.star_poly:
+            _s = self.star_poly[star]
+            x, y = self.pos_poly(star)
             starpos.append([_s['name'], x*1000, y*1000, _s['type'], _s['Kmag']])
         for star in self.star_pms:
             _s = self.star_pms[star]
@@ -94,13 +189,28 @@ class GCorbits():
         try:
             return self.pos_orbit(star)
         except KeyError:
-            return self.pos_pm(star)
+            try:
+                return self.pos_poly(star)
+            except KeyError:
+                return self.pos_pm(star)
 
     def star_kmag(self, star):
         try:
             return self.star_orbits[star]['Kmag']
         except KeyError:
             return self.star_pms[star]['Kmag']
+
+    def pos_poly(self, star):
+        t = self.t
+        star = self.star_poly[star]
+
+        res = [0, 0]
+        for p in range(star['npol']):
+            res[0] += star['ra'][p*2]*(t - star['tref'])**p
+            res[1] += star['de'][p*2]*(t - star['tref'])**p
+        
+        return np.array(res)
+
 
     def pos_orbit(self, star, rall=False):
         """
