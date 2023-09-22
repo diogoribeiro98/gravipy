@@ -1837,29 +1837,48 @@ class GravNight():
             _fn = obj.filename
             spf = obj.spFrequAS
 
-            if nicer:
-                bl_sort = [2, 3, 5, 0, 4, 1]
-                nchannel = len(spf[0])
-                for bl in range(6):
-                    spf[bl] = (np.linspace(nchannel, 0, nchannel)
-                               + bl_sort[bl]*(nchannel+nchannel//2))
-
             ax = plt.subplot(gs[ndx, 0])
             x = spf
             val = obj.visphiSC_P1
             err = obj.visphierrSC_P1
             flag = obj.visphiflagSC_P1
-
+            if self.ndit > 1:
+                val = val.reshape(-1,6,len(x[0]))
+                err = err.reshape(-1,6,len(x[0]))
+                flag = flag.reshape(-1,6,len(x[0]))
+                spf = spf.reshape(-1,6,len(x[0]))
+            
+            if nicer:
+                bl_sort = [2, 3, 5, 0, 4, 1]
+                nchannel = val.shape[-1]
+                x = np.zeros((6, nchannel))
+                for bl in range(6):
+                    x[bl] = (np.linspace(nchannel, 0, nchannel)
+                               + bl_sort[bl]*(nchannel+nchannel//2))
+            else:
+                x = spf
+            ax = plt.subplot(gs[ndx, 0])
             colors = obj.colors_baseline
             labels = obj.baseline_labels
             prange = 6
             for i in range(prange):
-                plt.errorbar(x[i, :],
-                             val[i, :]*(1-flag)[i],
-                             err[i, :]*(1-flag)[i],
-                             color=colors[i],
-                             marker='.',
-                             ls='', lw=1, alpha=1, capsize=0)
+                if self.ndit > 1:
+                    for dit in range(self.ndit):
+                        plt.errorbar(x[i, :],
+                            val[dit, i, :]*(1-flag)[dit, i],
+                            err[dit, i, :]*(1-flag)[dit, i],
+                            color=colors[i],
+                            marker='.',
+                            ls='', lw=1, alpha=0.5, capsize=0)
+
+
+                else:
+                    plt.errorbar(x[i, :],
+                                 val[i, :]*(1-flag)[i],
+                                 err[i, :]*(1-flag)[i],
+                                 color=colors[i],
+                                marker='.',
+                                ls='', lw=1, alpha=1, capsize=0)
                 #plt.scatter(x[i, :],
                 #            val[i, :]*(1-flag)[i],
                 #            color=colors[i],
@@ -1892,14 +1911,31 @@ class GravNight():
             val = obj.visphiSC_P2
             err = obj.visphierrSC_P2
             flag = obj.visphiflagSC_P2
+            if self.ndit > 1:
+                val = val.reshape(-1,6,len(x[0]))
+                err = err.reshape(-1,6,len(x[0]))
+                flag = flag.reshape(-1,6,len(x[0]))
+
+
 
             for i in range(prange):
-                plt.errorbar(x[i, :],
-                             val[i, :]*(1-flag)[i],
-                             err[i, :]*(1-flag)[i],
-                             color=colors[i],
-                             marker='.',
-                             ls='', lw=1, alpha=1, capsize=0)
+                if self.ndit > 1:
+                    for dit in range(self.ndit):
+                        plt.errorbar(x[i, :],
+                            val[dit, i, :]*(1-flag)[dit, i],
+                            err[dit, i, :]*(1-flag)[dit, i],
+                            color=colors[i],
+                            marker='.',
+                            ls='', lw=1, alpha=0.5, capsize=0)
+
+
+                else:
+                    plt.errorbar(x[i, :],
+                                val[i, :]*(1-flag)[i],
+                                err[i, :]*(1-flag)[i],
+                                color=colors[i],
+                                marker='.',
+                                ls='', lw=1, alpha=1, capsize=0)
                 #plt.scatter(x[i, :],
                 #            val[i, :]*(1-flag)[i],
                 #            color=colors[i],
