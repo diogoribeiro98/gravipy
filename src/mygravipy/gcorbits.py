@@ -198,7 +198,10 @@ class GCorbits():
         try:
             return self.star_orbits[star]['Kmag']
         except KeyError:
-            return self.star_pms[star]['Kmag']
+            try:
+                return self.star_poly[star]['Kmag']
+            except KeyError:
+                return self.star_pms[star]['Kmag']
 
     def pos_poly(self, star):
         t = self.t

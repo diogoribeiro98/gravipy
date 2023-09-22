@@ -19,6 +19,15 @@ from dynesty import plotting as dyplot
 from dynesty import utils as dyfunc
 from numba import jit
 import time
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfgen import canvas
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.lib import colors
+from reportlab.lib.styles import getSampleStyleSheet
+from io import BytesIO
+from reportlab.graphics import renderPDF
+from svglib.svglib import svg2rlg
+from reportlab.platypus import PageBreak
 
 from .gravdata import *
 from .gcorbits import GCorbits
@@ -1089,7 +1098,7 @@ class GravMFit(GravData, GravPhaseMaps):
         """
         return 10**((mag1-mag2)/2.5)
 
-    def prep_fit(self, fit=False, plot=True, *args, **kwargs):
+    def prep_fit(self, fit=False, plot=True, fiberrad=70, *args, **kwargs):
         """
         Prepare the fit by finding stars in the pointing and
         returning the RA, Dec, fr and initial values for the fit
@@ -1100,7 +1109,7 @@ class GravMFit(GravData, GravPhaseMaps):
         offs = (self.header['ESO INS SOBJ OFFX'],
                 self.header['ESO INS SOBJ OFFY'])
 
-        stars, _ = orb.find_stars(*offs, plot=plot)
+        stars, _ = orb.find_stars(*offs, plot=plot, fiberrad=fiberrad)
         if stars is None:
             self.logger.error('No stars found in pointing')
             raise ValueError('No stars found in pointing')
@@ -1130,6 +1139,7 @@ class GravMFit(GravData, GravPhaseMaps):
 
         else:
             self.logger.info('Star field file')
+            print(star_names)
             star_names = [s[0] for s in stars]
             stars = np.asarray([s[1:] for s in stars])
 
@@ -1152,8 +1162,8 @@ class GravMFit(GravData, GravPhaseMaps):
             center = stars[0]
             pc = center[:2]
             stars = stars[1:]
-            ra_list = stars[:, 0]
-            de_list = stars[:, 1]
+            ra_list = stars[:, 0] - pc[0]
+            de_list = stars[:, 1] - pc[1]
             mag = stars[:, 3]
             fr_list = self.flux_ratio(mag[0], mag[1:])
 
@@ -1162,7 +1172,7 @@ class GravMFit(GravData, GravPhaseMaps):
                        1]
 
         self.logger.info(f'Fitting for: {star_names}')
-        self.logger.info(f'PC on SGRA, flux ratio rel. to {star_names[1]}')           
+        self.logger.info(f'PC on {star_names[0]}, flux ratio rel. to {star_names[1]}')           
         pr_ra_list = [f'{x:.3f}' for x in ra_list]
         pr_de_list = [f'{x:.3f}' for x in de_list]
         pr_fr_list = [f'{x:.3f}' for x in fr_list]
@@ -1240,6 +1250,7 @@ class GravMFit(GravData, GravPhaseMaps):
                   initial=None,
                   plot_science=True,
                   phasemaps=True,
+                  create_pdf=False,
                   **kwargs):
         '''
         Multi source fit to GRAVITY data
@@ -1271,6 +1282,7 @@ class GravMFit(GravData, GravPhaseMaps):
         fixedBHalpha:   Fit for black hole power law [False]
         plot_science:    plot fit result [True]
         phasemaps:      Use Phasemaps for fit [True]
+        create_pdf:     Create pdf of fit [False]
 
         Optional unnamed arguments (can be given via kwargs):
         fit_mode:       Kind of integration for visibilities (approx, numeric,
@@ -2088,6 +2100,8 @@ class GravMFit(GravData, GravPhaseMaps):
             self.fittab = fittab
         if iopandas is not None and not pdexists:
             fittab.to_pickle(pdname)
+        if create_pdf:
+            self.create_pdf()
 
         try:
             fitted = 1-(np.array(self.fit_for) == 0)
@@ -2106,10 +2120,12 @@ class GravMFit(GravData, GravPhaseMaps):
         else:
             return results
 
-    def plot_fit(self, plotdata, nicer=True):
+    def plot_fit(self, plotdata, nicer=True, save=False):
         rad2as = 180 / np.pi * 3600
         stname = self.name.find('GRAVI')
         title_name = self.name[stname:-5]
+        if save:
+            self.imgdata = BytesIO()
 
         nplot = len(plotdata)
         if nplot == 2:
@@ -2226,7 +2242,11 @@ class GravMFit(GravData, GravPhaseMaps):
                     plt.legend()
                     plt.xlabel('spatial frequency (1/arcsec)')
             plt.suptitle(title_name, y=0.92)
-            plt.show()
+            if save:
+                plt.savefig(self.imgdata, format='svg')
+                plt.close()
+            else:
+                plt.show()
 
         # Vis2
         if self.fit_for[1]:
@@ -2273,7 +2293,11 @@ class GravMFit(GravData, GravPhaseMaps):
                     plt.legend()
                     plt.xlabel('spatial frequency (1/arcsec)')
             plt.suptitle(title_name, y=0.92)
-            plt.show()
+            if save:
+                plt.savefig(self.imgdata, format='svg')
+                plt.close()
+            else:
+                plt.show()
 
         # T3
         if self.fit_for[2]:
@@ -2331,8 +2355,12 @@ class GravMFit(GravData, GravPhaseMaps):
                 else:
                     plt.legend()
                     plt.xlabel('spatial frequency of largest baseline in triangle (1/arcsec)')
-        plt.suptitle(title_name, y=0.92)
-        plt.show()
+            plt.suptitle(title_name, y=0.92)
+            if save:
+                plt.savefig(self.imgdata, format='svg')
+                plt.close()
+            else:
+                plt.show()
 
         # Visphi
         if self.fit_for[3]:
@@ -2391,7 +2419,92 @@ class GravMFit(GravData, GravPhaseMaps):
                     plt.legend()
                     plt.xlabel('spatial frequency (1/arcsec)')
             plt.suptitle(title_name, y=0.92)
-            plt.show()
+            if save:
+                plt.savefig(self.imgdata, format='svg')
+                plt.close()
+            else:
+                plt.show()
+        if save:
+            self.imgdata.seek(0)
+
+    
+    def create_pdf(self):
+        title_style = getSampleStyleSheet()["Title"]
+        stname = self.name[self.name.find('GRAVI'):]
+        fname = stname[:29]
+        title_paragraph = Paragraph(fname, title_style)
+
+        keys = self.fittab.keys()[1:-7]
+        d = []
+        for key in keys:
+            d.append([np.round(_,3) for _ in self.fittab[key].values])
+        d = np.array(d).T.tolist()
+        d = [[''] + keys] + d
+
+        d = list(map(list, zip(*d)))
+
+        c = ['', 'Initial', 'M.L.', 'M.P.', '-sig', '+sig',
+             'Initial', 'M.L.', 'M.P.', '-sig', '+sig']
+
+        d = [c] + d
+        d = [["", "Polarization 1", "", "", "", "", "Polarization 2", ""]] + d
+
+        table = Table(d)
+        style = TableStyle([
+            ('SPAN', (1, 0), (5, 0)),
+            ('SPAN', (6, 0), (-1, 0)),
+            ('BACKGROUND', (1, 1), (-1, 1), colors.grey),
+            ('TEXTCOLOR', (0, 1), (-1, 1), colors.whitesmoke),
+            ('ALIGN', (0, 0), (1, -1), 'RIGHT'),
+            ('ALIGN', (1, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 1), 'Helvetica-Bold'),
+            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+            ('BACKGROUND', (0, 2), (-1, -1), colors.white),
+            ('GRID', (1, 1), (-1, -1), 1, colors.grey),
+        ])
+        table.setStyle(style)
+
+        chi2 = self.fittab['chi2'].values
+        chi2 = [np.round(c, 3) for c in chi2]
+        d = [['', 'Reduced chi2'],
+             ['', 'Visamp', 'Vis2', 'Closure', 'Visphi'],
+             ['Pol. 1', chi2[0], chi2[1], chi2[2], chi2[3]],
+             ['Pol. 2', chi2[5], chi2[6], chi2[7], chi2[8]]]
+        table2 = Table(d)
+
+        style2 = TableStyle([
+            ('SPAN', (1, 0), (-1, 0)),
+            ('BACKGROUND', (1, 1), (-1, 1), colors.grey),
+            ('TEXTCOLOR', (0, 1), (-1, 1), colors.whitesmoke),
+            ('ALIGN', (0, 0), (1, -1), 'RIGHT'),
+            ('ALIGN', (1, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 1), 'Helvetica-Bold'),
+            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+            ('BACKGROUND', (0, 2), (-1, -1), colors.white),
+            ('GRID', (1, 1), (-1, -1), 1, colors.grey),
+        ])
+        table2.setStyle(style2)
+
+        doc = SimpleDocTemplate(f'{fname}.pdf', pagesize=A4)
+        elements = []
+        elements.append(title_paragraph)
+        elements.append(Spacer(1, 20))
+        elements.append(table)
+        elements.append(Spacer(1, 20))
+        elements.append(table2)
+        elements.append(PageBreak())
+
+        for idx in range(4):
+            self.fit_for = [0, 0, 0, 0]
+            self.fit_for[idx] = 1
+            self.plot_fit(self.plotdata, save=True)
+            drawing = svg2rlg(self.imgdata)
+            drawing.width = 300
+            drawing.height = 300
+            drawing.scale(0.6, 0.6)
+            elements.append(drawing)
+        doc.build(elements)
+
 
 
 def _lnprob_night(theta, fitdata, lower, upper, theta_names, fitarg, fithelp):
