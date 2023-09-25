@@ -9,6 +9,8 @@ from mygravipy.gravmfit import _calc_vis_mstars
 from mygravipy.gcorbits import GCorbits
 from astropy.io import fits
 from astropy.stats import mad_std as mad
+import warnings
+import matplotlib.cbook
 
 # try:
 #     from PyQt6.QtCore import QThread, pyqtSignal
@@ -112,6 +114,7 @@ class FitWorker(QThread):
         self.save_folder = save_folder
 
     def run(self):
+        warnings.filterwarnings("ignore", category=UserWarning)
         ra_list = []
         de_list = []
         fr_list = []
@@ -141,6 +144,7 @@ class FitWorker(QThread):
                                         minimizer = 'leastsq',
                                         fit_for = self.fit_for,
                                         plot_science = False,
+                                        create_pdf = self.checkbox_dict['create_pdf'],
                                         )
             else:
                 res = data.fit_stars(ra_list,
@@ -156,10 +160,12 @@ class FitWorker(QThread):
                                      fit_for = self.fit_for,
                                      plot_science = False,
                                      savemcmc = self.save_folder,
-                                     refit = self.checkbox_dict['refit']
-                                     )
+                                     refit = self.checkbox_dict['refit'],
+                                     create_pdf = self.checkbox_dict['create_pdf'],
+                                    )
             self.update_progress.emit(fdx)
         self.finished.emit()
+        warnings.resetwarnings()
 
 
 class PlotData(FigureCanvas):

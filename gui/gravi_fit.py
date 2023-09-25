@@ -193,6 +193,9 @@ class GRAVITYfitGUI(QMainWindow):
         central_widget.setLayout(main_layout)
         self.setCentralWidget(central_widget)
 
+        logging.info("GUI initialized")
+        logging.info("Please report any crashes, bugs, or missing features")
+
 
 
     def create_button_layout(self):
@@ -342,7 +345,7 @@ class GRAVITYfitGUI(QMainWindow):
         hdx = 2
         source_label = QLabel('Fit for')
         source_label.setMaximumSize(200, 30)
-        source_label.setAlignment(Qt.AlignmentFlag.AlignRight)
+        source_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         source_label.setContentsMargins(0, 5, 0, 0)
         input_layout.addWidget(source_label, hdx, 0)
 
@@ -365,9 +368,26 @@ class GRAVITYfitGUI(QMainWindow):
         hdx += 1
         source_label = QLabel('Number of sources')
         source_label.setMaximumSize(200, 30)
-        source_label.setAlignment(Qt.AlignmentFlag.AlignRight)
+        source_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         source_label.setContentsMargins(0, 5, 0, 0)
         input_layout.addWidget(source_label, hdx, 0)
+
+        pdf_label = QLabel('Create PDF')
+        pdf_label.setMaximumSize(100, 30)
+        pdf_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        input_layout.addWidget(pdf_label, hdx, 2)
+
+        pdf_checkbox = QCheckBox()
+        pdf_checkbox.setFixedSize(80, 25)
+        pdf_checkbox.setStyleSheet(self.checkbox_style)
+        self.checkbox_mapping[pdf_checkbox] = f"create_pdf"
+        pdf_checkbox.stateChanged.connect(self.checkbox_state_changed)
+        if f'create_pdf' not in self.checkbox_dict:
+            self.checkbox_dict[f"create_pdf"] = True
+        pdf_checkbox.setChecked(self.checkbox_dict[f"create_pdf"])
+        input_layout.addWidget(pdf_checkbox, hdx, 3)
+
+
 
         source_combo = QComboBox(self)
         source_combo.setStyleSheet(self.combo_style)
@@ -408,7 +428,7 @@ class GRAVITYfitGUI(QMainWindow):
         for ldx, label_text in enumerate(input_labels):
             input_label = QLabel(label_text)
             input_label.setMaximumSize(200, 30)
-            input_label.setAlignment(Qt.AlignmentFlag.AlignRight)
+            input_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             input_label.setContentsMargins(0, 5, 0, 0)
             input_layout.addWidget(input_label, ldx+hdx, 0)
             for i in range(nsources-1):
@@ -416,7 +436,7 @@ class GRAVITYfitGUI(QMainWindow):
                     continue
                 input_box = QLineEdit(self)
                 input_box.setStyleSheet(self.input_style)
-                input_box.setAlignment(Qt.AlignmentFlag.AlignRight)
+                input_box.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
                 self.input_mapping[input_box] = f"{input_labels_dic[ldx]} {i+1}"
                 input_box.textChanged.connect(self.update_dictionary)
                 if f'{input_labels_dic[ldx]} {i+1}' not in self.input_dict:
@@ -431,7 +451,7 @@ class GRAVITYfitGUI(QMainWindow):
         for ldx, label_text in enumerate(fit_labels):
             fit_label = QLabel(label_text)
             fit_label.setMaximumSize(200, 30)
-            fit_label.setAlignment(Qt.AlignmentFlag.AlignRight)
+            fit_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             fit_label.setContentsMargins(0, 5, 0, 0)
             input_layout.addWidget(fit_label, ldx+hdx, 0)
             for i in range(nsources-1):
@@ -458,12 +478,12 @@ class GRAVITYfitGUI(QMainWindow):
         for ldx, label_text in enumerate(init_labels):
             init_label = QLabel(label_text)
             init_label.setMaximumSize(200, 30)
-            init_label.setAlignment(Qt.AlignmentFlag.AlignRight)
+            init_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             init_label.setContentsMargins(0, 5, 0, 0)
             input_layout.addWidget(init_label, ldx+hdx, 0)
             init_box = QLineEdit(self)
             init_box.setStyleSheet(self.input_style)
-            init_box.setAlignment(Qt.AlignmentFlag.AlignRight)
+            init_box.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             init_box.setFixedSize(100, 25)
             self.input_mapping[init_box] = f"{init_labels_dic[ldx]}"
             init_box.textChanged.connect(self.update_dictionary)
@@ -475,7 +495,7 @@ class GRAVITYfitGUI(QMainWindow):
         hdx += 5
         mode_label = QLabel('Fitting Mode')
         mode_label.setMaximumSize(200, 30)
-        mode_label.setAlignment(Qt.AlignmentFlag.AlignRight)
+        mode_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         mode_label.setContentsMargins(0, 5, 0, 0)
         input_layout.addWidget(mode_label, hdx, 0)
 
@@ -499,12 +519,12 @@ class GRAVITYfitGUI(QMainWindow):
             for ldx, label_text in enumerate(mcmc_labels):
                 mcmc_label = QLabel(label_text)
                 mcmc_label.setMaximumSize(100, 30)
-                mcmc_label.setAlignment(Qt.AlignmentFlag.AlignRight)
+                mcmc_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
                 mcmc_label.setContentsMargins(0, 5, 0, 0)
                 input_layout.addWidget(mcmc_label, ldx+hdx-3, 2)
                 mcmc_box = QLineEdit(self)
                 mcmc_box.setStyleSheet(self.input_style)
-                mcmc_box.setAlignment(Qt.AlignmentFlag.AlignRight)
+                mcmc_box.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
                 mcmc_box.setFixedSize(100, 25)
                 self.input_mapping[mcmc_box] = f"{label_text}"
                 mcmc_box.textChanged.connect(self.update_dictionary)
