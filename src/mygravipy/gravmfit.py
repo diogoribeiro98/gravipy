@@ -1139,7 +1139,6 @@ class GravMFit(GravData, GravPhaseMaps):
 
         else:
             self.logger.info('Star field file')
-            print(star_names)
             star_names = [s[0] for s in stars]
             stars = np.asarray([s[1:] for s in stars])
 
