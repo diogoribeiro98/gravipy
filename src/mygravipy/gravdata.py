@@ -1842,12 +1842,11 @@ class GravNight():
             val = obj.visphiSC_P1
             err = obj.visphierrSC_P1
             flag = obj.visphiflagSC_P1
-            if self.ndit > 1:
+            if val.shape[0] > 6:
                 val = val.reshape(-1,6,len(x[0]))
                 err = err.reshape(-1,6,len(x[0]))
                 flag = flag.reshape(-1,6,len(x[0]))
                 spf = spf.reshape(-1,6,len(x[0]))
-            
             if nicer:
                 bl_sort = [2, 3, 5, 0, 4, 1]
                 nchannel = val.shape[-1]
@@ -1862,7 +1861,7 @@ class GravNight():
             labels = obj.baseline_labels
             prange = 6
             for i in range(prange):
-                if self.ndit > 1:
+                if val.ndim == 3:
                     for dit in range(self.ndit):
                         plt.errorbar(x[i, :],
                             val[dit, i, :]*(1-flag)[dit, i],
@@ -1911,7 +1910,7 @@ class GravNight():
             val = obj.visphiSC_P2
             err = obj.visphierrSC_P2
             flag = obj.visphiflagSC_P2
-            if self.ndit > 1:
+            if val.shape[0] > 6:
                 val = val.reshape(-1,6,len(x[0]))
                 err = err.reshape(-1,6,len(x[0]))
                 flag = flag.reshape(-1,6,len(x[0]))
@@ -1919,7 +1918,7 @@ class GravNight():
 
 
             for i in range(prange):
-                if self.ndit > 1:
+                if val.ndim == 3:
                     for dit in range(self.ndit):
                         plt.errorbar(x[i, :],
                             val[dit, i, :]*(1-flag)[dit, i],
