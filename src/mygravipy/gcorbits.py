@@ -10,7 +10,11 @@ import logging
 import glob
 import re
 from .gravdata import convert_date, log_level_mapping, fiber_coupling
+from astropy.visualization import make_lupton_rgb
+from scipy.special import j1
 
+deg_to_rad = np.pi/180
+microarcsec_to_deg = (10**(-3))/3600
 
 class GCorbits():
     def __init__(self, t=None, loglevel='INFO'):
@@ -31,7 +35,6 @@ class GCorbits():
         gcorb_logger.setLevel(log_level)
         if not gcorb_logger.hasHandlers():
             ch = logging.StreamHandler()
-            # ch.setLevel(log_level)
             formatter = logging.Formatter('%(levelname)s: %(name)s - %(message)s')
             ch.setFormatter(formatter)
             gcorb_logger.addHandler(ch)
@@ -419,3 +422,279 @@ class GCorbits():
         plt.xlabel('dRa [mas]')
         plt.ylabel('dDec [mas]')
         plt.show()
+
+
+    #Add stars to a given image
+    def add_stars(self, x, y, coord, mag, ka):
+        """
+        Returns a simulated image of a single star as observed from a 
+        telescope.
+
+        Parameters
+        ----------
+        x : meshgrid
+            sky coordinates (RA)
+        y : meshgrid
+            sky coordinates (DEC)
+        coord : array
+            Star coordinates
+        mag : float
+            Star magnitude
+        ka : float
+            wavelength of light divided by the telescope aperture
+
+        Returns
+        -------
+        array
+            Simulated image to be displayed with imshow
+        """
+
+        #Get star coordinates 
+        xc = coord[0]
+        yc = coord[1]
+
+        #Get magnitude
+        I0 = np.exp(17-mag)
+        
+        #Add airy disk
+        theta = np.sqrt(((x-xc))**2 + (y-yc)**2)*microarcsec_to_deg*deg_to_rad
+        arg = ka*theta
+
+        imag = I0*( 2*j1(arg) / arg)**2
+
+        return imag
+
+
+
+    def mock_observation(self, 
+                         off= [0, 0],
+                         figsize=5, 
+                         lim=100, 
+                         long=False,
+                         plot_fiber=False,
+                         fiber_text=False,
+                         telescope_size=130,
+                         wavelength=1.65*10**(-6),
+                         npixels=1000,
+                         savefig=False,
+                         figname='test.png'):
+        """
+        Plot the inner region around SgrA* at a given TIME simulating 
+        a telescope
+        lim:  radius to which stars are plotted
+        long: more information if True
+        """
+        #Calculate the wavenumber of the diffraction pattern
+        ka = 2*np.pi*telescope_size/wavelength  # (2*pi/l) * D
+        starpos = self.starpos
+        
+        fig, ax  = plt.subplots(figsize=(figsize, figsize), dpi=300)
+        ax.axis([lim*1.2+off[0], -lim*1.2+off[0],
+                 -lim*1.2+off[1], lim*1.2+off[1]])
+        ax.set_aspect('equal')
+        ax.set_xlabel('dRa [mas]')
+        ax.set_ylabel('dDec [mas]')
+        ax.grid(False)
+
+        xlist, ylist = np.meshgrid(
+                np.linspace(lim*1.2+off[0], -lim*1.2+off[0], npixels), 
+                np.linspace(-lim*1.2+off[1], lim*1.2+off[1], npixels))
+
+        early_type_image = 0*xlist
+        late_type_image = 0*xlist
+        no_type_image = 0*xlist
+
+        et_color = np.array([52, 207, 235])/256     # Early type (Blue)
+        lt_color = np.array([235, 131, 52])/256      # Late type (Red)
+        nt_color = np.array([256, 256, 256])/256     # No type (white)
+
+        for s in starpos:
+            n, xc, yc, ty, mag = s
+            #If star is outside of the field of view, continue to next star            
+            if np.any(np.abs(xc-off[0]) > lim) or np.any(np.abs(yc-off[1]) > lim):
+                continue
+            
+            if long:
+                if ty == 'e':
+                    early_type_image += self.add_stars(xlist, 
+                                                       ylist, 
+                                                       [-xc,yc], 
+                                                       mag, ka) 
+                    xlabel = -xc-20*lim/500
+                    ylabel =  yc+20*lim/500
+                    if np.any(np.abs( xlabel - off[0]) < lim) or np.any(np.abs(ylabel-off[1]) < lim):                        
+                        ax.annotate('%s m$_K$=%.1f' % (n, mag), 
+                                    xy=(xc,yc),
+                                    xytext=(-xc-20*lim/500,yc+20*lim/500),
+                                    rotation=0, 
+                                    fontsize=6.5,
+                                    ha='left', va='bottom', color=et_color)
+                    
+                elif ty == 'l':
+                    late_type_image += self.add_stars(xlist, 
+                                                      ylist, 
+                                                      [-xc,yc], 
+                                                      mag, ka) 
+                    
+                    ax.annotate('%s m$_K$=%.1f' % (n, mag), 
+                                xy=(xc, yc),
+                                xytext=(xc-20*lim/500,yc+20*lim/500),
+                                rotation=0, 
+                                fontsize=6.5,
+                                ha='left', va='bottom', color=lt_color)
+        
+                else:
+                    no_type_image += self.add_stars(xlist, 
+                                                    ylist, 
+                                                    [-xc,yc], 
+                                                    mag, ka)               
+                    
+                    ax.annotate('%s m$_K$=%.1f' % (n, mag), 
+                                xy=(xc,yc),
+                                xytext=(xc-20*lim/500,yc+20*lim/500),
+                                rotation=0, 
+                                fontsize=6.5,
+                                ha='left', va='bottom', color=nt_color)
+        
+
+            else:
+                if ty == 'e':
+                    early_type_image += self.add_stars(xlist, 
+                                                      ylist, 
+                                                      [-xc,yc], 
+                                                      mag, ka) 
+                    xlabel = -xc-20*lim/500
+                    ylabel =  yc+20*lim/500
+
+                    if np.any(np.abs( xlabel + off[0]) < 1.02*lim) and np.any(np.abs(ylabel-off[1]) < 1.02*lim):
+                        ax.annotate('%s' % (n), 
+                                    xy=(xc,yc),
+                                    xytext=(xc-20*lim/500,yc+20*lim/500),
+                                    rotation=0, 
+                                    fontsize=6.5,
+                                    ha='left', va='bottom', color=et_color)
+                    
+                elif ty == 'l':                    
+                    late_type_image += self.add_stars(xlist, 
+                                                      ylist, 
+                                                      [-xc,yc], 
+                                                      mag, ka) 
+                    xlabel = -xc-20*lim/500
+                    ylabel =  yc+20*lim/500
+
+                    if np.any(np.abs( xlabel + off[0]) < 1.02*lim) and np.any(np.abs(ylabel-off[1]) < 1.02*lim):
+                        ax.annotate('%s' % (n), 
+                                    xy=(xc,yc),
+                                    xytext=(xc-20*lim/500,yc+20*lim/500),
+                                    rotation=0, 
+                                    fontsize=6.5,
+                                    ha='left', va='bottom', color=lt_color)
+
+                else:
+                    if n == 'SGRA':
+                        continue
+
+                    no_type_image += self.add_stars(xlist, 
+                                                    ylist, 
+                                                    [-xc,yc], 
+                                                    mag, ka)               
+                    
+                    xlabel = -xc-20*lim/500
+                    ylabel =  yc+20*lim/500
+
+                    if (np.abs( xlabel + off[0]) < 1.02*lim) and (np.abs(ylabel-off[1]) < 1.02*lim) :
+                        ax.annotate('%s' % (n), 
+                                    xy=(-xc,yc),
+                                    xytext=(xc-20*lim/500,yc+20*lim/500),
+                                    rotation=0, 
+                                    fontsize=6.5,
+                                    ha='left', va='bottom', color=nt_color)
+            
+        if plot_fiber:
+            fiberrad = 70
+            circ = plt.Circle((off), 
+                              radius=fiberrad, facecolor="None",
+                              edgecolor='red', linewidth=0.5, ls='--')
+            ax.add_artist(circ)
+        
+            if fiber_text:
+                ax.text(   0+off[0], -78+off[1], 'GRAVITY Fiber FoV', 
+                            fontsize='6', 
+                            color='red',
+                            ha='center')   
+
+        #If the fiber offset is off the plotting limits, ignore the SgA point
+        if np.any(np.abs(off[0]) > lim) or np.any(np.abs(off[1]) > lim):
+            pass
+        else:
+            ax.scatter(0, 0, color='yellow', s=2, lw=0.2, zorder=100, marker='x')
+            ax.text(-4, -8, 'Sgr A*', fontsize='6', color=nt_color)
+
+        #If not directly poiting at SgA, make a legend
+        if off != [0,0]:
+            ax.scatter(*off, color='k', marker='X', s=20, zorder=100)
+            ax.text(-4+off[0], -8+off[1], 'Pointing*', fontsize='8')
+
+        #Plot Legend
+        ax.annotate('Late type', xy=(0.99, 0.01), rotation=0, fontsize=6.5, xycoords='axes fraction', ha='right', va='bottom', color=lt_color)
+        ax.annotate('Early type', xy=(0.99, 0.04), rotation=0, fontsize=6.5, xycoords='axes fraction', ha='right', va='bottom', color=et_color)
+        ax.annotate('Unknown', xy=(0.99, 0.07), rotation=0, fontsize=6.5, xycoords='axes fraction', ha='right', va='bottom', color=nt_color)
+
+        ax.annotate(ty[:10], 
+                    xy=(0.01,0.99), 
+                    rotation=0, 
+                    fontsize=6.5, 
+                    xycoords='axes fraction', 
+                    ha='left', 
+                    va='top', 
+                    color='white')
+
+
+        r = nt_color[0]*no_type_image + lt_color[0]*late_type_image + et_color[0]*early_type_image
+        g = nt_color[1]*no_type_image + lt_color[1]*late_type_image + et_color[1]*early_type_image
+        b = nt_color[2]*no_type_image + lt_color[2]*late_type_image + et_color[2]*early_type_image
+
+        rgb = make_lupton_rgb(r, g, b, Q=10, stretch=0.05)
+
+        ax.imshow(rgb,
+                  extent =[xlist.min(), xlist.max(), ylist.min(), ylist.max()],
+                  origin ='lower')
+
+        #Save or display?
+        if savefig:
+            fig.savefig(figname)
+        else:
+            plt.show()
+
+        plt.close(fig)
+        '''
+        plt.axis([lim*1.2+off[0], -lim*1.2+off[0],
+                  -lim*1.2+off[1], lim*1.2+off[1]])
+        plt.gca().set_aspect('equal', adjustable='box')
+
+        fiberrad = 70
+        circ = plt.Circle((off), radius=fiberrad, facecolor="None",
+                          edgecolor='darkblue', linewidth=0.2)
+        ax.add_artist(circ)
+        plt.text(0+off[0], -78+off[1], 'GRAVITY Fiber FoV', fontsize='6', color='darkblue',
+                 ha='center')
+        if np.any(np.abs(off[0]) > lim) or np.any(np.abs(off[1]) > lim):
+            pass
+        else:
+            plt.scatter(0, 0, color='k', s=20, zorder=100)
+            plt.text(-4, -8, 'Sgr A*', fontsize='8')
+
+        if off != [0,0]:
+            plt.scatter(*off, color='k', marker='X', s=20, zorder=100)
+            plt.text(-4+off[0], -8+off[1], 'Pointing*', fontsize='8')
+
+        plt.text(-80+off[0], 100+off[1], 'late type', fontsize=6, color='C0')
+        plt.text(-80+off[0], 92+off[1], 'early type', fontsize=6, color='C2')
+        plt.text(-80+off[0], 84+off[1], 'unknown', fontsize=6, color='C1')
+
+        plt.xlabel('dRa [mas]')
+        plt.ylabel('dDec [mas]')
+        plt.show()
+        '''
+
+
