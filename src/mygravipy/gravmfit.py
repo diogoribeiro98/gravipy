@@ -819,7 +819,7 @@ def _leastsq_mstars(params, theta1, theta2, fitdata, fitarg, fithelp):
 
 def _lnlike_mstars(theta, fitdata, fitarg, fithelp, loglike=False):
     (nsource, fit_for, bispec_ind, fit_mode, wave, dlambda,
-     fixedBHalpha, todel, fixed, phasemaps, northA, dra, ddec, amp_map_int,
+     todel, fixed, phasemaps, northA, dra, ddec, amp_map_int,
      pha_map_int, amp_map_denom_int, fit_phasemaps, fix_pm_sources,
      fix_pm_amp_c, fix_pm_pha_c, fix_pm_int_c) = fithelp
 
@@ -867,7 +867,7 @@ def _calc_vis_mstars(theta_in, fitarg, fithelp):
     mas2rad = 1e-3 / 3600 / 180 * np.pi
 
     (nsource, fit_for, bispec_ind, fit_mode, wave, dlambda,
-     fixedBHalpha, todel, fixed, phasemaps, northA, dra, ddec, amp_map_int,
+     todel, fixed, phasemaps, northA, dra, ddec, amp_map_int,
      pha_map_int, amp_map_denom_int, fit_phasemaps, fix_pm_sources,
      fix_pm_amp_c, fix_pm_pha_c, fix_pm_int_c) = fithelp
 
@@ -885,9 +885,8 @@ def _calc_vis_mstars(theta_in, fitarg, fithelp):
     pc_RA = theta[th_rest+2]
     pc_DEC = theta[th_rest+3]
     fr_BH = 10**(theta[th_rest+4])
-
-    alpha_bg = 3.
-    alpha_stars = 3
+    alpha_bg = theta[th_rest+5]
+    alpha_stars = theta[th_rest+6]
 
     if phasemaps:
         if fit_phasemaps:
@@ -1019,7 +1018,7 @@ def _calc_vis_mstars(theta_in, fitarg, fithelp):
     visphi = visphi + 360.*(visphi < -180.) - 360.*(visphi > 180.)
     closure = closure + 360.*(closure < -180.) - 360.*(closure > 180.)
     for i in range(6):
-        visamp[i, :] *= theta[th_rest+5+i]
+        visamp[i, :] *= theta[th_rest+7+i]
     return visamp, visphi, closure
 
 
@@ -1075,7 +1074,7 @@ class GravMFit(GravData, GravPhaseMaps):
         if offs == (0, 0):
             self.logger.info('SgrA* file')
             pc = [0, 0]
-            initial = [-1, 1, *pc, 0.5, 1]
+            initial = [-1, 3, 3, 1, *pc, 0.5, 1]
             stars = stars[1:]
             star_names = [s[0] for s in stars]
             stars = np.asarray([s[1:] for s in stars])
@@ -1120,7 +1119,7 @@ class GravMFit(GravData, GravPhaseMaps):
             mag = stars[:, 3]
             fr_list = self.flux_ratio(mag[0], mag[1:])
 
-            initial = [-1, 0.5, *pc,
+            initial = [-1, 3, 3, 0.5, *pc,
                        self.flux_ratio(mag[0], center[3]),
                        1]
 
@@ -1198,7 +1197,7 @@ class GravMFit(GravData, GravPhaseMaps):
                   nwalkers=301,
                   nruns=301,
                   fit_for=np.array([0.5, 0.5, 1.0, 0.0]),
-                  fixedBHalpha=False,
+                  fixed_BH_alpha=False,
                   fixedBG=False,
                   initial=None,
                   plot_science=True,
@@ -1232,34 +1231,37 @@ class GravMFit(GravData, GravPhaseMaps):
         nruns:          number of MCMC runs [500]
         fit_for:        weight of VA, V2, T3, VP [[0.5,0.5,1.0,0.0]]
         initial:        Initial guess for fit [None]
-        fixedBHalpha:   Fit for black hole power law [False]
+        fixed_BH_alpha:   Fit for black hole power law [False]
         plot_science:    plot fit result [True]
         phasemaps:      Use Phasemaps for fit [True]
         create_pdf:     Create pdf of fit [False]
 
         Optional unnamed arguments (can be given via kwargs):
-        fit_mode:       Kind of integration for visibilities (approx, numeric,
-                        analytic, onlyphases) [numeric]
-        bequiet:        Suppresses ALL outputs
-        bestchi:        Gives best chi2 (for True) or mcmc res as output [True]
-        redchi2:        Gives redchi2 instead of chi2 [True]
-        flagtill:       Flag blue channels, default 3 for LOW, 30 for MED
-        flagfrom:       Flag red channels, default 13 for LOW, 200 for MED
-        coh_loss:       If True, fit for a coherence loss per Basline [False]
-        no_fit  :       Only gives fitting results for parameters from
-                        initial guess [False]
-        onlypol:        Only fits one polarization for split mode, 
-                        either 0 or 1 [None]
-        iopandas:       I/O of pandas file. Saves results in dedicated
-                        Folder and loads them instead of fitting if
-                        available. Give prefix to filename [None]
-        fit_phasemaps:  Fit phasemaps at each step, otherwise jsut takes the 
-                        initial guess value [False]
-        plot_corner:     plot MCMC results [False, steps, corner, both]
-        interppm:       Interpolate Phasemaps [True]
-        pmdatayear:     Phasemaps year, 2019 or 2020 [2019]
-        smoothkernel:   Size of smoothing kernel in mas [15]
-        vis_flag:       Does flag vis > 1 if True [True]
+        fit_mode:         Kind of integration for visibilities (approx, numeric,
+                          analytic, onlyphases) [numeric]
+        minimizer:        Minimizer for initial guess (emcee, leastsq) [emcee]
+        minmethod:        Minimizer method for leastsq (all lmfit otpions) [lbfgsb]
+        bestchi:          Gives best chi2 (for True) or mcmc res as output [True]
+        redchi2:          Gives redchi2 instead of chi2 [True]
+        flagtill:         Flag blue channels, default 3 for LOW, 30 for MED
+        flagfrom:         Flag red channels, default 13 for LOW, 200 for MED
+        coh_loss:         If True, fit for a coherence loss per Basline [False]
+        no_fit  :         Only gives fitting results for parameters from
+                          initial guess [False]
+        onlypol:          Only fits one polarization for split mode, 
+                          either 0 or 1 [None]
+        iopandas:         I/O of pandas file. Saves results in dedicated
+                          Folder and loads them instead of fitting if
+                          available. Give prefix to filename [None]
+        plot_corner:      plot MCMC results [False, steps, corner, both]
+        fit_phasemaps:    Fit phasemaps at each step, otherwise jsut takes the 
+                          initial guess value [False]
+        interppm:         Interpolate Phasemaps [True]
+        pmdatayear:       Phasemaps year, 2019 or 2020 [2019]
+        smoothkernel:     Size of smoothing kernel in mas [15]
+        vis_flag:         Does flag vis > 1 if True [True]
+        fixed_BG_alpha:   Fix background power law index [True]
+        fixed_star_alpha: Fix star power law index [True]
         '''
         fit_mode = kwargs.get('fit_mode', 'numeric')
         minimizer = kwargs.get('minimizer', 'emcee')
@@ -1276,7 +1278,8 @@ class GravMFit(GravData, GravPhaseMaps):
         savemcmc = kwargs.get('savemcmc', None)
         refit = kwargs.get('refit', False)
         vis_flag = kwargs.get('vis_flag', True)
-
+        fixed_BG_alpha = kwargs.get('fixed_BG_alpha', True)
+        fixed_star_alpha = kwargs.get('fixed_star_alpha', True)
         fit_phasemaps = kwargs.get('fit_phasemaps', False)
         interppm = kwargs.get('interppm', True)
         self.datayear = kwargs.get('pmdatayear', 2019)
@@ -1304,9 +1307,6 @@ class GravMFit(GravData, GravPhaseMaps):
         else:
             onlyphases = False
         self.fit_for = fit_for
-        self.fixedBHalpha = fixedBHalpha
-        self.fixedBG = fixedBG
-        self.coh_loss = coh_loss
         self.interppm = interppm
         self.fit_mode = fit_mode
         self.phasemaps = phasemaps
@@ -1384,29 +1384,33 @@ class GravMFit(GravData, GravPhaseMaps):
         results = []
         # Initial guesses
         if initial is not None:
-            if len(initial) != 6:
+            if len(initial) != 8:
                 raise ValueError('Length of initial parameter '
-                                 'list is not correct, should be 6: '
-                                 'alpha, fr BG, pc ra, pc dec, fr_BH, '
+                                 'list is not correct, should be 8: '
+                                 'alpha BH, alpha BG, alpha star, '
+                                 'fr BG, pc ra, pc dec, fr_BH, '
                                  'coh. loss')
 
-            (alpha_SgrA_in, flux_ratio_bg_in, pc_RA_in, pc_DEC_in,
+            (alpha_SgrA_in, alpha_BG_in, alpha_star_in, 
+             flux_ratio_bg_in, pc_RA_in, pc_DEC_in,
              flux_ratio_bh, coh_loss_in) = initial
         else:
             alpha_SgrA_in = -0.5
+            alpha_BG_in = 3
+            alpha_star_in = 3
             flux_ratio_bg_in = 0.1
             pc_RA_in = 0
             pc_DEC_in = 0
             flux_ratio_bh = 1
             coh_loss_in = 1
         if singlesource:
-            theta = np.zeros(11)
-            lower = np.zeros(11)
-            upper = np.zeros(11)
+            theta = np.zeros(13)
+            lower = np.zeros(13)
+            upper = np.zeros(13)
         else:
-            theta = np.zeros(nsource*3+10)
-            lower = np.zeros(nsource*3+10)
-            upper = np.zeros(nsource*3+10)
+            theta = np.zeros(nsource*3+12)
+            lower = np.zeros(nsource*3+12)
+            upper = np.zeros(nsource*3+12)
 
         theta_names = []
         todel = []
@@ -1457,6 +1461,8 @@ class GravMFit(GravData, GravPhaseMaps):
         theta[th_rest+2] = pc_RA_in
         theta[th_rest+3] = pc_DEC_in
         theta[th_rest+4] = np.log10(flux_ratio_bh)
+        theta[th_rest+5] = alpha_BG_in
+        theta[th_rest+6] = alpha_star_in
 
         pc_size = 5
         lower[th_rest] = -10
@@ -1464,22 +1470,28 @@ class GravMFit(GravData, GravPhaseMaps):
         lower[th_rest+2] = pc_RA_in - pc_size
         lower[th_rest+3] = pc_DEC_in - pc_size
         lower[th_rest+4] = np.log10(0.001)
+        lower[th_rest+5] = -10
+        lower[th_rest+6] = -10
 
         upper[th_rest] = 10
         upper[th_rest+1] = 20
         upper[th_rest+2] = pc_RA_in + pc_size
         upper[th_rest+3] = pc_DEC_in + pc_size
         upper[th_rest+4] = np.log10(100.)
+        upper[th_rest+5] = 10
+        upper[th_rest+6] = 10
 
         theta_names.append('alpha_BH')
         theta_names.append('f_BG')
         theta_names.append('pc_RA')
         theta_names.append('pc_Dec')
         theta_names.append('fr_BH')
+        theta_names.append('alpha_BG')
+        theta_names.append('alpha_stars')
 
-        theta[th_rest+5:] = coh_loss_in
-        upper[th_rest+5:] = 1.5
-        lower[th_rest+5:] = 0.1
+        theta[th_rest+7:] = coh_loss_in
+        upper[th_rest+7:] = 1.5
+        lower[th_rest+7:] = 0.1
 
         theta_names.append('CL1')
         theta_names.append('CL2')
@@ -1491,7 +1503,7 @@ class GravMFit(GravData, GravPhaseMaps):
         self.theta_names = theta_names
 
         ndim = len(theta)
-        if fixedBHalpha:
+        if fixed_BH_alpha:
             todel.append(th_rest)
         if fixedBG:
             todel.append(th_rest+1)
@@ -1500,14 +1512,18 @@ class GravMFit(GravData, GravPhaseMaps):
             todel.append(th_rest+3)
         if singlesource:
             todel.append(th_rest+4)
+        if fixed_BG_alpha:
+            todel.append(th_rest+5)
+        if fixed_star_alpha:
+            todel.append(th_rest+6)
         if not coh_loss:
-            todel.extend(np.arange(th_rest+5, th_rest+5+6))
+            todel.extend(np.arange(th_rest+7, th_rest+7+6))
         elif type(coh_loss) == list:
             if len(coh_loss) != 6:
                 raise ValueError('If coherence loss is a list needs to have '
                                  '6 boolean values')
             no_coh_loss = [not e for e in coh_loss]
-            todel.extend(np.arange(th_rest+5, th_rest+5+6)[no_coh_loss])
+            todel.extend(np.arange(th_rest+7, th_rest+7+6)[no_coh_loss])
         elif not fixedBG:
             todel.append(th_rest+1)
 
@@ -1725,7 +1741,6 @@ class GravMFit(GravData, GravPhaseMaps):
                     if fit_phasemaps:
                         fithelp = [self.nsource, self.fit_for, self.bispec_ind,
                                    self.fit_mode, self.wave, self.dlambda,
-                                   self.fixedBHalpha,
                                    todel, fixed,
                                    self.phasemaps, self.northangle, self.dra,
                                    self.ddec, phasemaps.amp_map_int,
@@ -1735,7 +1750,6 @@ class GravMFit(GravData, GravPhaseMaps):
                     else:
                         fithelp = [self.nsource, self.fit_for, self.bispec_ind,
                                    self.fit_mode, self.wave, self.dlambda,
-                                   self.fixedBHalpha,
                                    todel, fixed,
                                    self.phasemaps, self.northangle, self.dra,
                                    self.ddec, None, None, None,
@@ -1744,7 +1758,6 @@ class GravMFit(GravData, GravPhaseMaps):
                 else:
                     fithelp = [self.nsource, self.fit_for, self.bispec_ind,
                                self.fit_mode, self.wave, self.dlambda,
-                               self.fixedBHalpha,
                                todel, fixed,
                                self.phasemaps, None, None, None, None, None,
                                None, None, None, None, None, None]
@@ -2111,7 +2124,7 @@ class GravMFit(GravData, GravPhaseMaps):
             theta, fitdata, fitarg, fithelp = plotdata[idx]
 
             (nsource, fit_for, bispec_ind, fit_mode, wave, dlambda,
-             fixedBHalpha, todel, fixed, phasemaps, northA, dra, ddec, amp_map_int,
+             todel, fixed, phasemaps, northA, dra, ddec, amp_map_int,
              pha_map_int, amp_map_denom_int, fit_phasemaps, fix_pm_sources,
              fix_pm_amp_c, fix_pm_pha_c, fix_pm_int_c) = fithelp
 
