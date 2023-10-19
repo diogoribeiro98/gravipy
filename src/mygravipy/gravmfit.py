@@ -56,43 +56,7 @@ color2 = '#348ABD'
 color3 = '#F26D21'
 color4 = '#7A68A6'
 
-
-# some numba functions for future!
-# @njit('float64(float64[:], float64[:])', fastmath=False)
-# def nb_trapz(y, x):
-#     sz = y.shape[0]
-#     res = 0
-#     for i in range(sz-1):
-#         res = res + (y[i+1]+y[i])*(x[i+1]-x[i])*0.5
-#     return res
-#
-# @njit('float64[:](float64[:,:], float64[:], int64)', fastmath=False)
-# def nb_trapz2d_ax(z, xy, axis):
-#
-#     sz1, sz2 = z.shape[0], z.shape[1]
-#
-#     if axis == 0:
-#         res = np.empty(sz2)
-#         for j in prange(sz2):
-#             res[j] = nb_trapz(z[:,j], xy)
-#         return res
-#     elif axis == 1:
-#         res = np.empty(sz1)
-#         for i in prange(sz1):
-#             res[i] = nb_trapz(z[i,:], xy)
-#         return res
-#     else:
-#         raise ValueError
-
-# @jit(nopython=True)
-# def mathfunc_real(values, dt):
-#     print(values.shape)
-#     return nb_trapz2d_ax(np.real(values), dt, 0)
-
-# @jit(nopython=True)
-# def mathfunc_imag(values, dt):
-#     print(values.shape)
-#     return nb_trapz2d_ax(np.imag(values), dt, 0)
+PKG_NAME = 'mygravipy'
 
 def mathfunc_real(values, dt):
     return np.trapz(np.real(values), dx=dt, axis=0)
@@ -349,7 +313,7 @@ class GravPhaseMaps():
                                                      * np.exp(1j*phase)))
             return complexPsf[cc, cc]/np.abs(complexPsf[cc, cc]).max()
 
-        zernikefile = resource_filename('mygravipy', 'Phasemaps/' + zerfile)
+        zernikefile = resource_filename(PKG_NAME, 'Phasemaps/' + zerfile)
         zer = np.load(zernikefile, allow_pickle=True).item()
 
         wave = self.wlSC
@@ -440,9 +404,9 @@ class GravPhaseMaps():
             savename2 = ('Phasemaps/Phasemap_%s_%s_Smooth%i_2020data_denom.npy'
                          % (self.tel, self.resolution, smooth))
 
-        savefile = resource_filename('mygravipy', savename)
+        savefile = resource_filename(PKG_NAME, savename)
         np.save(savefile, all_pm)
-        savefile = resource_filename('mygravipy', savename2)
+        savefile = resource_filename(PKG_NAME, savename2)
         np.save(savefile, all_pm_denom)
         self.all_pm = all_pm
         if plot:
@@ -532,8 +496,8 @@ class GravPhaseMaps():
                         % (self.tel, self.resolution, smoothkernel))
 
         try:
-            pm1 = np.load(resource_filename('mygravipy', pm1_file))
-            pm2 = np.real(np.load(resource_filename('mygravipy', pm2_file)))
+            pm1 = np.load(resource_filename(PKG_NAME, pm1_file))
+            pm2 = np.real(np.load(resource_filename(PKG_NAME, pm2_file)))
         except FileNotFoundError:
             raise ValueError('%s does not exist, you have to create '
                              'the phasemap first!\nFor this '
@@ -562,11 +526,13 @@ class GravPhaseMaps():
                                            name='SC_AMP UT%i' % (4-tel)))
                 hlist.append(fits.ImageHDU(pha_map[:, tel],
                                            name='SC_PHA UT%i' % (4-tel)))
+                hlist.append(fits.ImageHDU(amp_map_denom[:, tel],
+                                           name='SC_INT UT%i' % (4-tel)))
             hdul = fits.HDUList(hlist)
-            hdul.writeto(resource_filename('mygravipy', 'testfits.fits'),
+            hdul.writeto(resource_filename(PKG_NAME, 'testfits.fits'),
                          overwrite=True)
             self.logger.info('Saving phasemaps as fits file to: %s'
-                  % resource_filename('mygravipy', 'testfits.fits'))
+                  % resource_filename(PKG_NAME, 'testfits.fits'))
 
         if interp:
             x = np.arange(201)
@@ -632,12 +598,6 @@ class GravPhaseMaps():
             pos = np.array([ra + dra[tel], dec + ddec[tel]])
             if self.tel == 'AT':
                 pos /= 4.4
-            # pm_pos_off is never defined?
-            # try:
-            #     pos[0] += self.pm_pos_off[0]
-            #     pos[1] += self.pm_pos_off[1]
-            # except (NameError, AttributeError):
-            #     pass
             pos_rot = np.dot(self.rotation(northangle[tel]), pos) + 100
             readout_pos[readout_pos[:, 1] == tel, 2] = pos_rot[1]
             readout_pos[readout_pos[:, 1] == tel, 3] = pos_rot[0]
@@ -706,12 +666,6 @@ def _read_phasemaps(ra, dec, northangle, amp_map_int,
 
     for tel in range(4):
         pos = np.array([ra + dra[tel], dec + ddec[tel]])
-        # # pm_pos_off is never defined?
-        # try:
-        #     pos[0] += self.pm_pos_off[0]
-        #     pos[1] += self.pm_pos_off[1]
-        # except (NameError, AttributeError):
-        #     pass
         pos_rot = np.dot(_rotation(northangle[tel]), pos) + 100
         readout_pos[readout_pos[:, 1] == tel, 2] = pos_rot[1]
         readout_pos[readout_pos[:, 1] == tel, 3] = pos_rot[0]
