@@ -1051,7 +1051,7 @@ class GravMFit(GravData, GravPhaseMaps):
         """
         return 10**((mag1-mag2)/2.5)
 
-    def prep_fit(self, fit=False, plot=True, fiberrad=70, *args, **kwargs):
+    def prep_fit(self, fit=False, plot=True, fiberrad=70, offs=None, *args, **kwargs):
         """
         Prepare the fit by finding stars in the pointing and
         returning the RA, Dec, fr and initial values for the fit
@@ -1059,8 +1059,12 @@ class GravMFit(GravData, GravPhaseMaps):
         if fit = True the fit is done        
         """
         orb = GCorbits(t=self.date_obs, loglevel=self.loglevel)
-        offs = (self.header['ESO INS SOBJ OFFX'],
-                self.header['ESO INS SOBJ OFFY'])
+        if offs is not None:
+            offs = (self.header['ESO INS SOBJ OFFX'],
+                    self.header['ESO INS SOBJ OFFY'])
+        if len(offs) != 2:
+            self.logger.error('Length of offsets not correct, should be 2')
+            raise ValueError('Length of offsets not correct, should be 2')
 
         stars, _ = orb.find_stars(*offs, plot=plot, fiberrad=fiberrad)
         if stars is None:
