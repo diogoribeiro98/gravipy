@@ -1059,7 +1059,7 @@ class GravMFit(GravData, GravPhaseMaps):
         if fit = True the fit is done        
         """
         orb = GCorbits(t=self.date_obs, loglevel=self.loglevel)
-        if offs is not None:
+        if offs is None:
             offs = (self.header['ESO INS SOBJ OFFX'],
                     self.header['ESO INS SOBJ OFFY'])
         if len(offs) != 2:
@@ -1132,9 +1132,9 @@ class GravMFit(GravData, GravPhaseMaps):
         pr_ra_list = [f'{x:.3f}' for x in ra_list]
         pr_de_list = [f'{x:.3f}' for x in de_list]
         pr_fr_list = [f'{x:.3f}' for x in fr_list]
-        self.logger.info(f'RA: {pr_ra_list}')
-        self.logger.info(f'DEC: {pr_de_list}')
-        self.logger.info(f'Flux ratio: {pr_fr_list}')        
+        self.logger.debug(f'RA: {pr_ra_list}')
+        self.logger.debug(f'DEC: {pr_de_list}')
+        self.logger.debug(f'Flux ratio: {pr_fr_list}')        
         
         if fit:
             self.logger.info('Fitting for stars')

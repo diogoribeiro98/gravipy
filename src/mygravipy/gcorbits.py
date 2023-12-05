@@ -320,7 +320,7 @@ class GCorbits():
         if plot is True, plots the stars in the inner region
         plotlim: radius of the plot
         """
-        self.gcorb_logger.info(f'Finding stars within {fiberrad} mas from {x}, {y}')
+        self.gcorb_logger.debug(f'Finding stars within {fiberrad} mas from {x}, {y}')
         starpos = self.starpos
         stars = []
         for s in starpos:
@@ -329,7 +329,7 @@ class GCorbits():
             if dist < fiberrad:
                 dmag = -2.5*np.log10(fiber_coupling(dist))
                 stars.append([n, sx-x, sy-y, dist, mag, mag + dmag])
-                self.gcorb_logger.info(f'{n} at a distance of [{sx-x:.2f} {sy-y:.2f}]')
+                self.gcorb_logger.debug(f'{n} at a distance of [{sx-x:.2f} {sy-y:.2f}]')
 
         if plot:
             fig, ax = plt.subplots()
