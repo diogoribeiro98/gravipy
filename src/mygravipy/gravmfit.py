@@ -1036,7 +1036,7 @@ def _calc_vis_mstars(theta, fitarg, fithelp):
 
 
 class GravMFit(GravData, GravPhaseMaps):
-    def __init__(self, data, loglevel='INFO', ignore_tel=[], simu=False):
+    def __init__(self, data, loglevel='INFO', ignore_tel=[]):
         """
         GravMFit: Class to fit a multiple point source model to GRAVITY data
 
@@ -1045,7 +1045,7 @@ class GravMFit(GravData, GravPhaseMaps):
         plot_fit : plot the data and the fitted model
         """
         super().__init__(data, loglevel=loglevel)
-        self.get_int_data(ignore_tel=ignore_tel, simu=simu)
+        self.get_int_data(ignore_tel=ignore_tel)
         log_level = log_level_mapping.get(loglevel, logging.INFO)
         logger = logging.getLogger(__name__)
         logger.setLevel(log_level)
