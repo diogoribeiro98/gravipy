@@ -1534,7 +1534,6 @@ class GravMFit(GravData, GravPhaseMaps):
         theta_names.append('SelfCal3')
         theta_names.append('SelfCal4')
 
-
         self.theta_names = theta_names
 
         ndim = len(theta)
@@ -2153,7 +2152,9 @@ class GravMFit(GravData, GravPhaseMaps):
         if self.phasemaps:
             wave_model = wave
         else:
-            wave_model = np.linspace(wave[0], wave[len(wave)-1], 1000)
+            wave_model = wave
+            #TODO: fix residuals plot to make this work again
+            #wave_model = np.linspace(wave[0], wave[len(wave)-1], 1000)
         dlambda_model = np.zeros((6, len(wave_model)))
         for i in range(0, 6):
             dlambda_model[i, :] = np.interp(wave_model, wave, dlambda[i, :])
@@ -2175,7 +2176,7 @@ class GravMFit(GravData, GravPhaseMaps):
             (nsource, fit_for, bispec_ind, fit_mode, wave, dlambda,
              todel, fixed, phasemaps, northA, dra, ddec, amp_map_int,
              pha_map_int, amp_map_denom_int, fit_phasemaps, fix_pm_sources,
-             fix_pm_amp_c, fix_pm_pha_c, fix_pm_int_c) = fithelp
+             fix_pm_amp_c, fix_pm_pha_c, fix_pm_int_c, only_stars) = fithelp
 
             for ddx in range(len(todel)):
                 theta = np.insert(theta, todel[ddx], fixed[ddx])
@@ -2215,15 +2216,16 @@ class GravMFit(GravData, GravPhaseMaps):
         # Visamp
         if self.fit_for[0]:
             if plotsplit:
-                plt.figure(figsize=(10, 5))
-                gs = gridspec.GridSpec(1, 2, wspace=0.05)
+                plt.figure(figsize=(10, 6))
+                gs = gridspec.GridSpec(2, 2, wspace=0.05, hspace=0.05, height_ratios=[1, 0.2])
             else:
-                plt.figure(figsize=(5, 5))
+                plt.figure(figsize=(5, 6))
+                gs = gridspec.GridSpec(2, 1, wspace=0.05, hspace=0.05, height_ratios=[1, 0.2])
             for idx in range(nplot):
                 if plotsplit:
                     ax = plt.subplot(gs[0, idx])
                 else:
-                    ax = plt.subplot()
+                    ax = plt.subplot(gs[0, 0])
                 visamp = plotdata[idx][1][0]
                 visamp_error = plotdata[idx][1][1]
                 visamp_flag = plotdata[idx][1][2]
@@ -2238,23 +2240,37 @@ class GravMFit(GravData, GravPhaseMaps):
                                 visamp[i, :]*(1-visamp_flag)[i],
                                 color=self.colors_baseline[i],
                                 alpha=0.5, label=self.baseline_labels[i])
-                    if nicer:
-                        plt.text(magu_as[i, :].mean(), -0.07,
-                                 self.baseline_labels[i],
-                                 color=self.colors_baseline[i],
-                                 ha='center', va='center')
                     plt.plot(magu_as_model[i, :], model_visamp_full[i, :],
                              color='grey', zorder=100)
                 if idx == 0:
                     plt.ylabel('Visibility Amplitude')
                 else:
                     ax.set_yticklabels([])
+                if not nicer:
+                    plt.legend()
                 plt.ylim(-0.03, 1.1)
+                ax.set_xticks([])
+                if plotsplit:
+                    ax = plt.subplot(gs[1, idx])
+                else:
+                    ax = plt.subplot(gs[1, 0])
+                for i in range(0, 6):
+                    plt.scatter(magu_as[i, :],
+                                (visamp[i, :] - model_visamp_full[i, :])*(1-visamp_flag)[i],
+                                color=self.colors_baseline[i],
+                                alpha=0.5, label=self.baseline_labels[i])
+                    if nicer:
+                        plt.text(magu_as[i, :].mean(), -0.14,
+                                self.baseline_labels[i],
+                                color=self.colors_baseline[i],
+                                ha='center', va='center')
+                if idx != 0:
+                    ax.set_yticklabels([])
+                ax.set_ylim(-0.1, 0.1)
+                plt.axhline(0, ls='--', color='grey')
                 if nicer:
-                    # ax.set_xticklabels([])
                     ax.set_xticks([])
                 else:
-                    plt.legend()
                     plt.xlabel('spatial frequency (1/arcsec)')
             plt.suptitle(title_name, y=0.92)
             if save:
@@ -2266,15 +2282,16 @@ class GravMFit(GravData, GravPhaseMaps):
         # Vis2
         if self.fit_for[1]:
             if plotsplit:
-                plt.figure(figsize=(10, 5))
-                gs = gridspec.GridSpec(1, 2, wspace=0.05)
+                plt.figure(figsize=(10, 6))
+                gs = gridspec.GridSpec(2, 2, wspace=0.05, hspace=0.05, height_ratios=[1, 0.2])
             else:
-                plt.figure(figsize=(5, 5))
+                plt.figure(figsize=(5, 6))
+                gs = gridspec.GridSpec(2, 1, wspace=0.05, hspace=0.05, height_ratios=[1, 0.2])
             for idx in range(nplot):
                 if plotsplit:
                     ax = plt.subplot(gs[0, idx])
                 else:
-                    ax = plt.subplot()
+                    ax = plt.subplot(gs[0, 0])
                 vis2 = plotdata[idx][1][3]
                 vis2_error = plotdata[idx][1][4]
                 vis2_flag = plotdata[idx][1][5]
@@ -2289,23 +2306,37 @@ class GravMFit(GravData, GravPhaseMaps):
                                 vis2[i, :]*(1-vis2_flag)[i],
                                 color=self.colors_baseline[i],
                                 alpha=0.5, label=self.baseline_labels[i])
-                    if nicer:
-                        plt.text(magu_as[i, :].mean(), -0.07,
-                                 self.baseline_labels[i],
-                                 color=self.colors_baseline[i],
-                                 ha='center', va='center')
                     plt.plot(magu_as_model[i, :], model_vis2_full[i, :],
                              color='grey', zorder=100)
                 if idx == 0:
                     plt.ylabel('Visibility Squared')
                 else:
                     ax.set_yticklabels([])
+                if not nicer:
+                    plt.legend()
                 plt.ylim(-0.03, 1.1)
+                ax.set_xticks([])
+                if plotsplit:
+                    ax = plt.subplot(gs[1, idx])
+                else:
+                    ax = plt.subplot(gs[1, 0])
+                for i in range(0, 6):
+                    plt.scatter(magu_as[i, :],
+                                (vis2[i, :] - model_vis2_full[i, :])*(1-vis2_flag)[i],
+                                color=self.colors_baseline[i],
+                                alpha=0.5, label=self.baseline_labels[i])
+                    if nicer:
+                        plt.text(magu_as[i, :].mean(), -0.14,
+                                 self.baseline_labels[i],
+                                 color=self.colors_baseline[i],
+                                 ha='center', va='center')
+                if idx != 0:
+                    ax.set_yticklabels([])
+                ax.set_ylim(-0.1, 0.1)
+                plt.axhline(0, ls='--', color='grey')
                 if nicer:
-                    # ax.set_xticklabels([])
                     ax.set_xticks([])
                 else:
-                    plt.legend()
                     plt.xlabel('spatial frequency (1/arcsec)')
             plt.suptitle(title_name, y=0.92)
             if save:
@@ -2329,15 +2360,16 @@ class GravMFit(GravData, GravPhaseMaps):
             except:
                 cmax = 180
             if plotsplit:
-                plt.figure(figsize=(10, 5))
-                gs = gridspec.GridSpec(1, 2, wspace=0.05)
+                plt.figure(figsize=(10, 6))
+                gs = gridspec.GridSpec(2, 2, wspace=0.05, hspace=0.05, height_ratios=[1, 0.2])
             else:
-                plt.figure(figsize=(5, 5))
+                plt.figure(figsize=(5, 6))
+                gs = gridspec.GridSpec(2, 1, wspace=0.05, hspace=0.05, height_ratios=[1, 0.2])
             for idx in range(nplot):
                 if plotsplit:
                     ax = plt.subplot(gs[0, idx])
                 else:
-                    ax = plt.subplot()
+                    ax = plt.subplot(gs[0, 0])
                 closure = plotdata[idx][1][6]
                 closure_error = plotdata[idx][1][7]
                 closure_flag = plotdata[idx][1][8]
@@ -2352,23 +2384,39 @@ class GravMFit(GravData, GravPhaseMaps):
                                 closure[i, :]*(1-closure_flag)[i],
                                 color=self.colors_closure[i],
                                 alpha=0.5, label=self.closure_labels[i])
-                    if nicer:
-                        plt.text(magu_as_T3[i, :].mean(), -cmax*1.06,
-                                 self.closure_labels[i],
-                                 color=self.colors_closure[i],
-                                 ha='center', va='center')
                     plt.plot(magu_as_T3_model[i, :], model_closure_full[i, :],
                              color='grey', zorder=100)
                 if idx == 0:
                     plt.ylabel('Closure Phase (deg)')
                 else:
                     ax.set_yticklabels([])
+                if not nicer:
+                    plt.legend()
                 plt.ylim(-cmax, cmax)
+                ax.set_xticks([])
+                ax.set_xticks([])
+                if plotsplit:
+                    ax = plt.subplot(gs[1, idx])
+                else:
+                    ax = plt.subplot(gs[1, 0])
+                for i in range(0, 4):
+                    diff = (closure[i, :]-model_closure_full[i, :]+180)%360 - 180
+                    plt.scatter(magu_as_T3[i, :],
+                                (diff)*(1-closure_flag)[i],
+                                color=self.colors_closure[i],
+                                alpha=0.5, label=self.closure_labels[i])
+                    if nicer:
+                        plt.text(magu_as_T3[i, :].mean(), -13,
+                                 self.closure_labels[i],
+                                 color=self.colors_closure[i],
+                                 ha='center', va='center')
+                if idx != 0:
+                    ax.set_yticklabels([])
+                ax.set_ylim(-10, 10)
+                plt.axhline(0, ls='--', color='grey')
                 if nicer:
-                    # ax.set_xticklabels([])
                     ax.set_xticks([])
                 else:
-                    plt.legend()
                     plt.xlabel('spatial frequency of largest baseline in triangle (1/arcsec)')
             plt.suptitle(title_name, y=0.92)
             if save:
@@ -2392,15 +2440,17 @@ class GravMFit(GravData, GravPhaseMaps):
             except:
                 cmax = 180
             if plotsplit:
-                plt.figure(figsize=(10, 5))
-                gs = gridspec.GridSpec(1, 2, wspace=0.05)
+                plt.figure(figsize=(10, 6))
+                gs = gridspec.GridSpec(2, 2, wspace=0.05, hspace=0.05, height_ratios=[1, 0.2])
             else:
-                plt.figure(figsize=(5, 5))
+                plt.figure(figsize=(5, 6))
+                gs = gridspec.GridSpec(2, 1, wspace=0.05, hspace=0.05, height_ratios=[1, 0.2])
+            self.phase_res = []
             for idx in range(nplot):
                 if plotsplit:
                     ax = plt.subplot(gs[0, idx])
                 else:
-                    ax = plt.subplot()
+                    ax = plt.subplot(gs[0, 0])
                 visphi = plotdata[idx][1][9]
                 visphi_error = plotdata[idx][1][10]
                 visphi_flag = plotdata[idx][1][11]
@@ -2415,23 +2465,40 @@ class GravMFit(GravData, GravPhaseMaps):
                                 visphi[i, :]*(1-visphi_flag)[i],
                                 color=self.colors_baseline[i],
                                 alpha=0.5, label=self.baseline_labels[i])
-                    if nicer:
-                        plt.text(magu_as[i, :].mean(), -cmax*1.06,
-                                 self.baseline_labels[i],
-                                 color=self.colors_baseline[i],
-                                 ha='center', va='center')
                     plt.plot(magu_as_model[i, :], model_visphi_full[i, :],
                              color='grey', zorder=100)
                 if idx == 0:
                     plt.ylabel('visibility phase')
                 else:
                     ax.set_yticklabels([])
+                if not nicer:
+                    plt.legend()
                 plt.ylim(-cmax,cmax)
+                ax.set_xticks([])
+                if plotsplit:
+                    ax = plt.subplot(gs[1, idx])
+                else:
+                    ax = plt.subplot(gs[1, 0])
+                
+                for i in range(0, 6):
+                    diff = (visphi[i, :]-model_visphi_full[i, :]+180)%360 - 180
+                    self.phase_res.append(diff)
+                    plt.scatter(magu_as[i, :],
+                                diff*(1-visphi_flag)[i],
+                                color=self.colors_baseline[i],
+                                alpha=0.5, label=self.baseline_labels[i])
+                    if nicer:
+                        plt.text(magu_as[i, :].mean(), -13,
+                                 self.baseline_labels[i],
+                                 color=self.colors_baseline[i],
+                                 ha='center', va='center')
+                if idx != 0:
+                    ax.set_yticklabels([])
+                ax.set_ylim(-10, 10)
+                plt.axhline(0, ls='--', color='grey')
                 if nicer:
-                    # ax.set_xticklabels([])
                     ax.set_xticks([])
                 else:
-                    plt.legend()
                     plt.xlabel('spatial frequency (1/arcsec)')
             plt.suptitle(title_name, y=0.92)
             if save:
@@ -2519,7 +2586,8 @@ class GravMFit(GravData, GravPhaseMaps):
             drawing.scale(0.6, 0.6)
             elements.append(drawing)
         doc.build(elements)
-
+        pdfn = os.getcwd() 
+        self.logger.info(f'PDF saved as: {pdfn}/{fname}.pdf')
 
 
 def _lnprob_night(theta, fitdata, lower, upper, theta_names, fitarg, fithelp):
