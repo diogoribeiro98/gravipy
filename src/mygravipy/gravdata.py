@@ -279,9 +279,9 @@ class GravData():
             self.p2vm_file = False
 
         tel = fits.open(self.name)[0].header["TELESCOP"]
-        if tel == 'ESO-VLTI-U1234':
+        if tel in ['ESO-VLTI-U1234', 'U1234']:
             self.tel = 'UT'
-        elif tel == 'ESO-VLTI-A1234':
+        elif tel in ['ESO-VLTI-A1234', 'A1234']:
             self.tel = 'AT'
         else:
             self.tel = 'test'
