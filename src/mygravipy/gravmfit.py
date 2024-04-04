@@ -821,7 +821,7 @@ def _lnlike_mstars(theta, fitdata, fitarg, fithelp, loglike=False):
     (nsource, fit_for, bispec_ind, fit_mode, wave, dlambda,
      todel, fixed, phasemaps, northA, dra, ddec, amp_map_int,
      pha_map_int, amp_map_denom_int, fit_phasemaps, fix_pm_sources,
-     fix_pm_amp_c, fix_pm_pha_c, fix_pm_int_c) = fithelp
+     fix_pm_amp_c, fix_pm_pha_c, fix_pm_int_c, only_stars) = fithelp
 
     for ddx in range(len(todel)):
         theta = np.insert(theta, todel[ddx], fixed[ddx])
@@ -860,7 +860,7 @@ def _lnlike_mstars(theta, fitdata, fitarg, fithelp, loglike=False):
         return least_sqr
 
 
-def _calc_vis_mstars(theta_in, fitarg, fithelp):
+def _calc_vis_mstars(theta, fitarg, fithelp):
     """
     Calculates the complex visibility of several point sources
     """
@@ -869,12 +869,10 @@ def _calc_vis_mstars(theta_in, fitarg, fithelp):
     (nsource, fit_for, bispec_ind, fit_mode, wave, dlambda,
      todel, fixed, phasemaps, northA, dra, ddec, amp_map_int,
      pha_map_int, amp_map_denom_int, fit_phasemaps, fix_pm_sources,
-     fix_pm_amp_c, fix_pm_pha_c, fix_pm_int_c) = fithelp
+     fix_pm_amp_c, fix_pm_pha_c, fix_pm_int_c, only_stars) = fithelp
 
     u = fitarg[0]
     v = fitarg[1]
-
-    theta = theta_in
 
     if nsource == 0:
         th_rest = 0
@@ -887,6 +885,9 @@ def _calc_vis_mstars(theta_in, fitarg, fithelp):
     fr_BH = 10**(theta[th_rest+4])
     alpha_bg = theta[th_rest+5]
     alpha_stars = theta[th_rest+6]
+
+    if only_stars:
+        alpha_SgrA = theta[th_rest+6]
 
     if phasemaps:
         if fit_phasemaps:
@@ -1014,16 +1015,28 @@ def _calc_vis_mstars(theta_in, fitarg, fithelp):
         closure[idx] = (visphi[bispec_ind[idx,0]]
                         + visphi[bispec_ind[idx,1]]
                         - visphi[bispec_ind[idx,2]])
+        
+    # sel_call
+    #TODO: should this be an OPD?
+    #TODO: should probably have a gaussian prior on the OPD
+    self_cal_arr = np.array([[1, 1, 1, 0, 0, 0],
+                            [-1, 0, 0, 1, 1, 0],
+                            [0, -1, 0, -1, 0, 1],
+                            [0, 0, -1, 0, -1, -1]])
+    for i in range(4):
+        visphi += (self_cal_arr[i]*theta[th_rest+13+i])[:,np.newaxis]
+    # coherence loss
+    for i in range(6):
+        visamp[i, :] *= theta[th_rest+7+i]
 
     visphi = visphi + 360.*(visphi < -180.) - 360.*(visphi > 180.)
     closure = closure + 360.*(closure < -180.) - 360.*(closure > 180.)
-    for i in range(6):
-        visamp[i, :] *= theta[th_rest+7+i]
+    
     return visamp, visphi, closure
 
 
 class GravMFit(GravData, GravPhaseMaps):
-    def __init__(self, data, loglevel='INFO', ignore_tel=[]):
+    def __init__(self, data, loglevel='INFO', ignore_tel=[], simu=False):
         """
         GravMFit: Class to fit a multiple point source model to GRAVITY data
 
@@ -1032,12 +1045,11 @@ class GravMFit(GravData, GravPhaseMaps):
         plot_fit : plot the data and the fitted model
         """
         super().__init__(data, loglevel=loglevel)
-        self.get_int_data(ignore_tel=ignore_tel)
+        self.get_int_data(ignore_tel=ignore_tel, simu=simu)
         log_level = log_level_mapping.get(loglevel, logging.INFO)
         logger = logging.getLogger(__name__)
         logger.setLevel(log_level)
         ch = logging.StreamHandler()
-        # ch.setLevel(logging.DEBUG) # not sure if needed
         formatter = logging.Formatter('%(levelname)s: %(name)s - %(message)s')
         ch.setFormatter(formatter)
         if not logger.hasHandlers():
@@ -1051,7 +1063,7 @@ class GravMFit(GravData, GravPhaseMaps):
         """
         return 10**((mag1-mag2)/2.5)
 
-    def prep_fit(self, fit=False, plot=True, fiberrad=70, offs=None, *args, **kwargs):
+    def prep_fit(self, fit=False, plot=True, offs=None, fiberrad=70, *args, **kwargs):
         """
         Prepare the fit by finding stars in the pointing and
         returning the RA, Dec, fr and initial values for the fit
@@ -1250,6 +1262,7 @@ class GravMFit(GravData, GravPhaseMaps):
         flagtill:         Flag blue channels, default 3 for LOW, 30 for MED
         flagfrom:         Flag red channels, default 13 for LOW, 200 for MED
         coh_loss:         If True, fit for a coherence loss per Basline [False]
+        phase_self_cal:   If True, fit for a phase self calibration [False] 
         no_fit  :         Only gives fitting results for parameters from
                           initial guess [False]
         onlypol:          Only fits one polarization for split mode, 
@@ -1266,6 +1279,8 @@ class GravMFit(GravData, GravPhaseMaps):
         vis_flag:         Does flag vis > 1 if True [True]
         fixed_BG_alpha:   Fix background power law index [True]
         fixed_star_alpha: Fix star power law index [True]
+        only_stars:       All sources have the same spectral index [False]
+        pc_size:          Size of the fitting area for the central source [5]
         '''
         fit_mode = kwargs.get('fit_mode', 'numeric')
         minimizer = kwargs.get('minimizer', 'emcee')
@@ -1275,6 +1290,7 @@ class GravMFit(GravData, GravPhaseMaps):
         flagtill = kwargs.get('flagtill', None)
         flagfrom = kwargs.get('flagfrom', None)
         coh_loss = kwargs.get('coh_loss', False)
+        phase_self_cal = kwargs.get('phase_self_cal', False)
         no_fit = kwargs.get('no_fit', False)
         onlypol = kwargs.get('onlypol', None)
         plot_corner = kwargs.get('plot_corner', None)
@@ -1284,10 +1300,17 @@ class GravMFit(GravData, GravPhaseMaps):
         vis_flag = kwargs.get('vis_flag', True)
         fixed_BG_alpha = kwargs.get('fixed_BG_alpha', True)
         fixed_star_alpha = kwargs.get('fixed_star_alpha', True)
+        only_stars = kwargs.get('only_stars', False)
+        pc_size = kwargs.get('pc_size', 5)
         fit_phasemaps = kwargs.get('fit_phasemaps', False)
         interppm = kwargs.get('interppm', True)
         self.datayear = kwargs.get('pmdatayear', 2019)
         self.smoothkernel = kwargs.get('smoothkernel', 15)
+
+        self.only_stars = only_stars
+        if only_stars:
+            fixed_BH_alpha =True
+            self.logger.warning('All sources have the same spectral index, to fit it fixed_star_alpha should be False')
 
         if flagtill is None and flagfrom is None:
             if self.resolution == 'LOW':
@@ -1370,15 +1393,14 @@ class GravMFit(GravData, GravPhaseMaps):
 
         # Get data from file
         tel = fits.open(self.name)[0].header["TELESCOP"]
-        if tel == 'ESO-VLTI-U1234':
+        if tel in ['ESO-VLTI-U1234', 'U1234']:
             self.tel = 'UT'
-        elif tel == 'ESO-VLTI-A1234':
+        elif tel in ['ESO-VLTI-A1234', 'A1234']:
             self.tel = 'AT'
         else:
             raise ValueError('Telescope not AT or UT, something wrong'
                              'with input data')
 
-        # MJD = fits.open(self.name)[0].header["MJD-OBS"]
         u = self.u
         v = self.v
         wave = self.wlSC
@@ -1408,13 +1430,13 @@ class GravMFit(GravData, GravPhaseMaps):
             flux_ratio_bh = 1
             coh_loss_in = 1
         if singlesource:
-            theta = np.zeros(13)
-            lower = np.zeros(13)
-            upper = np.zeros(13)
+            theta = np.zeros(17)
+            lower = np.zeros(17)
+            upper = np.zeros(17)
         else:
-            theta = np.zeros(nsource*3+12)
-            lower = np.zeros(nsource*3+12)
-            upper = np.zeros(nsource*3+12)
+            theta = np.zeros(nsource*3+16)
+            lower = np.zeros(nsource*3+16)
+            upper = np.zeros(nsource*3+16)
 
         theta_names = []
         todel = []
@@ -1468,7 +1490,6 @@ class GravMFit(GravData, GravPhaseMaps):
         theta[th_rest+5] = alpha_BG_in
         theta[th_rest+6] = alpha_star_in
 
-        pc_size = 5
         lower[th_rest] = -10
         lower[th_rest+1] = -2
         lower[th_rest+2] = pc_RA_in - pc_size
@@ -1493,9 +1514,9 @@ class GravMFit(GravData, GravPhaseMaps):
         theta_names.append('alpha_BG')
         theta_names.append('alpha_stars')
 
-        theta[th_rest+7:] = coh_loss_in
-        upper[th_rest+7:] = 1.5
-        lower[th_rest+7:] = 0.1
+        theta[th_rest+7:th_rest+13] = coh_loss_in
+        upper[th_rest+7:th_rest+13] = 1.5
+        lower[th_rest+7:th_rest+13] = 0.1
 
         theta_names.append('CL1')
         theta_names.append('CL2')
@@ -1503,6 +1524,16 @@ class GravMFit(GravData, GravPhaseMaps):
         theta_names.append('CL4')
         theta_names.append('CL5')
         theta_names.append('CL6')
+
+        theta[th_rest+13:th_rest+17] = 0
+        upper[th_rest+13:th_rest+17] = 30
+        lower[th_rest+13:th_rest+17] = -30
+
+        theta_names.append('SelfCal1')
+        theta_names.append('SelfCal2')
+        theta_names.append('SelfCal3')
+        theta_names.append('SelfCal4')
+
 
         self.theta_names = theta_names
 
@@ -1524,12 +1555,26 @@ class GravMFit(GravData, GravPhaseMaps):
             todel.extend(np.arange(th_rest+7, th_rest+7+6))
         elif type(coh_loss) == list:
             if len(coh_loss) != 6:
+                self.logger.error('If coherence loss is a list needs to have '
+                                 '6 boolean values')
                 raise ValueError('If coherence loss is a list needs to have '
                                  '6 boolean values')
             no_coh_loss = [not e for e in coh_loss]
             todel.extend(np.arange(th_rest+7, th_rest+7+6)[no_coh_loss])
         elif not fixedBG:
             todel.append(th_rest+1)
+        if not phase_self_cal:
+            todel.extend(np.arange(th_rest+13, th_rest+13+4))
+        elif type(phase_self_cal) == list:
+            if len(phase_self_cal) != 4:
+                self.logger.error('If phase self calibration is a list needs to have '
+                                 '4 boolean values')
+                raise ValueError('If phase self calibration is a list needs to have '
+                                 '4 boolean values')
+            no_phase_self_cal = [not e for e in phase_self_cal]
+            todel.extend(np.arange(th_rest+13, th_rest+13+4)[no_phase_self_cal])
+        else:
+            self.logger.warning('Phase self calibration is set to True for all telescopes')
 
         ndof = ndim - len(todel)
         self.theta_in = np.copy(theta)
@@ -1750,7 +1795,7 @@ class GravMFit(GravData, GravPhaseMaps):
                                    self.ddec, phasemaps.amp_map_int,
                                    phasemaps.pha_map_int, 
                                    phasemaps.amp_map_denom_int,
-                                   fit_phasemaps, None, None, None, None]
+                                   fit_phasemaps, None, None, None, None, only_stars]
                     else:
                         fithelp = [self.nsource, self.fit_for, self.bispec_ind,
                                    self.fit_mode, self.wave, self.dlambda,
@@ -1758,13 +1803,13 @@ class GravMFit(GravData, GravPhaseMaps):
                                    self.phasemaps, self.northangle, self.dra,
                                    self.ddec, None, None, None,
                                    fit_phasemaps, self.pm_sources, 
-                                   self.pm_amp_c, self.pm_pha_c, self.pm_int_c]
+                                   self.pm_amp_c, self.pm_pha_c, self.pm_int_c, only_stars]
                 else:
                     fithelp = [self.nsource, self.fit_for, self.bispec_ind,
                                self.fit_mode, self.wave, self.dlambda,
                                todel, fixed,
                                self.phasemaps, None, None, None, None, None,
-                               None, None, None, None, None, None]
+                               None, None, None, None, None, None, only_stars]
 
                 if not no_fit:
                     level = self.logger.level
