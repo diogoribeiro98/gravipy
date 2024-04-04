@@ -1039,36 +1039,44 @@ class GravData():
     def rotmat(self, x):
         return np.array([[np.cos(x), np.sin(x)], [-np.sin(x), np.cos(x)]])
 
-    def acq_cam_separation(self, guess=[0,0], only_show=False, plotfit=True):
+    def acq_cam_separation(self, guess=[0,0], from_fit=True,
+                           only_show=False, plot_fit=True):
         """
         Get the separation from the acq cam image
         """
         acq = fits.open(self.name)['IMAGING_DATA_ACQ'].data[0][:250]
-        # guess = [-34, -34] # guess of separation in pixel. if zero takes fiber separation
-        # guess = [0, 0]
-
         h = fits.open(self.name)[0].header
 
-        ftx = [int(round(h[f'ESO QC ACQ FIELD{i} FT_X'])) for i in range(1,5)]
-        fty = [int(round(h[f'ESO QC ACQ FIELD{i} FT_Y'])) for i in range(1,5)]
+        if from_fit:
+            ft_string_pre = 'ESO QC ACQ FIELD'
+            sc_string_pre = 'ESO QC ACQ FIELD'
+            ft_string_pos = ' FT_'
+            sc_string_pos = ' SC_'
+        else:
+            ft_string_pre = 'ESO ACQ FIBER FT'
+            sc_string_pre = 'ESO ACQ FIBER SC'
+            ft_string_pos = ''
+            sc_string_pos = ''
+        ftx = [int(round(h[f'{ft_string_pre}{i}{ft_string_pos}X'])) for i in range(1,5)]
+        fty = [int(round(h[f'{ft_string_pre}{i}{ft_string_pos}Y'])) for i in range(1,5)]
         if guess == [0,0]:
-            scx = [int(round(h[f'ESO QC ACQ FIELD{i} SC_X'])) for i in range(1,5)]
-            scy = [int(round(h[f'ESO QC ACQ FIELD{i} SC_Y'])) for i in range(1,5)]
+            scx = [int(round(h[f'{sc_string_pre}{i}{sc_string_pos}X'])) for i in range(1,5)]
+            scy = [int(round(h[f'{sc_string_pre}{i}{sc_string_pos}Y'])) for i in range(1,5)]
         else:
             scx = [i+guess[0] for i in ftx]
             scy = [i+guess[1] for i in fty]
 
         if np.any(np.array(ftx) > 1000):
-            ftx = [int(round(h[f'ESO QC ACQ FIELD{i} FT_X']
+            ftx = [int(round(h[f'{ft_string_pre}{i}{ft_string_pos}X']
                             - h[f'HIERARCH ESO DET1 FRAM{(i-1)+1} STRX']
                             + (i-1)*250)) for i in range(1,5)]
-            fty = [int(round(h[f'ESO QC ACQ FIELD{i} FT_Y']
+            fty = [int(round(h[f'{ft_string_pre}{i}{ft_string_pos}Y']
                             - h[f'HIERARCH ESO DET1 FRAM{(i-1)+1} STRY'])) for i in range(1,5)]
             if guess == [0,0]:
-                scx = [int(round(h[f'ESO QC ACQ FIELD{i} SC_X']
+                scx = [int(round(h[f'{sc_string_pre}{i}{sc_string_pos}X']
                                 - h[f'HIERARCH ESO DET1 FRAM{(i-1)+1} STRX']
                                 + (i-1)*250)) for i in range(1,5)]
-                scy = [int(round(h[f'ESO QC ACQ FIELD{i} SC_Y']
+                scy = [int(round(h[f'{sc_string_pre}{i}{sc_string_pos}Y']
                                 - h[f'HIERARCH ESO DET1 FRAM{(i-1)+1} STRY'])) for i in range(1,5)]
             else:
                 scx = [i+guess[0] for i in ftx]
@@ -1110,7 +1118,7 @@ class GravData():
                 popt, pcov = optimize.curve_fit(self.twoD_Gaussian, (x, y), nacq.flatten(), p0=initial_guess)
                 data_fitted = self.twoD_Gaussian((x, y), *popt)
 
-                if plotfit:
+                if plot_fit:
                     fig, ax = plt.subplots(1, 1)
                     plt.imshow(nacq, vmin=0,vmax=np.percentile(nacq, 99), origin='lower')
                     ax.contour(x, y, data_fitted.reshape(2*fcut+1, 2*fcut+1), 4, colors='w')
@@ -1123,7 +1131,7 @@ class GravData():
                 popt, pcov = optimize.curve_fit(self.twoD_Gaussian, (x, y), nacq.flatten(), p0=initial_guess)
                 data_fitted = self.twoD_Gaussian((x, y), *popt)
                 
-                if plotfit:
+                if plot_fit:
                     fig, ax = plt.subplots(1, 1)
                     plt.imshow(nacq, vmin=0,vmax=np.percentile(nacq, 99), origin='lower')
                     ax.contour(x, y, data_fitted.reshape(2*fcut+1, 2*fcut+1), 4, colors='w')
