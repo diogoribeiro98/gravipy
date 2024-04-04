@@ -4,6 +4,7 @@ from matplotlib import gridspec
 import numpy as np
 import logging
 from scipy import interpolate
+from scipy import optimize
 from pkg_resources import resource_filename
 from astropy.time import Time
 from datetime import datetime, timedelta
@@ -1022,6 +1023,128 @@ class GravData():
             plt.xlabel('spatial frequency (1/arcsec)')
             plt.ylabel('visibility phase')
             plt.show()
+
+    def twoD_Gaussian(self, xy, amplitude, xo, yo, sigma_x,
+                      sigma_y, theta, offset):
+        x, y = xy
+        xo = float(xo)
+        yo = float(yo)    
+        a = (np.cos(theta)**2)/(2*sigma_x**2) + (np.sin(theta)**2)/(2*sigma_y**2)
+        b = -(np.sin(2*theta))/(4*sigma_x**2) + (np.sin(2*theta))/(4*sigma_y**2)
+        c = (np.sin(theta)**2)/(2*sigma_x**2) + (np.cos(theta)**2)/(2*sigma_y**2)
+        g = offset + amplitude*np.exp( - (a*((x-xo)**2) + 2*b*(x-xo)*(y-yo) 
+                                + c*((y-yo)**2)))
+        return g.ravel()
+
+    def rotmat(self, x):
+        return np.array([[np.cos(x), np.sin(x)], [-np.sin(x), np.cos(x)]])
+
+    def acq_cam_separation(self, guess=[0,0], only_show=False, plotfit=True):
+        """
+        Get the separation from the acq cam image
+        """
+        acq = fits.open(self.name)['IMAGING_DATA_ACQ'].data[0][:250]
+        # guess = [-34, -34] # guess of separation in pixel. if zero takes fiber separation
+        # guess = [0, 0]
+
+        h = fits.open(self.name)[0].header
+
+        ftx = [int(round(h[f'ESO QC ACQ FIELD{i} FT_X'])) for i in range(1,5)]
+        fty = [int(round(h[f'ESO QC ACQ FIELD{i} FT_Y'])) for i in range(1,5)]
+        if guess == [0,0]:
+            scx = [int(round(h[f'ESO QC ACQ FIELD{i} SC_X'])) for i in range(1,5)]
+            scy = [int(round(h[f'ESO QC ACQ FIELD{i} SC_Y'])) for i in range(1,5)]
+        else:
+            scx = [i+guess[0] for i in ftx]
+            scy = [i+guess[1] for i in fty]
+
+        if np.any(np.array(ftx) > 1000):
+            ftx = [int(round(h[f'ESO QC ACQ FIELD{i} FT_X']
+                            - h[f'HIERARCH ESO DET1 FRAM{(i-1)+1} STRX']
+                            + (i-1)*250)) for i in range(1,5)]
+            fty = [int(round(h[f'ESO QC ACQ FIELD{i} FT_Y']
+                            - h[f'HIERARCH ESO DET1 FRAM{(i-1)+1} STRY'])) for i in range(1,5)]
+            if guess == [0,0]:
+                scx = [int(round(h[f'ESO QC ACQ FIELD{i} SC_X']
+                                - h[f'HIERARCH ESO DET1 FRAM{(i-1)+1} STRX']
+                                + (i-1)*250)) for i in range(1,5)]
+                scy = [int(round(h[f'ESO QC ACQ FIELD{i} SC_Y']
+                                - h[f'HIERARCH ESO DET1 FRAM{(i-1)+1} STRY'])) for i in range(1,5)]
+            else:
+                scx = [i+guess[0] for i in ftx]
+                scy = [i+guess[1] for i in fty]
+
+
+        plt.figure(figsize=(5,7), dpi=300)
+        ax = plt.subplot()
+        plt.imshow(acq, vmin=0, vmax=np.percentile(acq, 99), origin='lower')
+        plt.scatter(ftx, fty, c='r', s=2)
+        plt.scatter(scx, scy, c='r', s=2)
+        ax.set_xticklabels([])
+        ax.set_yticklabels([])
+        plt.show()
+
+        if only_show:
+            plt.figure(figsize=(4,4), dpi=300)
+            ax = plt.subplot()
+            plt.imshow(acq[:250,:250], 
+                       vmin=np.percentile(acq, 10),
+                       vmax=np.percentile(acq, 95), origin='lower')
+            plt.scatter(ftx[0], fty[0], c='r', s=10, marker='x')
+            plt.scatter(scx[0], scy[0], c='r', s=10, marker='x')
+            ax.set_xticklabels([])
+            ax.set_yticklabels([])
+            plt.show()
+        else:
+            fcut = 20
+
+            x = np.linspace(0, 2*fcut, 2*fcut+1)
+            y = np.linspace(0, 2*fcut, 2*fcut+1)
+            x, y = np.meshgrid(x, y)
+
+            fit_ft = np.zeros((4,2))
+            fit_sc = np.zeros((4,2))
+            for tel in range(4):
+                nacq = acq[fty[tel]-fcut:fty[tel]+fcut+1,ftx[tel]-fcut:ftx[tel]+fcut+1]
+                initial_guess = (np.max(nacq), fcut, fcut, 5, 5, 0, 100)
+                popt, pcov = optimize.curve_fit(self.twoD_Gaussian, (x, y), nacq.flatten(), p0=initial_guess)
+                data_fitted = self.twoD_Gaussian((x, y), *popt)
+
+                if plotfit:
+                    fig, ax = plt.subplots(1, 1)
+                    plt.imshow(nacq, vmin=0,vmax=np.percentile(nacq, 99), origin='lower')
+                    ax.contour(x, y, data_fitted.reshape(2*fcut+1, 2*fcut+1), 4, colors='w')
+                    plt.show()
+
+                fit_ft[tel] = np.array(popt[1:3]) - fcut  + np.array([ftx[tel], fty[tel]])
+
+                nacq = acq[scy[tel]-fcut:scy[tel]+fcut+1,scx[tel]-fcut:scx[tel]+fcut+1]
+                initial_guess = (np.max(nacq), fcut, fcut, 5, 5, 0, 100)
+                popt, pcov = optimize.curve_fit(self.twoD_Gaussian, (x, y), nacq.flatten(), p0=initial_guess)
+                data_fitted = self.twoD_Gaussian((x, y), *popt)
+                
+                if plotfit:
+                    fig, ax = plt.subplots(1, 1)
+                    plt.imshow(nacq, vmin=0,vmax=np.percentile(nacq, 99), origin='lower')
+                    ax.contour(x, y, data_fitted.reshape(2*fcut+1, 2*fcut+1), 4, colors='w')
+                    plt.show()
+                fit_sc[tel] = np.array(popt[1:3]) - fcut  + np.array([scx[tel], scy[tel]])
+                
+            scal = 18
+            if h['TELESCOP'] == 'ESO-VLTI-A1234': scal *= 4.44
+
+            vec = (fit_sc - fit_ft) * scal
+            res = np.zeros((4,2))
+            for tel in range(4):
+                a = h[f'ESO QC ACQ FIELD{tel+1} NORTH_ANGLE']
+                R = self.rotmat(-a/180*np.pi)
+                res[tel] = np.dot(R, vec[tel])
+            mres = res.mean(0)
+            self.logger.info(f'Separation: [{mres[0]:.0f}, {mres[1]:.0f}]')
+
+
+
+    
 
 
 
