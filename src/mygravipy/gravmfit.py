@@ -819,9 +819,10 @@ def _leastsq_mstars(params, theta1, theta2, fitdata, fitarg, fithelp):
 
 def _lnlike_mstars(theta, fitdata, fitarg, fithelp, loglike=False):
     (nsource, fit_for, bispec_ind, fit_mode, wave, dlambda,
-     todel, fixed, phasemaps, northA, dra, ddec, amp_map_int,
-     pha_map_int, amp_map_denom_int, fit_phasemaps, fix_pm_sources,
-     fix_pm_amp_c, fix_pm_pha_c, fix_pm_int_c, only_stars) = fithelp
+     todel, fixed, phasemaps, northA, dra, ddec,
+     amp_map_int, pha_map_int, amp_map_denom_int,
+     fit_phasemaps, fix_pm_sources,
+     only_stars) = fithelp
 
     for ddx in range(len(todel)):
         theta = np.insert(theta, todel[ddx], fixed[ddx])
@@ -866,10 +867,11 @@ def _calc_vis_mstars(theta, fitarg, fithelp):
     """
     mas2rad = 1e-3 / 3600 / 180 * np.pi
 
-    (nsource, fit_for, bispec_ind, fit_mode, wave, dlambda,
-     todel, fixed, phasemaps, northA, dra, ddec, amp_map_int,
-     pha_map_int, amp_map_denom_int, fit_phasemaps, fix_pm_sources,
-     fix_pm_amp_c, fix_pm_pha_c, fix_pm_int_c, only_stars) = fithelp
+    (nsource, _, bispec_ind, fit_mode, wave, dlambda,
+     _, _, phasemaps, northA, dra, ddec,
+     amp_map_int, pha_map_int, amp_map_denom_int,
+     fit_phasemaps, fix_pm_sources,
+     only_stars) = fithelp
 
     u = fitarg[0]
     v = fitarg[1]
@@ -919,8 +921,7 @@ def _calc_vis_mstars(theta, fitarg, fithelp):
                     pm_sources.append([pm_amp, pm_pha, pm_int])
         else:
             pm_sources = fix_pm_sources
-            pm_amp_c, pm_pha_c, pm_int_c = (fix_pm_amp_c, fix_pm_pha_c,
-                                            fix_pm_int_c)
+            pm_amp_c, pm_pha_c, pm_int_c = pm_sources[0]
 
     vis = np.zeros((6, len(wave))) + 0j
     for i in range(0, 6):
@@ -939,7 +940,7 @@ def _calc_vis_mstars(theta, fitarg, fithelp):
                        + (theta[ndx*3] + pc_DEC)*v[i]) * mas2rad * 1e6
 
             if phasemaps:
-                _, pm_pha, _ = pm_sources[ndx]
+                _, pm_pha, _ = pm_sources[ndx+1]
                 s_s -= ((pm_pha[i, 0] - pm_pha[i, 1])/360*wave)
             s_stars.append(s_s)
 
@@ -956,8 +957,6 @@ def _calc_vis_mstars(theta, fitarg, fithelp):
         int_star_center = _ind_visibility(0, alpha_stars, wave,
                                           dlambda[i, :], fit_mode)
         if phasemaps:
-            pm_amp_norm, _, pm_int_norm = pm_sources[0]
-
             cr1 = (pm_amp_c[i, 0])
             cr2 = (pm_amp_c[i, 1])
             cr_denom1 = (pm_int_c[i, 0])
@@ -971,7 +970,7 @@ def _calc_vis_mstars(theta, fitarg, fithelp):
                 int_star = _ind_visibility(s_stars[ndx], alpha_stars, wave,
                                            dlambda[i, :], fit_mode)
 
-                pm_amp, _, pm_int = pm_sources[ndx]
+                pm_amp, _, pm_int = pm_sources[ndx+1]
                 cr1 = (pm_amp[i, 0])
                 cr2 = (pm_amp[i, 1])
                 cr_denom1 = (pm_int[i, 0])
@@ -1015,8 +1014,8 @@ def _calc_vis_mstars(theta, fitarg, fithelp):
         closure[idx] = (visphi[bispec_ind[idx,0]]
                         + visphi[bispec_ind[idx,1]]
                         - visphi[bispec_ind[idx,2]])
-        
-    # sel_call
+
+    # self_call
     #TODO: should this be an OPD?
     #TODO: should probably have a gaussian prior on the OPD
     self_cal_arr = np.array([[1, 1, 1, 0, 0, 0],
@@ -1212,9 +1211,9 @@ class GravMFit(GravData, GravPhaseMaps):
                   nthreads=1,
                   nwalkers=301,
                   nruns=301,
-                  fit_for=np.array([0.5, 0.5, 1.0, 0.0]),
+                  fit_for=np.array([1.0, 1.0, 1.0, 1.0]),
                   fixed_BH_alpha=False,
-                  fixedBG=False,
+                  fixed_BG=False,
                   initial=None,
                   plot_science=True,
                   phasemaps=True,
@@ -1245,11 +1244,10 @@ class GravMFit(GravData, GravPhaseMaps):
         nthreads:       number of cores [4]
         nwalkers:       number of walkers [500]
         nruns:          number of MCMC runs [500]
-        fit_for:        weight of VA, V2, T3, VP [[0.5,0.5,1.0,0.0]]
+        fit_for:        weight of VA, V2, T3, VP [[1,1,1,1]]
         initial:        Initial guess for fit [None]
-        fixed_BH_alpha:   Fit for black hole power law [False]
-        plot_science:    plot fit result [True]
-        phasemaps:      Use Phasemaps for fit [True]
+        fixed_BH_alpha: Fit for black hole power law [False]
+        plot_science:   plot fit result [True]
         create_pdf:     Create pdf of fit [False]
 
         Optional unnamed arguments (can be given via kwargs):
@@ -1267,10 +1265,14 @@ class GravMFit(GravData, GravPhaseMaps):
                           initial guess [False]
         onlypol:          Only fits one polarization for split mode, 
                           either 0 or 1 [None]
-        iopandas:         I/O of pandas file. Saves results in dedicated
+        save_result:      I/O of results. Saves results in dedicated
                           Folder and loads them instead of fitting if
                           available. Give prefix to filename [None]
+        save_mcmc:        I/O of MCMC results. Saves results in dedicated
+                          Folder and gives prefix to filename [None]
+        refit:            Refit the data even if save files exist [False]
         plot_corner:      plot MCMC results [False, steps, corner, both]
+        phasemaps:        Use Phasemaps for fit [True]
         fit_phasemaps:    Fit phasemaps at each step, otherwise jsut takes the 
                           initial guess value [False]
         interppm:         Interpolate Phasemaps [True]
@@ -1294,29 +1296,47 @@ class GravMFit(GravData, GravPhaseMaps):
         no_fit = kwargs.get('no_fit', False)
         onlypol = kwargs.get('onlypol', None)
         plot_corner = kwargs.get('plot_corner', None)
-        iopandas = kwargs.get('iopandas', None)
-        savemcmc = kwargs.get('savemcmc', None)
+        save_result = kwargs.get('save_result', None)
+        save_mcmc = kwargs.get('save_mcmc', None)
         refit = kwargs.get('refit', False)
         vis_flag = kwargs.get('vis_flag', True)
         fixed_BG_alpha = kwargs.get('fixed_BG_alpha', True)
         fixed_star_alpha = kwargs.get('fixed_star_alpha', True)
         only_stars = kwargs.get('only_stars', False)
         pc_size = kwargs.get('pc_size', 5)
+        phasemaps = kwargs.get('phasemaps', True)
         fit_phasemaps = kwargs.get('fit_phasemaps', False)
         interppm = kwargs.get('interppm', True)
         self.datayear = kwargs.get('pmdatayear', 2019)
         self.smoothkernel = kwargs.get('smoothkernel', 15)
 
-        self.only_stars = only_stars
+        available_keys = ['fit_mode', 'minimizer', 'minmethod', 'bestchi',
+                          'redchi2', 'flagtill', 'flagfrom', 'coh_loss',
+                          'phase_self_cal', 'no_fit', 'onlypol', 'plot_corner',
+                          'save_result', 'save_mcmc', 'refit', 'vis_flag',
+                          'fixed_BG_alpha', 'fixed_star_alpha', 'only_stars',
+                          'pc_size', 'phasemaps', 'fit_phasemaps', 'interppm',
+                          'pmdatayear', 'smoothkernel']
+
+        for kwarg in kwargs:
+            if kwarg not in available_keys:
+                self.logger.warning(f'Argument {kwarg} not available')
+                self.logger.warning(f'Available arguments are: {available_keys}')
+
         if only_stars:
             fixed_BH_alpha =True
-            self.logger.warning('All sources have the same spectral index, to fit it fixed_star_alpha should be False')
+            if fixed_star_alpha:
+                self.logger.warning('All sources have the same spectral index, to fit it fixed_star_alpha should be False')
+            else:
+                self.logger.info('All sources have the same spectral index')
 
         if flagtill is None and flagfrom is None:
             if self.resolution == 'LOW':
+                self.logger.info('No flag values given, using default values for LOW data')
                 flagtill = 2
                 flagfrom = 13
             elif self.resolution == 'MEDIUM':
+                self.logger.info('No flag values given, using default values for MED data')
                 flagtill = 30
                 flagfrom = 200
             else:
@@ -1336,8 +1356,9 @@ class GravMFit(GravData, GravPhaseMaps):
         self.fit_for = fit_for
         self.interppm = interppm
         self.fit_mode = fit_mode
-        self.phasemaps = phasemaps
         self.fit_phasemaps = fit_phasemaps
+        self.phasemaps = phasemaps
+
         if phasemaps:
             self.load_phasemaps(interp=interppm)
 
@@ -1539,7 +1560,7 @@ class GravMFit(GravData, GravPhaseMaps):
         ndim = len(theta)
         if fixed_BH_alpha:
             todel.append(th_rest)
-        if fixedBG:
+        if fixed_BG:
             todel.append(th_rest+1)
         if fit_for[3] == 0:
             todel.append(th_rest+2)
@@ -1560,7 +1581,7 @@ class GravMFit(GravData, GravPhaseMaps):
                                  '6 boolean values')
             no_coh_loss = [not e for e in coh_loss]
             todel.extend(np.arange(th_rest+7, th_rest+7+6)[no_coh_loss])
-        elif not fixedBG:
+        elif not fixed_BG:
             todel.append(th_rest+1)
         if not phase_self_cal:
             todel.extend(np.arange(th_rest+13, th_rest+13+4))
@@ -1583,8 +1604,10 @@ class GravMFit(GravData, GravPhaseMaps):
         if phasemaps:
             if not self.fit_phasemaps:
                 self.pm_sources = []
-                self.pm_amp_c, self.pm_pha_c, self.pm_int_c = self.phasemap_source(pc_RA_in, pc_DEC_in,
-                                                                                   self.northangle, self.dra, self.ddec)
+                pm_amp, pm_pha, pm_int = self.phasemap_source(pc_RA_in, pc_DEC_in,
+                                                              self.northangle,
+                                                              self.dra, self.ddec)
+                self.pm_sources.append([pm_amp, pm_pha, pm_int])
 
                 pm_amp, pm_pha, pm_int = self.phasemap_source(pc_RA_in + theta[0],
                                                               pc_DEC_in + theta[1],
@@ -1595,37 +1618,55 @@ class GravMFit(GravData, GravPhaseMaps):
                                                                   pc_DEC_in + theta[ndx*3],
                                                                   self.northangle, self.dra, self.ddec)
                     self.pm_sources.append([pm_amp, pm_pha, pm_int])
-        if savemcmc is not None:
-            # check if savemcmc is a string
-            if type(savemcmc) != str:
-                raise ValueError('savemcmc needs to be a string')
-            savefolder = savemcmc + '/'
-            iopandas = 'Fit'
-        elif iopandas is not None:
-            savefolder = './fitresults/'
+        
+        savefolder = './fitresults/'
+        if save_mcmc is not None:
+            # check if save_mcmc is a string
+            if type(save_mcmc) != str:
+                self.logger.error('save_mcmc needs to be a string')
+                raise ValueError('save_mcmc needs to be a string')
 
-        if iopandas is not None and not no_fit:
-            isExist = os.path.exists(savefolder)
-            if not isExist:
-                os.makedirs(savefolder)
-            pdname = f'{savefolder}{iopandas}_{self.filename[:-4]}pd'
-            try:
-                fittab = pd.read_pickle(pdname)
-                pdexists = True
-                no_fit = True
-                self.logger.info('Results exist at %s' % pdname)
-            except FileNotFoundError:
-                pdexists = False
-            if refit:
-                pdexists = False
-                no_fit = False
-        elif no_fit:
-            pdexists = False
+        if save_result is not None:
+            # check if save_mcmc is a string
+            if type(save_result) != str:
+                self.logger.error('save_result needs to be a string')
+                raise ValueError('save_result needs to be a string')
 
         if no_fit:
+            save_result_exist = False
             plot_corner = False
             self.logger.info('Will not fit the data, just print out the results for '
-                    'the given initial conditions')
+                             'the given initial conditions')
+        elif refit:
+            save_result_exist = False
+            no_fit = False
+            self.logger.info('Refit the data even if results exist')
+        else:
+            # check if results and mcmc results exist
+            # if result exists do not fit the data
+            # wether mcmc exists does not change fit/no_fit
+            if save_result is not None:
+                if not os.path.exists(savefolder):
+                    self.logger.debug('Create folder %s' % savefolder)
+                    os.makedirs(savefolder)
+                pdname = f'{savefolder}{save_result}_{self.filename[:-4]}pd'
+                try:
+                    fittab = pd.read_pickle(pdname)
+                    save_result_exist = True
+                    no_fit = True
+                    self.logger.info('Results exist at %s' % pdname)
+                except FileNotFoundError:
+                    save_result_exist = False
+                    no_fit = False
+                    self.logger.debug('Results do not exist')
+            else:
+                save_result_exist = False
+                no_fit = False
+
+            if save_mcmc is not None:
+                if not os.path.exists(savefolder):
+                    os.makedirs(savefolder)
+                mcmcname = f'{savefolder}{save_mcmc}_{self.filename[:-5]}mcmc'
 
         for ddx in sorted(todel, reverse=True):
             del theta_names[ddx]
@@ -1785,30 +1826,30 @@ class GravMFit(GravData, GravPhaseMaps):
                            visphi, visphi_error, visphi_flag]
                 fitarg = [u, v]
 
-                if self.phasemaps:
+                if phasemaps:
                     if fit_phasemaps:
                         fithelp = [self.nsource, self.fit_for, self.bispec_ind,
                                    self.fit_mode, self.wave, self.dlambda,
                                    todel, fixed,
-                                   self.phasemaps, self.northangle, self.dra,
+                                   phasemaps, self.northangle, self.dra,
                                    self.ddec, phasemaps.amp_map_int,
                                    phasemaps.pha_map_int, 
                                    phasemaps.amp_map_denom_int,
-                                   fit_phasemaps, None, None, None, None, only_stars]
+                                   fit_phasemaps, None, only_stars]
                     else:
                         fithelp = [self.nsource, self.fit_for, self.bispec_ind,
                                    self.fit_mode, self.wave, self.dlambda,
                                    todel, fixed,
-                                   self.phasemaps, self.northangle, self.dra,
+                                   phasemaps, self.northangle, self.dra,
                                    self.ddec, None, None, None,
-                                   fit_phasemaps, self.pm_sources, 
-                                   self.pm_amp_c, self.pm_pha_c, self.pm_int_c, only_stars]
+                                   fit_phasemaps, self.pm_sources,
+                                   only_stars]
                 else:
                     fithelp = [self.nsource, self.fit_for, self.bispec_ind,
                                self.fit_mode, self.wave, self.dlambda,
                                todel, fixed,
-                               self.phasemaps, None, None, None, None, None,
-                               None, None, None, None, None, None, only_stars]
+                               phasemaps, None, None, None, None, None,
+                               None, None, None, only_stars]
 
                 if not no_fit:
                     level = self.logger.level
@@ -1853,8 +1894,8 @@ class GravMFit(GravData, GravPhaseMaps):
                                 self.logger.info(f'Mean acceptance fraction: {ac_fraction:.2}')
 
                             samples = sampler.chain
-                            if savemcmc is not None:
-                                mcname = f'{pdname[:-3]}_mcmc_P{idx+1}'
+                            if save_mcmc is not None:
+                                mcname = f'{mcmcname}_P{idx+1}'
                                 np.save(mcname, samples)
                                 np.savetxt(f'{mcname}.txt', theta_names, fmt='%s')
 
@@ -2016,7 +2057,7 @@ class GravMFit(GravData, GravPhaseMaps):
                             fulltheta = np.insert(fulltheta, todel[ddx], fixed[ddx])
 
                 else:
-                    if iopandas is not None and pdexists:
+                    if save_result is not None and save_result_exist:
                         fulltheta = fittab.loc[fittab['column'].str.contains('M.L. P%i_%i' % (idx, dit))].values[0, 1:]
                         theta_result = np.copy(fulltheta)
                         theta_result = np.delete(theta_result, todel)
@@ -2026,6 +2067,39 @@ class GravMFit(GravData, GravPhaseMaps):
                         for ddx in range(len(todel)):
                             fulltheta = np.insert(fulltheta, todel[ddx],
                                                   fixed[ddx])
+                        
+                    if plot_corner in ['corner', 'steps', 'both'] and save_mcmc is not None:
+                        mcname = f'{mcmcname}_P{idx+1}'
+                        try:
+                            samples = np.load(f'{mcname}.npy')
+                            theta_names = np.loadtxt(f'{mcname}.txt', dtype=str)
+
+                            cldim = len(theta_names)
+                            if plot_corner in ['steps', 'both']:
+                                fig, axes = plt.subplots(cldim, figsize=(8, cldim/1.5),
+                                                        sharex=True)
+                                for i in range(cldim):
+                                    ax = axes[i]
+                                    ax.plot(samples[:, :, i].T, "k", alpha=0.3)
+                                    ax.set_ylabel(theta_names[i])
+                                    ax.yaxis.set_label_coords(-0.1, 0.5)
+                                axes[-1].set_xlabel("step number")
+                                plt.show()
+
+                            if nruns > 300:
+                                fl_samples = samples[:, -200:, :].reshape((-1, ndim))
+                            elif nruns > 200:
+                                fl_samples = samples[:, -100:, :].reshape((-1, ndim))
+                            else:
+                                fl_samples = samples.reshape((-1, ndim))
+
+                            if plot_corner in ['corner', 'both']:
+                                fig = corner.corner(fl_samples,
+                                                    quantiles=[0.16, 0.5, 0.84],
+                                                    labels=theta_names)
+                                plt.show()
+                        except FileNotFoundError:
+                            self.logger.warning('MCMC results shouldbe saved, but do not exist')
 
                 self.theta_result = theta_result
                 (fit_visamp, fit_visphi,
@@ -2110,9 +2184,9 @@ class GravMFit(GravData, GravPhaseMaps):
             if plot_science:
                 self.plot_fit(plotdata)
             self.plotdata = plotdata
-        if not no_fit or pdexists:
+        if not no_fit or save_result_exist:
             self.fittab = fittab
-        if iopandas is not None and not pdexists:
+        if save_result is not None and not save_result_exist:
             fittab.to_pickle(pdname)
         if create_pdf:
             self.create_pdf()
@@ -2174,9 +2248,10 @@ class GravMFit(GravData, GravPhaseMaps):
             theta, fitdata, fitarg, fithelp = plotdata[idx]
 
             (nsource, fit_for, bispec_ind, fit_mode, wave, dlambda,
-             todel, fixed, phasemaps, northA, dra, ddec, amp_map_int,
-             pha_map_int, amp_map_denom_int, fit_phasemaps, fix_pm_sources,
-             fix_pm_amp_c, fix_pm_pha_c, fix_pm_int_c, only_stars) = fithelp
+             todel, fixed, phasemaps, northA, dra, ddec,
+             amp_map_int, pha_map_int, amp_map_denom_int,
+             fit_phasemaps, fix_pm_sources,
+             only_stars) = fithelp
 
             for ddx in range(len(todel)):
                 theta = np.insert(theta, todel[ddx], fixed[ddx])
@@ -2590,11 +2665,11 @@ class GravMFit(GravData, GravPhaseMaps):
         self.logger.info(f'PDF saved as: {pdfn}/{fname}.pdf')
 
 
-def _lnprob_night(theta, fitdata, lower, upper, theta_names, fitarg, fithelp):
+def _lnprob_night(theta, fitdata, lower, upper, theta_names, fitarg, fithelp_night):
     lp = _lnprior_night(theta, lower, upper, theta_names)
     if not np.isfinite(lp):
         return -np.inf
-    return lp + _lnlike_night(theta, fitdata, fitarg, fithelp)
+    return lp + _lnlike_night(theta, fitdata, fitarg, fithelp_night)
 
 
 def _lnprior_night(theta, lower, upper, theta_names):
@@ -2625,10 +2700,14 @@ def _prior_transform(u, gprior, mean, width):
     return v
 
 
-def _lnlike_night(theta, fitdata, fitarg, fithelp):
-    (len_lightcurve, nsource, fit_for, bispec_ind, fit_mode,
-     wave, dlambda, fixedBHalpha, oneBHalpha, oneBG, todel, fixed,
-     phasemaps, pm_sources) = fithelp
+def _lnlike_night(theta, fitdata, fitarg, fithelp_night):
+    (len_lightcurve, nsource, fit_for,
+     bispec_ind, fit_mode,
+     wave, dlambda,
+     one_BH_alpha, one_BG, one_pc, one_fr,
+     todel, fixed,
+     phasemaps, pm_sources_night,
+     only_stars) = fithelp_night
     (visamp, visamp_error, visamp_flag,
      vis2, vis2_error, vis2_flag,
      closure, closure_error, closure_flag,
@@ -2638,8 +2717,10 @@ def _lnlike_night(theta, fitdata, fitarg, fithelp):
         theta = np.insert(theta, todel[ddx], fixed[ddx])
     
     ln_prob_res = 0
+    th_rest = nsource*3-1
+    theta_stars = nsource*3+1
     for ndx in range(len_lightcurve):
-        _theta = np.zeros(nsource*3+10)
+        _theta = np.zeros(nsource*3+16)
         for sdx in range(nsource):
             if sdx == 0:
                 _theta[:2] = theta[:2]
@@ -2647,37 +2728,52 @@ def _lnlike_night(theta, fitdata, fitarg, fithelp):
                 _theta[sdx*3-1] = theta[sdx*2]
                 _theta[sdx*3] = theta[sdx*2+1]
                 _theta[sdx*3+1] = theta[nsource*2+sdx-1]
-
-            th_rest = nsource*3-1
-            if oneBHalpha:
-                _theta[th_rest] = theta[nsource*3-1]
-            else:
-                _theta[th_rest] = theta[nsource*3-1 + ndx*11]
-            if oneBG:
-                _theta[th_rest+1] = theta[nsource*3-1 + ndx*11 + 1]
-            else:
-                _theta[th_rest+1] = theta[nsource*3-1 + ndx*11 + 1]
-            _theta[th_rest+2] = theta[nsource*3-1 + ndx*11 + 2]
-            _theta[th_rest+3] = theta[nsource*3-1 + ndx*11 + 3]
-            _theta[th_rest+4] = theta[nsource*3-1 + ndx*11 + 4]
-            _theta[th_rest+5:] = theta[nsource*3-1 + ndx*11+5
-                                       :nsource*3-1 + ndx*11+11]
+            
+        # alphaBH
+        if one_BH_alpha:
+            _theta[th_rest] = theta[theta_stars]
+        else:
+            _theta[th_rest] = theta[theta_stars + ndx*11]
+        # f_BG
+        if one_BG:
+            _theta[th_rest+1] = theta[theta_stars + 1]
+        else:
+            _theta[th_rest+1] = theta[theta_stars + ndx*11 + 1]
+        # pc
+        if one_pc:
+            _theta[th_rest+2] = theta[theta_stars + 2]
+            _theta[th_rest+3] = theta[theta_stars + 3]
+        else:
+            _theta[th_rest+2] = theta[theta_stars + ndx*11 + 2]
+            _theta[th_rest+3] = theta[theta_stars + ndx*11 + 3]
+        # fr_BH
+        if one_fr:
+            _theta[th_rest+4] = theta[theta_stars + 4]
+        else:
+            _theta[th_rest+4] = theta[theta_stars + ndx*11 + 4]
+        # alpha BG
+        _theta[th_rest+5] = theta[nsource*3]
+        # alpha star
+        _theta[th_rest+6] = theta[nsource*3-1]
+        # coh loss
+        _theta[th_rest+7:th_rest+13] = theta[theta_stars + ndx*11+5
+                                             :theta_stars + ndx*11+11]
 
         if phasemaps:
-            _pm_sources = pm_sources[ndx]
-            pm_amp_c, pm_pha_c, pm_int_c = _pm_sources[0]
-            _pm_sources = _pm_sources[1:]
-            _fithelp = [nsource, fit_for, bispec_ind, fit_mode,
-                        wave, dlambda, fixedBHalpha, None, None, phasemaps,
-                        None, None, None, None, None, None, False,
-                        _pm_sources, pm_amp_c, pm_pha_c, pm_int_c]
+            pm_sources = pm_sources_night[ndx]
+            fithelp = [nsource, fit_for, bispec_ind, fit_mode, wave, dlambda,
+                       None, None, phasemaps, None, None, None,
+                       None, None, None,
+                       False, pm_sources,
+                       only_stars]
         else:
-            _fithelp = [nsource, fit_for, bispec_ind, fit_mode,
-                        wave, dlambda, fixedBHalpha, None, None, phasemaps,
-                        None, None, None, None, None, None, False,
-                        None, None, None, None]
+            fithelp = [nsource, fit_for, bispec_ind, fit_mode, wave, dlambda,
+                       None, None, phasemaps, None, None, None,
+                       None, None, None,
+                       False, None,
+                       only_stars]
         (model_visamp, model_visphi,
-         model_closure) = _calc_vis_mstars(_theta, fitarg[:, ndx], _fithelp)
+         model_closure) = _calc_vis_mstars(_theta, fitarg[:, ndx], fithelp)
         model_vis2 = model_visamp**2.
 
         #Data
@@ -2710,8 +2806,8 @@ def _lnlike_night(theta, fitdata, fitarg, fithelp):
 
 
 
-class GravMNightFit(GravNight):
-    def __init__(self, file_list, verbose=False, debug=False):
+class GravMNightFit(GravNight, GravPhaseMaps):
+    def __init__(self, file_list, loglevel='INFO'):
         """
         GravMNightFit: Class to fit a multiple point source model
                        to several GRAVITY datasets at once
@@ -2721,8 +2817,17 @@ class GravMNightFit(GravNight):
         fit_stars : the function to do the fit
         plot_fit : plot the data and the fitted model
         """
-        super().__init__(file_list, verbose=verbose)
-        self.debug = debug
+        super().__init__(file_list, loglevel=loglevel)
+        log_level = log_level_mapping.get(loglevel, logging.INFO)
+        logger = logging.getLogger(__name__)
+        logger.setLevel(log_level)
+        ch = logging.StreamHandler()
+        formatter = logging.Formatter('%(levelname)s: %(name)s - %(message)s')
+        ch.setFormatter(formatter)
+        if not logger.hasHandlers():
+            logger.addHandler(ch)
+        self.logger = logger
+        self.loglevel = loglevel
 
     def fit_stars(self,
                   ra_list,
@@ -2734,10 +2839,12 @@ class GravMNightFit(GravNight):
                   nthreads=1,
                   nwalkers=301,
                   nruns=301,
-                  fit_for=np.array([0.5, 0.5, 1.0, 0.0]),
-                  fixedBHalpha=False,
-                  oneBHalpha=False,
-                  oneBG=True,
+                  fit_for=np.array([1.0, 1.0, 1.0, 1.0]),
+                  fixed_BH_alpha=False,
+                  one_BH_alpha=False,
+                  one_BG=True,
+                  one_fr=False,
+                  one_pc=False,
                   initial=None,
                   phasemaps=True,
                   **kwargs):
@@ -2763,43 +2870,76 @@ class GravMNightFit(GravNight):
         nthreads:       number of cores [4]
         nwalkers:       number of walkers [500]
         nruns:          number of MCMC runs [500]
-        fit_for:        weight of VA, V2, T3, VP [[0.5,0.5,1.0,0.0]]
+        fit_for:        weight of VA, V2, T3, VP [[1,1,1,1]]
         initial:        Initial guess for fit [None]
-        fixedBHalpha:   No fit for black hole power law [False]
-        oneBHalpha:     One power law index for all files [False]
-        phasemaps:      Use Phasemaps for fit [False]
+        fixed_BH_alpha: No fit for black hole power law [False]
+        one_BH_alpha:   One power law index for all files [False]
+        one_BG:         One BG for all files [True]
+        one_pc:         Fits one phasecenter for all files [False]
+        one_fr:         Fits one flux ratio to central source for all files [False]
+        phasemaps:      Use Phasemaps for fit [True]
 
         Optional unnamed arguments (can be given via kwargs):
-        fit_mode:       Kind of integration for visibilities
-                        (approx, numeric, analytic) [numeric]
-        bequiet:        Suppresses ALL outputs
-        flagtill:       Flag blue channels, default 3 for LOW, 30 for MED
-        flagfrom:       Flag red channels, default 13 for LOW, 200 for MED
-        error_scale:    Scaling of error bars [1]
-        nocohloss:      if True does not fit a coherence loss [False]
-        interppm:       Interpolate Phasemaps [True]
-        smoothkernel:   Size of smoothing kernel in mas [15]
-        pmdatayear:     Phasemaps year, 2019 or 2020 [2019]
+        fit_mode:         Kind of integration for visibilities
+                          (approx, numeric, analytic) [numeric]
+        flagtill:         Flag blue channels, default 3 for LOW, 30 for MED
+        flagfrom:         Flag red channels, default 13 for LOW, 200 for MED
+        error_scale:      Scaling of error bars [1]
+        nocohloss:        if True does not fit a coherence loss [False]
+        no_fit  :         Only gives fitting results for parameters from
+                          initial guess [False]
+        nested  :         Use nested sampling [False]
+        save_mcmc:        I/O of MCMC results. Saves results in dedicated
+                          Folder and gives prefix to filename [None]
+        only_stars:       All sources have the same spectral index [False]
+        fixed_BG_alpha:   Fix background power law index [True]
+        fixed_star_alpha: Fix star power law index [True]
+        interppm:         Interpolate Phasemaps [True]
+        smoothkernel:     Size of smoothing kernel in mas [15]
+        pmdatayear:       Phasemaps year, 2019 or 2020 [2019]
         """
 
         fit_mode = kwargs.get('fit_mode', 'numeric')
-        bequiet = kwargs.get('bequiet', False)
         flagtill = kwargs.get('flagtill', None)
         flagfrom = kwargs.get('flagfrom', None)
         error_scale = kwargs.get('error_scale', 1)
         nocohloss = kwargs.get('nocohloss', False)
         no_fit = kwargs.get('no_fit', False)
         nested = kwargs.get('nested', False)
+        save_mcmc = kwargs.get('save_mcmc', None)
+        only_stars = kwargs.get('only_stars', False)
+        fixed_BG_alpha = kwargs.get('fixed_BG_alpha', True)
+        fixed_star_alpha = kwargs.get('fixed_star_alpha', True)
         self.no_fit = no_fit
         self.nested = nested
 
         interppm = kwargs.get('interppm', True)
         self.datayear = kwargs.get('pmdatayear', 2019)
         self.smoothkernel = kwargs.get('smoothkernel', 15)
+        self.phasemaps = phasemaps
+
+        available_keys = ['fit_mode', 'flagtill', 'flagfrom', 'error_scale',
+                          'nocohloss', 'no_fit', 'nested', 'only_stars',
+                          'save_mcmc',
+                          'fixed_BG_alpha', 'fixed_star_alpha', 'interppm',
+                          'smoothkernel', 'pmdatayear']
+
+        for kwarg in kwargs:
+            if kwarg not in available_keys:
+                self.logger.warning(f'Argument {kwarg} not available')
+                self.logger.warning(f'Available arguments are: {available_keys}')
+
+        if only_stars:
+            fixed_BH_alpha =True
+            if fixed_star_alpha:
+                self.logger.warning('All sources have the same spectral index, to fit it fixed_star_alpha should be False')
+            else:
+                self.logger.info('All sources have the same spectral index')
+
 
         if flagtill is None and flagfrom is None:
             if self.datalist[0].resolution == 'LOW':
-                flagtill = 3
+                flagtill = 2
                 flagfrom = 13
             elif self.datalist[0].resolution == 'MEDIUM':
                 flagtill = 30
@@ -2808,15 +2948,21 @@ class GravMNightFit(GravNight):
                 raise ValueError('HIGH data, give values for flagtill '
                                  'and flagfrom')
 
+        savefolder = './fitresults/'
+        if save_mcmc is not None:
+            # check if save_mcmc is a string
+            if type(save_mcmc) != str:
+                self.logger.error('save_mcmc needs to be a string')
+                raise ValueError('save_mcmc needs to be a string')
+            if not os.path.exists(savefolder):
+                self.logger.debug('Create folder %s' % savefolder)
+                os.makedirs(savefolder)
+            mcmcname = f'{savefolder}{save_mcmc}_{self.file_list[0][:-5]}_multimcmc'
+
         self.fit_for = fit_for
-        self.fixedBHalpha = fixedBHalpha
-        self.oneBHalpha = oneBHalpha
-        self.oneBG = oneBG
         self.interppm = interppm
         self.fit_mode = fit_mode
-        self.bequiet = bequiet
         self.nruns = nruns
-        self.phasemaps = phasemaps
 
         nsource = len(ra_list)
         nfiles = len(self.datalist)*2
@@ -2917,11 +3063,14 @@ class GravMNightFit(GravNight):
 
                 ndit.append(np.shape(obj.visampSC_P1)[0]//6)
                 if ndit[-1] != 1:
+                    self.logger.error('Only maxframe reduced files can be used'
+                                      'for full night fits!')
                     raise ValueError('Only maxframe reduced files can be used'
                                      'for full night fits!')
 
         elif self.polmode == 'COMBINED':
-            raise ValueError("Sorry, only SPLIT is implemented at the moment")
+            self.logger.error('COMBINED mode not implemented')
+            raise ValueError('COMBINED mode not implemented')
 
         visamp_P = np.array(visamp_P)
         visamp_error_P = np.array(visamp_error_P)
@@ -2964,9 +3113,8 @@ class GravMNightFit(GravNight):
             if ((flagtill > 0) and (flagfrom > 0)):
                 p = flagtill
                 t = flagfrom
-                if num == 0 and not bequiet:
-                    if not bequiet:
-                        print('using channels from #%i to #%i' % (p, t))
+                if num == 0:
+                    self.logger.info(f'using channels from #{p} to #{t}')
                 visamp_flag_P[num, :, 0:p] = True
                 vis2_flag_P[num, :, 0:p] = True
                 visphi_flag_P[num, :, 0:p] = True
@@ -2978,30 +3126,40 @@ class GravMNightFit(GravNight):
                 closure_flag_P[num, :, t:] = True
 
         if initial is not None:
-            if len(initial) != 5:
+            if len(initial) != 8:
                 raise ValueError('Length of initial parameter '
-                                 'list is not correct, should be 5: '
-                                 'alpha, fr BG, pc ra, pc dec, fr_BH')
-            (alpha_SgrA_in, flux_ratio_bg_in, pc_RA_in, pc_DEC_in,
-             fr_BH) = initial
+                                 'list is not correct, should be 8: '
+                                 'alpha BH, alpha BG, alpha star, '
+                                 'fr BG, pc ra, pc dec, fr_BH, '
+                                 'coh. loss')
+
+            (alpha_SgrA_in, alpha_BG_in, alpha_star_in, 
+             flux_ratio_bg_in, pc_RA_in, pc_DEC_in,
+             flux_ratio_bh, coh_loss_in) = initial
         else:
             alpha_SgrA_in = -0.5
-            flux_ratio_bg_in = 1
+            alpha_BG_in = 3
+            alpha_star_in = 3
+            flux_ratio_bg_in = 0.1
             pc_RA_in = 0
             pc_DEC_in = 0
-            fr_BH = 1
-        lightcurve_list = np.ones(nfiles)*fr_BH
+            flux_ratio_bh = 1
+            coh_loss_in = 1
+
+        lightcurve_list = np.ones(nfiles)*flux_ratio_bh
         fluxBG_list = np.ones(nfiles)*flux_ratio_bg_in
 
         # nsource*2 positions
         # (nsource - 1) source flux ratios
         # len(files) * (flux ratio + bg + pc*2 + sgra color + 6 coherence loss)
-        theta = np.zeros(nsource*2 + (nsource-1) + nfiles*11)
-        lower = np.zeros(nsource*2 + (nsource-1) + nfiles*11)
-        upper = np.zeros(nsource*2 + (nsource-1) + nfiles*11)
+        theta = np.zeros(nsource*2 + (nsource-1) + 2 + nfiles*11)
+        lower = np.zeros(nsource*2 + (nsource-1) + 2 + nfiles*11)
+        upper = np.zeros(nsource*2 + (nsource-1) + 2 + nfiles*11)
         todel = []
         theta_names = []
         pc_size = 5
+
+        # 0 - nstars *2: positions
         for ndx in range(nsource):
             theta[ndx*2] = ra_list[ndx]
             theta[ndx*2+1] = de_list[ndx]
@@ -3017,12 +3175,13 @@ class GravMNightFit(GravNight):
                 todel.append(ndx*2+1)
             theta_names.append('dRA%i' % (ndx + 1))
             theta_names.append('dDEC%i' % (ndx + 1))
-            if not bequiet:
-                if ndx == 0:
-                    print('Initial conditions:')
-                print('dRA%i    = %.2f' % ((ndx + 1), theta[ndx*2]))
-                print('dDec%i   = %.2f' % ((ndx + 1), theta[ndx*2+1]))
 
+            if ndx == 0:
+                self.logger.info('Initial conditions:')
+            self.logger.info(f'dRA{ndx + 1}     = {theta[ndx*2]:.2f}')
+            self.logger.info(f'dDec{ndx + 1}    = {theta[ndx*2+1]:.2f}')
+
+        # nstars*2 - nstars*3-1: flux ratios
         for ndx in range(nsource-1):
             theta[nsource*2+ndx] = np.log10(fr_list[ndx])
             lower[nsource*2+ndx] = np.log10(0.001)
@@ -3030,37 +3189,57 @@ class GravMNightFit(GravNight):
             if not fit_fr[ndx]:
                 todel.append(nsource*2 + ndx)
             theta_names.append('fr%i' % (ndx + 2))
-            if not bequiet:
-                print('fr %i/1  = %.2f' % ((ndx + 2), fr_list[ndx]))
-        if not bequiet:
-            print('fr BH/1 = %.2f' % (lightcurve_list[0]))
-            print('fr BG   = %.2f' % (fluxBG_list[0]))
-            print('alphaBH = %.2f' % (alpha_SgrA_in))
+            self.logger.info(f'fr S{ndx+2}/S1 = {fr_list[ndx]:.2f}')
+
+        # alpha star
+        theta[nsource*3-1] = alpha_star_in
+        lower[nsource*3-1] = -10
+        upper[nsource*3-1] = 10
+        theta_names.append('alphaStars')
+        if fixed_star_alpha:
+            todel.append(nsource*3-1)
+        self.logger.info(f'alphastar = {alpha_star_in:.2f}')
+
+        # alpha BG
+        theta[nsource*3] = alpha_BG_in
+        lower[nsource*3] = -10
+        upper[nsource*3] = 10
+        theta_names.append('alphaBG')
+        if fixed_BG_alpha:
+            todel.append(nsource*3)
+        self.logger.info(f'alphaBG = {alpha_BG_in:.2f}')
+
+        theta_stars = nsource*3+1
+      
+        # everything dependent on files
+        self.logger.info(f'fr BH/S1 = {lightcurve_list[0]:.2f}')
+        self.logger.info(f'fr BG    = {fluxBG_list[0]:.2f}')
+        self.logger.info(f'alphaBH  = {alpha_SgrA_in:.2f}')
 
         for ndx in range(nfiles):
-            theta[nsource*3-1 + ndx*11] = alpha_SgrA_in
-            lower[nsource*3-1 + ndx*11] = -10
-            upper[nsource*3-1 + ndx*11] = 10
+            theta[theta_stars + ndx*11] = alpha_SgrA_in
+            lower[theta_stars + ndx*11] = -10
+            upper[theta_stars + ndx*11] = 10
 
-            theta[nsource*3-1 + ndx*11 + 1] = fluxBG_list[ndx]
-            lower[nsource*3-1 + ndx*11 + 1] = 0.1
-            upper[nsource*3-1 + ndx*11 + 1] = 20
+            theta[theta_stars + ndx*11 + 1] = fluxBG_list[ndx]
+            lower[theta_stars + ndx*11 + 1] = 0.1
+            upper[theta_stars + ndx*11 + 1] = 20
 
-            theta[nsource*3-1 + ndx*11 + 2] = pc_RA_in
-            lower[nsource*3-1 + ndx*11 + 2] = pc_RA_in - pc_size
-            upper[nsource*3-1 + ndx*11 + 2] = pc_RA_in + pc_size
+            theta[theta_stars + ndx*11 + 2] = pc_RA_in
+            lower[theta_stars + ndx*11 + 2] = pc_RA_in - pc_size
+            upper[theta_stars + ndx*11 + 2] = pc_RA_in + pc_size
 
-            theta[nsource*3-1 + ndx*11 + 3] = pc_DEC_in
-            lower[nsource*3-1 + ndx*11 + 3] = pc_DEC_in - pc_size
-            upper[nsource*3-1 + ndx*11 + 3] = pc_DEC_in + pc_size
+            theta[theta_stars + ndx*11 + 3] = pc_DEC_in
+            lower[theta_stars + ndx*11 + 3] = pc_DEC_in - pc_size
+            upper[theta_stars + ndx*11 + 3] = pc_DEC_in + pc_size
 
-            theta[nsource*3-1 + ndx*11 + 4] = np.log10(lightcurve_list[ndx])
-            lower[nsource*3-1 + ndx*11 + 4] = np.log10(0.001)
-            upper[nsource*3-1 + ndx*11 + 4] = np.log10(100)
+            theta[theta_stars + ndx*11 + 4] = np.log10(lightcurve_list[ndx])
+            lower[theta_stars + ndx*11 + 4] = np.log10(0.001)
+            upper[theta_stars + ndx*11 + 4] = np.log10(100)
 
-            theta[nsource*3-1 + ndx*11 + 5:nsource*3-1 + ndx*11+11] = 1.0
-            lower[nsource*3-1 + ndx*11 + 5:nsource*3-1 + ndx*11+11] = 0.5
-            upper[nsource*3-1 + ndx*11 + 5:nsource*3-1 + ndx*11+11] = 1.5
+            theta[theta_stars + ndx*11 + 5:theta_stars + ndx*11+11] = coh_loss_in
+            lower[theta_stars + ndx*11 + 5:theta_stars + ndx*11+11] = 0.5
+            upper[theta_stars + ndx*11 + 5:theta_stars + ndx*11+11] = 1.5
 
             theta_names.append('alphaBH%i' % (ndx+1))
             theta_names.append('frBG%i' % (ndx+1))
@@ -3069,31 +3248,32 @@ class GravMNightFit(GravNight):
             theta_names.append('frBH%i' % (ndx+1))
             for cdx in range(6):
                 theta_names.append('coh%i-%i' % ((cdx+1), (ndx+1)))
-            if fixedBHalpha:
-                todel.append(nsource*3-1 + ndx*11)
-            if oneBHalpha and ndx > 0:
-                todel.append(nsource*3-1 + ndx*11)
-            # only one BG
-            if oneBG and ndx > 0:
-                todel.append(nsource*3-1 + ndx*11 + 1)
+            if fixed_BH_alpha:
+                todel.append(theta_stars + ndx*11)
+            if one_BH_alpha and ndx > 0:
+                todel.append(theta_stars + ndx*11)
+            if one_BG and ndx > 0:
+                todel.append(theta_stars + ndx*11 + 1)
             if fit_for[3] == 0:
-                todel.append(nsource*3-1 + ndx*11 + 2)
-                todel.append(nsource*3-1 + ndx*11 + 3)
+                todel.append(theta_stars + ndx*11 + 2)
+                todel.append(theta_stars + ndx*11 + 3)
+            if one_pc and ndx > 0:
+                todel.append(theta_stars + ndx*11 + 2)
+                todel.append(theta_stars + ndx*11 + 3)
+            if one_fr and ndx > 0:
+                todel.append(theta_stars + ndx*11 + 4)
             if nocohloss:
-                todel.extend(np.arange(nsource*3-1 + ndx*11 + 5, nsource*3-1 + ndx*11+11))
+                todel.extend(np.arange(theta_stars + ndx*11 + 5, theta_stars + ndx*11+11))
 
-        if self.debug:
-            print('\n\n')
-            for idx in range(len(theta)):
-                if idx in todel:
-                    print('%s    %.2f    FIXXED' % (theta_names[idx], theta[idx]))
-                else:
-                    print('%s    %.2f' % (theta_names[idx], theta[idx]))
-
-            print('\n\n')
-            print(len(theta), todel)
+        for idx in range(len(theta)):
+            if idx in todel:
+                self.logger.debug(f'{theta_names[idx]} {theta[idx]:.2f}  FIXXED')
+            else:
+                self.logger.debug(f'{theta_names[idx]} {theta[idx]:.2f}')
 
         if len(theta_names) != len(theta):
+            self.logger.error('Somethign wrong with intitialization of parameter')
+            self.logger.error(f'theta length: {len(theta)}, theta_names length: {len(theta_names)}')
             raise ValueError('Somethign wrong with intitialization of parameter')
 
         todel = sorted(list(set(todel)))
@@ -3103,26 +3283,21 @@ class GravMNightFit(GravNight):
         ndim = len(theta)
         self.ndof = ndim - len(todel)
 
-        if self.phasemaps:
-            phasemaps = GravPhaseMaps()
-            phasemaps.tel = self.tel
-            phasemaps.resolution = self.resolution
-            phasemaps.smoothkernel = self.smoothkernel
-            phasemaps.datayear = self.datayear
-            phasemaps.wlSC = self.datalist[0].wlSC
-            phasemaps.interppm = interppm
-            phasemaps.load_phasemaps(interp=interppm)
+        if phasemaps:
+            self.wlSC = self.datalist[0].wlSC
+            self.load_phasemaps(interp=interppm)
 
-            header = self.headerlist[0]
-            northangle1 = header['ESO QC ACQ FIELD1 NORTH_ANGLE']/180*math.pi
-            northangle2 = header['ESO QC ACQ FIELD2 NORTH_ANGLE']/180*math.pi
-            northangle3 = header['ESO QC ACQ FIELD3 NORTH_ANGLE']/180*math.pi
-            northangle4 = header['ESO QC ACQ FIELD4 NORTH_ANGLE']/180*math.pi
-            self.northangle = [northangle1, northangle2,
-                               northangle3, northangle4]
             ddec = []
             dra = []
+            northangle = []
             for header in self.headerlist:
+                northangle1 = header['ESO QC ACQ FIELD1 NORTH_ANGLE']/180*math.pi
+                northangle2 = header['ESO QC ACQ FIELD2 NORTH_ANGLE']/180*math.pi
+                northangle3 = header['ESO QC ACQ FIELD3 NORTH_ANGLE']/180*math.pi
+                northangle4 = header['ESO QC ACQ FIELD4 NORTH_ANGLE']/180*math.pi
+                northangle.append([northangle1, northangle2, northangle3, northangle4])
+    
+
                 ddec1 = header['ESO QC MET SOBJ DDEC1']
                 ddec2 = header['ESO QC MET SOBJ DDEC2']
                 ddec3 = header['ESO QC MET SOBJ DDEC3']
@@ -3135,22 +3310,22 @@ class GravMNightFit(GravNight):
                 dra4 = header['ESO QC MET SOBJ DRA4']
                 dra.append([dra1, dra2, dra3, dra4])
 
-            pm_sources = []
+            pm_sources_night = []
             for ndx in range(nfiles):
                 _sources = []
-                pm_amp, pm_pha, pm_int = phasemaps.phasemap_source(0, 0,
-                                                              self.northangle,
+                pm_amp, pm_pha, pm_int = self.phasemap_source(pc_RA_in, pc_DEC_in,
+                                                              northangle[ndx//2],
                                                               dra[ndx//2],
                                                               ddec[ndx//2])
                 _sources.append([pm_amp, pm_pha, pm_int])
                 for sdx in range(nsource):
-                    pm_amp, pm_pha, pm_int = phasemaps.phasemap_source(theta[sdx*2],
-                                                                  theta[sdx*2+1],
-                                                                  self.northangle,
+                    pm_amp, pm_pha, pm_int = self.phasemap_source(pc_RA_in + theta[sdx*2],
+                                                                  pc_DEC_in + theta[sdx*2+1],
+                                                                  northangle[ndx//2],
                                                                   dra[ndx//2],
                                                                   ddec[ndx//2])
                     _sources.append([pm_amp, pm_pha, pm_int])
-                pm_sources.append(_sources)
+                pm_sources_night.append(_sources)
 
         for ddx in sorted(todel, reverse=True):
             del theta_names[ddx]
@@ -3161,13 +3336,12 @@ class GravMNightFit(GravNight):
         self.fixed = fixed
         self.todel = todel
 
-        if self.debug:
-            print('\n\n')
-            for idx in range(len(theta)):
-                print('%s    %.2f' % (theta_names[idx], theta[idx]))
-            print('\n\n')
+        self.logger.debug('Used parameters for fit:')
+        for idx in range(len(theta)):
+            self.logger.debug(f'{theta_names[idx]}    {theta[idx]:.2f}')
 
         if len(theta_names) != len(theta):
+            self.logger.error('Somethign wrong with intitialization of parameter')
             raise ValueError('Somethign wrong with intitialization of parameter')
 
         ndim = len(theta)
@@ -3187,24 +3361,33 @@ class GravMNightFit(GravNight):
                    visphi_P, visphi_error_P, visphi_flag_P]
 
         fitarg = np.array([u, v])
-        if self.phasemaps:
-            fithelp = [self.nfiles, self.nsource, self.fit_for,
-                       self.bispec_ind, self.fit_mode, self.wave,
-                       self.dlambda, self.fixedBHalpha, oneBHalpha,
-                       oneBG, todel, fixed, self.phasemaps, pm_sources]
+        if phasemaps:
+            fithelp_night = [self.nfiles, self.nsource, self.fit_for,
+                             self.bispec_ind, self.fit_mode,
+                             self.wave, self.dlambda,
+                             one_BH_alpha, one_BG, one_pc, one_fr,
+                             todel, fixed,
+                             phasemaps, pm_sources_night,
+                             only_stars]
         else:
-            fithelp = [self.nfiles, self.nsource, self.fit_for,
-                       self.bispec_ind, self.fit_mode, self.wave,
-                       self.dlambda, self.fixedBHalpha, oneBHalpha,
-                       oneBG, todel, fixed, self.phasemaps, None]
+            fithelp_night = [self.nfiles, self.nsource, self.fit_for,
+                             self.bispec_ind, self.fit_mode,
+                             self.wave, self.dlambda,
+                             one_BH_alpha, one_BG, one_pc, one_fr,
+                             todel, fixed,
+                             phasemaps, None,
+                             only_stars]
         self.fitarg = fitarg
         self.fitdata = fitdata
-        self.fithelp = fithelp
+        self.fithelp_night = fithelp_night
         self.MJD = MJD
         self.theta = theta
-        if self.debug:
-            print('\n\n')
-            print(_lnprob_night(theta, fitdata, lower, upper, theta_names, fitarg, fithelp))
+
+        log_lik_in = _lnprob_night(theta, fitdata, lower, upper,
+                                   theta_names, fitarg, fithelp_night)
+        if self.logger.level < logging.INFO:
+            self.logger.debug('Log likelyhood with initial values:')
+            self.logger.debug(log_lik_in)
             sys.exit()
 
         if not no_fit:
@@ -3223,7 +3406,7 @@ class GravMNightFit(GravNight):
                                                 nlive=nwalkers,
                                                 pool=pool,
                                                 queue_size=nthreads,
-                                                logl_args=[fitdata, fitarg, fithelp],
+                                                logl_args=[fitdata, fitarg, fithelp_night],
                                                 ptform_args=[gprior, mean, width],
                                                 sample='rwalk')
                 sampler.run_nested(checkpoint_file='dynesty.save')
@@ -3234,8 +3417,8 @@ class GravMNightFit(GravNight):
                                                          _lnprob_night,
                                                          args=(fitdata, lower,
                                                                upper, theta_names,
-                                                               fitarg, fithelp))
-                    if bequiet:
+                                                               fitarg, fithelp_night))
+                    if self.logger.level > logging.INFO:
                         self.sampler.run_mcmc(pos, nruns, progress=False,
                                               skip_initial_state_check=True)
                     else:
@@ -3248,14 +3431,18 @@ class GravMNightFit(GravNight):
                                                              args=(fitdata, lower,
                                                                    upper, theta_names,
                                                                    fitarg,
-                                                                   fithelp),
+                                                                   fithelp_night),
                                                              pool=pool)
-                        if bequiet:
+                        if self.logger.level > logging.INFO:
                             self.sampler.run_mcmc(pos, nruns, progress=False,
                                                   skip_initial_state_check=True)
                         else:
                             self.sampler.run_mcmc(pos, nruns, progress=True,
                                                   skip_initial_state_check=True)
+            if save_mcmc is not None:
+                samples = self.sampler.chain
+                np.save(mcmcname, samples)
+                np.savetxt(f'{mcmcname}.txt', theta_names, fmt='%s')
 
     def get_fit_result(self, plot=True, plot_corner=False, ret=False):
         if not self.no_fit:
@@ -3271,8 +3458,8 @@ class GravMNightFit(GravNight):
                 self.medianprop = mean
 
                 lnlike = _lnlike_night(self.medianprop, self.fitdata,
-                                       self.fitarg, self.fithelp)
-                print('LogLikelihood: %i' % (lnlike*-1))
+                                       self.fitarg, self.fithelp_night)
+                self.logger.info('LogLikelihood: %i' % (lnlike*-1))
 
                 # percentiles = np.percentile(fl_clsamples, [16, 50, 84], axis=0).T
                 # percentiles[:, 0] = percentiles[:, 1] - percentiles[:, 0]
@@ -3334,7 +3521,7 @@ class GravMNightFit(GravNight):
                 self.medianprop = np.percentile(fl_samples, [50], axis=0)[0]
 
                 lnlike = _lnlike_night(self.medianprop, self.fitdata,
-                                       self.fitarg, self.fithelp)
+                                       self.fitarg, self.fithelp_night)
                 print('LogLikelihood: %i' % (lnlike*-1))
 
                 percentiles = np.percentile(fl_clsamples, [16, 50, 84], axis=0).T
@@ -3376,7 +3563,7 @@ class GravMNightFit(GravNight):
             self.medianprop = self.theta
 
         allfitres = self.get_fit_vis(self.medianprop, self.fitarg,
-                                     self.fithelp)
+                                     self.fithelp_night)
         (visamp, visamp_error, visamp_flag,
          vis2, vis2_error, vis2_flag,
          closure, closure_error, closure_flag,
@@ -3452,56 +3639,74 @@ class GravMNightFit(GravNight):
                                 truths=clmostprop, labels=cllabels)
             plt.show()
 
-    def get_fit_vis(self, fitres, fitarg, fithelp):
+    def get_fit_vis(self, theta, fitarg, fithelp_night):
         (len_lightcurve, nsource, fit_for, bispec_ind, fit_mode,
-         wave, dlambda, fixedBHalpha, oneBHalpha, oneBG, todel, fixed,
-         phasemaps, pm_sources) = fithelp
+         wave, dlambda, one_BH_alpha, one_BG, one_pc, one_fr, todel, fixed,
+         phasemaps, pm_sources_night, only_stars) = fithelp_night
 
         for ddx in range(len(todel)):
-            fitres = np.insert(fitres, todel[ddx], fixed[ddx])
+            theta = np.insert(theta, todel[ddx], fixed[ddx])
 
         allfitres = []
+        th_rest = nsource*3-1
+        theta_stars = nsource*3+1
         for ndx in range(len_lightcurve):
-            _theta = np.zeros(nsource*3+10)
+            _theta = np.zeros(nsource*3+16)
             for sdx in range(nsource):
                 if sdx == 0:
-                    _theta[:2] = fitres[:2]
+                    _theta[:2] = theta[:2]
                 else:
-                    _theta[sdx*3-1] = fitres[sdx*2]
-                    _theta[sdx*3] = fitres[sdx*2+1]
-                    _theta[sdx*3+1] = fitres[nsource*2+sdx-1]
+                    _theta[sdx*3-1] = theta[sdx*2]
+                    _theta[sdx*3] = theta[sdx*2+1]
+                    _theta[sdx*3+1] = theta[nsource*2+sdx-1]
+                
+            # alphaBH
+            if one_BH_alpha:
+                _theta[th_rest] = theta[theta_stars]
+            else:
+                _theta[th_rest] = theta[theta_stars + ndx*11]
+            # f_BG
+            if one_BG:
+                _theta[th_rest+1] = theta[theta_stars + 1]
+            else:
+                _theta[th_rest+1] = theta[theta_stars + ndx*11 + 1]
+            # pc
+            if one_pc:
+                _theta[th_rest+2] = theta[theta_stars + 2]
+                _theta[th_rest+3] = theta[theta_stars + 3]
+            else:
+                _theta[th_rest+2] = theta[theta_stars + ndx*11 + 2]
+                _theta[th_rest+3] = theta[theta_stars + ndx*11 + 3]
+            # fr_BH
+            if one_fr:
+                _theta[th_rest+4] = theta[theta_stars + 4]
+            else:
+                _theta[th_rest+4] = theta[theta_stars + ndx*11 + 4]
+            # alpha BG
+            _theta[th_rest+5] = theta[nsource*3]
+            # alpha star
+            _theta[th_rest+6] = theta[nsource*3-1]
+            # coh loss
+            _theta[th_rest+7:th_rest+13] = theta[theta_stars + ndx*11+5
+                                                :theta_stars + ndx*11+11]
 
-            th_rest = nsource*3-1
-            if oneBHalpha:
-                _theta[th_rest] = fitres[nsource*3-1]
-            else:
-                _theta[th_rest] = fitres[nsource*3-1 + ndx*11]
-            if oneBG:
-                _theta[th_rest+1] = fitres[nsource*3-1 + 1]
-            else:
-                _theta[th_rest+1] = fitres[nsource*3-1 + ndx*11 + 1]
-            _theta[th_rest+2] = fitres[nsource*3-1 + ndx*11 + 2]
-            _theta[th_rest+3] = fitres[nsource*3-1 + ndx*11 + 3]
-            _theta[th_rest+4] = fitres[nsource*3-1 + ndx*11 + 4]
-            _theta[th_rest+5:] = fitres[nsource*3-1 + ndx*11+5
-                                        :nsource*3-1 + ndx*11+11]
 
             if phasemaps:
-                _pm_sources = pm_sources[ndx]
-                pm_amp_c, pm_pha_c, pm_int_c = _pm_sources[0]
-                _pm_sources = _pm_sources[1:]
-                _fithelp = [nsource, fit_for, bispec_ind, fit_mode,
-                            wave, dlambda, fixedBHalpha, None, None, phasemaps,
-                            None, None, None, None, None, None, False,
-                            _pm_sources, pm_amp_c, pm_pha_c, pm_int_c]
+                pm_sources = pm_sources_night[ndx]
+                fithelp = [nsource, fit_for, bispec_ind, fit_mode, wave, dlambda,
+                           None, None, phasemaps, None, None, None,
+                           None, None, None,
+                           False, pm_sources,
+                           only_stars]
             else:
-                _fithelp = [nsource, fit_for, bispec_ind, fit_mode,
-                            wave, dlambda, fixedBHalpha, None, None, phasemaps,
-                            None, None, None, None, None, None, False,
-                            None, None, None, None]
+                fithelp = [nsource, fit_for, bispec_ind, fit_mode, wave, dlambda,
+                           None, None, phasemaps, None, None, None,
+                           None, None, None,
+                           False, None,
+                           only_stars]
             (visamp, visphi,
              closure) = _calc_vis_mstars(_theta, fitarg[:, ndx],
-                                                         _fithelp)
+                                                         fithelp)
             visamp2 = visamp**2
             allfitres.append([visamp, visamp2, closure, visphi])
         return allfitres
@@ -3513,10 +3718,6 @@ class GravMNightFit(GravNight):
             result = self.mostprop
         else:
             result = self.medianprop
-        (visamp, visamp_error, visamp_flag,
-         vis2, vis2_error, vis2_flag,
-         closure, closure_error, closure_flag,
-         visphi, visphi_error, visphi_flag) = self.fitdata
         (uu, vv) = self.fitarg
 
         wave = self.wave
@@ -3529,10 +3730,10 @@ class GravMNightFit(GravNight):
         for i in range(0, 6):
             dlambda_model[i, :] = np.interp(wave_model, wave, dlambda[i, :])
 
-        fithelp_model = np.copy(self.fithelp)
-        fithelp_model[5] = wave_model
-        fithelp_model[6] = dlambda_model
-        allfitres = self.get_fit_vis(result, self.fitarg, fithelp_model)
+        fithelp_night_model = np.copy(self.fithelp_night)
+        fithelp_night_model[5] = wave_model
+        fithelp_night_model[6] = dlambda_model
+        allfitres = self.get_fit_vis(result, self.fitarg, fithelp_night_model)
 
         obj = self.datalist[0]
         plot_quant = ['Visamp', 'Vis2', 'Closure Phase', 'Visibility Phase']
