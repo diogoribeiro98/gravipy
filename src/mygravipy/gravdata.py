@@ -1194,7 +1194,7 @@ class GravNight():
         self.datalist = []
         self.headerlist = []
 
-        for num, fi in enumerate(self.file_list):
+        for fi in self.file_list:
             self.datalist.append(GravData(fi, loglevel='ERROR'))
             self.headerlist.append(fits.open(fi)[0].header)
         self.logger.setLevel(self.log_level)
@@ -1260,6 +1260,7 @@ class GravNight():
         self.mjd = [i.mjd for i in self.datalist]
         self.mjd0 = np.min(np.array(self.mjd))
         self.files = [i.name for i in self.datalist]
+        self.filenames = [i.filename for i in self.datalist]
 
     def get_int_data(self, mode='SC', plot=False, plotTAmp=False, flag=False,
                      ignore_tel=[]):

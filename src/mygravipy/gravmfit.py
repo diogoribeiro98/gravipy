@@ -2957,7 +2957,7 @@ class GravMNightFit(GravNight, GravPhaseMaps):
             if not os.path.exists(savefolder):
                 self.logger.debug('Create folder %s' % savefolder)
                 os.makedirs(savefolder)
-            mcmcname = f'{savefolder}{save_mcmc}_{self.file_list[0][:-5]}_multimcmc'
+            mcmcname = f'{savefolder}{save_mcmc}_{self.filenames[0][:-5]}_multimcmc'
 
         self.fit_for = fit_for
         self.interppm = interppm
