@@ -3509,8 +3509,8 @@ class GravMNightFit(GravNight, GravPhaseMaps):
                 cldim = len(clmostprop)
 
                 if self.nruns > 300:
-                    fl_samples = samples[:, -200:, :].reshape((-1, self.ndim))
-                    fl_clsamples = clsamples[:, -200:, :].reshape((-1, cldim))
+                    fl_samples = samples[:, -100:, :].reshape((-1, self.ndim))
+                    fl_clsamples = clsamples[:, -100:, :].reshape((-1, cldim))
                 elif self.nruns > 200:
                     fl_samples = samples[:, -100:, :].reshape((-1, self.ndim))
                     fl_clsamples = clsamples[:, -100:, :].reshape((-1, cldim))
