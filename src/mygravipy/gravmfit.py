@@ -1104,7 +1104,6 @@ class GravMFit(GravData, GravPhaseMaps):
             fr_list = self.flux_ratio(mag[0], mag[1:])
             star_names = ['SGRA'] + star_names
 
-
         else:
             self.logger.info('Star field file')
             star_names = [s[0] for s in stars]
@@ -1125,6 +1124,13 @@ class GravMFit(GravData, GravPhaseMaps):
             else:
                 star_names = [x for _, x in sorted(zip(stars[:, 4], star_names))]
                 stars = np.asarray([x for _, x in sorted(zip(stars[:, 4], stars))])
+
+            if 'only_stars' in kwargs and fit:
+                if not kwargs['only_stars']:
+                    self.logger.warning('For fields without SgrA* the only_stars option should be used')
+                    self.logger.warning('will be set to True')
+                    kwargs['only_stars'] = True
+                    kwargs['fixed_star_alpha'] = False
 
             center = stars[0]
             pc = center[:2]
