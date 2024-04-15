@@ -1125,8 +1125,8 @@ class GravMFit(GravData, GravPhaseMaps):
                 star_names = [x for _, x in sorted(zip(stars[:, 4], star_names))]
                 stars = np.asarray([x for _, x in sorted(zip(stars[:, 4], stars))])
 
-            if 'only_stars' in kwargs and fit:
-                if not kwargs['only_stars']:
+            if fit:
+                if 'only_stars' not in kwargs or not kwargs['only_stars']:
                     self.logger.warning('For fields without SgrA* the only_stars option should be used')
                     self.logger.warning('will be set to True')
                     kwargs['only_stars'] = True
