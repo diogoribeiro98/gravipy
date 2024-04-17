@@ -131,7 +131,6 @@ class GravPhaseMaps():
         load_phasemaps : load the phasemaps from package
         read_phasemaps : read correction from loaded phasemaps
         """
-        self.get_int_data()
         log_level = log_level_mapping.get(loglevel, logging.INFO)
         logger = logging.getLogger(__name__)
         logger.setLevel(log_level)
@@ -142,6 +141,10 @@ class GravPhaseMaps():
         if not logger.hasHandlers():
             logger.addHandler(ch)
         self.logger = logger
+        try:
+            self.get_int_data()
+        except AttributeError:
+            self.logger.warning('No data loaded, need to set attributes by hand')
 
     def create_phasemaps(self, nthreads=1, smooth=15, plot=True, 
                          datayear=2019):
@@ -899,7 +902,7 @@ def _calc_vis_mstars(theta, fitarg, fithelp):
                                                            pha_map_int,
                                                            amp_map_denom_int,
                                                            wave, dra, ddec)
-
+            pm_sources.append([pm_amp_c, pm_pha_c, pm_int_c])
             for ndx in range(nsource):
                 if ndx == 0:
                     pm_amp, pm_pha, pm_int = _read_phasemaps(pc_RA + theta[0],
@@ -1371,17 +1374,17 @@ class GravMFit(GravData, GravPhaseMaps):
             self.load_phasemaps(interp=interppm)
 
             header = fits.open(self.name)[0].header
-            northangle1 = header['ESO QC ACQ FIELD1 NORTH_ANGLE']/180*math.pi
-            northangle2 = header['ESO QC ACQ FIELD2 NORTH_ANGLE']/180*math.pi
-            northangle3 = header['ESO QC ACQ FIELD3 NORTH_ANGLE']/180*math.pi
-            northangle4 = header['ESO QC ACQ FIELD4 NORTH_ANGLE']/180*math.pi
+            northangle1 = header['ESO QC ACQ FIELD1 NORTH_ANGLE']/180*np.pi
+            northangle2 = header['ESO QC ACQ FIELD2 NORTH_ANGLE']/180*np.pi
+            northangle3 = header['ESO QC ACQ FIELD3 NORTH_ANGLE']/180*np.pi
+            northangle4 = header['ESO QC ACQ FIELD4 NORTH_ANGLE']/180*np.pi
             self.northangle = [northangle1, northangle2, 
                                northangle3, northangle4]
             
             if simulateGC:
                 mu = -4.091
                 si = 0.2844
-                self.northangle = (1+np.random.randn(4)*0.1)*np.random.randn()*si+mu
+                self.northangle = ((1+np.random.randn(4)*0.1)*np.random.randn()*si+mu)/180*np.pi
 
             ddec1 = header['ESO QC MET SOBJ DDEC1']
             ddec2 = header['ESO QC MET SOBJ DDEC2']
