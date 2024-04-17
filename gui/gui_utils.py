@@ -128,6 +128,8 @@ class FitWorker(QThread):
                 fr_list.append(float(self.input_dict[f"fr {idx+1}"]))
                 fit_fr.append(self.checkbox_dict[f"fr {idx+1}"])
         initial = [float(self.input_dict["alphaBH"]),
+                   3,
+                   3,
                    float(self.input_dict["frBG"]),
                    float(self.input_dict["pcRA"]),
                    float(self.input_dict["pcDec"]),
@@ -431,24 +433,15 @@ class PlotData(FigureCanvas):
             
             try:
                 data.pm_sources
+                phasemap = True
             except AttributeError:
-                ra_list = []
-                de_list = []
-                for idx in range(nsources):
-                    ra_list.append(float(theta[f'dRA{idx+1}']))
-                    de_list.append(float(theta[f'dDEC{idx+1}']))
-                pm = [float(theta['pc_RA']),
-                      float(theta['pc_Dec'])]
-                data.phasemap_positions(ra_list, de_list, pm)
+                phasemap = False
+                logging.warning('No phase map data available')
 
-            fithelp = [nsources, None, data.bispec_ind,
-                       'numeric', data.wlSC, data.dlambda,
-                       None, None, None, True,
-                       data.northangle, data.dra, data.ddec,
-                       data.amp_map_int, data.pha_map_int,
-                       data.amp_map_denom_int, False,
-                       data.pm_sources, data.pm_amp_c, 
-                       data.pm_pha_c, data.pm_int_c]
+            fithelp = [nsources, None, data.bispec_ind, 'numeric', data.wlSC, data.dlambda,
+                       None, None, phasemap, None, None, None,
+                       None, None, None,
+                       False, data.pm_sources, False]
 
             wave_model = data.wlSC
             dlambda_model = data.dlambda
