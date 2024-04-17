@@ -1283,6 +1283,7 @@ class GravMFit(GravData, GravPhaseMaps):
         fixed_star_alpha: Fix star power law index [True]
         only_stars:       All sources have the same spectral index [False]
         pc_size:          Size of the fitting area for the central source [5]
+        simulateGC:       Uses default GC values for some properties [False]
         '''
         fit_mode = kwargs.get('fit_mode', 'numeric')
         minimizer = kwargs.get('minimizer', 'emcee')
@@ -1309,6 +1310,7 @@ class GravMFit(GravData, GravPhaseMaps):
         interppm = kwargs.get('interppm', True)
         self.datayear = kwargs.get('pmdatayear', 2019)
         self.smoothkernel = kwargs.get('smoothkernel', 15)
+        simulateGC = kwargs.get('simulateGC', False)
 
         available_keys = ['fit_mode', 'minimizer', 'minmethod', 'bestchi',
                           'redchi2', 'flagtill', 'flagfrom', 'coh_loss',
@@ -1316,7 +1318,7 @@ class GravMFit(GravData, GravPhaseMaps):
                           'save_result', 'save_mcmc', 'refit', 'vis_flag',
                           'fixed_BG_alpha', 'fixed_star_alpha', 'only_stars',
                           'pc_size', 'phasemaps', 'fit_phasemaps', 'interppm',
-                          'pmdatayear', 'smoothkernel']
+                          'pmdatayear', 'smoothkernel', 'simulateGC']
 
         for kwarg in kwargs:
             if kwarg not in available_keys:
@@ -1369,13 +1371,18 @@ class GravMFit(GravData, GravPhaseMaps):
             northangle4 = header['ESO QC ACQ FIELD4 NORTH_ANGLE']/180*math.pi
             self.northangle = [northangle1, northangle2, 
                                northangle3, northangle4]
+            
+            if simulateGC:
+                mu = -4.091
+                si = 0.2844
+                self.northangle = (1+np.random.randn(4)*0.1)*np.random.randn()*si+mu
 
             ddec1 = header['ESO QC MET SOBJ DDEC1']
             ddec2 = header['ESO QC MET SOBJ DDEC2']
             ddec3 = header['ESO QC MET SOBJ DDEC3']
             ddec4 = header['ESO QC MET SOBJ DDEC4']
             self.ddec = [ddec1, ddec2, ddec3, ddec4]
-
+            
             dra1 = header['ESO QC MET SOBJ DRA1']
             dra2 = header['ESO QC MET SOBJ DRA2']
             dra3 = header['ESO QC MET SOBJ DRA3']
@@ -3730,7 +3737,7 @@ class GravMNightFit(GravNight, GravPhaseMaps):
         for i in range(0, 6):
             dlambda_model[i, :] = np.interp(wave_model, wave, dlambda[i, :])
 
-        fithelp_night_model = np.copy(self.fithelp_night)
+        fithelp_night_model = self.fithelp_night
         fithelp_night_model[5] = wave_model
         fithelp_night_model[6] = dlambda_model
         allfitres = self.get_fit_vis(result, self.fitarg, fithelp_night_model)
