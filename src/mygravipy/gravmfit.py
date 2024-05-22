@@ -1380,7 +1380,7 @@ class GravMFit(GravData, GravPhaseMaps):
             northangle4 = header['ESO QC ACQ FIELD4 NORTH_ANGLE']/180*np.pi
             self.northangle = [northangle1, northangle2, 
                                northangle3, northangle4]
-            
+
             if simulateGC:
                 mu = -4.091
                 si = 0.2844
@@ -1391,7 +1391,7 @@ class GravMFit(GravData, GravPhaseMaps):
             ddec3 = header['ESO QC MET SOBJ DDEC3']
             ddec4 = header['ESO QC MET SOBJ DDEC4']
             self.ddec = [ddec1, ddec2, ddec3, ddec4]
-            
+
             dra1 = header['ESO QC MET SOBJ DRA1']
             dra2 = header['ESO QC MET SOBJ DRA2']
             dra3 = header['ESO QC MET SOBJ DRA3']
@@ -1666,11 +1666,13 @@ class GravMFit(GravData, GravPhaseMaps):
                     self.logger.debug('Create folder %s' % savefolder)
                     os.makedirs(savefolder)
                 pdname = f'{savefolder}{save_result}_{self.filename[:-4]}pd'
+                self.logger.debug(f'Look for results at {pdname}')
                 try:
                     fittab = pd.read_pickle(pdname)
+                    fittab_res = fittab.iloc[:, :-1]
                     save_result_exist = True
                     no_fit = True
-                    self.logger.info('Results exist at %s' % pdname)
+                    self.logger.info(f'Results exist at {pdname}')
                 except FileNotFoundError:
                     save_result_exist = False
                     no_fit = False
@@ -1808,7 +1810,7 @@ class GravMFit(GravData, GravPhaseMaps):
                 if ((flagtill > 0) and (flagfrom > 0)):
                     p = flagtill
                     t = flagfrom
-                    if idx == 0 and dit == 0:
+                    if idx == 0 and dit == 0 and not no_fit:
                         self.logger.info('using channels from #%i to #%i' % (p, t))
                     visamp_flag[:, 0:p] = True
                     vis2_flag[:, 0:p] = True
@@ -1829,12 +1831,10 @@ class GravMFit(GravData, GravPhaseMaps):
                     pos[:, par] = (theta[par]
                                    + width*np.random.randn(nwalkers))
 
-                if not no_fit:
-                    self.logger.info('')
-                    self.logger.info(f'Run Fit for Pol {idx+1}')
+                if no_fit:
+                    self.logger.info(f'Get results for Pol {idx+1}')
                 else:
-                    self.logger.info('')
-                    self.logger.info(f'Pol {idx+1}')
+                    self.logger.info(f'Run Fit for Pol {idx+1}')
 
                 fitdata = [visamp, visamp_error, visamp_flag,
                            vis2, vis2_error, vis2_flag,
@@ -2074,7 +2074,25 @@ class GravMFit(GravData, GravPhaseMaps):
 
                 else:
                     if save_result is not None and save_result_exist:
-                        fulltheta = fittab.loc[fittab['column'].str.contains('M.L. P%i_%i' % (idx, dit))].values[0, 1:]
+                        fulltheta = fittab_res.loc[fittab['column'].str.contains('M.L. P%i_%i' % (idx, dit))].values[0, 1:]
+                        param_pd = list(fittab_res.columns[1:])
+                        param_fit = self.theta_allnames
+                        param_diff = set(param_pd) ^ set(param_fit)
+                        
+                        if len(param_diff) != 0:
+                            if param_diff == {'SelfCal1', 'SelfCal4', 'SelfCal3', 'SelfCal2'}:
+                                self.logger.warning('Phase self cal not in pandas file, will continue with assuming self cal is zero')
+                                self.logger.warning('To remove this inconsistency, run the fit again with refit=True')
+                                fulltheta = np.concatenate((fulltheta, [0.0,0.0,0.0,0.0])) 
+                            else:
+                                self.logger.error(f'Pandas and fit parameters are different, inconsistency in:')
+                                [self.logger.error(i) for i in param_diff]
+                                self.logger.error('To remove this inconsistency, run the fit again with refit=True')
+                                raise ValueError('Pandas and fit parameters are different')
+                        if len(self.theta_in) != len(fulltheta):
+                            self.logger.error('Length of parameters from pandas are not as expected')
+                            raise ValueError('Length of parameters from pandas are not as expected')
+                        
                         theta_result = np.copy(fulltheta)
                         theta_result = np.delete(theta_result, todel)
                     else:
