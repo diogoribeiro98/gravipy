@@ -1661,6 +1661,11 @@ class GravMFit(GravData, GravPhaseMaps):
             save_result_exist = False
             no_fit = False
             self.logger.info('Refit the data even if results exist')
+            if save_result is not None:
+                if not os.path.exists(savefolder):
+                    self.logger.debug('Create folder %s' % savefolder)
+                    os.makedirs(savefolder)
+                pdname = f'{savefolder}{save_result}_{self.filename[:-4]}pd'
         else:
             # check if results and mcmc results exist
             # if result exists do not fit the data
@@ -1685,10 +1690,10 @@ class GravMFit(GravData, GravPhaseMaps):
                 save_result_exist = False
                 no_fit = False
 
-            if save_mcmc is not None:
-                if not os.path.exists(savefolder):
-                    os.makedirs(savefolder)
-                mcmcname = f'{savefolder}{save_mcmc}_{self.filename[:-5]}mcmc'
+        if save_mcmc is not None:
+            if not os.path.exists(savefolder):
+                os.makedirs(savefolder)
+            mcmcname = f'{savefolder}{save_mcmc}_{self.filename[:-5]}mcmc'
 
         for ddx in sorted(todel, reverse=True):
             del theta_names[ddx]
