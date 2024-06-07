@@ -1089,9 +1089,13 @@ class GravMFit(GravData, GravPhaseMaps):
             raise ValueError('Only one star found in pointing')
         self.stars=stars
 
-        if offs == (0, 0):
+        star_names = [s[0] for s in stars]
+        if 'SGRA' in star_names:
             self.logger.info('SgrA* file')
-            pc = [0, 0]
+            pc = stars[0][1:3]
+            if np.sqrt(np.sum(np.array(pc)**2)) > 25:
+                self.logger.error('SgrA* further than 25mas from fiber center, initial conditions have to be choosen by Hand with fit_stars')
+                raise ValueError('SgrA* further than 25mas from fiber center, initial conditions have to be choosen by Hand with fit_stars')
             initial = [-1, 3, 3, 1, *pc, 0.5, 1]
             stars = stars[1:]
             star_names = [s[0] for s in stars]
@@ -1101,8 +1105,8 @@ class GravMFit(GravData, GravPhaseMaps):
             star_names = [x for _, x in sorted(zip(stars[:, 4], star_names))]
             stars = np.asarray([x for _, x in sorted(zip(stars[:, 4], stars))])
             
-            ra_list = stars[:, 0]
-            de_list = stars[:, 1]
+            ra_list = stars[:, 0] - pc[0]
+            de_list = stars[:, 1] - pc[1]
             mag = stars[:, 3]
             fr_list = self.flux_ratio(mag[0], mag[1:])
             star_names = ['SGRA'] + star_names
