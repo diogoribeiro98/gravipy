@@ -43,12 +43,16 @@ class GCorbits():
         if t is None:
             d = datetime.utcnow()
             t = d.strftime("%Y-%m-%dT%H:%M:%S")
-        try:
-            t = convert_date(t)[0]
-        except ValueError:
-            raise ValueError('t has to be given as YYYY-MM-DDTHH:MM:SS')
+        if isinstance(t, float):
+            pass
+        else:
+            if isinstance(t, str) and len(t) == 10:
+                t += 'T12:00:00'
+            try:
+                t = convert_date(t)[0]
+            except ValueError:
+                raise ValueError('t has to be given as YYYY-MM-DDTHH:MM:SS, YYYY-MM-DD, or float')
         self.t = t
-
         self.star_poly = {}
         self.poly_stars = []
         self.star_orbits = {}
@@ -114,7 +118,7 @@ class GCorbits():
                 for _s in _data[sdx:]:
                     data_new.append(_s[:_s.find(' ; ')])
                 data_new = [
-                    [float(m) for m in re.findall(r'-?\d+\.\d+', line)][0]
+                    [float(m) for m in re.findall(r'-?\d+(?:\.\d+)?', line)][0]
                      for line in data_new]
                 data_new = np.array(data_new)
                 
@@ -320,7 +324,7 @@ class GCorbits():
         if plot is True, plots the stars in the inner region
         plotlim: radius of the plot
         """
-        self.gcorb_logger.debug(f'Finding stars within {fiberrad} mas from {x}, {y}')
+        self.gcorb_logger.info(f'Finding stars within {fiberrad} mas from {x}, {y}')
         starpos = self.starpos
         stars = []
         for s in starpos:
@@ -329,7 +333,7 @@ class GCorbits():
             if dist < fiberrad:
                 dmag = -2.5*np.log10(fiber_coupling(dist))
                 stars.append([n, sx-x, sy-y, dist, mag, mag + dmag])
-                self.gcorb_logger.debug(f'{n} at a distance of [{sx-x:.2f} {sy-y:.2f}]')
+                self.gcorb_logger.info(f'{n} at a distance of [{sx-x:.2f} {sy-y:.2f}] from fiber pointing')
 
         if plot:
             fig, ax = plt.subplots()
@@ -355,6 +359,25 @@ class GCorbits():
             plt.show()
         return stars, starpos
 
+    def star_pos_list(self, offs=[0,0], lim=70):
+        """
+        Returns a list of stars within the fiber radius
+        """
+        starpos = self.starpos
+        stars = []
+        for s in starpos:
+            n, sx, sy, _, mag = s
+            dist = np.sqrt((sx-offs[0])**2+(sy-offs[1])**2)
+            if dist < lim:
+                dmag = -2.5*np.log10(fiber_coupling(dist))
+                stars.append([n, sx-offs[0], sy-offs[1], dist, mag, mag + dmag])
+        return stars
+    
+    def flux_ratio(self, mag1, mag2):
+        """
+        Returns the flux ratio from two stars in magnitudes
+        """
+        return 10**((mag1-mag2)/2.5)
 
 
     def plot_orbits(self, off=[0, 0], t=None, figsize=8, lim=100, long=False):
