@@ -1,17 +1,18 @@
 import numpy as np
-from astropy import units as u
-from astropy import constants as c
-from scipy.optimize import newton
-from .star_orbits import star_pms, star_orbits
-from datetime import datetime
 import matplotlib.pyplot as plt
-from pkg_resources import resource_filename
 import logging
 import glob
 import re
-from .gravdata import convert_date, log_level_mapping, fiber_coupling
+from astropy import units as u
 from astropy.visualization import make_lupton_rgb
+from astropy import constants as c
+from scipy.optimize import newton
 from scipy.special import j1
+from datetime import datetime
+from pkg_resources import resource_filename
+
+from .utils import *
+from .star_orbits import star_pms, star_orbits
 
 deg_to_rad = np.pi/180
 microarcsec_to_deg = (10**(-3))/3600
@@ -31,14 +32,8 @@ class GCorbits():
         pos_pm : get positions for stars with proper motions
         """
         log_level = log_level_mapping.get(loglevel, logging.INFO)
-        gcorb_logger = logging.getLogger(__name__)
-        gcorb_logger.setLevel(log_level)
-        if not gcorb_logger.hasHandlers():
-            ch = logging.StreamHandler()
-            formatter = logging.Formatter('%(levelname)s: %(name)s - %(message)s')
-            ch.setFormatter(formatter)
-            gcorb_logger.addHandler(ch)
-        self.gcorb_logger = gcorb_logger
+        self.gcorb_logger = logging.getLogger(__name__)
+        self.gcorb_logger.setLevel(log_level)
 
         if t is None:
             d = datetime.utcnow()
@@ -60,7 +55,7 @@ class GCorbits():
         self.star_pms = {}
         self.pm_stars = []
 
-        _s = resource_filename('mygravipy', f'Datafiles/s*.dat')
+        _s = resource_filename(__name__, f'Datafiles/s*.dat')
         dfiles = sorted(glob.glob(_s))
 
         for d in dfiles:
@@ -85,7 +80,7 @@ class GCorbits():
                 elif 'polyFitResultDec' in _s:
                     de_s = _s
             if ra_s is not None and de_s is not None:
-                gcorb_logger.debug(f'Polynomial found for S{snum}')
+                self.gcorb_logger.debug(f'Polynomial found for S{snum}')
                 
                 ra = [float(m) for m in re.findall(r'-?\d+\.\d+', ra_s)]
                 de = [float(m) for m in re.findall(r'-?\d+\.\d+', de_s)]
@@ -112,7 +107,7 @@ class GCorbits():
                         sdx = _sdx + 1
                         break
                 if sdx == -1:
-                    gcorb_logger.warning(f'No orbit or polynomial found for S{snum}')
+                    self.gcorb_logger.warning(f'No orbit or polynomial found for S{snum}')
                     continue          
                 data_new = []
                 for _s in _data[sdx:]:
@@ -123,7 +118,7 @@ class GCorbits():
                 data_new = np.array(data_new)
                 
                 if len(data_new) != 14:
-                    gcorb_logger.debug(f'No orbit or polynomial found for S{snum}')
+                    self.gcorb_logger.debug(f'No orbit or polynomial found for S{snum}')
                     continue
 
                 s = {'name': f'S{snum}',
@@ -137,6 +132,7 @@ class GCorbits():
                      'Omega': data_new[6]/180*np.pi,
                      'Kmag': 20,
                      'type': ''}
+                self.gcorb_logger.debug(f'Orbit found for S{snum}')
                 self.star_orbits[f'S{snum}'] = s
                 self.orbit_stars.append(f'S{snum}')
                 
@@ -148,7 +144,7 @@ class GCorbits():
             else:
                 self.star_orbits[s['name']] = s
                 self.orbit_stars.append(s['name'])
-                gcorb_logger.debug(f'Added {s["name"]} from old orbits')
+                self.gcorb_logger.debug(f'Added {s["name"]} from old orbits')
 
         for s in star_pms:
             if s['name'] in self.star_orbits:
@@ -160,17 +156,17 @@ class GCorbits():
             else:
                 self.star_pms[s['name']] = s
                 self.pm_stars.append(s['name'])
-                gcorb_logger.debug(f'Added {s["name"]} from old pm stars')
+                self.gcorb_logger.debug(f'Added {s["name"]} from old pm stars')
 
-        gcorb_logger.info(f'Evaluating for {t:.4f}')
-        gcorb_logger.debug('Stars with orbits:')
-        gcorb_logger.debug(self.orbit_stars)
-        gcorb_logger.debug('')
-        gcorb_logger.debug('Stars with polynomias:')
-        gcorb_logger.debug(self.poly_stars)
-        gcorb_logger.debug('')
-        gcorb_logger.debug('Stars with proper motions:')
-        gcorb_logger.debug(self.pm_stars)
+        self.gcorb_logger.info(f'Evaluating for {t:.4f}')
+        self.gcorb_logger.debug('Stars with orbits:')
+        self.gcorb_logger.debug(self.orbit_stars)
+        self.gcorb_logger.debug('')
+        self.gcorb_logger.debug('Stars with polynomias:')
+        self.gcorb_logger.debug(self.poly_stars)
+        self.gcorb_logger.debug('')
+        self.gcorb_logger.debug('Stars with proper motions:')
+        self.gcorb_logger.debug(self.pm_stars)
 
 
         # calculate starpos

@@ -1,36 +1,37 @@
-from astropy.io import fits
-from astropy.convolution import Gaussian2DKernel
 import matplotlib.pyplot as plt
-from matplotlib import gridspec
 import numpy as np
 import emcee
 import corner
-from multiprocessing import Pool
-from scipy import signal, interpolate, stats
 import math
 import mpmath
-from pkg_resources import resource_filename
 import os
 import pandas as pd
-from joblib import Parallel, delayed
-from lmfit import minimize, Parameters
 import dynesty
+import time
+import colorsys
+import matplotlib.colors as mc
+from astropy.io import fits
+from astropy.convolution import Gaussian2DKernel
+from matplotlib import gridspec
+from multiprocessing import Pool
+from scipy import signal, interpolate, stats
+from pkg_resources import resource_filename
+from lmfit import minimize, Parameters
 from dynesty import plotting as dyplot
 from dynesty import utils as dyfunc
 from numba import jit
-import time
 from reportlab.lib.pagesizes import A4
-from reportlab.pdfgen import canvas
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet
 from io import BytesIO
-from reportlab.graphics import renderPDF
 from svglib.svglib import svg2rlg
 from reportlab.platypus import PageBreak
+from joblib import Parallel, delayed
 
 from .gravdata import *
 from .gcorbits import GCorbits
+from .utils import *
 
 try:
     from generalFunctions import *
@@ -38,8 +39,6 @@ try:
 except (ValueError, NameError, ModuleNotFoundError):
     pass
 
-import colorsys
-import matplotlib.colors as mc
 
 
 def lighten_color(color, amount=0.5):
@@ -50,21 +49,12 @@ def lighten_color(color, amount=0.5):
     c = colorsys.rgb_to_hls(*mc.to_rgb(c))
     return colorsys.hls_to_rgb(c[0], 1 - amount * (1 - c[1]), c[2])
 
-
-color1 = '#C02F1D'
-color2 = '#348ABD'
-color3 = '#F26D21'
-color4 = '#7A68A6'
-
-PKG_NAME = 'mygravipy'
-
 def mathfunc_real(values, dt):
     return np.trapz(np.real(values), dx=dt, axis=0)
 
 
 def mathfunc_imag(values, dt):
     return np.trapz(np.imag(values), dx=dt, axis=0)
-
 
 def complex_quadrature_num(func, a, b, theta, nsteps=int(1e2)):
     t = np.logspace(np.log10(a), np.log10(b), nsteps)
@@ -74,7 +64,6 @@ def complex_quadrature_num(func, a, b, theta, nsteps=int(1e2)):
     imag_integral = mathfunc_imag(values, dt)
     return real_integral + 1j*imag_integral
 
-
 def print_status(number, total):
     number = number+1
     if number == total:
@@ -82,7 +71,6 @@ def print_status(number, total):
     else:
         percentage = int((number/total)*100)
         print("\rComplete: ", percentage, "%", end="")
-
 
 def procrustes(a, target, padval=0):
     try:
@@ -132,15 +120,8 @@ class GravPhaseMaps():
         read_phasemaps : read correction from loaded phasemaps
         """
         log_level = log_level_mapping.get(loglevel, logging.INFO)
-        logger = logging.getLogger(__name__)
-        logger.setLevel(log_level)
-        ch = logging.StreamHandler()
-        # ch.setLevel(logging.DEBUG) # not sure if needed
-        formatter = logging.Formatter('%(levelname)s: %(name)s - %(message)s')
-        ch.setFormatter(formatter)
-        if not logger.hasHandlers():
-            logger.addHandler(ch)
-        self.logger = logger
+        self.logger = logging.getLogger(__name__)
+        self.logger.setLevel(log_level)
         try:
             self.get_int_data()
         except AttributeError:
@@ -316,7 +297,7 @@ class GravPhaseMaps():
                                                      * np.exp(1j*phase)))
             return complexPsf[cc, cc]/np.abs(complexPsf[cc, cc]).max()
 
-        zernikefile = resource_filename(PKG_NAME, 'Phasemaps/' + zerfile)
+        zernikefile = resource_filename(__name__, 'Phasemaps/' + zerfile)
         zer = np.load(zernikefile, allow_pickle=True).item()
 
         wave = self.wlSC
@@ -407,9 +388,9 @@ class GravPhaseMaps():
             savename2 = ('Phasemaps/Phasemap_%s_%s_Smooth%i_2020data_denom.npy'
                          % (self.tel, self.resolution, smooth))
 
-        savefile = resource_filename(PKG_NAME, savename)
+        savefile = resource_filename(__name__, savename)
         np.save(savefile, all_pm)
-        savefile = resource_filename(PKG_NAME, savename2)
+        savefile = resource_filename(__name__, savename2)
         np.save(savefile, all_pm_denom)
         self.all_pm = all_pm
         if plot:
@@ -499,8 +480,8 @@ class GravPhaseMaps():
                         % (self.tel, self.resolution, smoothkernel))
 
         try:
-            pm1 = np.load(resource_filename(PKG_NAME, pm1_file))
-            pm2 = np.real(np.load(resource_filename(PKG_NAME, pm2_file)))
+            pm1 = np.load(resource_filename(__name__, pm1_file))
+            pm2 = np.real(np.load(resource_filename(__name__, pm2_file)))
         except FileNotFoundError:
             raise ValueError('%s does not exist, you have to create '
                              'the phasemap first!\nFor this '
@@ -532,10 +513,10 @@ class GravPhaseMaps():
                 hlist.append(fits.ImageHDU(amp_map_denom[:, tel],
                                            name='SC_INT UT%i' % (4-tel)))
             hdul = fits.HDUList(hlist)
-            hdul.writeto(resource_filename(PKG_NAME, 'testfits.fits'),
+            hdul.writeto(resource_filename(__name__, 'testfits.fits'),
                          overwrite=True)
             self.logger.info('Saving phasemaps as fits file to: %s'
-                  % resource_filename(PKG_NAME, 'testfits.fits'))
+                  % resource_filename(__name__, 'testfits.fits'))
 
         if interp:
             x = np.arange(201)
@@ -1049,15 +1030,10 @@ class GravMFit(GravData, GravPhaseMaps):
         super().__init__(data, loglevel=loglevel)
         self.get_int_data(ignore_tel=ignore_tel)
         log_level = log_level_mapping.get(loglevel, logging.INFO)
-        logger = logging.getLogger(__name__)
-        logger.setLevel(log_level)
-        ch = logging.StreamHandler()
-        formatter = logging.Formatter('%(levelname)s: %(name)s - %(message)s')
-        ch.setFormatter(formatter)
-        if not logger.hasHandlers():
-            logger.addHandler(ch)
-        self.logger = logger
+        self.logger = logging.getLogger(__name__)
+        self.logger.setLevel(log_level)
         self.loglevel = loglevel
+
 
     def flux_ratio(self, mag1, mag2):
         """
@@ -1214,6 +1190,7 @@ class GravMFit(GravData, GravPhaseMaps):
                                                           self.northangle, self.dra, self.ddec)
             self.pm_sources.append([pm_amp, pm_pha, pm_int])
 
+    @timing
     def fit_stars(self,
                   ra_list,
                   de_list,
@@ -2862,14 +2839,8 @@ class GravMNightFit(GravNight, GravPhaseMaps):
         """
         super().__init__(file_list, loglevel=loglevel)
         log_level = log_level_mapping.get(loglevel, logging.INFO)
-        logger = logging.getLogger(__name__)
-        logger.setLevel(log_level)
-        ch = logging.StreamHandler()
-        formatter = logging.Formatter('%(levelname)s: %(name)s - %(message)s')
-        ch.setFormatter(formatter)
-        if not logger.hasHandlers():
-            logger.addHandler(ch)
-        self.logger = logger
+        self.logger = logging.getLogger(__name__)
+        self.logger.setLevel(log_level)
         self.loglevel = loglevel
 
     def fit_stars(self,

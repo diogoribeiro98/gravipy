@@ -1,53 +1,18 @@
-from astropy.io import fits
 import matplotlib.pyplot as plt
-from matplotlib import gridspec
 import numpy as np
 import logging
-from scipy import interpolate
-from scipy import optimize
-from pkg_resources import resource_filename
-from astropy.time import Time
-from datetime import datetime, timedelta
-
 import os
+from matplotlib import gridspec
+from astropy.io import fits
+from scipy import interpolate, optimize
+
+from .utils import *
 
 try:
     from generalFunctions import *
     set_style('show')
 except (ValueError, NameError, ModuleNotFoundError):
     pass
-
-
-color1 = '#C02F1D'
-color2 = '#348ABD'
-color3 = '#F26D21'
-color4 = '#7A68A6'
-
-log_level_mapping = {
-    "DEBUG": logging.DEBUG,
-    "INFO": logging.INFO,
-    "WARNING": logging.WARNING,
-    "ERROR": logging.ERROR,
-    "CRITICAL": logging.CRITICAL,
-}
-
-
-def fiber_coupling(x):
-    fiber_coup = np.exp(-1*(2*np.pi*np.sqrt(np.sum(x**2))/280)**2)
-    return fiber_coup
-
-
-def convert_date(date, mjd=False):
-    t = Time(date)
-    if mjd:
-        return t.mjd
-    t2 = Time('2000-01-01T12:00:00')
-    date_decimal = (t.mjd - t2.mjd)/365.25+2000
-
-    date = date.replace('T', ' ')
-    date = date.split('.')[0]
-    date = datetime.strptime(date, '%Y-%m-%d %H:%M:%S')
-    return date_decimal, date
 
 
 def get_met(Volts, fc=False, removefc=True, returncomplex=False):
@@ -122,12 +87,6 @@ def get_refangle(header, tel, length):
     fangle = - posangle - drottoff + 270
     angle = fangle + parang + 45.
     return (angle) % 360
-
-
-def find_nearest(array, value):
-    idx = (np.abs(array-value)).argmin()
-    return idx
-
 
 def averaging(x, N, median=False):
     if N == 1:
@@ -221,15 +180,8 @@ class GravData():
         calibrate_phi : Calibrate visibility phases
         """
         log_level = log_level_mapping.get(loglevel, logging.INFO)
-        logger = logging.getLogger(__name__)
-        logger.setLevel(log_level)
-        ch = logging.StreamHandler()
-        # ch.setLevel(logging.DEBUG) # not sure if needed
-        formatter = logging.Formatter('%(levelname)s: %(name)s - %(message)s')
-        ch.setFormatter(formatter)
-        if not logger.hasHandlers():
-            logger.addHandler(ch)
-        self.logger = logger
+        self.logger = logging.getLogger(__name__)
+        self.logger.setLevel(log_level)
         self.name = data
         self.test = test
         self.filename = os.path.basename(data)
@@ -262,7 +214,7 @@ class GravData():
                     raise ValueError('filetype is %s, which is not supported'
                                      % datacatg)
             else:
-                logger.info('Assume this is a raw file!')
+                self.logger.info('Assume this is a raw file!')
                 datacatg = 'RAW'
         if datacatg == 'RAW':
             self.raw = True
@@ -320,12 +272,12 @@ class GravData():
             self.closure_labels = np.array(closure_labels)
             self.baseline_labels = np.array(baseline_labels)
 
-        logger.debug(f'Category: {self.datacatg}')
-        logger.debug(f'Telescope: {self.tel}')
-        logger.debug(f'Polarization: {self.polmode}')
-        logger.debug(f'Resolution: {self.resolution}')
-        logger.debug(f'DIT: {self.dit}')
-        logger.debug(f'NDIT: {self.ndit}')
+        self.logger.debug(f'Category: {self.datacatg}')
+        self.logger.debug(f'Telescope: {self.tel}')
+        self.logger.debug(f'Polarization: {self.polmode}')
+        self.logger.debug(f'Resolution: {self.resolution}')
+        self.logger.debug(f'DIT: {self.dit}')
+        self.logger.debug(f'NDIT: {self.ndit}')
 
         if not self.raw:
             if self.polmode == 'SPLIT':
@@ -1169,17 +1121,8 @@ class GravNight():
         get_faint_timer : get timing from G-Faint files
         """
         log_level = log_level_mapping.get(loglevel, logging.INFO)
-        self.log_level = log_level
-
-        logger = logging.getLogger(__name__)
-        logger.setLevel(log_level)
-        ch = logging.StreamHandler()
-        # ch.setLevel(logging.DEBUG) # not sure if needed
-        formatter = logging.Formatter('%(levelname)s: %(name)s - %(message)s')
-        ch.setFormatter(formatter)
-        if not logger.hasHandlers():
-            logger.addHandler(ch)
-        self.logger = logger
+        self.logger = logging.getLogger(__name__)
+        self.logger.setLevel(log_level)
 
         self.file_list = file_list
         self.nfiles = len(file_list)
