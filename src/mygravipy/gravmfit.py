@@ -125,7 +125,16 @@ class GravPhaseMaps():
         try:
             self.get_int_data()
         except AttributeError:
-            self.logger.warning('No data loaded, need to set attributes by hand')
+            self.wlSC = np.array([2.       , 2.037    , 2.074    ,
+                                  2.111    , 2.148    , 2.1850002,
+                                  2.222    , 2.259    , 2.296    ,
+                                  2.3330002, 2.37     , 2.407    ,
+                                  2.444    , 2.481    ])
+            self.resolution = 'LOW'
+            self.tel = 'UT'
+            self.smoothkernel = 15
+            self.datayear = 2019
+            self.logger.warning('No data loaded, assume UT LOW res data')
 
     def create_phasemaps(self, nthreads=1, smooth=15, plot=True, 
                          datayear=2019):
@@ -478,6 +487,9 @@ class GravPhaseMaps():
                         % (self.tel, self.resolution, smoothkernel))
             pm2_file = ('Phasemaps/Phasemap_%s_%s_Smooth%i_2020data_denom.npy'
                         % (self.tel, self.resolution, smoothkernel))
+        else:
+            self.logger.error('Datayear has to be 2019 or 2020')
+            raise ValueError('Datayear has to be 2019 or 2020')
 
         try:
             pm1 = np.load(resource_filename(__name__, pm1_file))
