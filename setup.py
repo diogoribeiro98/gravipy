@@ -1,16 +1,14 @@
 from setuptools import setup, find_packages
 
-setup(name='mygravipy',
+setup(name='gravipy',
       version='1.5',
       author='Felix Widmann',
       description='Package to work with GRAVITY GC data',
       url='https://github.com/widmannf/mygravipy',
       python_requires='>=3.7',
-      packages=['mygravipy'],
+      packages=['gravipy'],
       package_dir={'':'src'},
-      package_data={'mygravipy': ['Phasemaps/*.npy',
-                                'Datafiles/*',
-                                'met_corrections/*.npy']},
+      package_data={'gravipy': ['logger/config.json']},
       include_package_data=True,
       install_requires=[
         'matplotlib',
