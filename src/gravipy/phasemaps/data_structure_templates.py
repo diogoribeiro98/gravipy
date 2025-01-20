@@ -1,0 +1,45 @@
+import copy
+
+template_zernike_list = {
+'A00'  : 0.0,
+'A1m1' : 0.0,
+'A1p1' : 0.0,
+'A2m2' : 0.0,
+'A2p2' : 0.0,
+'A20'  : 0.0,
+'A3m1' : 0.0,
+'A3p1' : 0.0,
+'A3m3' : 0.0,
+'A3p3' : 0.0,
+'A4m2' : 0.0,
+'A4p2' : 0.0,
+'A4m4' : 0.0,
+'A4p4' : 0.0,
+'A40'  : 0.0,
+'A5m1' : 0.0,
+'A5p1' : 0.0,
+'A5m3' : 0.0,
+'A5p3' : 0.0,
+'A5m5' : 0.0,
+'A5p5' : 0.0,
+'A6m6' : 0.0,
+'A6p6' : 0.0,
+'A6m4' : 0.0,
+'A6p4' : 0.0,
+'A6m2' : 0.0,
+'A6p2' : 0.0,
+'A60'  : 0.0,
+
+'B1m1' : 0.0,
+'B1p1' : 0.0,
+'B20'  : 0.0,
+'B2m2' : 0.0,
+'B2p2' : 0.0,
+}
+
+template_zernike_table = {
+    'GV1': copy.deepcopy(template_zernike_list),
+    'GV2': copy.deepcopy(template_zernike_list),
+    'GV3': copy.deepcopy(template_zernike_list),
+    'GV4': copy.deepcopy(template_zernike_list),
+}
