@@ -26,6 +26,10 @@ from ..physical_units import units as units
 #data structure templates
 from .data_structure_templates import *
 
+#Plotting tools
+import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 class GravPhaseMaps():
 	"""GRAVITY phasemaps class
@@ -301,3 +305,81 @@ class GravPhaseMaps():
 		complexPsf /= np.abs(complexPsf[cc, cc]).max()
 
 		return x[cc, cc]/units.mas_to_rad, y[cc, cc]/units.mas_to_rad, px[cc, cc], py[cc, cc],  fiber_ip[cc, cc], fiber_pp[cc, cc], complexPsf[cc, cc]
+
+	def plot_phasemaps(self, wavelength = 2.2 , fiber_fov = 80):
+		"""Plot intensity and phase maps for the 4 beams
+		"""
+		
+		#Create figure and setup grid
+		fig = plt.figure( figsize=(9,4.5))
+		gs = gridspec.GridSpec(ncols=4,nrows=2, height_ratios=[1,1], width_ratios=[1,1,1,1.08])
+		
+		#Plotting arguments
+		pltargsP = {'cmap': 'twilight_shifted', 'levels': np.linspace(-180, 180, 19, endpoint=True)}
+		
+
+		pms = self.phasemaps
+
+		for idx, beam in enumerate(pms):
+			
+			# Get data
+	
+			x = pms[beam].grid[1]
+			y = pms[beam].grid[2]
+
+			xx, yy = np.meshgrid(x, y)
+			zz = pms[beam]((wavelength,yy,xx))
+			
+			rmap = np.sqrt(xx*xx + yy*yy)
+			zz[rmap > fiber_fov] = 0.0 
+
+			# Setup axis
+			ax1  = plt.subplot(gs[0,idx])
+			ax2  = plt.subplot(gs[1,idx])
+
+			ax1.set_title("{} ({} $\\mu m)$".format(beam, wavelength))
+
+			ax1.set_xticklabels([])
+		
+			if idx != 0:
+				ax1.set_yticklabels([])
+				ax2.set_yticklabels([])
+			
+			if idx == 0:
+				ax1.set_ylabel("y (mas)")
+				ax2.set_ylabel("y (mas)")
+
+			ax2.set_xlabel("x (mas)")
+
+			scale = 1.05*fiber_fov
+			for ax in [ax1,ax2]:
+				ax.set_xlim(-scale,scale)
+				ax.set_ylim(-scale,scale)
+
+			#Plot
+			intensity_plot = ax1.pcolormesh(xx, yy, np.abs(zz)/np.max(np.abs(zz)))
+			#ax2.pcolormesh(xx, yy, np.angle(zz, deg=True), **pltargsP)
+			phase_plot = ax2.contourf(xx, yy, np.angle(zz,deg=True), **pltargsP)
+
+			if idx==3:
+				divider1 = make_axes_locatable(ax1)
+				cax1 = divider1.append_axes("right", size="5%", pad="3%")
+				cbar1 = plt.colorbar(intensity_plot, cax=cax1)
+
+				divider2 = make_axes_locatable(ax2)
+				cax2 = divider2.append_axes("right", size="5%", pad="3%")
+				cbar2 = plt.colorbar(phase_plot, cax=cax2)
+
+			
+			circ = plt.Circle((0,0), radius=fiber_fov, facecolor="None", edgecolor='black', linewidth=0.8)
+			ax1.add_artist(circ)
+
+			circ = plt.Circle((0,0), radius=fiber_fov, facecolor="None", edgecolor='black', linewidth=0.8)
+			ax2.add_artist(circ)
+
+			ax1.set_aspect(1) 
+			ax2.set_aspect(1) 
+
+			plt.subplots_adjust(wspace=0, hspace=0)
+
+			fig.tight_layout()
