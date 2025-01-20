@@ -383,3 +383,5 @@ class GravPhaseMaps():
 			plt.subplots_adjust(wspace=0, hspace=0)
 
 			fig.tight_layout()
+
+			return fig
