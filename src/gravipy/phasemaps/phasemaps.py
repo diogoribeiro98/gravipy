@@ -79,17 +79,17 @@ class GravPhaseMaps():
 
 		#Storage variable for interpolating function (defaults to zero function)
 		self.phasemaps = {
-			'GV1' : lambda args : 0, 
-			'GV2' : lambda args : 0,
-			'GV3' : lambda args : 0,
-			'GV4' : lambda args : 0,
+			'GV1' : lambda args : 1, 
+			'GV2' : lambda args : 1,
+			'GV3' : lambda args : 1,
+			'GV4' : lambda args : 1,
 		}
 		
 		self.phasemaps_normalization = {
-			'GV1' : lambda args : 0, 
-			'GV2' : lambda args : 0,
-			'GV3' : lambda args : 0,
-			'GV4' : lambda args : 0,
+			'GV1' : lambda args : 1, 
+			'GV2' : lambda args : 1,
+			'GV3' : lambda args : 1,
+			'GV4' : lambda args : 1,
 		}
 	
 	def load_zernike_coefficients(self,zernikefile):
