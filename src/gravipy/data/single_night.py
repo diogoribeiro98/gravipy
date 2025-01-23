@@ -505,6 +505,4 @@ class GravData():
 
                 ax.errorbar(x, y, yerr, **plot_config, marker='D', color=self.colors_baseline[idx % 6])
             
-
-        #Display plot
-        plt.show()
+        return fig, axes
