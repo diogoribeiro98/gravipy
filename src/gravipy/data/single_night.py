@@ -73,6 +73,8 @@ class GravData():
         self.wlFT    = None
         self.wFTC_nchannels = None
 
+        self.tel_pos = None
+
         self.u = None
         self.v =  None
         self.spatial_frequency_as = None
@@ -180,6 +182,8 @@ class GravData():
 
         tel_name  = fits.open(self.name)['OI_ARRAY'].data['TEL_NAME']
         sta_index = fits.open(self.name)['OI_ARRAY'].data['STA_INDEX']
+        tel_pos  = fits.open(self.name)['OI_ARRAY'].data['STAXYZ'][:,0:2]
+
         
         if self.polmode == 'SPLIT':
                 vis_index = fits.open(self.name)['OI_VIS', 11].data['STA_INDEX']
@@ -203,6 +207,7 @@ class GravData():
         self.baseline_labels = np.array(baseline_labels)
         self.closure_labels  = np.array(closure_labels)
         self.baseline_telescopes = np.array(baseline_telescopes)
+        self.tel_pos = np.array(tel_pos)
 
         # ----------------------------
         # Load wavelength data
