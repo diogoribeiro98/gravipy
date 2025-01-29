@@ -262,13 +262,14 @@ class GravData():
             self.spatial_frequency_as = np.sqrt(u_as**2.+v_as**2.)
             
             uv_magnitude = np.sqrt(self.u**2.+self.v**2.)
-            max_spf = np.zeros((len(uv_magnitude)//6*4))
 
-            for idx in range(len(uv_magnitude)//6):
-                max_spf[0 + idx*4] = np.max(np.array([uv_magnitude[0 + idx*6], uv_magnitude[3 + idx*6], uv_magnitude[1 + idx*6]]))
-                max_spf[1 + idx*4] = np.max(np.array([uv_magnitude[0 + idx*6], uv_magnitude[4 + idx*6], uv_magnitude[2 + idx*6]]))
-                max_spf[2 + idx*4] = np.max(np.array([uv_magnitude[1 + idx*6], uv_magnitude[5 + idx*6], uv_magnitude[2 + idx*6]]))
-                max_spf[3 + idx*4] = np.max(np.array([uv_magnitude[3 + idx*6], uv_magnitude[5 + idx*6], uv_magnitude[4 + idx*6]]))
+            #Note: For closure phases, it is custumary to use as reference the longest baseline
+            max_spf = np.zeros(4)
+
+            max_spf[0] = np.max(np.array([uv_magnitude[0], uv_magnitude[3], uv_magnitude[1]]))
+            max_spf[1] = np.max(np.array([uv_magnitude[0], uv_magnitude[4], uv_magnitude[2]]))
+            max_spf[2] = np.max(np.array([uv_magnitude[1], uv_magnitude[5], uv_magnitude[2]]))
+            max_spf[3] = np.max(np.array([uv_magnitude[3], uv_magnitude[5], uv_magnitude[4]]))
 
             self.spatial_frequency_as_T3 = np.zeros((len(max_spf),  self.wlSC_nchannels))
             
