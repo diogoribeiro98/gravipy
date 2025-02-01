@@ -23,7 +23,11 @@ def spectral_visibility(opd, alpha, l0=2.2, dl=0.2, reference_l0=2.2):
         l0 (float, optional): Reference wavelength in micrometers. Defaults to 2.2.
         dl (float, optional): Half filter width in micrometers. Defaults to 0.2.
     """
-    return complex_quadrature_num(spectral_visibility_integrator, l0-dl, l0+dl, (opd, alpha, reference_l0))
+
+    if np.all(opd == 0.) and alpha != 0:
+        return  -reference_l0**(1 + alpha)/alpha * ( (l0+dl)**(-alpha) - (l0-dl)**(-alpha) )
+    else:
+        return complex_quadrature_num(spectral_visibility_integrator, l0-dl, l0+dl, (opd, alpha, reference_l0))
 
 def nsource_visibility( bij, sources, background, l0=2.2, dl=0.2, reference_l0=2.2):
     
