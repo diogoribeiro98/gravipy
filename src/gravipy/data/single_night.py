@@ -14,17 +14,13 @@ from ..tools.time_and_dates import convert_date
 #Plot utils
 import matplotlib.pyplot as plt
 from matplotlib import gridspec
- 
-color1 = '#006BA4' 
-color2 = '#FF800E' 
-color3 = '#ABABAB' 
-color4 = '#595959'
-color5 = '#5F9ED1' 
-color6 = '#C85200' 
-color7 = '#898989' 
-color8 = '#A2C8EC' 
-color9 = '#FFBC79' 
-color10= '#CFCFCF'
+
+fw_black = 'k'
+fw_dblue = 'darkblue'
+fw_lblue = '#006BA4'
+fw_gray = '#595959'
+fw_orange = '#FF800E' 
+fw_red = 'darkred'
 
 class GravData():
     """GRAVITY data loader
@@ -114,10 +110,8 @@ class GravData():
         self.visphiflagSC_P1 = None
         self.visphiflagSC_P2 = None
 
-
-        self.colors_baseline = np.array(['k', 'darkblue', color4, color2, 'darkred', color1])
-        self.colors_closure  = np.array([color1, 'darkred', 'k', color2])
-
+        self.colors_baseline = np.array([fw_black , fw_dblue , fw_gray, fw_orange, fw_red, fw_lblue])
+        self.colors_closure  = np.array([fw_lblue , fw_red   , fw_black, fw_orange])
 
         #List of allowed file types
         allowed_file_types = [
