@@ -35,6 +35,259 @@ class GravMfit(GravData, GravPhaseMaps):
 		#Super constructor
 		GravData.__init__(self,data,loglevel=loglevel)
 		GravPhaseMaps.__init__(self,loglevel=loglevel)
+		
+		# ---------------------------
+		# Pre-define class quantities
+		# ---------------------------
+		
+		#Fitting parameters
+		self.params = None
+		
+		#Fitting helper quantities
+		self.field_type = None
+		self.nsource 	= None
+		self.sources 	= None
+		self.background = None
+		self.use_phasemaps = None
+
+	#========================================
+	# Fitting parameters setup
+	#=========================================
+	
+	def prep_fit_parameters(self,
+		
+		#Star parameters
+		ra_list,
+		de_list,
+		fr_list,
+		star_alpha = 3.0,
+		fit_star_pos = True,
+		fit_star_fr  = True,
+		fit_star_alpha = False,
+		
+		#SgrA parameters
+		sgr_ra = 0.0,
+		sgr_de = 0.0,
+		sgr_fr = 1.0,
+		sgr_alpha = 3.0,
+		fit_sgr_pos = False,
+		fit_sgr_fr  = False,
+		fit_sgr_alpha = False,
+		
+		#Background parameters
+		background_alpha = 3,
+		background_fr = 0.1,
+		fit_background_fr = False,
+		fit_background_alpha = False,
+
+		#Field type and fitting model
+		field_type = 'star',
+		fit_window_stars = None,
+		fit_window_sgr = None,
+
+		#Use phasemaps?
+		use_phasemaps = True
+						 ):
+		
+		#Check if the list of RA, Dec and Flux all have the same length
+		if not all(len(lst) == len(ra_list) for lst in [de_list, fr_list]):
+			raise  ValueError('RA, Dec and Flux lists must have the same length!')
+		else:
+			nsource = len(ra_list)
+
+		# -----------------------------------------------------------------
+		# Create a different set of parameters depending on the field type
+		# -----------------------------------------------------------------
+
+		if field_type=='star':
+			
+			self.logger.info( 'Setting up star field fit')
+
+			if nsource==0:
+				raise ValueError('Field type is star but no initial guess was given. Give at least one ra,dec,flux set of values.')
+
+			#Setup class and create list of sources
+			self.field_type = 'star' 
+			self.nsource = nsource
+			self.sources = np.zeros((nsource, 4)) 	# [ra,dec,flux,alpha]
+			self.background = np.zeros(2)			# [flux,alpha]
+			self.use_phasemaps = use_phasemaps
+
+			# Parameters for stars 
+			# number of parameters = (3n-1)+1
+			star_fit_parameters = {
+				'stars_alpha' : [ star_alpha , -10, 10, fit_star_alpha]
+			}
+
+			#Check the fit_window_argument
+			if fit_window_stars == None:
+				fit_window = np.ones(nsource)*5.0
+			elif isinstance(fit_window_stars,float):
+				fit_window = np.ones(nsource)*fit_window_stars
+			elif len(fit_window_stars) == nsource:
+				fit_window = fit_window_stars
+			else:
+				raise ValueError('fit_window_stars must be either a float or array with the size of star sources!')
+
+			for idx in range(nsource):
+				
+				star_fit_parameters[f'source_{idx}_ra']   = [ ra_list[idx],  ra_list[idx] - fit_window[idx],  ra_list[idx] + fit_window[idx], fit_star_pos ]
+				star_fit_parameters[f'source_{idx}_dec']  = [ de_list[idx],  de_list[idx] - fit_window[idx],  ra_list[idx] + fit_window[idx], fit_star_pos ]
+				
+				#If first star, fix the flux
+				if idx==0:
+					star_fit_parameters[f'source_{idx}_flux'] = [ 1.0, np.log10(0.001),  np.log10(100.), False ]
+				else:
+					star_fit_parameters[f'source_{idx}_flux'] = [ fr_list[idx]/fr_list[0],  np.log10(0.001),  np.log10(100.), fit_star_fr ]
+
+			#Fitting parameters for background
+			# number of parameters = 2
+			background_fit_parameters = {
+				'background_flux' : [background_fr   ,   0.0, 20.0, fit_background_fr   ],
+				'background_alpha': [background_alpha, -10.0, 10.0, fit_background_alpha]
+			}		
+
+			#Create a dictionary with all the parameters to fit and assemble parameter class
+			all_fitting_parameters = {}
+			all_fitting_parameters.update(star_fit_parameters) 
+			all_fitting_parameters.update(background_fit_parameters)
+
+			self.params = self.assemble_parameter_class(all_fitting_parameters)
+			
+		elif field_type=='sgra':
+
+			self.logger.info( 'Setting up sgra field fit' )
+
+			if nsource==0:
+				self.logger.info('No sources exept sgra. Fitting single source.')
+
+				#Setup class and create list of sources
+				self.field_type = 'sgra' 
+				self.nsource = 0
+				self.sources = np.zeros((1, 4)) # [ra,dec,flux,alpha]
+				self.background = np.zeros(2)	# [flux,alpha]
+				self.use_phasemaps = use_phasemaps
+
+				#Check fitting area
+				if fit_window_sgr == None:
+					fit_window = 5.0
+				elif isinstance(fit_window_sgr,float):
+					fit_window = fit_window_sgr
+				else:
+					raise ValueError('fit_window_sgr must be a float!')
+
+				sgra_fit_parameters = {
+					'sgra_ra' 	 : [sgr_ra	 	, -fit_window	 , fit_window	 , fit_sgr_pos  ],
+					'sgra_dec' 	 : [sgr_de	 	, -fit_window	 , fit_window	 , fit_sgr_pos  ],
+					'sgra_flux'  : [1.0			, np.log10(0.001), np.log10(100.), False        ],
+					'sgra_alpha' : [sgr_alpha	, -10.0	 		 , 10.0			 , fit_sgr_alpha],
+				}
+
+				#Fitting parameters for background
+				# number of parameters = 2
+				background_fit_parameters = {
+					'background_flux' : [background_fr   ,  0.0, 20.0, fit_background_fr   ],
+					'background_alpha': [background_alpha, -10.0, 10.0, fit_background_alpha]
+				}	
+
+				all_fitting_parameters = {}
+				all_fitting_parameters.update(sgra_fit_parameters) 
+				all_fitting_parameters.update(background_fit_parameters)
+
+				self.params = self.assemble_parameter_class(all_fitting_parameters)
+
+			else:
+
+				#Setup class and create list of sources
+				self.field_type = 'sgra' 
+				self.nsource = nsource
+				self.sources = np.zeros((nsource + 1, 4))  	# [ra,dec,flux,alpha]
+				self.background = np.zeros(2)				# [flux,alpha]
+				self.use_phasemaps = use_phasemaps
+
+				#Fitting parameters for stars 
+				# number of parameters = (3n-1)+1
+				star_fit_parameters = {
+					'stars_alpha' : [ star_alpha , -10, 10, fit_star_alpha]
+				}
+
+				#Check the fit_window_argument
+				if fit_window_stars == None:
+					fit_window = np.ones(nsource)*5.0
+				elif isinstance(fit_window_stars,float):
+					fit_window = np.ones(nsource)*fit_window_stars
+				elif len(fit_window_stars) == nsource:
+					fit_window = fit_window_stars
+				else:
+					raise ValueError('fit_window_stars must be either a float or array with the size of star sources!')
+
+				for idx in range(nsource):
+					
+					star_fit_parameters[f'source_{idx}_ra']   = [ ra_list[idx],  ra_list[idx] - fit_window[idx],  ra_list[idx] + fit_window[idx], fit_star_pos ]
+					star_fit_parameters[f'source_{idx}_dec']  = [ de_list[idx],  de_list[idx] - fit_window[idx],  de_list[idx] + fit_window[idx], fit_star_pos ]
+					
+					#If first star, fix the flux
+					if idx==0:
+						star_fit_parameters[f'source_{idx}_flux'] = [ 1.0, np.log10(0.001),  np.log10(100.), False ]
+					else:
+						star_fit_parameters[f'source_{idx}_flux'] = [ fr_list[idx]/fr_list[0],  np.log10(0.001),  np.log10(100.), fit_star_fr ]
+
+				#Check fitting area
+				if fit_window_sgr == None:
+					fit_window = 5.0
+				elif isinstance(fit_window_sgr,float):
+					fit_window = fit_window_sgr
+				else:
+					raise ValueError('fit_window_sgr must be a float!')
+
+				sgra_fit_parameters = {
+					'sgra_ra' 	 : [sgr_ra	 			, -fit_window	 , fit_window	 , fit_sgr_pos  ],
+					'sgra_dec' 	 : [sgr_de	 			, -fit_window	 , fit_window	 , fit_sgr_pos  ],
+					'sgra_flux'  : [sgr_fr/fr_list[0]	, np.log10(0.001), np.log10(100.), fit_sgr_fr   ],
+					'sgra_alpha' : [sgr_alpha			, -10.0	 		 , 10.0			 , fit_sgr_alpha],
+				}
+
+				#Fitting parameters for background
+				# number of parameters = 2
+				background_fit_parameters = {
+					'background_flux' : [background_fr   ,  0.0, 20.0, fit_background_fr   ],
+					'background_alpha': [background_alpha, -10.0, 10.0, fit_background_alpha]
+				}	
+
+				#Create a dictionary with all the parameters to fit
+				all_fitting_parameters = {}
+				all_fitting_parameters.update(star_fit_parameters) 
+				all_fitting_parameters.update(sgra_fit_parameters) 
+				all_fitting_parameters.update(background_fit_parameters)
+
+				self.params = self.assemble_parameter_class(all_fitting_parameters)
+				
+		else:
+			raise ValueError('Field type not recognized. Field type must be "stars" or "sgra".')
+
+	def assemble_parameter_class(self, parameter_dictionary):
+		""" Generates a lmfit.Parameters class from a parameter dictionary.
+			The parameter dictionary should be of the form
+
+			dict = {'parameter name' : [value, min_value, max_value, vary]}
+
+			where min_value and max_value represent the bounds on the parameter
+			and vary wether or not the parameter should be varied during the fit		
+		"""
+
+		params = lmfit.Parameters()
+		
+		for name in parameter_dictionary:
+			
+			params.add(
+				name, 
+				value = parameter_dictionary[name][0],
+				vary  = parameter_dictionary[name][3],
+				min   = parameter_dictionary[name][1],
+				max   = parameter_dictionary[name][2],
+				)
+
+		return params
 
 	def nsource_visibility(
 			self,
