@@ -216,6 +216,9 @@ class GravData():
                 self.wlFT = fits.open(self.name)['OI_WAVELENGTH', 20].data['EFF_WAVE']*1e6
                 self.wlFT_nchannels = len(self.wlFT)
 
+            effband = fits.open(self.name)['OI_WAVELENGTH', 10].data['EFF_BAND']
+            self.dlambda = effband/2*1e6
+
         elif self.polmode == 'SPLIT':
 
             wlSC_P1 = fits.open(self.name)['OI_WAVELENGTH', 11].data['EFF_WAVE']*1e6
@@ -230,6 +233,9 @@ class GravData():
                 
                 self.wlFT = wlFT_P1
                 self.wlFT_nchannels = len(self.wlFT)
+
+            effband = fits.open(self.name)['OI_WAVELENGTH', 11].data['EFF_BAND']
+            self.dlambda = effband/2*1e6
 
         else:
             raise ValueError(f'Polarization mode {self.polmode} not supported. Must be SPLIT or COMBINED')
