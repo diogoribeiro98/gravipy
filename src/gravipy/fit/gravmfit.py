@@ -289,6 +289,41 @@ class GravMfit(GravData, GravPhaseMaps):
 
 		return params
 
+	#====================
+	# Visibility model 
+	#===================
+
+	def get_visibility_model(self, params, use_phasemaps=False):
+		
+		#Get sources from parameters
+		sources, background = GravMfit.get_sources_and_background(params.valuesdict(), self.field_type, self.nsource )
+
+		#Storage dictionary
+		visibility_model = copy.deepcopy(self.visibility_model)
+
+		for telescopes, label in zip(self.baseline_telescopes, self.baseline_labels):
+			
+			baseline_index = self.baseline_index_map[label] 
+
+			ucoord = self.u[baseline_index]/units.micrometer
+			vcoord = self.v[baseline_index]/units.micrometer
+
+			model = GravMfit.nsource_visibility(
+			uv_coordinates= [ucoord,vcoord],
+			telescope_names = telescopes,
+			sources=sources,
+			background=background,
+			l_list=self.wlSC,
+			dl=self.dlambda,
+			use_phasemaps=use_phasemaps,
+			phasemaps= self.phasemaps,
+			phasemaps_normalization=self.phasemaps_normalization
+			)
+
+			visibility_model[label] = model
+		
+		return visibility_model
+
 	def nsource_visibility(
 			self,
 			telescope_names,
