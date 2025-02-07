@@ -31,6 +31,13 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
+#Helper function for templating phasemaps functions
+def return_one(args):
+	return 1
+
+def return_zero(args):
+	return 0
+
 class GravPhaseMaps():
 	"""GRAVITY phasemaps class
 	"""
@@ -73,125 +80,73 @@ class GravPhaseMaps():
 		# Storage variables
 		# ------------------
 
-		self.pickle_folder = 'interpolated_phasemaps/'
+		self.data_folder = 'data/'
+		self.zernike_file_2019 = 'zernike_coefficients_2019.json'
+		self.zernike_file_2020 = 'zernike_coefficients_2020.json'
 
 		self.zernike_coefficients = None 
 
 		#Storage variable for interpolating function (defaults to zero function)
 		self.phasemaps = {
-			'GV1' : lambda args : 1, 
-			'GV2' : lambda args : 1,
-			'GV3' : lambda args : 1,
-			'GV4' : lambda args : 1,
+			'GV1' : return_one,
+			'GV2' : return_one,
+			'GV3' : return_one,
+			'GV4' : return_one,
 		}
-		
+	
 		self.phasemaps_normalization = {
-			'GV1' : lambda args : 1, 
-			'GV2' : lambda args : 1,
-			'GV3' : lambda args : 1,
-			'GV4' : lambda args : 1,
+			'GV1' : return_one, 
+			'GV2' : return_one,
+			'GV3' : return_one,
+			'GV4' : return_one,
 		}
 	
-	def load_zernike_coefficients(self,zernikefile):
-		""" Loads Zernike coefficients to class from a .json file
-		"""
-		
-		self.zernike_coefficients = copy.deepcopy(template_zernike_table)
+		self.phasemaps_amplitude = {
+			'GV1' : return_one,
+			'GV2' : return_one,
+			'GV3' : return_one,
+			'GV4' : return_one,
+		}
 
-		#Load zernike coefficients
-		with open(zernikefile) as f:
-
-			file_table = json.load(f)
-
-			#Check that file has the correct formatting
-			if not file_table.keys() == template_zernike_table.keys():
-				raise ValueError('ERROR: Could not read zernike coefficients from file {}. Make sure the json file follows the correct convention.'.format(zernikefile))
-			
-			for beam in file_table:
-				if not file_table[beam].keys() == template_zernike_list.keys():
-					raise ValueError('ERROR: Could not read zernike coefficients from file {}. There seems to be a formating problem with beam {} data'.format(zernikefile,beam))
-
-			#If formatting is correct, load the file 
-			for beam in file_table:
-				for coefficient in file_table[beam]:
-					self.zernike_coefficients[beam][coefficient] = file_table[beam][coefficient]
-
-		return 
-	
-	def create_phasemaps(self,zernikefile, smoothkernel=15):
-		"""Generates the phasemap interpolating functions based on the zernike coeficients in a .json file 
-		"""
-
-		#Check if phasemaps already exist
-		#output_name = zernikefile[:-5]+'_phasemaps.p'
-		#output_name_normalization = zernikefile[:-5]+'_phasemaps_normalization.p'
-
-		output_name = resource_filename(__name__, self.pickle_folder + zernikefile[:-5] + '_phasemaps.p')
-		output_name_normalization = resource_filename(__name__, self.pickle_folder + zernikefile[:-5]+'_phasemaps_normalization.p')
-
-		if pathlib.Path(output_name).exists() or pathlib.Path(output_name_normalization).exists():
-			raise ValueError('Phasemaps interpolation function files seem to exist already')
-
-		self.load_zernike_coefficients(zernikefile)
+		self.phasemaps_phase = {
+			'GV1' : return_zero,
+			'GV2' : return_zero,
+			'GV3' : return_zero,
+			'GV4' : return_zero,
+		}
 
 		#Storage variables for phasemap data
-		phasemaps_data = {
+		self.phasemaps_data = {
 			'GV1' : np.zeros((self.spectral_channels, self.phasemap_size, self.phasemap_size), dtype=np.complex128),
 			'GV2' : np.zeros((self.spectral_channels, self.phasemap_size, self.phasemap_size), dtype=np.complex128),
 			'GV3' : np.zeros((self.spectral_channels, self.phasemap_size, self.phasemap_size), dtype=np.complex128),
 			'GV4' : np.zeros((self.spectral_channels, self.phasemap_size, self.phasemap_size), dtype=np.complex128),
 		}
 
-		phasemaps_normalization_data = {
-			'GV1' : np.zeros((self.spectral_channels, self.phasemap_size, self.phasemap_size), dtype=np.complex128),
-			'GV2' : np.zeros((self.spectral_channels, self.phasemap_size, self.phasemap_size), dtype=np.complex128),
-			'GV3' : np.zeros((self.spectral_channels, self.phasemap_size, self.phasemap_size), dtype=np.complex128),
-			'GV4' : np.zeros((self.spectral_channels, self.phasemap_size, self.phasemap_size), dtype=np.complex128),
+		self.phasemaps_normalization_data = {
+			'GV1' : np.zeros((self.spectral_channels, self.phasemap_size, self.phasemap_size), dtype=np.float64),
+			'GV2' : np.zeros((self.spectral_channels, self.phasemap_size, self.phasemap_size), dtype=np.float64),
+			'GV3' : np.zeros((self.spectral_channels, self.phasemap_size, self.phasemap_size), dtype=np.float64),
+			'GV4' : np.zeros((self.spectral_channels, self.phasemap_size, self.phasemap_size), dtype=np.float64),
 		}
 
-		kernel = Gaussian2DKernel(x_stddev=smoothkernel)
-
-		self.logger.info('Creating phasemaps')
-
-		for beam in phasemaps_data:
-
-			for idx, wl in enumerate(self.wave_list):
-				
-				self.logger.info('Creating phasemap points for beam {} at {} micrometers'.format(beam, wl))
-				
-				#Get phasemap
-				x, y, _, _, _, _, complexPsf = self.get_phase_screen(wl,beam)
-				
-				#Convolve with 2D kernel
-				phasemaps_data[beam][idx] = signal.convolve2d(complexPsf, kernel, mode='same')
-				phasemaps_normalization_data[beam][idx] = signal.convolve2d(np.abs(complexPsf)**2, kernel, mode='same')
-
-			self.logger.info('Creating interpolating function for phasemap')
-
-			self.phasemaps[beam] = RegularGridInterpolator((self.wave_list, x[0,:], y[:,0]), phasemaps_data[beam])
-			self.phasemaps_normalization[beam] = RegularGridInterpolator((self.wave_list, x[0,:], y[:,0]), phasemaps_normalization_data[beam])
-
-		#Save interpolaring functions to file
-		self.logger.info('Saving interpolating functions to pickle files')
-	
-		pickle.dump( self.phasemaps , open( output_name, "wb" ) )
-		pickle.dump( self.phasemaps_normalization , open(output_name_normalization, "wb" ) )
+		self.phasemaps_amplitude_data = {
+			'GV1' : np.zeros((self.spectral_channels, self.phasemap_size, self.phasemap_size), dtype=np.float64),
+			'GV2' : np.zeros((self.spectral_channels, self.phasemap_size, self.phasemap_size), dtype=np.float64),
+			'GV3' : np.zeros((self.spectral_channels, self.phasemap_size, self.phasemap_size), dtype=np.float64),
+			'GV4' : np.zeros((self.spectral_channels, self.phasemap_size, self.phasemap_size), dtype=np.float64),
+		}
 		
-		self.logger.info('Interpolating functions saved to {} and {}'.format(output_name, output_name_normalization))
+		self.phasemaps_phase_data = {
+			'GV1' : np.zeros((self.spectral_channels, self.phasemap_size, self.phasemap_size), dtype=np.float64),
+			'GV2' : np.zeros((self.spectral_channels, self.phasemap_size, self.phasemap_size), dtype=np.float64),
+			'GV3' : np.zeros((self.spectral_channels, self.phasemap_size, self.phasemap_size), dtype=np.float64),
+			'GV4' : np.zeros((self.spectral_channels, self.phasemap_size, self.phasemap_size), dtype=np.float64),
+		}
 
-		return 
-
-	def load_phasemaps(self,phasemap_file, normalization_file):
-		"""Loads the interpolating functions from existing pickle files
-		"""
-
-		pm_file = resource_filename(__name__, self.pickle_folder + phasemap_file)
-		pm_normalization_file = resource_filename(__name__, self.pickle_folder + normalization_file)
-
-		self.phasemaps = pickle.load( open( pm_file, "rb" ) ) 
-		self.phasemaps_normalization = pickle.load( open( pm_normalization_file, "rb" ) )
-
-		return
+	#=========================
+	# Phasemap creation tools
+	#=========================
 
 	def get_phase_screen(self, wavelength, beam, 
 					  	 include_image_plane_aberrations=True,
@@ -306,6 +261,194 @@ class GravPhaseMaps():
 
 		return x[cc, cc]/units.mas_to_rad, y[cc, cc]/units.mas_to_rad, px[cc, cc], py[cc, cc],  fiber_ip[cc, cc], fiber_pp[cc, cc], complexPsf[cc, cc]
 
+	def load_zernike_coefficients(self,zernikefile):
+		""" Loads Zernike coefficients to class from a .json file
+		"""
+		
+		self.zernike_coefficients = copy.deepcopy(template_zernike_table)
+
+		#Load zernike coefficients
+		with open(zernikefile) as f:
+
+			file_table = json.load(f)
+
+			#Check that file has the correct formatting
+			if not file_table.keys() == template_zernike_table.keys():
+				raise ValueError('ERROR: Could not read zernike coefficients from file {}. Make sure the json file follows the correct convention.'.format(zernikefile))
+			
+			for beam in file_table:
+				if not file_table[beam].keys() == template_zernike_list.keys():
+					raise ValueError('ERROR: Could not read zernike coefficients from file {}. There seems to be a formating problem with beam {} data'.format(zernikefile,beam))
+
+			#If formatting is correct, load the file 
+			for beam in file_table:
+				for coefficient in file_table[beam]:
+					self.zernike_coefficients[beam][coefficient] = file_table[beam][coefficient]
+
+		return 
+
+	def get_phasemaps_filenames(self, zernikefile, smooth_kernel=15):
+
+		filenames = [
+
+			self.data_folder + f'{zernikefile[:-5]}_smooth_{smooth_kernel}_phasemap_data.p',
+			self.data_folder + f'{zernikefile[:-5]}_smooth_{smooth_kernel}_amplitude_data.p',
+			self.data_folder + f'{zernikefile[:-5]}_smooth_{smooth_kernel}_phase_data.p',
+			self.data_folder + f'{zernikefile[:-5]}_smooth_{smooth_kernel}_normalization_data.p',
+
+			self.data_folder + f'{zernikefile[:-5]}_smooth_{smooth_kernel}_phasemap_interpolator.p',
+			self.data_folder + f'{zernikefile[:-5]}_smooth_{smooth_kernel}_amplitude_interpolator.p', 
+			self.data_folder + f'{zernikefile[:-5]}_smooth_{smooth_kernel}_phase_interpolator.p',
+			self.data_folder + f'{zernikefile[:-5]}_smooth_{smooth_kernel}_normalization_interpolator.p', 
+		]
+
+		return [ resource_filename(__name__, f) for f in filenames]
+
+	def create_phasemaps_from_file(self, zernikefile, smooth_kernel=15):
+		""" Generates the phasemap interpolating functions based on the zernike coeficients in a .json file.
+			The function generates 8 pickle files:
+			
+			{zernikefile}_smooth_{smooth_kernel}_phasemap_data.p
+			{zernikefile}_smooth_{smooth_kernel}_phase_data.p
+			{zernikefile}_smooth_{smooth_kernel}_amplitude_data.p 
+			{zernikefile}_smooth_{smooth_kernel}_normalization_data.p 
+			
+			{zernikefile}_smooth_{smooth_kernel}_phasemap_interpolator.p
+			{zernikefile}_smooth_{smooth_kernel}_phase_interpolator.p
+			{zernikefile}_smooth_{smooth_kernel}_amplitude_interpolator.p 
+			{zernikefile}_smooth_{smooth_kernel}_normalization_interpolator.p 
+		"""
+
+		#Check if phasemaps already exist
+		output_filepaths = self.get_phasemaps_filenames(zernikefile, smooth_kernel)
+
+		for file in output_filepaths:
+			if pathlib.Path(file).exists():
+				raise ValueError('Phasemaps data files seem to exist already')
+
+		#Load zenikefiles
+		self.load_zernike_coefficients(zernikefile)
+
+		#Gaussian kernel
+		kernel = Gaussian2DKernel(x_stddev=smooth_kernel)
+
+		self.logger.info('Creating phasemaps')
+
+		for beam in self.phasemaps_data:
+
+			for idx, wl in enumerate(self.wave_list):
+				
+				self.logger.info('Creating phasemap points for beam {} at {} micrometers'.format(beam, wl))
+				
+				#Get phasemap
+				x, y, _, _, _, _, complexPsf = self.get_phase_screen(wl,beam)
+
+				amplitude = np.abs(complexPsf)
+				phase     = np.angle(complexPsf, deg=True)
+
+				#Convolve with 2D kernel
+				self.phasemaps_data[beam][idx] 				 = signal.convolve2d(complexPsf,   kernel, mode='same')
+				self.phasemaps_amplitude_data[beam][idx] 	 = signal.convolve2d(amplitude,    kernel, mode='same')
+				self.phasemaps_phase_data[beam][idx] 		 = signal.convolve2d(phase,        kernel, mode='same')
+				self.phasemaps_normalization_data[beam][idx] = signal.convolve2d(amplitude**2, kernel, mode='same')
+
+			self.logger.info('Creating interpolating function for phasemap')
+
+			self.phasemaps[beam] 				= RegularGridInterpolator((self.wave_list, x[0,:], y[:,0]), self.phasemaps_data[beam])
+			self.phasemaps_amplitude[beam]  	= RegularGridInterpolator((self.wave_list, x[0,:], y[:,0]), self.phasemaps_amplitude_data[beam])
+			self.phasemaps_phase[beam]  		= RegularGridInterpolator((self.wave_list, x[0,:], y[:,0]), self.phasemaps_phase_data[beam])
+			self.phasemaps_normalization[beam]  = RegularGridInterpolator((self.wave_list, x[0,:], y[:,0]), self.phasemaps_normalization_data[beam])
+
+			#self.amplitude_map[beam] = RegularGridInterpolator((self.wave_list, x[0,:], y[:,0]), np.abs(self.phasemaps_data[beam], dtype=np.float32))
+
+		#Save grid data to file
+		self.logger.info('Saving phasemap grids to pickle files')
+		pickle.dump( self.phasemaps_data 			   , open( output_filepaths[0], "wb" ) )
+		pickle.dump( self.phasemaps_amplitude_data 	   , open( output_filepaths[1], "wb" ) )
+		pickle.dump( self.phasemaps_phase_data 		   , open( output_filepaths[2], "wb" ) )
+		pickle.dump( self.phasemaps_normalization_data , open( output_filepaths[3], "wb" ) )
+
+		self.logger.info('Phasemap grids saved successeully')
+
+		#Save interpolaring functions to file
+		self.logger.info('Saving interpolating functions to pickle files')
+	
+		pickle.dump( self.phasemaps 			   , open( output_filepaths[4], "wb" ) )
+		pickle.dump( self.phasemaps_amplitude 	   , open( output_filepaths[5], "wb" ) )
+		pickle.dump( self.phasemaps_phase 		   , open( output_filepaths[6], "wb" ) )
+		pickle.dump( self.phasemaps_normalization  , open( output_filepaths[7], "wb" ) )
+
+		self.logger.info('Interpolating functions saved successeully')
+
+		return 
+
+	def create_phasemaps(self, year, smooth_kernel):
+
+		if year==2019:
+			self.create_phasemaps_from_file(self.zernike_file_2019, smooth_kernel)
+		elif year==2020:
+			self.create_phasemaps_from_file(self.zernike_file_2020, smooth_kernel)
+		else:
+			raise ValueError('ERROR: Phasemaps can only be created for 2020')
+		return
+	
+	#=========================
+	# Phasemap loading tools
+	#=========================
+
+	def load_phasemaps_interpolator(self,phasemap_file, normalization_file):
+		"""Loads the interpolating functions from existing pickle files
+		"""
+
+		pm_file = resource_filename(__name__, self.pickle_folder + phasemap_file)
+		pm_normalization_file = resource_filename(__name__, self.pickle_folder + normalization_file)
+
+		self.phasemaps = pickle.load( open( pm_file, "rb" ) ) 
+		self.phasemaps_normalization = pickle.load( open( pm_normalization_file, "rb" ) )
+
+		return
+
+	def load_phasemaps_data(self,phasemap_file, normalization_file):
+		"""Loads the interpolating functions from existing pickle files
+		"""
+
+		pm_file = resource_filename(__name__, self.pickle_folder + phasemap_file)
+		pm_normalization_file = resource_filename(__name__, self.pickle_folder + normalization_file)
+
+		self.phasemaps_data = pickle.load( open( pm_file, "rb" ) ) 
+		self.phasemaps_normalization_data = pickle.load( open( pm_normalization_file, "rb" ) )
+
+		return
+
+	def load_phasemaps(self, year, smooth_kernel):
+
+		#Get zernikefile depending on the year
+		if year==2019:
+			zernikefile = self.zernike_file_2019
+		elif year==2020:
+			zernikefile = self.zernike_file_2020
+		else:
+			raise ValueError('ERROR: Phasemaps can only be created for 2020')
+		
+		input_filepaths = self.get_phasemaps_filenames(zernikefile, smooth_kernel)
+
+		#Load phasemap data
+		self.phasemaps_data 			   = pickle.load( open( input_filepaths[0], "rb" ) ) 
+		self.phasemaps_amplitude_data 	   = pickle.load( open( input_filepaths[1], "rb" ) ) 
+		self.phasemaps_phase_data 		   = pickle.load( open( input_filepaths[2], "rb" ) ) 
+		self.phasemaps_normalization_data  = pickle.load( open( input_filepaths[3], "rb" ) ) 
+
+		self.phasemaps 			   		= pickle.load( open( input_filepaths[4], "rb" ) )
+		self.phasemaps_amplitude 	   	= pickle.load( open( input_filepaths[5], "rb" ) )
+		self.phasemaps_phase 		   	= pickle.load( open( input_filepaths[6], "rb" ) )
+		self.phasemaps_normalization  	= pickle.load( open( input_filepaths[7], "rb" ) )
+
+		return
+
+	#=========================
+	# Phasemap plotting tools
+	#=========================
+
 	def plot_phasemaps(self, wavelength = 2.2 , fiber_fov = 80):
 		"""Plot intensity and phase maps for the 4 beams
 		"""
@@ -317,7 +460,6 @@ class GravPhaseMaps():
 		#Plotting arguments
 		pltargsP = {'cmap': 'twilight_shifted', 'levels': np.linspace(-180, 180, 19, endpoint=True)}
 		
-
 		pms = self.phasemaps
 
 		for idx, beam in enumerate(pms):
@@ -358,7 +500,6 @@ class GravPhaseMaps():
 
 			#Plot
 			intensity_plot = ax1.pcolormesh(xx, yy, np.abs(zz)/np.max(np.abs(zz)))
-			#ax2.pcolormesh(xx, yy, np.angle(zz, deg=True), **pltargsP)
 			phase_plot = ax2.contourf(xx, yy, np.angle(zz,deg=True), **pltargsP)
 
 			if idx==3:
@@ -380,8 +521,8 @@ class GravPhaseMaps():
 			ax1.set_aspect(1) 
 			ax2.set_aspect(1) 
 
-			plt.subplots_adjust(wspace=0, hspace=0)
+		plt.subplots_adjust(wspace=0, hspace=0)
 
-			fig.tight_layout()
+		fig.tight_layout()
 
-			return fig
+		return fig
