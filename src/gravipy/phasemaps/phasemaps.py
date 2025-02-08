@@ -161,8 +161,10 @@ class GravPhaseMaps():
 		Npixels = 1024
 		pixels = np.arange(Npixels) - (Npixels/2)
 
+		#Note: Indexing ij is required because of the interpolating function
+
 		dalpha = 1.0*units.mas_to_rad
-		x, y  = np.meshgrid(pixels*dalpha, pixels*dalpha)
+		x, y  = np.meshgrid(pixels*dalpha, pixels*dalpha, indexing='ij') 
 		rho   = np.sqrt(x**2 + y**2)
 		theta = np.angle(x + 1j*y)
 		
@@ -190,7 +192,7 @@ class GravPhaseMaps():
 
 		#Pupil plane quantities
 		pupil_pixels = fftshift(fftfreq(Npixels, d=dalpha))*units.micrometer*wavelength
-		px, py = np.meshgrid(pupil_pixels, pupil_pixels)
+		px, py = np.meshgrid(pupil_pixels, pupil_pixels, indexing='ij')
 		pupil_rho   = np.sqrt(px**2 + py**2)
 		pupil_theta = np.angle(px + 1j*py)
 		
@@ -354,10 +356,10 @@ class GravPhaseMaps():
 
 			self.logger.info('Creating interpolating function for phasemap')
 
-			self.phasemaps[beam] 				= RegularGridInterpolator((self.wave_list, x[0,:], y[:,0]), self.phasemaps_data[beam])
-			self.phasemaps_amplitude[beam]  	= RegularGridInterpolator((self.wave_list, x[0,:], y[:,0]), self.phasemaps_amplitude_data[beam])
-			self.phasemaps_phase[beam]  		= RegularGridInterpolator((self.wave_list, x[0,:], y[:,0]), self.phasemaps_phase_data[beam])
-			self.phasemaps_normalization[beam]  = RegularGridInterpolator((self.wave_list, x[0,:], y[:,0]), self.phasemaps_normalization_data[beam])
+			self.phasemaps[beam] 				= RegularGridInterpolator((self.wave_list, x[:,0], y[0,:]), self.phasemaps_data[beam])
+			self.phasemaps_amplitude[beam]  	= RegularGridInterpolator((self.wave_list, x[:,0], y[0,:]), self.phasemaps_amplitude_data[beam])
+			self.phasemaps_phase[beam]  		= RegularGridInterpolator((self.wave_list, x[:,0], y[0,:]), self.phasemaps_phase_data[beam])
+			self.phasemaps_normalization[beam]  = RegularGridInterpolator((self.wave_list, x[:,0], y[0,:]), self.phasemaps_normalization_data[beam])
 
 			#self.amplitude_map[beam] = RegularGridInterpolator((self.wave_list, x[0,:], y[:,0]), np.abs(self.phasemaps_data[beam], dtype=np.float32))
 
