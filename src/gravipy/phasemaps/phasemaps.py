@@ -329,7 +329,8 @@ class GravPhaseMaps():
 				raise ValueError('Phasemaps data files seem to exist already')
 
 		#Load zenikefiles
-		self.load_zernike_coefficients(zernikefile)
+		zernikefile_path = resource_filename(__name__, self.data_folder + zernikefile)
+		self.load_zernike_coefficients(zernikefile_path)
 
 		#Gaussian kernel
 		kernel = Gaussian2DKernel(x_stddev=smooth_kernel)
@@ -398,30 +399,6 @@ class GravPhaseMaps():
 	# Phasemap loading tools
 	#=========================
 
-	def load_phasemaps_interpolator(self,phasemap_file, normalization_file):
-		"""Loads the interpolating functions from existing pickle files
-		"""
-
-		pm_file = resource_filename(__name__, self.pickle_folder + phasemap_file)
-		pm_normalization_file = resource_filename(__name__, self.pickle_folder + normalization_file)
-
-		self.phasemaps = pickle.load( open( pm_file, "rb" ) ) 
-		self.phasemaps_normalization = pickle.load( open( pm_normalization_file, "rb" ) )
-
-		return
-
-	def load_phasemaps_data(self,phasemap_file, normalization_file):
-		"""Loads the interpolating functions from existing pickle files
-		"""
-
-		pm_file = resource_filename(__name__, self.pickle_folder + phasemap_file)
-		pm_normalization_file = resource_filename(__name__, self.pickle_folder + normalization_file)
-
-		self.phasemaps_data = pickle.load( open( pm_file, "rb" ) ) 
-		self.phasemaps_normalization_data = pickle.load( open( pm_normalization_file, "rb" ) )
-
-		return
-
 	def load_phasemaps(self, year, smooth_kernel):
 
 		#Get zernikefile depending on the year
@@ -472,7 +449,7 @@ class GravPhaseMaps():
 			y = pms[beam].grid[2]
 
 			xx, yy = np.meshgrid(x, y)
-			zz = pms[beam]((wavelength,yy,xx))
+			zz = pms[beam]((wavelength,xx,yy))
 			
 			rmap = np.sqrt(xx*xx + yy*yy)
 			zz[rmap > fiber_fov] = 0.0 
