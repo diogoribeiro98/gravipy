@@ -1,8 +1,6 @@
 import numpy as np
+import copy
 
-#Logging tools
-import logging
-from ..logger.log import log_level_mapping
 
 #Parent classes
 from ..data import GravData
@@ -13,6 +11,18 @@ from ..physical_units import units as units
 
 #Fitting tools
 from .models import spectral_visibility
+import lmfit
+import emcee
+import multiprocessing
+
+#Plotting tools
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+
+#Logging tools
+import logging
+from ..logger.log import log_level_mapping
+logging.getLogger("matplotlib").setLevel(logging.WARNING)
 
 #Alias between beam and telescope
 telescope_to_beam = {
@@ -26,14 +36,14 @@ class GravMfit(GravData, GravPhaseMaps):
 	"""GRAVITY single night fit class
 	"""
 
-	def __init__(self, data, loglevel='INFO'):	
+	def __init__(self, data, flag_channels = [0,1,2,-1,-2,-3], loglevel='INFO'):	
 		
 		#Create a logger and set log level according to user
 		self.logger = logging.getLogger(type(self).__name__)
 		self.logger.setLevel(log_level_mapping.get(loglevel, logging.INFO))
 		
 		#Super constructor
-		GravData.__init__(self,data,loglevel=loglevel)
+		GravData.__init__(self,data=data, flag_channels=flag_channels, loglevel=loglevel)
 		GravPhaseMaps.__init__(self,loglevel=loglevel)
 		
 		# ---------------------------
@@ -151,6 +161,26 @@ class GravMfit(GravData, GravPhaseMaps):
 		# -----------------------------------------------------------------
 		# Create a different set of parameters depending on the field type
 		# -----------------------------------------------------------------
+
+		#Note:
+		# The Instrumental parameters should likely be added here too
+		'''
+		instrumental_fit_parameters = {
+			#Coherence loss for each baseline
+			'CL1' : [coherence_lost, 1.5, 0.1, fit_coherence_lost],
+			'CL2' : [coherence_lost, 1.5, 0.1, fit_coherence_lost],
+			'CL3' : [coherence_lost, 1.5, 0.1, fit_coherence_lost],
+			'CL4' : [coherence_lost, 1.5, 0.1, fit_coherence_lost],
+			'CL5' : [coherence_lost, 1.5, 0.1, fit_coherence_lost],
+			'CL6' : [coherence_lost, 1.5, 0.1, fit_coherence_lost],
+			#FLux self calibration
+			'SelfCal1' : [0, 30, -30, False],
+			'SelfCal2' : [0, 30, -30, False],
+			'SelfCal3' : [0, 30, -30, False],
+			'SelfCal4' : [0, 30, -30, False],
+		}
+		'''
+
 
 		if field_type=='star':
 			
@@ -804,93 +834,362 @@ class GravMfit(GravData, GravPhaseMaps):
 
 		return sampler, parameters_to_fit, result_parameters
 
-			self,
-			telescope_names,
-			sources,
-			background,
-			l0=2.2,
-			dl=0.2,
-			reference_l0=2.2,
-			use_phasemaps=True,
-	):
+	#========================================
+	# Visualization tools and fit inspection
+	#=========================================
 
-		#Fetch baseline
-		baseline_index = [idx for idx, x in enumerate(self.baseline_telescopes) if np.array_equal(x,telescope_names)][0]
+	def fit_report_template(self, wavelength=2.2, fiber_fov=70):
+
+		A4_size = (11.69,8.27)
 		
-		u = self.u[baseline_index]/units.micrometer
-		v = self.v[baseline_index]/units.micrometer
+		# Create the figure
+		fig = plt.figure(figsize=A4_size,layout='constrained')
+		fig.suptitle(f'{self.filename}', y = 0.99)
+				
+		#Create top and bottom row
+		_ , top_row, bottom_row = fig.subfigures(3, 1, hspace=0.1,height_ratios=[0.02, 1,1.5])
 
-		#Calculate things differently if using phasemaps or not
-		if not use_phasemaps:
+		#Top row contains phasemaps and field of view with model (and possibly the dirty beam)
+		phasemaps, field_of_view, baselines = top_row.subfigures(1, 3, width_ratios=[0.4, 0.22, 0.15],wspace=0.05)
+
+		pm_axes = phasemaps.subplots(2, 4, width_ratios=[1,1,1,1.08])
+		fov_ax  = field_of_view.subplots(1, 1)
+		baselines_ax  = baselines.subplots(2, 1)
+
+		#Bottom row contains data, model and residuals
+		data_axes = bottom_row.subplots(2,4, height_ratios=[1,0.4], gridspec_kw = {'wspace':0, 'hspace':0})
+
+		#---------------------
+		# Setup phasemap plot
+		#---------------------
+
+		for idx,beam in enumerate(['GV1','GV2','GV3','GV4']):
+
+			ax1, ax2 = pm_axes[:,idx]
+
+			ax1.set_title("{} ({} $\\mu m)$".format(beam, wavelength))
+			ax1.set_xticklabels([])
+				
+			if idx != 0:
+				ax1.set_yticklabels([])
+				ax2.set_yticklabels([])
 			
-			#Storage variables
-			visibility = 0.0
-			normalization = 0.0
+			if idx == 0:
+				ax1.set_ylabel("y (mas)")
+				ax2.set_ylabel("y (mas)")
 
-			for src in sources:
+			ax2.set_xlabel("x (mas)")
 
-				#Get position, flux and spectral index for each source
-				x, y, flux, alpha = src
+			scale = 1.05*fiber_fov
+			for ax in [ax1,ax2]:
+				ax.set_xlim(-scale,scale)
+				ax.set_ylim(-scale,scale)
 
-				#Calculate optical path difference from position on sky and visibility
-				s = (u*x + v*y)*units.mas_to_rad 
+			if idx==3:
+				divider1 = make_axes_locatable(ax1)
+				cax1 = divider1.append_axes("right", size="5%", pad="3%")
+			#	cbar1 = plt.colorbar(intensity_plot, cax=cax1)
 
-				#Add source visibility to nsource one
-				visibility += flux*spectral_visibility(s, alpha, l0, dl, reference_l0)
-				normalization += flux*spectral_visibility(0, alpha, l0, dl, reference_l0)
+				divider2 = make_axes_locatable(ax2)
+				cax2 = divider2.append_axes("right", size="5%", pad="3%")
+			#	cbar2 = plt.colorbar(phase_plot, cax=cax2)
 
-			#Add background to normalization
-			flux, alpha = background
-			normalization += flux*spectral_visibility(0, alpha, l0, dl,reference_l0)
+
+			circ = plt.Circle((0,0), radius=fiber_fov, facecolor="None", edgecolor='black', linewidth=0.8)
+			ax1.add_artist(circ)
+
+			circ = plt.Circle((0,0), radius=fiber_fov, facecolor="None", edgecolor='black', linewidth=0.8)
+			ax2.add_artist(circ)
+
+			ax1.set_aspect(1) 
+			ax2.set_aspect(1) 
+
+		#---------------------
+		# Setup FOV plot
+		#---------------------
+
+		ax = fov_ax
+		scale = 1.05*fiber_fov
+		ax.set_xlim( scale,-scale)
+		ax.set_ylim(-scale, scale)
+
+		ax.set_xlabel('ra [mas]')
+		ax.set_ylabel('dec [mas]')
+
+		circ = plt.Circle((0,0), radius=fiber_fov, facecolor="None", edgecolor='black', linewidth=0.8)
+		ax.add_artist(circ)
+
+		ax.set_aspect(1)
+
+		#---------------------
+		# Setup baselines plot
+		#---------------------
+
+		for ax in baselines_ax:
+			ax.set_aspect(1)
+
+		#---------------------
+		# Setup bottom plot
+		#---------------------
+
+		lim = (70,340)
+		ax = data_axes[:,0]
+		ax[0].set_title('Visibility Amplitude')
+		ax[0].set_xticks([])
+		ax[0].set_xlim(lim)
+		ax[1].set_xlim(lim)
+		ax[0].set_ylim(-0.0, 1.1)
+		ax[1].set_ylim(-0.2, 0.2)
+		ax[0].set_ylabel('Visibility Amplitude')
+		ax[1].set_xlabel('spatial frequency (1/arcsec)')
+		ax[1].set_ylabel('Residuals')
+		ax[0].axhline(1, ls='--', lw=0.5, c='black')
+		ax[1].axhline(0, ls='--', lw=0.5, c='black')
+
+		#Visibility Phase plot
+		ax = data_axes[:,1]
+		ax[0].set_title('Visibility Phase')
+		ax[0].set_xlim(lim)
+		ax[1].set_xlim(lim)
+		ax[0].set_xticks([])
+		ax[0].set_ylim(-250, 250)
+		ax[1].set_ylim(-10, 10)
+		ax[0].set_ylabel('Visibility Phase')
+		ax[1].set_xlabel('spatial frequency (1/arcsec)')
+		ax[1].set_ylabel('Residuals')
+		ax[0].axhline(0, ls='--', lw=0.5, c='black')
+		ax[1].axhline(0, ls='--', lw=0.5, c='black')
+
+
+		#Visibility Squared plot
+		ax = data_axes[:,2]
+		ax[0].set_title('Visibility Squared')
+		ax[0].set_xlim(lim)
+		ax[1].set_xlim(lim)
+		ax[0].set_xticks([])
+		ax[0].set_ylim(-0.1, 1.1)
+		ax[1].set_ylim(-0.2, 0.2)
+		ax[0].set_ylabel('Visibility Squared')
+		ax[1].set_xlabel('spatial frequency (1/arcsec)')
+		ax[1].set_ylabel('Residuals')
+		ax[0].axhline(1, ls='--', lw=0.5, c='black')
+		ax[1].axhline(0, ls='--', lw=0.5, c='black')
+
+		lim2 = (150,350)
+		#Closure phases
+		ax = data_axes[:,3]
+		ax[0].set_title('Closure Phases')
+		ax[0].set_xlim(lim2)
+		ax[1].set_xlim(lim2)
+		ax[0].set_xticks([])
+		ax[0].set_ylim(-250, 250)
+		ax[0].set_ylabel('Closure Phases')
+		ax[1].set_xlabel('spatial frequency (1/arcsec)')
+		ax[1].set_ylabel('Residuals')
+		ax[0].axhline(0, ls='--', lw=0.5, c='black')
+		ax[1].axhline(0, ls='--', lw=0.5, c='black')
+
+		return fig, (pm_axes, cax1, cax2), fov_ax, baselines_ax, data_axes
+
+	def fit_report(self, params, wavelength=2.2, fiber_fov=70):
+		
+		fig, (pm_axes, cax1, cax2), fov_ax, baselines_ax, data_axes = self.fit_report_template(wavelength=wavelength, fiber_fov=fiber_fov)
+
+		#Get sources
+		sources, _ = GravMfit.get_sources_and_background(params.valuesdict(), self.field_type, self.nsource )
+
+		#
+		# Plot phasemaps
+		#
+
+		pltargsP = {'cmap': 'twilight_shifted', 'levels': np.linspace(-180, 180, 19, endpoint=True)}
+
+		if self.use_phasemaps:
+			pms = self.phasemaps
 			
-			#Calculate spatial frequencies
-			sf = np.sqrt(u**2+v**2)/l0*units.as_to_rad
-
-			return sf, visibility/normalization
-
-		else:
+			for idx, beam in enumerate(pms):
 			
-			#Storage variables
-			visibility = 0.0
-			normalization_i = 0.0
-			normalization_j = 0.0
+				# Get data
 
-			#Telescope names
-			tel_i, tel_j = telescope_names
+				# There should be a try here for when there are no loaded phasemaps
+				x = pms[beam].grid[1]
+				y = pms[beam].grid[2]
 
-			#Phasemaps
-			#pms = self.phasemaps
+				xx, yy = np.meshgrid(x, y)
+				zz = pms[beam]((wavelength,xx,yy))
+				
+				rmap = np.sqrt(xx*xx + yy*yy)
+				zz[rmap > fiber_fov] = 0.0 
 
-			Ai = lambda sx, sy : self.phasemaps[telescope_to_beam[tel_i]]((l0,sx,sy))
-			Aj = lambda sx, sy : self.phasemaps[telescope_to_beam[tel_j]]((l0,sx,sy))
+				# Setup axis
+				ax1, ax2 = pm_axes[:,idx]
+			
+				#Plot
+				intensity_plot = ax1.pcolormesh(xx, yy, np.abs(zz)/np.max(np.abs(zz)))
+				phase_plot = ax2.contourf(xx, yy, np.angle(zz,deg=True), **pltargsP)
 
-			Li = lambda sx, sy : self.phasemaps_normalization[telescope_to_beam[tel_i]]((l0,sx,sy))
-			Lj = lambda sx, sy : self.phasemaps_normalization[telescope_to_beam[tel_j]]((l0,sx,sy))
+				circ = plt.Circle((0,0), radius=fiber_fov, facecolor="None", edgecolor='black', linewidth=0.8)
+				ax1.add_artist(circ)
 
-			for src in sources:
+				circ = plt.Circle((0,0), radius=fiber_fov, facecolor="None", edgecolor='black', linewidth=0.8)
+				ax2.add_artist(circ)
 
-				#Get position, flux and spectral index for each source
-				x, y, flux, alpha = src
+				if idx==3:
+					cbar1 = plt.colorbar(intensity_plot, cax=cax1)
+					cbar2 = plt.colorbar(phase_plot, cax=cax2)
 
-				#Calculate optical path difference from position on sky and visibility
-				s = (u*x + v*y)*units.mas_to_rad
+				#Plot sources
+				for x, y, flux, alpha in sources:
+					ax1.scatter([x],[y],  edgecolors='black', s=10.2)
+					ax2.scatter([x],[y],  edgecolors='black', s=10.2)
 
-				#Correct with phasemaps
-				s -= ( Ai(x,y) - Aj(x,y))*l0/360 
+		#
+		# Plot field of view and model positions
+		#
 
-				#Calculate visibility
-				visibility += Ai(x,y)*Aj(x,y)*flux*spectral_visibility(s, alpha, l0, dl, reference_l0)
-				normalization_i +=    Li(x,y)*flux*spectral_visibility(0, alpha, l0, dl, reference_l0)
-				normalization_j +=    Lj(x,y)*flux*spectral_visibility(0, alpha, l0, dl, reference_l0)
+		ax = fov_ax
+		ax.set_facecolor('#8f8f8f')
 
+		for x, y, flux, alpha in sources:
+			ax.scatter([x],[y],  edgecolors='black')
 
-		 	#Add background to normalization
-			flux, alpha = background
-			normalization_i += flux*spectral_visibility(0, alpha, l0, dl,reference_l0)
-			normalization_j += flux*spectral_visibility(0, alpha, l0, dl,reference_l0)
+		#
+		# Plot baseline configuration
+		#
+
+		ax1, ax2 = baselines_ax
+
+		uv_coordinates = np.transpose([self.u,self.v])
+
+		for idx,station in enumerate(uv_coordinates):
+			ax1.scatter( station[0], station[1], c=self.colors_baseline[idx], s=14.5)
+			ax1.scatter(-station[0],-station[1], c=self.colors_baseline[idx], s=14.5)
+			ax1.plot([-station[0],station[0]],[-station[1],station[1]], c=self.colors_baseline[idx],lw=1.8,ls='-')
+
+		for tel_coord in self.tel_pos:
+			ax2.scatter(-tel_coord[0],-tel_coord[1],c='black',zorder=10,s=10)
+
+		for idx, triangle in enumerate([(4,3,2) ,(4,3,1),(4,2,1),(3,2,1)]):
+
+			index = np.array(triangle) - [1,1,1]
+
+			#Define triangles
+			x = -self.tel_pos[index,0]
+			y = -self.tel_pos[index,1]
+			
+			centroid_x = np.mean(x)
+			centroid_y = np.mean(y)
+
+			scale_factor = 0.8
+
+			x_inner = centroid_x + (x - centroid_x) * scale_factor
+			y_inner = centroid_y + (y - centroid_y) * scale_factor
+			
+			ax2.plot(np.append(x_inner, x_inner[0]), np.append(y_inner, y_inner[0]), color=self.colors_closure[idx], linewidth=1)
+			ax2.fill(x_inner, y_inner, color=self.colors_closure[idx], edgecolor=self.colors_closure[idx], linewidth=0, alpha=0.3)
+
+		ax1.set_aspect(1)
+		ax2.set_aspect(1)
+		ax1.axis('off')
+		ax2.axis('off')
+
+		#
+		# Plot data and residuals
+		#
+		
+		#visibility_model = self.get_visibility_model(self.params)
+		visibility_model = self.get_visibility_model(params, use_phasemaps=self.use_phasemaps)
+		
+		plot_config = {
+			'alpha':    0.8,
+			'ms':       3.0,
+			'lw':       0.8,
+			'capsize':  1.0,
+			'ls':       ''    
+		}
+		
+
+		ax1,ax2,ax3,ax4 	= data_axes[0,:]
+		ax1r,ax2r,ax3r,ax4r = data_axes[1,:]
+
+		#for idx in range(len(self.spatial_frequency_as)):
+		for idx,key in enumerate(visibility_model):
+
+			#Get model
+			mx, my = visibility_model[key]
+
+			#Visibility ampliude
+			x   = self.spatial_frequency_as[idx] 
+			y   = self.visampSC_P1[idx] 
+			yerr= self.visamperrSC_P1[idx]
+			ax1.errorbar(x, y, yerr, **plot_config, marker='o', color=self.colors_baseline[idx % 6])
+				
+			#y   = self.visampSC_P2[idx]   
+			#yerr= self.visamperrSC_P2[idx]
+			#ax1.errorbar(x, y, yerr, **plot_config, marker='D', color=self.colors_baseline[idx % 6])
+
+			ax1.plot(mx,np.abs(my), color=self.colors_baseline[idx % 6])
+			ax1.scatter(mx,np.abs(my),s=2, color=self.colors_baseline[idx % 6])
     
-			#Calculate spatial frequencies
-			sf = np.sqrt(u**2+v**2)/l0*units.as_to_rad
+			ax1r.errorbar(x, y-np.abs(my), yerr, **plot_config, marker='D', color=self.colors_baseline[idx % 6])
+
+			#Visibility phase
+			x   = self.spatial_frequency_as[idx] 
+			y   = self.visphiSC_P1[idx] 
+			yerr= self.visphierrSC_P1[idx]
+
+			ax2.errorbar(x, y, yerr, **plot_config, marker='o', color=self.colors_baseline[idx % 6])
+
+			#y   = self.visphiSC_P2[idx] 
+			#yerr= self.visphierrSC_P2[idx]
+			#ax2.errorbar(x, y, yerr, **plot_config, marker='D', color=self.colors_baseline[idx % 6])
+
+			ax2.plot(mx,np.angle(my,deg=True), color=self.colors_baseline[idx % 6])
+			ax2.scatter(mx,np.angle(my,deg=True),s=2, color=self.colors_baseline[idx % 6])
+    
+			ax2r.errorbar(x, y-np.angle(my,deg=True), yerr, **plot_config, marker='D', color=self.colors_baseline[idx % 6])
+
+			#Visibility squared
+			x   = self.spatial_frequency_as[idx] 
+			y   = self.vis2SC_P1[idx] 
+			yerr= self.vis2errSC_P1[idx]
+
+			ax3.errorbar(x, y, yerr, **plot_config, marker='o', color=self.colors_baseline[idx % 6])
+
+			#y   = self.vis2SC_P2[idx] 
+			#yerr= self.vis2errSC_P2[idx]
+			#ax3.errorbar(x, y, yerr, **plot_config, marker='D', color=self.colors_baseline[idx % 6])
+
+			ax3.plot(mx,my**2, color=self.colors_baseline[idx % 6])
+			ax3.scatter(mx,my**2,s=2, color=self.colors_baseline[idx % 6])
+    
+			ax3r.errorbar(x, y-my**2, yerr, **plot_config, marker='D', color=self.colors_baseline[idx % 6])
+
+		#Closure phases
+		c1 = np.angle(visibility_model['UT4-3'][1]) + np.angle(visibility_model['UT3-2'][1]) - np.angle(visibility_model['UT4-2'][1])
+		c2 = np.angle(visibility_model['UT4-3'][1]) + np.angle(visibility_model['UT3-1'][1]) - np.angle(visibility_model['UT4-1'][1])
+		c3 = np.angle(visibility_model['UT4-2'][1]) + np.angle(visibility_model['UT2-1'][1]) - np.angle(visibility_model['UT4-1'][1])
+		c4 = np.angle(visibility_model['UT3-2'][1]) + np.angle(visibility_model['UT2-1'][1]) - np.angle(visibility_model['UT3-1'][1])
+
+		cp = np.array([c1,c2,c3,c4])*180/np.pi
+
+		for idx in range(len(self.spatial_frequency_as_T3)):
+
+			x   = self.spatial_frequency_as_T3[idx] 
+			y   = self.t3SC_P1[idx] 
+			yerr= self.t3errSC_P1[idx]
+
+			ax4.errorbar(x, y, yerr, **plot_config, marker='o', color=self.colors_closure[idx])
+
+			#y   = self.t3SC_P2[idx] 
+			#yerr= self.t3errSC_P2[idx]
+			#ax4.errorbar(x, y, yerr, **plot_config, marker='D', color=self.colors_closure[idx])
 
 
-			return sf, visibility/np.sqrt(normalization_i*normalization_j)
+			ax4.plot(x,cp[idx], color=self.colors_closure[idx])
+			ax4.scatter(x,cp[idx], s=2, color=self.colors_closure[idx])
+    
+			ax4r.errorbar(x, y-cp[idx], yerr, **plot_config, marker='D', color=self.colors_closure[idx])
+
+		return fig, pm_axes, fov_ax, baselines_ax, data_axes
+
