@@ -457,20 +457,39 @@ class GravMfit(GravData, GravPhaseMaps):
 			ucoord = self.u[baseline_index]/units.micrometer
 			vcoord = self.v[baseline_index]/units.micrometer
 
+			#Load phasemap interpolating functions if using phasemaps
+			if use_phasemaps:
+
+				phase_maps = [self.phasemaps_phase[telescope_to_beam[telescopes[0]]],
+							  self.phasemaps_phase[telescope_to_beam[telescopes[1]]]]
+						
+				amplitude_maps = [	self.phasemaps_amplitude[telescope_to_beam[telescopes[0]]],
+									self.phasemaps_amplitude[telescope_to_beam[telescopes[1]]]]
+						
+				normalization_maps = [	self.phasemaps_normalization[telescope_to_beam[telescopes[0]]],
+										self.phasemaps_normalization[telescope_to_beam[telescopes[1]]]]
+
+				phasemap_args = {
+					'phase_maps': phase_maps,
+					'amplitude_maps': amplitude_maps,
+					'normalization_maps': normalization_maps
+				}
+
+			else:
+				phasemap_args = {}
+
 			model = GravMfit.nsource_visibility(
 			uv_coordinates= [ucoord,vcoord],
-			telescope_names = telescopes,
 			sources=sources,
 			background=background,
 			l_list=self.wlSC,
-			dl=self.dlambda,
+			dl_list=self.dlambda,
 			use_phasemaps=use_phasemaps,
-			phasemaps= self.phasemaps,
-			phasemaps_normalization=self.phasemaps_normalization
+			**phasemap_args
 			)
 
 			visibility_model[label] = model
-		
+				
 		return visibility_model
 
 	def nsource_visibility(
