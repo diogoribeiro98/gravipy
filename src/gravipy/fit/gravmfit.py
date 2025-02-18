@@ -80,15 +80,15 @@ class GravMfit(GravData, GravPhaseMaps):
 		sgr_de = 0.0,
 		sgr_fr = 1.0,
 		sgr_alpha = 3.0,
-		fit_sgr_pos = False,
-		fit_sgr_fr  = False,
-		fit_sgr_alpha = False,
+		fit_sgr_pos = True,
+		fit_sgr_fr  = True,
+		fit_sgr_alpha = True,
 		
 		#Background parameters
-		background_alpha = 3,
+		background_alpha = 3.0,
 		background_fr = 0.1,
-		fit_background_fr = False,
-		fit_background_alpha = False,
+		fit_background_fr = True,
+		fit_background_alpha = True,
 
 		#Field type and fitting model
 		field_type = 'star',
@@ -96,8 +96,38 @@ class GravMfit(GravData, GravPhaseMaps):
 		fit_window_sgr = None,
 
 		#Use phasemaps?
-		use_phasemaps = True
+		use_phasemaps = True,
+		phasemap_year = 2020,
+		phasemap_smoothing_kernel = 15
 						 ):
+		"""Set up fitting parameters for fitting procedure
+
+		Args:
+			ra_list (list): list of stars` right ascensions 
+			de_list (list): list of stars` declinations
+			fr_list (list): list of stars` flux ratios
+			star_alpha (float, optional): Spectral index of stars. Defaults to 3.0.
+			fit_star_pos (bool, optional): If True, star positions are fitted. Defaults to True.
+			fit_star_fr (bool, optional): If True, star fluxes (magnitudes) are fitted. Defaults to True.
+			fit_star_alpha (bool, optional): If True, spectral index of stars is fitted. Defaults to False.
+			
+			sgr_ra (float, optional): Right ascension of Sgr A*. Defaults to 0.0.
+			sgr_de (float, optional): Declination of Sgr A*. Defaults to 0.0.
+			sgr_fr (float, optional): Flux ratio of SgrA*. Defaults to 1.0.
+			sgr_alpha (float, optional): Spectral index of Sgr A*. Defaults to 3.0.
+			fit_sgr_pos (bool, optional): If True, position of Sgr A* is fitted. Defaults to True.
+			fit_sgr_fr (bool, optional): If True, flux ratio (magnitude) of Sgr A* if fitted. Defaults to True.
+			fit_sgr_alpha (bool, optional): If True, spectral ratio of Sgr A* if fitted. Defaults to True.
+			
+			background_alpha (int, optional): Spectral index of background. Defaults to 3.0.
+			background_fr (float, optional): Flux ratio of background with respect to first source. Defaults to 0.1.
+			fit_background_fr (bool, optional): If True, background flux is fitted. Defaults to True.
+			fit_background_alpha (bool, optional): If True, spectral index of background is fitted. Defaults to True.
+
+			field_type (str, optional): Type of field to fit. Allowed values are 'star' and 'sgra'. Defaults to 'star'.
+			fit_window_stars (_type_, optional): Size of flat prior around initial position of stars. If None is give, defaults to 5 miliarcseconds.
+			fit_window_sgr (_type_, optional): Size of flat prior around Sgr A* position.If None is given, defaults to 5 miliarcseconds.
+		"""
 		
 		#Check if the list of RA, Dec and Flux all have the same length
 		if not all(len(lst) == len(ra_list) for lst in [de_list, fr_list]):
