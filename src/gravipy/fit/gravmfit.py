@@ -106,6 +106,19 @@ class GravMfit(GravData, GravPhaseMaps):
 			nsource = len(ra_list)
 
 		# -----------------------------------------------------------------
+		# Setup phasemaps if requested
+		# -----------------------------------------------------------------
+		
+		self.use_phasemaps = use_phasemaps
+		
+		if use_phasemaps:
+			
+			self.phasemap_year = phasemap_year
+			self.phasemap_smoothing_kernel = phasemap_smoothing_kernel
+
+			self.load_phasemaps(year = phasemap_year, smooth_kernel=phasemap_smoothing_kernel)
+
+		# -----------------------------------------------------------------
 		# Create a different set of parameters depending on the field type
 		# -----------------------------------------------------------------
 
@@ -121,8 +134,7 @@ class GravMfit(GravData, GravPhaseMaps):
 			self.nsource = nsource
 			self.sources = np.zeros((nsource, 4)) 	# [ra,dec,flux,alpha]
 			self.background = np.zeros(2)			# [flux,alpha]
-			self.use_phasemaps = use_phasemaps
-
+			
 			# Parameters for stars 
 			# number of parameters = (3n-1)+1
 			star_fit_parameters = {
@@ -146,14 +158,14 @@ class GravMfit(GravData, GravPhaseMaps):
 				
 				#If first star, fix the flux
 				if idx==0:
-					star_fit_parameters[f'source_{idx}_flux'] = [ 1.0, np.log10(0.001),  np.log10(100.), False ]
+					star_fit_parameters[f'source_{idx}_dmag'] = [ 0.0, np.log10(0.001),  np.log10(100.), False ]
 				else:
-					star_fit_parameters[f'source_{idx}_flux'] = [ fr_list[idx]/fr_list[0],  np.log10(0.001),  np.log10(100.), fit_star_fr ]
+					star_fit_parameters[f'source_{idx}_dmag'] = [ -2.5*np.log10(fr_list[idx]/fr_list[0]),  -4,  4, fit_star_fr ]
 
 			#Fitting parameters for background
 			# number of parameters = 2
 			background_fit_parameters = {
-				'background_flux' : [background_fr   ,   0.0, 20.0, fit_background_fr   ],
+				'background_flux' : [background_fr   ,   0.0, 10.0, fit_background_fr   ],
 				'background_alpha': [background_alpha, -10.0, 10.0, fit_background_alpha]
 			}		
 
@@ -176,7 +188,6 @@ class GravMfit(GravData, GravPhaseMaps):
 				self.nsource = 0
 				self.sources = np.zeros((1, 4)) # [ra,dec,flux,alpha]
 				self.background = np.zeros(2)	# [flux,alpha]
-				self.use_phasemaps = use_phasemaps
 
 				#Check fitting area
 				if fit_window_sgr == None:
@@ -189,7 +200,7 @@ class GravMfit(GravData, GravPhaseMaps):
 				sgra_fit_parameters = {
 					'sgra_ra' 	 : [sgr_ra	 	, -fit_window	 , fit_window	 , fit_sgr_pos  ],
 					'sgra_dec' 	 : [sgr_de	 	, -fit_window	 , fit_window	 , fit_sgr_pos  ],
-					'sgra_flux'  : [1.0			, np.log10(0.001), np.log10(100.), False        ],
+					'sgra_dmag'  : [0.0			, np.log10(0.001), np.log10(100.), False        ],
 					'sgra_alpha' : [sgr_alpha	, -10.0	 		 , 10.0			 , fit_sgr_alpha],
 				}
 
@@ -213,7 +224,6 @@ class GravMfit(GravData, GravPhaseMaps):
 				self.nsource = nsource
 				self.sources = np.zeros((nsource + 1, 4))  	# [ra,dec,flux,alpha]
 				self.background = np.zeros(2)				# [flux,alpha]
-				self.use_phasemaps = use_phasemaps
 
 				#Fitting parameters for stars 
 				# number of parameters = (3n-1)+1
@@ -238,9 +248,9 @@ class GravMfit(GravData, GravPhaseMaps):
 					
 					#If first star, fix the flux
 					if idx==0:
-						star_fit_parameters[f'source_{idx}_flux'] = [ 1.0, np.log10(0.001),  np.log10(100.), False ]
+						star_fit_parameters[f'source_{idx}_dmag'] = [ 0.0, 0.0,  10. , False ]
 					else:
-						star_fit_parameters[f'source_{idx}_flux'] = [ fr_list[idx]/fr_list[0],  np.log10(0.001),  np.log10(100.), fit_star_fr ]
+						star_fit_parameters[f'source_{idx}_dmag'] = [ -2.5*np.log10(fr_list[idx]/fr_list[0]), -4 ,  4 , fit_star_fr ]
 
 				#Check fitting area
 				if fit_window_sgr == None:
@@ -253,14 +263,14 @@ class GravMfit(GravData, GravPhaseMaps):
 				sgra_fit_parameters = {
 					'sgra_ra' 	 : [sgr_ra	 			, -fit_window	 , fit_window	 , fit_sgr_pos  ],
 					'sgra_dec' 	 : [sgr_de	 			, -fit_window	 , fit_window	 , fit_sgr_pos  ],
-					'sgra_flux'  : [sgr_fr/fr_list[0]	, np.log10(0.001), np.log10(100.), fit_sgr_fr   ],
+					'sgra_dmag'  : [-2.5*np.log10(sgr_fr/fr_list[0])	,   -4			 , 4		   	 , fit_sgr_fr   ],
 					'sgra_alpha' : [sgr_alpha			, -10.0	 		 , 10.0			 , fit_sgr_alpha],
 				}
 
 				#Fitting parameters for background
 				# number of parameters = 2
 				background_fit_parameters = {
-					'background_flux' : [background_fr   ,  0.0, 20.0, fit_background_fr   ],
+					'background_flux' : [background_fr   ,  0.0, 10.0, fit_background_fr   ],
 					'background_alpha': [background_alpha, -10.0, 10.0, fit_background_alpha]
 				}	
 
