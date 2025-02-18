@@ -343,6 +343,105 @@ class GravMfit(GravData, GravPhaseMaps):
 	# Visibility model 
 	#===================
 
+	@staticmethod
+	def nsource_visibility(
+			uv_coordinates,
+			sources,
+			background,
+			l_list,
+			dl_list,
+			reference_l0=2.2,
+			use_phasemaps=False,
+			phase_maps = None,
+			amplitude_maps = None,
+			normalization_maps = None
+			):
+		
+		u,v = uv_coordinates
+
+		#Storage variable for opd
+		opd = np.zeros_like(l_list)
+
+		#Calculate things differently if using phasemaps or not
+		if not use_phasemaps:
+	
+			#Storage variables
+			visibility = np.zeros_like(l_list, dtype=np.complex128)
+			normalization = np.zeros_like(l_list)
+			
+			#for x, y, flux, alpha in sources:
+			for src in sources:
+
+				#Get position, flux and spectral index for each source
+				x, y, flux, alpha = src	
+				
+				#Calculate optical path difference from position on sky and visibility
+				opd.fill((u*x + v*y)*units.mas_to_rad)
+
+				#Add source visibility to nsource one
+				visibility += flux*spectral_visibility(opd, alpha, l_list, dl_list, reference_l0)
+				normalization += flux*spectral_visibility(0, alpha, l_list, dl_list, reference_l0)
+			
+			#Add background to normalization
+			flux, alpha = background
+			normalization += flux*spectral_visibility(0, alpha, l_list, dl_list,reference_l0)
+			
+			#Calculate spatial frequencies
+			sf = np.sqrt(u**2+v**2)/l_list*units.as_to_rad
+
+			return sf, visibility/normalization
+
+		else:
+
+			#Storage variables
+			visibility = np.zeros_like(l_list, dtype=np.complex128)
+			normalization_i = np.zeros_like(l_list)
+			normalization_j = np.zeros_like(l_list)
+			
+			#Get phasemaps
+			phi_i, phi_j = phase_maps
+			Ai, Aj = amplitude_maps
+			Li, Lj = normalization_maps
+
+			#Helper vectors to vectorize operations
+			xlist = np.zeros_like(l_list)
+			ylist = np.zeros_like(l_list)
+
+			for src in sources:
+
+				#Get position, flux and spectral index for each source
+				x, y, flux, alpha = src
+			
+				#Calculate optical path difference from position on sky and visibility
+				opd.fill((u*x + v*y)*units.mas_to_rad)
+				
+				xlist.fill(x)
+				ylist.fill(y)
+				
+				#Correct with phasemaps
+				arg = (l_list,xlist,ylist)
+				opd -= ( phi_i(arg) - phi_j(arg))*l_list/360. 
+				Lij  =  Ai(arg)*Aj(arg)
+
+				#Calculate visibility
+				visibility += Lij*flux*spectral_visibility(opd, alpha, l_list, dl_list, reference_l0)
+				
+				# Normalization terms
+				sv0 = spectral_visibility(0, alpha, l_list, dl_list, reference_l0)
+				
+				normalization_i += Li(arg) * flux * sv0
+				normalization_j += Lj(arg) * flux * sv0
+				
+		 	#Add background to normalization
+			flux, alpha = background
+			normalization_i += flux*spectral_visibility(0, alpha, l_list, dl_list,reference_l0)
+			normalization_j += flux*spectral_visibility(0, alpha, l_list, dl_list,reference_l0)
+			
+			#Calculate spatial frequencies
+			sf = np.sqrt(u**2+v**2)/l_list*units.as_to_rad
+			
+			return sf, visibility/np.sqrt(normalization_i*normalization_j)
+			
 	def get_visibility_model(self, params, use_phasemaps=False):
 		
 		#Get sources from parameters
