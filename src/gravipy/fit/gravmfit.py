@@ -492,7 +492,318 @@ class GravMfit(GravData, GravPhaseMaps):
 				
 		return visibility_model
 
-	def nsource_visibility(
+	#========================================
+	# Static methods for multithread fitting
+	#=========================================
+	
+	@staticmethod
+	def get_sources_and_background(parameter_value_dictionary, field_type, nsource):
+		"""Returns the source and background arrays associated with the given
+		parameter dictionary
+		"""
+
+		if field_type=='star':
+
+			sources = np.zeros((nsource, 4)) 	# [ra,dec,flux,alpha] for each source
+			background = np.zeros(2)			# [flux,alpha]
+
+			stars_alpha = parameter_value_dictionary['stars_alpha']
+			background_flux = parameter_value_dictionary['background_flux']
+			background_alpha = parameter_value_dictionary['background_alpha']
+
+			for idx in range(nsource):
+				sources[idx, 0] = parameter_value_dictionary[f'source_{idx}_ra']
+				sources[idx, 1] = parameter_value_dictionary[f'source_{idx}_dec']
+				sources[idx, 2] = 10**(-0.4*parameter_value_dictionary[f'source_{idx}_dmag'])
+				sources[idx, 3] = stars_alpha  # Same for all sources
+		
+			background[:] = [background_flux, background_alpha]  
+
+		elif field_type=='sgra':
+			
+			#If sgra is the only source in the field
+			if nsource==0:
+				
+				sources = np.zeros((1, 4))  # [ra,dec,flux,alpha] for SgrA*
+				background = np.zeros(2)	# [flux,alpha]
+
+				background_flux = parameter_value_dictionary['background_flux']
+				background_alpha = parameter_value_dictionary['background_alpha']
+
+				sources[0, 0] = parameter_value_dictionary['sgra_ra']
+				sources[0, 1] = parameter_value_dictionary['sgra_dec']
+				sources[0, 2] = 10**(-0.4*parameter_value_dictionary['sgra_dmag'])
+				sources[0, 3] = parameter_value_dictionary['sgra_alpha']
+
+				background[:] = [background_flux, background_alpha] 
+
+			else:
+
+				sources = np.zeros((nsource + 1, 4)) # [ra,dec,flux,alpha] for each source and for Sgr A*
+				background = np.zeros(2)			 # [flux,alpha]
+
+				stars_alpha = parameter_value_dictionary['stars_alpha']
+				background_flux = parameter_value_dictionary['background_flux']
+				background_alpha = parameter_value_dictionary['background_alpha']
+			
+				for idx in range(nsource):
+					sources[idx, 0] = parameter_value_dictionary[f'source_{idx}_ra']
+					sources[idx, 1] = parameter_value_dictionary[f'source_{idx}_dec']
+					sources[idx, 2] = 10**(-0.4*parameter_value_dictionary[f'source_{idx}_dmag'])
+					sources[idx, 3] = stars_alpha  # Same for all sources
+			
+				sources[-1, 0] = parameter_value_dictionary['sgra_ra']
+				sources[-1, 1] = parameter_value_dictionary['sgra_dec']
+				sources[-1, 2] = 10**(-0.4*parameter_value_dictionary['sgra_dmag'])
+				sources[-1, 3] = parameter_value_dictionary['sgra_alpha'] 
+
+				background[:] = [background_flux, background_alpha]  
+
+		return sources, background
+
+	@staticmethod
+	def emcee_log_likelihood(theta, theta_names):
+		"""
+		Loglikelihood function for emcee sampler.
+		
+		The functions is made to run in parallel and needs
+		access to global variables. As such it should only be
+		called from within an open pool of workers with the proper
+		emcee worker initializer (see GravMfit.run_emcee_fit) function
+
+		"""
+	
+		# Create a parameter dictionary with all parameters + theta values
+		global parameter_value_dictionary
+		global uniform_prior_bounds
+
+		theta_parameter_dictionary = dict(zip(theta_names, theta))
+
+		for key in parameter_value_dictionary:
+			parameter_value_dictionary[key] = theta_parameter_dictionary.get(key, parameter_value_dictionary[key])
+
+		#Check if within the priors and reject samples outside
+		for key, value in theta_parameter_dictionary.items():
+			if key in uniform_prior_bounds:
+				min_bound, max_bound = uniform_prior_bounds[key]
+				if not (min_bound <= value <= max_bound):
+					return -np.inf  
+
+		#Fetch sources and background from the parameter dictionary
+		global field_type
+		global nsources
+
+		sources, background = GravMfit.get_sources_and_background(parameter_value_dictionary,field_type=field_type,nsource=nsources)
+
+		#Calculate visibilities
+		global baseline_telescopes
+		global baseline_labels
+		global baseline_index_map
+		
+		global wavelength_vector, dlambda_vector
+		global phasemaps_phase, phasemaps_amplitude, phasemaps_normalization
+		global use_phasemaps
+	
+		global visibility_model
+	
+		for telescopes, label in zip(baseline_telescopes, baseline_labels):
+			
+			baseline_index = baseline_index_map[label] 
+
+			ucoord = u[baseline_index]/units.micrometer
+			vcoord = v[baseline_index]/units.micrometer
+
+			#Load phasemap interpolating functions if using phasemaps
+			if use_phasemaps:
+
+				phase_maps = [phasemaps_phase[telescope_to_beam[telescopes[0]]],
+							  phasemaps_phase[telescope_to_beam[telescopes[1]]]]
+						
+				amplitude_maps = [	phasemaps_amplitude[telescope_to_beam[telescopes[0]]],
+									phasemaps_amplitude[telescope_to_beam[telescopes[1]]]]
+						
+				normalization_maps = [	phasemaps_normalization[telescope_to_beam[telescopes[0]]],
+										phasemaps_normalization[telescope_to_beam[telescopes[1]]]]
+				
+				phasemap_args = {
+					'phase_maps': phase_maps,
+					'amplitude_maps': amplitude_maps,
+					'normalization_maps': normalization_maps
+				}
+
+			else:
+				phasemap_args = {}
+
+			model = GravMfit.nsource_visibility(
+			uv_coordinates= [ucoord,vcoord],
+			sources=sources,
+			background=background,
+			l_list=wavelength_vector,
+			dl_list=dlambda_vector,
+			use_phasemaps=use_phasemaps,
+			**phasemap_args		
+			)
+		
+			visibility_model[label] = model
+		
+		# Compute residuals
+		residual_sum = 0.0
+
+		for idx, label in enumerate(visibility_model):
+			
+			# Model quantities
+			visamp_model = np.abs(visibility_model[label][1])
+			visphi_model = np.angle(visibility_model[label][1], deg=True)
+			
+			# Data pairs for amplitude, phase, and squared residuals (only P1 implemented at the moment)
+			amp_data, amp_err = visamp[idx], visamp_err[idx]
+			phi_data, phi_err = visphi[idx], visphi_err[idx]
+
+			residuals_amp = ((visamp_model - amp_data)/amp_err )**2
+			residual_sum += np.nansum(residuals_amp)
+
+			residuals_phi = ((visphi_model - phi_data)/phi_err )**2
+			residual_sum += np.nansum(residuals_phi)
+
+		log_likelihood = -0.5*residual_sum
+
+		return log_likelihood 
+			
+	def run_mcmc_fit(self, nwalkers=50, steps=200, nthreads=1, initial_spread = 0.5, polarization='P1'):
+
+		#Initial spread cannot be larger than 1
+		if initial_spread >= 1:
+			raise ValueError('initial_spread cannot be larger than 1.')
+
+		#Get parameter names to fit
+		parameters_to_fit = [p for p in self.params if self.params[p].vary==True]
+		initial_values    = [self.params[p].value for p in parameters_to_fit] 
+		param_range  = [ np.abs(self.params[p].max-self.params[p].min)/2 for p in parameters_to_fit] 
+		
+		#Setup initial state of walkers
+		ndim = len(parameters_to_fit)
+		initial_emcee_state = np.array([
+    	[np.clip(
+			initial_values[idx] + initial_spread * np.random.uniform(-param_range[idx], param_range[idx]), 
+             self.params[parameters_to_fit[idx]].min, 
+             self.params[parameters_to_fit[idx]].max) 
+     	for idx in range(ndim)] 
+    	for _ in range(nwalkers)
+		])
+
+		#Setup number of threads
+		n_cores = nthreads
+		
+		if nthreads > multiprocessing.cpu_count():
+			raise ValueError(f'nthreads ({nthreads}) cannot be larger than cpu count on your machine ({multiprocessing.cpu_count()})')
+		
+		#Select model
+		log_likelihood = GravMfit.emcee_log_likelihood
+
+		#Define emcee worker init function to share data with each thread
+		def emcee_worker_init():
+
+			#Baseline information
+			global baseline_telescopes
+			global baseline_labels
+			global baseline_index_map
+			global u, v
+
+			baseline_telescopes = self.baseline_telescopes
+			baseline_labels = self.baseline_labels
+			baseline_index_map = self.baseline_index_map
+			u = self.u
+			v = self.v
+
+			#Wavelength information
+			global wavelength_vector
+			global dlambda_vector
+			wavelength_vector = self.wlSC
+			dlambda_vector = self.dlambda
+
+			#Storage variables
+			global visibility_model
+			visibility_model = self.visibility_model
+
+			#Parameter initial values and uniform bounds
+			global parameter_value_dictionary
+			global uniform_prior_bounds
+
+			parameter_value_dictionary = self.params.valuesdict()
+		
+			uniform_prior_bounds = {
+    			name: (param.min, param.max)
+				for name, param in self.params.items()
+				if param.min is not None and param.max is not None
+				}
+
+			#Field type and number of sources
+			global field_type
+			global nsources
+
+			field_type = self.field_type
+			nsources = self.nsource
+
+			#Phasemaps
+			global phasemaps_phase, phasemaps_amplitude
+			global phasemaps_normalization
+			global use_phasemaps
+
+			phasemaps_phase = self.phasemaps_phase
+			phasemaps_amplitude = self.phasemaps_amplitude
+			phasemaps_normalization = self.phasemaps_normalization
+			use_phasemaps = self.use_phasemaps
+
+			#Data
+			global visamp, visamp_err
+			global visphi, visphi_err
+			#global vis2  , vis2_err
+			#global t3    , t3_err
+			
+			if polarization=='P1':
+				visamp, visamp_err = self.visampSC_P1, self.visamperrSC_P1
+				visphi, visphi_err = self.visphiSC_P1, self.visphierrSC_P1
+			elif polarization=='P2':
+				visamp, visamp_err = self.visampSC_P2, self.visamperrSC_P2
+				visphi, visphi_err = self.visphiSC_P2, self.visphierrSC_P2
+			
+			#vis2  , vis2_err   = self.vis2SC_P1  , self.vis2errSC_P1
+			#t3    , t3_err     = self.t3SC_P1	 , self.t3errSC_P1 	
+			
+		#Perform fit		
+		with multiprocessing.Pool(processes=n_cores, initializer=emcee_worker_init) as pool:
+	
+			sampler = emcee.EnsembleSampler(
+				nwalkers=nwalkers, 
+				ndim=ndim, 
+				log_prob_fn=log_likelihood, 
+				pool=pool,
+				args=(parameters_to_fit,) )
+			
+			sampler.run_mcmc(
+				initial_state=initial_emcee_state, 
+				nsteps=steps, 
+				progress=True)
+		
+		#Get the walker
+		samples = sampler.get_chain(discard=20, thin=10, flat=True) 
+		best_fit = np.median(samples, axis=0)  # Take the median of the posterior
+		uncertainties = np.std(samples, axis=0)
+
+		#Overwrite parameter 
+		result_parameters = self.params.copy()
+
+		for idx, elem in enumerate(parameters_to_fit):
+			result_parameters[elem].value  = best_fit[idx]
+			result_parameters[elem].stderr = uncertainties[idx]
+
+		self.result_params = result_parameters
+
+		self.sampler = sampler
+		self.parameters_to_fit = parameters_to_fit
+
+		return sampler, parameters_to_fit, result_parameters
+
 			self,
 			telescope_names,
 			sources,
