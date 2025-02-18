@@ -48,7 +48,17 @@ class GravMfit(GravData, GravPhaseMaps):
 		self.nsource 	= None
 		self.sources 	= None
 		self.background = None
+		
+		#Phasemap helper quantities
 		self.use_phasemaps = None
+		self.phasemap_year = None
+		self.phasemap_smoothing_kernel = None
+
+		#Template structure for visibility model
+		self.visibility_model = dict((str(name),None) for name in self.baseline_labels)
+
+		#Baseline index maps 
+		self.baseline_index_map = {label : idx for idx, label in enumerate(self.baseline_labels)}
 
 	#========================================
 	# Fitting parameters setup
