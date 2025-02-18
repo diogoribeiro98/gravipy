@@ -31,7 +31,8 @@ class GravData():
                  loglevel='INFO',
                  plot=False,
                  flag=True,
-                 ignore_telescopes = []
+                 ignore_telescopes = [],
+                 flag_channels = [0,1,2,-1,-2,-3]
                  ):
 
         #Create a logger and set log level according to user
@@ -371,6 +372,48 @@ class GravData():
                 self.visphiSC_P2[self.visphiflagSC_P2]      = np.nan
                 self.visphierrSC_P2[self.visphiflagSC_P2]   = np.nan
 
+            # Ignore data with visibility larger than unity
+            # Note: It is not clear if we should consider the squared visibility too
+
+            cond = self.visampSC_P1>1.0
+
+            self.visampSC_P1    [cond]  = np.nan
+            self.visamperrSC_P1 [cond]  = np.nan
+                        
+            self.visphiSC_P1    [cond]  = np.nan
+            self.visphierrSC_P1 [cond]  = np.nan
+
+            self.vis2SC_P1      [cond]  = np.nan
+            self.vis2errSC_P1   [cond]  = np.nan
+
+            cond = self.visampSC_P2>1.0
+
+            self.visampSC_P2    [cond]  = np.nan
+            self.visamperrSC_P2 [cond]  = np.nan
+
+            self.visphiSC_P2    [cond]  = np.nan
+            self.visphierrSC_P2 [cond]  = np.nan
+
+            self.vis2SC_P2      [cond]  = np.nan
+            self.vis2errSC_P2   [cond]  = np.nan
+
+            #Flag extra channels
+            self.visampSC_P1    [:,flag_channels] = np.nan
+            self.visamperrSC_P1 [:,flag_channels] = np.nan
+
+            self.visphiSC_P1    [:,flag_channels]  = np.nan
+            self.visphierrSC_P1 [:,flag_channels]  = np.nan
+
+            self.visampSC_P2    [:,flag_channels]  = np.nan
+            self.visamperrSC_P2 [:,flag_channels]  = np.nan
+
+            self.visphiSC_P2    [:,flag_channels]  = np.nan
+            self.visphierrSC_P2 [:,flag_channels]  = np.nan
+
+            self.t3SC_P1    [:,flag_channels] = np.nan
+            self.t3errSC_P1 [:,flag_channels] = np.nan
+            self.t3SC_P2    [:,flag_channels] = np.nan
+            self.t3errSC_P2 [:,flag_channels] = np.nan
 
             if plot:
                 self.plot_interferometric_data()
