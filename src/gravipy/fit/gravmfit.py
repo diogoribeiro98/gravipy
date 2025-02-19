@@ -677,6 +677,13 @@ class GravMfit(GravData, GravPhaseMaps):
 			visibility_model[label] = model
 		
 		# Compute residuals
+		global visamp, visamp_err
+		global visphi, visphi_err
+		global vis2  , vis2_err
+		global t3    , t3_err
+		
+		global weights
+
 		residual_sum = 0.0
 
 		for idx, label in enumerate(visibility_model):
@@ -684,22 +691,47 @@ class GravMfit(GravData, GravPhaseMaps):
 			# Model quantities
 			visamp_model = np.abs(visibility_model[label][1])
 			visphi_model = np.angle(visibility_model[label][1], deg=True)
-			
+			vis2_model = visamp_model**2
+
 			# Data pairs for amplitude, phase, and squared residuals (only P1 implemented at the moment)
 			amp_data, amp_err = visamp[idx], visamp_err[idx]
 			phi_data, phi_err = visphi[idx], visphi_err[idx]
+			v2_data , v2_err  = vis2[idx]  , vis2_err[idx]  
 
-			residuals_amp = ((visamp_model - amp_data)/amp_err )**2
-			residual_sum += np.nansum(residuals_amp)
+			if weights[0] != 0.0:
+				residuals_amp = ((visamp_model - amp_data)/amp_err )**2
+				residual_sum += np.nansum(residuals_amp)*weights[0]
+			
+			if weights[1] != 0.0:
+				residuals_phi = ((visphi_model - phi_data)/phi_err )**2
+				residual_sum += np.nansum(residuals_phi)*weights[1]
 
-			residuals_phi = ((visphi_model - phi_data)/phi_err )**2
-			residual_sum += np.nansum(residuals_phi)
+			if weights[2] != 0.0:
+				residuals_vis2 = ((vis2_model - v2_data)/v2_err )**2
+				residual_sum  += np.nansum(residuals_vis2)*weights[2]
+
+		if weights[3] != 0.0:
+			
+			#Closure phases
+			c1 = np.angle(visibility_model['UT4-3'][1]) + np.angle(visibility_model['UT3-2'][1]) - np.angle(visibility_model['UT4-2'][1])
+			c2 = np.angle(visibility_model['UT4-3'][1]) + np.angle(visibility_model['UT3-1'][1]) - np.angle(visibility_model['UT4-1'][1])
+			c3 = np.angle(visibility_model['UT4-2'][1]) + np.angle(visibility_model['UT2-1'][1]) - np.angle(visibility_model['UT4-1'][1])
+			c4 = np.angle(visibility_model['UT3-2'][1]) + np.angle(visibility_model['UT2-1'][1]) - np.angle(visibility_model['UT3-1'][1])
+
+			cp = np.array([c1,c2,c3,c4])*180/np.pi
+			
+			for idx in range(4):
+
+				cphase_data, cphase_err = t3[idx], t3_err[idx]
+				
+				residuals_t3 = ((cp[idx] - cphase_data)/cphase_err )**2	
+				residual_sum  += np.nansum(residuals_t3)*weights[3]
 
 		log_likelihood = -0.5*residual_sum
 
 		return log_likelihood 
 			
-	def run_mcmc_fit(self, nwalkers=50, steps=200, nthreads=1, initial_spread = 0.5, polarization='P1'):
+	def run_mcmc_fit(self, nwalkers=50, steps=100, nthreads=1, initial_spread = 0.5, polarization='P1', fit_weights=[1.0, 1.0, 0.0, 0.0]):
 
 		#Initial spread cannot be larger than 1
 		if initial_spread >= 1:
@@ -787,19 +819,24 @@ class GravMfit(GravData, GravPhaseMaps):
 			#Data
 			global visamp, visamp_err
 			global visphi, visphi_err
-			#global vis2  , vis2_err
-			#global t3    , t3_err
+			global vis2  , vis2_err
+			global t3    , t3_err
 			
 			if polarization=='P1':
 				visamp, visamp_err = self.visampSC_P1, self.visamperrSC_P1
 				visphi, visphi_err = self.visphiSC_P1, self.visphierrSC_P1
+				vis2  , vis2_err   = self.vis2SC_P1  , self.vis2errSC_P1
+				t3    , t3_err     = self.t3SC_P1	 , self.t3errSC_P1 	
 			elif polarization=='P2':
 				visamp, visamp_err = self.visampSC_P2, self.visamperrSC_P2
 				visphi, visphi_err = self.visphiSC_P2, self.visphierrSC_P2
+				vis2  , vis2_err   = self.vis2SC_P2  , self.vis2errSC_P2
+				t3    , t3_err     = self.t3SC_P2	 , self.t3errSC_P2 	
 			
-			#vis2  , vis2_err   = self.vis2SC_P1  , self.vis2errSC_P1
-			#t3    , t3_err     = self.t3SC_P1	 , self.t3errSC_P1 	
-			
+			#Fitting weight
+			global weights
+			weights = fit_weights
+
 		#Perform fit		
 		with multiprocessing.Pool(processes=n_cores, initializer=emcee_worker_init) as pool:
 	
@@ -833,6 +870,10 @@ class GravMfit(GravData, GravPhaseMaps):
 		self.parameters_to_fit = parameters_to_fit
 
 		return sampler, parameters_to_fit, result_parameters
+
+	def save_mcmc_results(sampler, filename="mcmc_samples.npy"):
+		samples = sampler.get_chain(discard=20, thin=10, flat=True)
+		np.save(filename, samples)
 
 	#========================================
 	# Visualization tools and fit inspection
@@ -953,7 +994,7 @@ class GravMfit(GravData, GravPhaseMaps):
 		ax[1].set_xlim(lim)
 		ax[0].set_xticks([])
 		ax[0].set_ylim(-250, 250)
-		ax[1].set_ylim(-10, 10)
+		ax[1].set_ylim(-50, 50)
 		ax[0].set_ylabel('Visibility Phase')
 		ax[1].set_xlabel('spatial frequency (1/arcsec)')
 		ax[1].set_ylabel('Residuals')
@@ -983,6 +1024,7 @@ class GravMfit(GravData, GravPhaseMaps):
 		ax[1].set_xlim(lim2)
 		ax[0].set_xticks([])
 		ax[0].set_ylim(-250, 250)
+		ax[1].set_ylim(-50, 50)
 		ax[0].set_ylabel('Closure Phases')
 		ax[1].set_xlabel('spatial frequency (1/arcsec)')
 		ax[1].set_ylabel('Residuals')
@@ -1160,10 +1202,10 @@ class GravMfit(GravData, GravPhaseMaps):
 			#yerr= self.vis2errSC_P2[idx]
 			#ax3.errorbar(x, y, yerr, **plot_config, marker='D', color=self.colors_baseline[idx % 6])
 
-			ax3.plot(mx,my**2, color=self.colors_baseline[idx % 6])
-			ax3.scatter(mx,my**2,s=2, color=self.colors_baseline[idx % 6])
+			ax3.plot(mx,np.abs(my)**2, color=self.colors_baseline[idx % 6])
+			ax3.scatter(mx,np.abs(my)**2,s=2, color=self.colors_baseline[idx % 6])
     
-			ax3r.errorbar(x, y-my**2, yerr, **plot_config, marker='D', color=self.colors_baseline[idx % 6])
+			ax3r.errorbar(x, y-np.abs(my)**2, yerr, **plot_config, marker='D', color=self.colors_baseline[idx % 6])
 
 		#Closure phases
 		c1 = np.angle(visibility_model['UT4-3'][1]) + np.angle(visibility_model['UT3-2'][1]) - np.angle(visibility_model['UT4-2'][1])
