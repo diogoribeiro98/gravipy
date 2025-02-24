@@ -218,9 +218,9 @@ class GravMfit(GravData, GravPhaseMaps):
 				
 				#If first star, fix the flux
 				if idx==0:
-					star_fit_parameters[f'source_{idx}_dmag'] = [ 0.0, np.log10(0.001),  np.log10(100.), False ]
+					star_fit_parameters[f'source_{idx}_dmag'] = [ 0.0, -6.0 , 6.0, False ]
 				else:
-					star_fit_parameters[f'source_{idx}_dmag'] = [ -2.5*np.log10(fr_list[idx]/fr_list[0]),  -4,  4, fit_star_fr ]
+					star_fit_parameters[f'source_{idx}_dmag'] = [ -2.5*np.log10(fr_list[idx]/fr_list[0]), -6.0, 6.0, fit_star_fr ]
 
 			#Fitting parameters for background
 			# number of parameters = 2
@@ -260,14 +260,14 @@ class GravMfit(GravData, GravPhaseMaps):
 				sgra_fit_parameters = {
 					'sgra_ra' 	 : [sgr_ra	 	, -fit_window	 , fit_window	 , fit_sgr_pos  ],
 					'sgra_dec' 	 : [sgr_de	 	, -fit_window	 , fit_window	 , fit_sgr_pos  ],
-					'sgra_dmag'  : [0.0			, np.log10(0.001), np.log10(100.), False        ],
+					'sgra_dmag'  : [0.0			, -6.0			 , 6.0			 , False        ],
 					'sgra_alpha' : [sgr_alpha	, -10.0	 		 , 10.0			 , fit_sgr_alpha],
 				}
 
 				#Fitting parameters for background
 				# number of parameters = 2
 				background_fit_parameters = {
-					'background_flux' : [background_fr   ,  0.0, 20.0, fit_background_fr   ],
+					'background_flux' : [background_fr   ,  0.0, 10.0, fit_background_fr   ],
 					'background_alpha': [background_alpha, -10.0, 10.0, fit_background_alpha]
 				}	
 
@@ -308,9 +308,9 @@ class GravMfit(GravData, GravPhaseMaps):
 					
 					#If first star, fix the flux
 					if idx==0:
-						star_fit_parameters[f'source_{idx}_dmag'] = [ 0.0, 0.0,  10. , False ]
+						star_fit_parameters[f'source_{idx}_dmag'] = [ 0.0, -6.0,  6.0 , False ]
 					else:
-						star_fit_parameters[f'source_{idx}_dmag'] = [ -2.5*np.log10(fr_list[idx]/fr_list[0]), -4 ,  4 , fit_star_fr ]
+						star_fit_parameters[f'source_{idx}_dmag'] = [ -2.5*np.log10(fr_list[idx]/fr_list[0]), -6.0 ,  6.0, fit_star_fr ]
 
 				#Check fitting area
 				if fit_window_sgr == None:
@@ -323,7 +323,7 @@ class GravMfit(GravData, GravPhaseMaps):
 				sgra_fit_parameters = {
 					'sgra_ra' 	 : [sgr_ra	 			, -fit_window	 , fit_window	 , fit_sgr_pos  ],
 					'sgra_dec' 	 : [sgr_de	 			, -fit_window	 , fit_window	 , fit_sgr_pos  ],
-					'sgra_dmag'  : [-2.5*np.log10(sgr_fr/fr_list[0])	,   -4			 , 4		   	 , fit_sgr_fr   ],
+					'sgra_dmag'  : [-2.5*np.log10(sgr_fr/fr_list[0]), -6.0, 6.0			 , fit_sgr_fr   ],
 					'sgra_alpha' : [sgr_alpha			, -10.0	 		 , 10.0			 , fit_sgr_alpha],
 				}
 
