@@ -871,9 +871,36 @@ class GravMfit(GravData, GravPhaseMaps):
 
 		return sampler, parameters_to_fit, result_parameters
 
-	def save_mcmc_results(sampler, filename="mcmc_samples.npy"):
-		samples = sampler.get_chain(discard=20, thin=10, flat=True)
-		np.save(filename, samples)
+	def save_mcmc_csv(self, appendix=None):
+		
+		if appendix==None:
+			raise ValueError('Please provide an appendix to save the mcmc chain')
+		
+		results_dir = 'mcmc_results'
+		if not os.path.exists(results_dir):
+			os.makedirs(results_dir)
+
+		samples = self.sampler.get_chain(discard=0, flat=True)
+    
+    	# Convert to DataFrame with column names
+		df = pd.DataFrame(samples, columns=self.parameters_to_fit)
+    
+    	# Save as CSV
+		output_name = os.path.join(results_dir, self.filename[:-5] + '_' + appendix + '.csv')
+
+		df.to_csv(output_name, index=False)
+    	
+		return
+
+	def load_mcmc_csv(self, appendix):
+
+		if appendix==None:
+			raise ValueError('Please provide an appendix to load the mcmc chain')
+
+		results_dir = 'mcmc_results'
+		load_name = os.path.join(results_dir, self.filename[:-5] + '_' + appendix + '.csv')
+
+		return pd.read_csv(load_name)
 
 	#========================================
 	# Visualization tools and fit inspection
