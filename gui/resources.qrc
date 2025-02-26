@@ -1,8 +1,0 @@
-<!DOCTYPE RCC>
-<RCC version="1.0">
-    <qresource>
-        <file>png/check_no.png</file>
-        <file>png/check_yes.png</file>
-        <file>png/combo_down.png</file>
-    </qresource>
-</RCC>
