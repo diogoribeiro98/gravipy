@@ -365,7 +365,10 @@ class GravMfit(GravData, GravPhaseMaps):
 			use_phasemaps=False,
 			phase_maps = None,
 			amplitude_maps = None,
-			normalization_maps = None
+			normalization_maps = None,
+			north_angle = [0.0,0.0],
+			met_offx = [0.0, 0.0],
+			met_offy = [0.0, 0.0],
 			):
 		
 		u,v = uv_coordinates
@@ -385,7 +388,7 @@ class GravMfit(GravData, GravPhaseMaps):
 
 				#Get position, flux and spectral index for each source
 				x, y, flux, alpha = src	
-				
+
 				#Calculate optical path difference from position on sky and visibility
 				opd.fill((u*x + v*y)*units.mas_to_rad)
 
@@ -415,24 +418,47 @@ class GravMfit(GravData, GravPhaseMaps):
 			Li, Lj = normalization_maps
 
 			#Helper vectors to vectorize operations
-			xlist = np.zeros_like(l_list)
-			ylist = np.zeros_like(l_list)
+			xi_list = np.zeros_like(l_list)
+			yi_list = np.zeros_like(l_list)
 
+			xj_list = np.zeros_like(l_list)
+			yj_list = np.zeros_like(l_list)
+
+			#Metrology offset and rotation corrections
+			offset_i = np.array([met_offx[0], met_offy[0]])
+			offset_j = np.array([met_offx[1], met_offy[1]])
+			
+			Ri = np.array([	[np.cos(north_angle[0]), -np.sin(north_angle[0])], 
+				  			[np.sin(north_angle[0]),  np.cos(north_angle[0])]])
+
+			Rj = np.array([	[np.cos(north_angle[1]), -np.sin(north_angle[1])], 
+				  			[np.sin(north_angle[1]),  np.cos(north_angle[1])]])
+			
 			for src in sources:
 
 				#Get position, flux and spectral index for each source
 				x, y, flux, alpha = src
 			
+				#Offset phasemap evaluation coordinates according to metrology
+
+				xi,yi = np.matmul(Ri, [x,y] + offset_i)
+				xj,yj = np.matmul(Rj, [x,y] + offset_j)
+
 				#Calculate optical path difference from position on sky and visibility
 				opd.fill((u*x + v*y)*units.mas_to_rad)
 				
-				xlist.fill(x)
-				ylist.fill(y)
+				xi_list.fill(xi)
+				yi_list.fill(yi)
 				
+				xj_list.fill(xj)
+				yj_list.fill(yj)
+
 				#Correct with phasemaps
-				arg = (l_list,xlist,ylist)
-				opd -= ( phi_i(arg) - phi_j(arg))*l_list/360. 
-				Lij  =  Ai(arg)*Aj(arg)
+				arg_i = (l_list,xi_list,yi_list)
+				arg_j = (l_list,xj_list,yj_list)
+
+				opd -= ( phi_i(arg_i) - phi_j(arg_j))*l_list/360. 
+				Lij  =  Ai(arg_j)*Aj(arg_j)
 
 				#Calculate visibility
 				visibility += Lij*flux*spectral_visibility(opd, alpha, l_list, dl_list, reference_l0)
@@ -440,8 +466,8 @@ class GravMfit(GravData, GravPhaseMaps):
 				# Normalization terms
 				sv0 = spectral_visibility(0, alpha, l_list, dl_list, reference_l0)
 				
-				normalization_i += Li(arg) * flux * sv0
-				normalization_j += Lj(arg) * flux * sv0
+				normalization_i += Li(arg_i) * flux * sv0
+				normalization_j += Lj(arg_j) * flux * sv0
 				
 		 	#Add background to normalization
 			flux, alpha = background
@@ -480,10 +506,24 @@ class GravMfit(GravData, GravPhaseMaps):
 				normalization_maps = [	self.phasemaps_normalization[telescope_to_beam[telescopes[0]]],
 										self.phasemaps_normalization[telescope_to_beam[telescopes[1]]]]
 
+				met_offx = [ self.sobj_metrology_correction_x[telescope_to_beam[telescopes[0]]],
+							 self.sobj_metrology_correction_x[telescope_to_beam[telescopes[1]]]]
+
+				met_offy = [ self.sobj_metrology_correction_y[telescope_to_beam[telescopes[0]]],
+							 self.sobj_metrology_correction_y[telescope_to_beam[telescopes[1]]]]
+
+				nangle = [	self.north_angle[telescope_to_beam[telescopes[0]]],
+							self.north_angle[telescope_to_beam[telescopes[1]]]]
+
+
+
 				phasemap_args = {
 					'phase_maps': phase_maps,
 					'amplitude_maps': amplitude_maps,
-					'normalization_maps': normalization_maps
+					'normalization_maps': normalization_maps,
+					'north_angle': nangle,
+					'met_offx': met_offx,
+					'met_offy': met_offy
 				}
 
 			else:
@@ -614,7 +654,9 @@ class GravMfit(GravData, GravPhaseMaps):
 		global wavelength_vector, dlambda_vector
 		global phasemaps_phase, phasemaps_amplitude, phasemaps_normalization
 		global use_phasemaps
-	
+		global north_angle
+		global metrology_offx, metrology_offy
+
 		global visibility_model
 	
 		for telescopes, label in zip(baseline_telescopes, baseline_labels):
@@ -636,11 +678,24 @@ class GravMfit(GravData, GravPhaseMaps):
 				normalization_maps = [	phasemaps_normalization[telescope_to_beam[telescopes[0]]],
 										phasemaps_normalization[telescope_to_beam[telescopes[1]]]]
 				
+				met_offx = [ metrology_offx[telescope_to_beam[telescopes[0]]],
+							 metrology_offx[telescope_to_beam[telescopes[1]]]]
+
+				met_offy = [ metrology_offy[telescope_to_beam[telescopes[0]]],
+							 metrology_offy[telescope_to_beam[telescopes[1]]]]
+
+				nangle = [	north_angle[telescope_to_beam[telescopes[0]]],
+							north_angle[telescope_to_beam[telescopes[1]]]]
+
 				phasemap_args = {
 					'phase_maps': phase_maps,
 					'amplitude_maps': amplitude_maps,
-					'normalization_maps': normalization_maps
+					'normalization_maps': normalization_maps,
+					'north_angle': nangle,
+					'met_offx': met_offx,
+					'met_offy': met_offy
 				}
+
 
 			else:
 				phasemap_args = {}
@@ -791,11 +846,17 @@ class GravMfit(GravData, GravPhaseMaps):
 			global phasemaps_phase, phasemaps_amplitude
 			global phasemaps_normalization
 			global use_phasemaps
+			global north_angle
+			global metrology_offx, metrology_offy
 
 			phasemaps_phase = self.phasemaps_phase
 			phasemaps_amplitude = self.phasemaps_amplitude
 			phasemaps_normalization = self.phasemaps_normalization
 			use_phasemaps = self.use_phasemaps
+			
+			north_angle = self.north_angle
+			metrology_offx = self.sobj_metrology_correction_x
+			metrology_offy = self.sobj_metrology_correction_y
 
 			#Data
 			global visamp, visamp_err
@@ -955,6 +1016,16 @@ class GravMfit(GravData, GravPhaseMaps):
 			circ = plt.Circle((0,0), radius=fiber_fov, facecolor="None", edgecolor='black', linewidth=0.8)
 			ax2.add_artist(circ)
 
+			#Add northangle orientation
+			angle = self.north_angle[beam]
+			n0 = np.array([np.sin(angle),np.cos(angle)])
+			
+			p1 = (fiber_fov-10)*n0 
+			p2 = (fiber_fov+10)*n0 
+		
+			ax1.plot([p1[0],p2[0]],[p1[1],p2[1]], c='k', lw=0.8)
+			ax2.plot([p1[0],p2[0]],[p1[1],p2[1]], c='k', lw=0.8)
+
 			ax1.set_aspect(1) 
 			ax2.set_aspect(1) 
 
@@ -972,6 +1043,21 @@ class GravMfit(GravData, GravPhaseMaps):
 
 		circ = plt.Circle((0,0), radius=fiber_fov, facecolor="None", edgecolor='black', linewidth=0.8)
 		ax.add_artist(circ)
+
+		#Add north east angle
+		angle = 0.0
+		n0 = np.array([np.sin(angle),np.cos(angle)])		
+		p1 = (fiber_fov-10)*n0 
+		p2 = (fiber_fov+10)*n0 
+		ax.plot([p1[0],p2[0]],[p1[1],p2[1]], c='k', lw=0.8)
+		ax.text(p1[0]-2,p1[1],'N', rotation=angle)
+		#Add north east angle
+		angle = np.pi/2
+		n0 = np.array([np.sin(angle),np.cos(angle)])		
+		p1 = (fiber_fov-10)*n0 
+		p2 = (fiber_fov+10)*n0 
+		ax.plot([p1[0],p2[0]],[p1[1],p2[1]], c='k', lw=0.8)
+		ax.text(p1[0]+5,p1[1]+2,'E', rotation=angle)
 
 		ax.set_aspect(1)
 
@@ -1093,10 +1179,25 @@ class GravMfit(GravData, GravPhaseMaps):
 					cbar1 = plt.colorbar(intensity_plot, cax=cax1)
 					cbar2 = plt.colorbar(phase_plot, cax=cax2)
 
-				#Plot sources
+				#Plot sources with metrology corrections
 				for x, y, flux, alpha in sources:
-					ax1.scatter([x],[y],  edgecolors='black', s=10.2)
-					ax2.scatter([x],[y],  edgecolors='black', s=10.2)
+
+					angle = self.north_angle[beam]
+
+					offset = np.array([
+						self.sobj_metrology_correction_x[beam], 
+						self.sobj_metrology_correction_y[beam]]
+						)
+
+					Rm = np.array([	
+						[np.cos(angle), -np.sin(angle)], 
+				  		[np.sin(angle),  np.cos(angle)]]
+						)
+
+					xi,yi = np.matmul(Rm, [x,y] + offset)
+
+					ax1.scatter([xi],[yi],  edgecolors='black', s=10.2)
+					ax2.scatter([xi],[yi],  edgecolors='black', s=10.2)
 
 		#
 		# Plot field of view and model positions
@@ -1152,7 +1253,6 @@ class GravMfit(GravData, GravPhaseMaps):
 		# Plot data and residuals
 		#
 		
-		#visibility_model = self.get_visibility_model(self.params)
 		visibility_model = self.get_visibility_model(params, use_phasemaps=self.use_phasemaps)
 		
 		plot_config = {
