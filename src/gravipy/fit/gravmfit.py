@@ -1,6 +1,7 @@
 import numpy as np
 import copy
-
+import pandas as pd
+import os
 
 #Parent classes
 from ..data import GravData
