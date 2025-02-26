@@ -953,7 +953,20 @@ class GravMfit(GravData, GravPhaseMaps):
 	# Visualization tools and fit inspection
 	#=========================================
 
-	def fit_report_template(self, wavelength=2.2, fiber_fov=70):
+	def fit_report_template(
+			self, 
+			wavelength=2.2, 
+			fiber_fov=70,
+			*,
+			visamp_limits=(0.0, 1.1),
+			visamp_residuals_limits = (-0.2, 0.2),
+			visphi_limits=(-250, 250),
+			visphi_residuals_limits=(-50, 50),
+			vis2_limits=(0.0,1.1),
+			vis2_residuals_limits=(-0.2,0.2),
+			closure_limits=(-250, 250),
+			closure_residuals_limits=(-50, 50)
+			):
 
 		A4_size = (11.69,8.27)
 		
@@ -1072,14 +1085,17 @@ class GravMfit(GravData, GravPhaseMaps):
 		# Setup bottom plot
 		#---------------------
 
+		#Visibility amplitude
 		lim = (70,340)
 		ax = data_axes[:,0]
 		ax[0].set_title('Visibility Amplitude')
 		ax[0].set_xticks([])
+		
 		ax[0].set_xlim(lim)
 		ax[1].set_xlim(lim)
-		ax[0].set_ylim(-0.0, 1.1)
-		ax[1].set_ylim(-0.2, 0.2)
+		
+		ax[0].set_ylim(visamp_limits)
+		ax[1].set_ylim(visamp_residuals_limits)
 		ax[0].set_ylabel('Visibility Amplitude')
 		ax[1].set_xlabel('spatial frequency (1/arcsec)')
 		ax[1].set_ylabel('Residuals')
@@ -1092,8 +1108,8 @@ class GravMfit(GravData, GravPhaseMaps):
 		ax[0].set_xlim(lim)
 		ax[1].set_xlim(lim)
 		ax[0].set_xticks([])
-		ax[0].set_ylim(-250, 250)
-		ax[1].set_ylim(-50, 50)
+		ax[0].set_ylim(visphi_limits)
+		ax[1].set_ylim(visphi_residuals_limits)
 		ax[0].set_ylabel('Visibility Phase')
 		ax[1].set_xlabel('spatial frequency (1/arcsec)')
 		ax[1].set_ylabel('Residuals')
@@ -1107,8 +1123,8 @@ class GravMfit(GravData, GravPhaseMaps):
 		ax[0].set_xlim(lim)
 		ax[1].set_xlim(lim)
 		ax[0].set_xticks([])
-		ax[0].set_ylim(-0.1, 1.1)
-		ax[1].set_ylim(-0.2, 0.2)
+		ax[0].set_ylim(vis2_limits)
+		ax[1].set_ylim(vis2_residuals_limits)
 		ax[0].set_ylabel('Visibility Squared')
 		ax[1].set_xlabel('spatial frequency (1/arcsec)')
 		ax[1].set_ylabel('Residuals')
@@ -1122,8 +1138,8 @@ class GravMfit(GravData, GravPhaseMaps):
 		ax[0].set_xlim(lim2)
 		ax[1].set_xlim(lim2)
 		ax[0].set_xticks([])
-		ax[0].set_ylim(-250, 250)
-		ax[1].set_ylim(-50, 50)
+		ax[0].set_ylim(closure_limits)
+		ax[1].set_ylim(closure_residuals_limits)
 		ax[0].set_ylabel('Closure Phases')
 		ax[1].set_xlabel('spatial frequency (1/arcsec)')
 		ax[1].set_ylabel('Residuals')
@@ -1132,9 +1148,35 @@ class GravMfit(GravData, GravPhaseMaps):
 
 		return fig, (pm_axes, cax1, cax2), fov_ax, baselines_ax, data_axes
 
-	def fit_report(self, params, wavelength=2.2, fiber_fov=70):
-		
-		fig, (pm_axes, cax1, cax2), fov_ax, baselines_ax, data_axes = self.fit_report_template(wavelength=wavelength, fiber_fov=fiber_fov)
+	def fit_report(
+			self, 
+			params, 
+			wavelength=2.2, 
+			fiber_fov=70, 
+			*,
+			visamp_limits=(0.0, 1.1),
+			visamp_residuals_limits = (-0.2, 0.2),
+			visphi_limits=(-250, 250),
+			visphi_residuals_limits=(-50, 50),
+			vis2_limits=(0.0,1.1),
+			vis2_residuals_limits=(-0.2,0.2),
+			closure_limits=(-250, 250),
+			closure_residuals_limits=(-50, 50)
+			):
+
+		#Load keyword arguments for plot limits
+		plot_limits = {
+		'visamp_limits'			 	: visamp_limits			,	
+		'visamp_residuals_limits'  	: visamp_residuals_limits  ,
+		'visphi_limits'			 	: visphi_limits			,
+		'visphi_residuals_limits'	: visphi_residuals_limits	,	
+		'vis2_limits'			 	: vis2_limits			 	,
+		'vis2_residuals_limits'	 	: vis2_residuals_limits	,
+		'closure_limits'			: closure_limits			,
+		'closure_residuals_limits'	: closure_residuals_limits	,
+		}
+
+		fig, (pm_axes, cax1, cax2), fov_ax, baselines_ax, data_axes = self.fit_report_template(wavelength=wavelength, fiber_fov=fiber_fov, **plot_limits)
 
 		#Get sources
 		sources, _ = GravMfit.get_sources_and_background(params.valuesdict(), self.field_type, self.nsource )
