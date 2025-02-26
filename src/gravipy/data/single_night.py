@@ -114,6 +114,17 @@ class GravData():
         self.colors_baseline = np.array([fw_black , fw_dblue , fw_gray, fw_orange, fw_red, fw_lblue])
         self.colors_closure  = np.array([fw_lblue , fw_red   , fw_black, fw_orange])
 
+        self.sobj_x = None
+        self.sobj_y = None
+
+        self.sobj_offx = None
+        self.sobj_offy = None
+
+        self.sobj_metrology_correction_x = None
+        self.sobj_metrology_correction_y = None
+
+        self.north_angle = None
+
         #List of allowed file types
         allowed_file_types = [
             'VIS_DUAL_SCI_RAW', 
@@ -167,6 +178,35 @@ class GravData():
         else:
             raise ValueError('Telescope not AT or UT, seomtehign wrong with input data')
         
+        #Field and pointing parameters
+        self.sobj_x = self.header['ESO INS SOBJ X'] # Distance from fringe tracker to field center in RA
+        self.sobj_y = self.header['ESO INS SOBJ Y'] # Distance from fringe tracker to field center in DEC
+
+        self.sobj_offx = self.header['ESO INS SOBJ OFFX'] #Distance between source field and current field in RA
+        self.sobj_offy = self.header['ESO INS SOBJ OFFY'] #Distance between source field and current field in DEC
+        
+        self.sobj_metrology_correction_x ={
+            'GV1': self.header['ESO QC MET SOBJ DRA1'], 
+            'GV2': self.header['ESO QC MET SOBJ DRA2'],
+            'GV3': self.header['ESO QC MET SOBJ DRA3'],
+            'GV4': self.header['ESO QC MET SOBJ DRA4'],
+        }
+
+        self.sobj_metrology_correction_y ={
+            'GV1': self.header['ESO QC MET SOBJ DDEC1'], 
+            'GV2': self.header['ESO QC MET SOBJ DDEC2'],
+            'GV3': self.header['ESO QC MET SOBJ DDEC3'],
+            'GV4': self.header['ESO QC MET SOBJ DDEC4'],
+        }
+
+
+        self.north_angle = {
+            'GV1': self.header['ESO QC ACQ FIELD1 NORTH_ANGLE']*np.pi/180., 
+            'GV2': self.header['ESO QC ACQ FIELD2 NORTH_ANGLE']*np.pi/180.,
+            'GV3': self.header['ESO QC ACQ FIELD3 NORTH_ANGLE']*np.pi/180.,
+            'GV4': self.header['ESO QC ACQ FIELD4 NORTH_ANGLE']*np.pi/180.,
+        }
+
         # --------------------------------------
         # Load baseline information from header
         # --------------------------------------
