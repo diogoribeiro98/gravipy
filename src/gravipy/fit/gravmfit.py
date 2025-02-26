@@ -845,7 +845,12 @@ class GravMfit(GravData, GravPhaseMaps):
 				ndim=ndim, 
 				log_prob_fn=log_likelihood, 
 				pool=pool,
-				args=(parameters_to_fit,) )
+				args=(parameters_to_fit,),
+				moves=[
+        			(emcee.moves.DEMove(), 0.8),
+        			(emcee.moves.DESnookerMove(), 0.2),
+    			] 
+				)
 			
 			sampler.run_mcmc(
 				initial_state=initial_emcee_state, 
