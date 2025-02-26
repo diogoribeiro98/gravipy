@@ -162,26 +162,6 @@ class GravMfit(GravData, GravPhaseMaps):
 		# Create a different set of parameters depending on the field type
 		# -----------------------------------------------------------------
 
-		#Note:
-		# The Instrumental parameters should likely be added here too
-		'''
-		instrumental_fit_parameters = {
-			#Coherence loss for each baseline
-			'CL1' : [coherence_lost, 1.5, 0.1, fit_coherence_lost],
-			'CL2' : [coherence_lost, 1.5, 0.1, fit_coherence_lost],
-			'CL3' : [coherence_lost, 1.5, 0.1, fit_coherence_lost],
-			'CL4' : [coherence_lost, 1.5, 0.1, fit_coherence_lost],
-			'CL5' : [coherence_lost, 1.5, 0.1, fit_coherence_lost],
-			'CL6' : [coherence_lost, 1.5, 0.1, fit_coherence_lost],
-			#FLux self calibration
-			'SelfCal1' : [0, 30, -30, False],
-			'SelfCal2' : [0, 30, -30, False],
-			'SelfCal3' : [0, 30, -30, False],
-			'SelfCal4' : [0, 30, -30, False],
-		}
-		'''
-
-
 		if field_type=='star':
 			
 			self.logger.info( 'Setting up star field fit')
