@@ -2,6 +2,7 @@ import logging
 from functools import wraps
 from datetime import datetime
 from astropy.time import Time
+import numpy as np
 
 def timing(func):
     @wraps(func)
@@ -15,7 +16,6 @@ def timing(func):
         return result
     return wrapper
 
-
 def convert_date(date, mjd=False):
     t = Time(date)
     if mjd:
@@ -27,6 +27,17 @@ def convert_date(date, mjd=False):
     date = datetime.strptime(date, '%Y-%m-%d %H:%M:%S')
     return date_decimal, date
 
+def convert_date2(date,mode='mjd'):
+    
+    t = Time(date)
+    if mode=='mjd':
+        return t.mjd
+    elif mode=='decimal':
+        return t.decimalyear
+    elif mode=='split':
+        return np.array(t.datetime.timetuple()[:6])
+    else:
+        raise ValueError(f"mode keyword must be ['mjd', 'decimal', 'split']")
 
 def print_status(number, total):
     number = number+1
