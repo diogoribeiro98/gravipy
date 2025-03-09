@@ -318,6 +318,146 @@ class GravData_scivis():
 
 			return data
 
+	def get_dirty_beam(
+			self,
+			pol,
+			channel='SC', 
+			flag_channels=[],
+			window=75,
+			gain=1.0, 
+			threshold=1e-3, 
+			max_iter=None,
+			pixels_per_beam = 5
+			):
+		"""Returns the Dirty Beam, Dirty Image and Clean Map of interferometric data
+	
+			Args:
+			pol (str): polarization to retrieve. Must be 'P1' or 'P2'.
+			channel (str): channel to retrieve. Must be 'SC'(science) or 'FT'(fringe tracker) Defaults to 'SC'.
+			flag_channels (list, optional): Wavelenght channels to flag. Defaults to [].
+			window (int, optional): Size of reconstructed image in miliarcseconds. Defaults to 80.
+			npoints (int, optional): Number of sample points. Total image will be (2*npoints+1) in both directions. Defaults to 500.
+			gain (float, optional): CLEAN loop gain. Defaults to 1.0.
+			threshold (float, optional): CLEAN loop threshold. Defaults to 0.05.
+			max_iter (int, optional): Maxium CLEAN iterations. If None is give, uses the number of UV sampled points. Defaults to None.
+
+		Returns:
+			(bx, B.real) : Dirty Beam 
+			(x, I.real)  : Dirty Image 
+			(x,clean_map.real): Clean Map
+		"""
+
+		#Fetch data
+		idata = self.get_interferometric_data(pol,channel,flag_channels)
+		uv_coordinates = np.transpose([idata.Bu,idata.Bv])
+
+		#
+		# Calculate central interferometric beam and appropriate image size
+		#
+
+		#Central lobe
+		Npoints, Ax, Axy, Ay = 0, 0, 0, 0
+
+		for idx,coords in enumerate(uv_coordinates):
+			for jj, wave in enumerate(idata.wave):
+			
+				if idata.vis_flag[idx][jj]:
+					continue
+
+				#uv dimensionless coordinates
+				u,v = (coords / (wave * units.micrometer) )
+
+				#Central lobe
+				Npoints   +=1
+				Ax  += u**2
+				Axy += u*v
+				Ay  += v**2
+
+		#Evaluate central lobe gaussian parameters
+		scale_factor = (2*np.pi**2/Npoints)*units.mas_to_rad**2
+		Ax  *=scale_factor
+		Axy *=scale_factor
+		Ay  *=scale_factor
+
+		#Select appropriate number of pixels
+		npoints = estimate_npoints(window,Ax,Axy,Ay,pixels_per_beam)
+
+		#
+		# Calculate Dirty image, Dirty beam and Central PSF 
+		#
+
+		#Dirty image
+		x = np.linspace(-window, window, 2*npoints+1)
+		X, Y = np.meshgrid(x, x)  # Centers
+		I = np.zeros_like(X)
+		
+		#Dirty beam (twice as big as the dirty image)
+		xb = np.linspace(-2*window, 2*window, 4*npoints+1)
+		Xb, Yb = np.meshgrid(xb, xb)
+		B = np.zeros_like(Xb)
+		
+		for idx,coords in enumerate(uv_coordinates):
+			for jj, wave in enumerate(idata.wave):
+			
+				if idata.vis_flag[idx][jj]:
+					continue
+
+				#uv dimensionless coordinates
+				u,v = (coords / (wave * units.micrometer)) * units.mas_to_rad 
+
+				#Visibility
+				amp   = idata.visamp[idx][jj]
+				phase = np.deg2rad(idata.visphi[idx][jj])  
+				
+				#Dirty beam
+				B += np.real( np.exp(2*np.pi*1j*( Xb*u + Yb*v )))
+
+				#Dirty image
+				V = amp*np.exp(1j*phase)
+				I += np.real( V*np.exp(2*np.pi*1j*(X*u + Y*v)))
+
+		#Normalize dirty beam
+		B /= np.max(B)
+
+		#
+		# CLEAN algorithm
+		#
+		
+		Iclean    = np.zeros_like(I)
+		residuals = np.copy(I)
+		
+		if max_iter==None:
+			max_iter = int(Npoints/gain)
+		
+		for ii in range(max_iter):
+
+			#Find maximum peak position
+			px,py = np.unravel_index(np.argmax(np.abs(residuals)), residuals.shape)
+		
+			f = gain*residuals[px,py]
+			Iclean[px,py] = f
+			
+			residuals -= f*np.roll(B, shift=((px-npoints),(py-npoints)), axis=(0,1) )[npoints:-npoints,npoints:-npoints]
+	
+			if np.std(residuals) < threshold:
+				print(f'Threshold reached after {ii+1} iterations!')
+				break
+
+		#Reconvolve with central lobe gaussian
+		psf = elliptical_beam_abc(
+		X, Y, 
+		A=1., 
+		Ax=Ax,Axy=Axy,Ay=Ay
+		)
+
+		Imap = fftconvolve(Iclean,psf, mode='same') #+ residuals
+		Imap /=np.max(Imap)
+
+		#Log information
+		print(f'Pixel scale: {x[1]-x[0]} arcsecond/pixel')
+
+		return (xb, B.real), (x, I.real), (x,Imap.real)
+
 	#========================================
 	# Plotting functions
 	#=========================================
@@ -417,4 +557,52 @@ class GravData_scivis():
 			yerr = idata.t3phi_err[idx] 
 			ax.errorbar(x, y, yerr, **plot_config, marker='o', color=self.colors_closure[idx])
 		
+		return fig, axes
+
+	def plot_dirty_beam(
+			self,
+			pol,
+			channel='SC', 
+			flag_channels=[],
+			window=75,
+			gain=1.0, 
+			threshold=1e-3, 
+			max_iter=None,
+			pixels_per_beam=6,
+			):
+
+		(bx,B), (x,I), (x,C) = self.get_dirty_beam(
+			pol=pol,
+			channel=channel, 
+			flag_channels=flag_channels,
+			window=window,
+			gain=gain, 
+			threshold=threshold, 
+			max_iter=max_iter,
+			pixels_per_beam=pixels_per_beam
+			)
+		
+
+		#Create figure
+		fig, axes = plt.subplots(ncols=3, figsize=(11,3), dpi = 300)
+
+		axes[0].set_title('Dirty Beam')
+		axes[1].set_title('Dirty Image')
+		axes[2].set_title('Clean Image')
+
+		axes[0].pcolormesh(bx,bx, B.real, cmap='gist_yarg')
+		axes[1].pcolormesh(x,x, I.real,   cmap='gist_yarg')
+		im = axes[2].pcolormesh(x ,x , C ,cmap='gist_yarg')
+		cb = plt.colorbar(im)
+
+		fiber_fov=70
+
+		for ax in axes:
+			circ = plt.Circle((0,0), radius=fiber_fov, facecolor="None", edgecolor='black', linewidth=0.8)
+			ax.add_artist(circ)
+			ax.set_xlim(-fiber_fov*1.05,fiber_fov*1.05)
+			ax.set_ylim(-fiber_fov*1.05,fiber_fov*1.05)
+			ax.invert_xaxis()
+			ax.set_aspect(1)
+
 		return fig, axes
