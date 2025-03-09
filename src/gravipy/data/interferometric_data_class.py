@@ -8,9 +8,14 @@ class InterferometricData:
 	Bu: np.ndarray
 	Bv: np.ndarray
 
+	#Telescope position
+	tel_pos: np.ndarray
+
 	#Baseline and closure telescopes
 	bl_telescopes: np.ndarray
 	t3_telescopes: np.ndarray
+	bl_labels: np.ndarray
+	t3_labels: np.ndarray
 
 	#Wavelength
 	wave: np.ndarray
