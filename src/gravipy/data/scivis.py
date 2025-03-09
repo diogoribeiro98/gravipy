@@ -188,7 +188,7 @@ class GravData_scivis():
 			oi_vis 			= f['OI_VIS'	   , fits_index].data
 			oi_vis2  		= f['OI_VIS2'	   , fits_index].data
 			oi_t3  			= f['OI_T3'	  	   , fits_index].data
-			
+
 			#---------------------------------
 			# Fetch telescope array quantities
 			#---------------------------------
@@ -198,6 +198,7 @@ class GravData_scivis():
 			
 			#Telescope names and indices
 			sta_names = oi_array['TEL_NAME']
+			sta_pos   = oi_array['STAXYZ'][:,0:2]
 			sta_index = oi_array['STA_INDEX']
 
 			sta_index_to_name = dict(zip(sta_index, sta_names))
@@ -206,19 +207,23 @@ class GravData_scivis():
 			bl_index = oi_vis['STA_INDEX']
 			t3_index  = oi_t3['STA_INDEX']
 
-			bl_telescopes = np.empty(len(bl_index), dtype=object)
-			t3_telescopes = np.empty(len(t3_index), dtype=object)
+			bl_telescopes 	= np.empty(len(bl_index), dtype=object)
+			bl_labels 		= np.empty(len(bl_index), dtype=object)
+			t3_telescopes 	= np.empty(len(t3_index), dtype=object)
+			t3_labels 		= np.empty(len(t3_index), dtype=object)
 
 			for idx,bl in enumerate(bl_index):
 				t1 = sta_index_to_name[bl[0]]
 				t2 = sta_index_to_name[bl[1]]
-				bl_telescopes[idx] = (t1,t2)
+				bl_telescopes[idx]  = (t1,t2)
+				bl_labels[idx] 		= t1+t2[-1]
 			
 			for idx,cl in enumerate(t3_index):
 				t1 = sta_index_to_name[cl[0]]
 				t2 = sta_index_to_name[cl[1]]
 				t3 = sta_index_to_name[cl[2]]
 				t3_telescopes[idx] = (t1,t2,t3)
+				t3_labels[idx] 		= t1+t2[-1]+t3[-1]
 			
 			#---------------------------------
 			# Fetch wavelength quantities
@@ -302,7 +307,9 @@ class GravData_scivis():
 
 			data = InterferometricData(
 				Bu=Bu, Bv=Bv, 
+				tel_pos=sta_pos,
 				bl_telescopes=bl_telescopes, t3_telescopes=t3_telescopes,
+				bl_labels=bl_labels, t3_labels=t3_labels,
 				wave=wave, band=band,
 				visamp=visamp, visamp_err=visamp_err,
 				visphi=visphi, visphi_err=visphi_err,
