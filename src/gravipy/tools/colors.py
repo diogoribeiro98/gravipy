@@ -1,0 +1,6 @@
+fw_black 	= 'k'
+fw_dblue 	= 'darkblue'
+fw_lblue 	= '#006BA4'
+fw_gray 	= '#595959'
+fw_orange 	= '#FF800E' 
+fw_red 		= 'darkred'
