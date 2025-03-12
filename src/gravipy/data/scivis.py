@@ -15,7 +15,7 @@ from .interferometric_data_class import InterferometricData
 
 #Plotting tools
 import matplotlib.pyplot as plt
-from ..tools.colors import *
+from ..tools.colors import colors_closure, colors_baseline
 
 dualscivis_types = [
 	'DUAL_SCI_VIS',
@@ -424,7 +424,7 @@ class GravData_scivis():
 		for idx, x in enumerate(idata.spatial_frequency_as):
 			y    = idata.visamp[idx] 
 			yerr = idata.visamp_err[idx] 
-			ax.errorbar(x, y, yerr, **plot_config, marker='o', color=self.colors_baseline[idx])
+			ax.errorbar(x, y, yerr, **plot_config, marker='o', color=colors_baseline[idx])
 		
 		#Visibility Phase plot
 		ax = axes[1]
@@ -440,7 +440,7 @@ class GravData_scivis():
 		for idx, x in enumerate(idata.spatial_frequency_as):
 			y    = idata.visphi[idx] 
 			yerr = idata.visphi_err[idx] 
-			ax.errorbar(x, y, yerr, **plot_config, marker='o', color=self.colors_baseline[idx])
+			ax.errorbar(x, y, yerr, **plot_config, marker='o', color=colors_baseline[idx])
 		
 		#Visibility Squared plot
 		ax = axes[2]
@@ -456,7 +456,7 @@ class GravData_scivis():
 		for idx, x in enumerate(idata.spatial_frequency_as):
 			y    = idata.vis2[idx] 
 			yerr = idata.vis2_err[idx] 
-			ax.errorbar(x, y, yerr, **plot_config, marker='o', color=self.colors_baseline[idx])
+			ax.errorbar(x, y, yerr, **plot_config, marker='o', color=colors_baseline[idx])
 		
 		#Closure Amplitudes
 		ax = axes[3]
@@ -472,7 +472,7 @@ class GravData_scivis():
 		for idx, x in enumerate(idata.spatial_frequency_as_T3):
 			y    = idata.t3amp[idx] 
 			yerr = idata.t3amp_err[idx] 
-			ax.errorbar(x, y, yerr, **plot_config, marker='o', color=self.colors_closure[idx])
+			ax.errorbar(x, y, yerr, **plot_config, marker='o', color=colors_closure[idx])
 		
 		#Closure phases
 		ax = axes[4]
@@ -488,7 +488,7 @@ class GravData_scivis():
 		for idx, x in enumerate(idata.spatial_frequency_as_T3):
 			y    = idata.t3phi[idx] 
 			yerr = idata.t3phi_err[idx] 
-			ax.errorbar(x, y, yerr, **plot_config, marker='o', color=self.colors_closure[idx])
+			ax.errorbar(x, y, yerr, **plot_config, marker='o', color=colors_closure[idx])
 		
 		return fig, axes
 
@@ -501,7 +501,8 @@ class GravData_scivis():
 			gain=1.0, 
 			threshold=1e-3, 
 			max_iter=None,
-			pixels_per_beam=6,
+			pixels_per_beam=2,
+			cmap='gist_yarg'
 			):
 
 		(bx,B), (x,I), (x,C) = self.get_dirty_beam(
@@ -523,10 +524,10 @@ class GravData_scivis():
 		axes[1].set_title('Dirty Image')
 		axes[2].set_title('Clean Image')
 
-		axes[0].pcolormesh(bx,bx, B.real, cmap='gist_yarg')
-		axes[1].pcolormesh(x,x, I.real,   cmap='gist_yarg')
-		im = axes[2].pcolormesh(x ,x , C ,cmap='gist_yarg')
-		cb = plt.colorbar(im)
+		axes[0].pcolormesh(bx,bx, B.real, 	cmap=cmap)
+		axes[1].pcolormesh(x,  x, I.real,   cmap=cmap)
+		axes[2].pcolormesh(x , x, C,		cmap=cmap)
+		#cb = plt.colorbar(im)
 
 		fiber_fov=70
 
