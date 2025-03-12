@@ -41,9 +41,9 @@ class GravData_scivis():
 		self.datacatg   : str | None
 		self.datatype   : str | None
 
-		self.date_obs   : str | None
-		self.date       : str | None
-		self.mjd        : str | None
+		self.date_obs   : str   | None
+		self.date       : float | None
+		self.mjd        : float | None
 
 		self.polmode    : str 	| None 
 		self.resolution : str 	| None
@@ -55,8 +55,17 @@ class GravData_scivis():
 		self.ra 	: float | None
 		self.dec 	: float | None
 
-		self.colors_baseline = np.array([fw_black , fw_dblue , fw_gray, fw_orange, fw_red, fw_lblue])
-		self.colors_closure  = np.array([fw_lblue , fw_red   , fw_black, fw_orange])
+		self.sobj   : float | None
+		self.sobj_x : float | None
+		self.sobj_y : float | None
+
+		self.sobj_offx: float | None
+		self.sobj_offy: float | None
+
+		self.sobj_metrology_correction_x : None
+		self.sobj_metrology_correction_y : None
+
+		self.north_angle : None
 
 		# ---------------------------
 		# Check input file is ok
@@ -306,6 +315,19 @@ class GravData_scivis():
 				spatial_frequency_as_T3[idx] = ( max_B[idx] / (wave * units.micrometer) ) / units.rad_to_as  # 1/as
 
 			data = InterferometricData(
+				filename=self.filename,
+				date_obs=self.date_obs,
+				object = self.object,
+				ra	= self.ra, 	
+				dec = self.dec, 
+				sobj   = self.sobj,
+				sobj_x = self.sobj_x,
+				sobj_y = self.sobj_y,
+				sobj_offx = self.sobj_offx,
+				sobj_offy = self.sobj_offy,
+				sobj_metrology_correction_x = self.sobj_metrology_correction_x,
+				sobj_metrology_correction_y = self.sobj_metrology_correction_y,
+				north_angle = self.north_angle,
 				Bu=Bu, Bv=Bv, 
 				tel_pos=sta_pos,
 				bl_telescopes=bl_telescopes, t3_telescopes=t3_telescopes,
