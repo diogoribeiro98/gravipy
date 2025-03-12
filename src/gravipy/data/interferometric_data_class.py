@@ -4,6 +4,27 @@ from dataclasses import dataclass
 @dataclass
 class InterferometricData:
 
+	#Header information
+	filename: str
+	date_obs: str
+
+	#Observation pointing
+	object 	: str
+	ra 		: float
+	dec 	: float
+
+	sobj   : float
+	sobj_x : float
+	sobj_y : float
+
+	sobj_offx: float 
+	sobj_offy: float 
+
+	#Metrology corrections
+	sobj_metrology_correction_x : dict
+	sobj_metrology_correction_y : dict
+	north_angle : dict
+	
 	#Baselines
 	Bu: np.ndarray
 	Bv: np.ndarray
