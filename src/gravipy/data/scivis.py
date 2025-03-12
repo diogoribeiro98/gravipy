@@ -129,6 +129,7 @@ class GravData_scivis():
 		self.dec 	= self.header['DEC']
 
 		#Field and pointing parameters
+		self.sobj   = self.header['ESO INS SOBJ NAME']
 		self.sobj_x = self.header['ESO INS SOBJ X'] # Distance from fringe tracker to field center in RA
 		self.sobj_y = self.header['ESO INS SOBJ Y'] # Distance from fringe tracker to field center in DEC
 
