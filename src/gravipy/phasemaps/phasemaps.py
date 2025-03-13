@@ -19,6 +19,7 @@ from pkg_resources import resource_filename
 #Logging tools
 import logging
 from ..logger.log import log_level_mapping
+logging.getLogger("matplotlib").setLevel(logging.WARNING)
 
 #Units
 from ..physical_units import units as units
@@ -434,8 +435,9 @@ class GravPhaseMaps():
 		
 		#Create figure and setup grid
 		fig = plt.figure( figsize=(9,4.5))
-		gs = gridspec.GridSpec(ncols=4,nrows=2, height_ratios=[1,1], width_ratios=[1,1,1,1.08])
-		
+		gs = gridspec.GridSpec(figure=fig, ncols=4,nrows=2, height_ratios=[1,1], width_ratios=[1,1,1,1.08])
+		axes = gs.subplots()
+
 		#Plotting arguments
 		pltargsP = {'cmap': 'twilight_shifted', 'levels': np.linspace(-180, 180, 19, endpoint=True)}
 		
@@ -455,9 +457,9 @@ class GravPhaseMaps():
 			zz[rmap > fiber_fov] = 0.0 
 
 			# Setup axis
-			ax1  = plt.subplot(gs[0,idx])
-			ax2  = plt.subplot(gs[1,idx])
-
+			ax1 = axes[0,idx]
+			ax2 = axes[1,idx]
+			
 			ax1.set_title("{} ({} $\\mu m)$".format(beam, wavelength))
 
 			ax1.set_xticklabels([])
@@ -504,4 +506,4 @@ class GravPhaseMaps():
 
 		fig.tight_layout()
 
-		return fig
+		return fig, axes
