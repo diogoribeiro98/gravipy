@@ -217,22 +217,22 @@ class GravData_scivis():
 			bl_index = oi_vis['STA_INDEX']
 			t3_index  = oi_t3['STA_INDEX']
 
-			bl_telescopes 	= np.empty(len(bl_index), dtype=object)
-			bl_labels 		= np.empty(len(bl_index), dtype=object)
-			t3_telescopes 	= np.empty(len(t3_index), dtype=object)
-			t3_labels 		= np.empty(len(t3_index), dtype=object)
+			bl_telescopes 	= np.empty((len(bl_index),2), dtype=object)
+			bl_labels 		= np.empty(len(bl_index)	, dtype=object)
+			t3_telescopes 	= np.empty((len(t3_index),3), dtype=object)
+			t3_labels 		= np.empty(len(t3_index)	, dtype=object)
 
 			for idx,bl in enumerate(bl_index):
 				t1 = sta_index_to_name[bl[0]]
 				t2 = sta_index_to_name[bl[1]]
-				bl_telescopes[idx]  = (t1,t2)
+				bl_telescopes[idx]  = np.array([t1,t2])
 				bl_labels[idx] 		= t1+t2[-1]
 			
 			for idx,cl in enumerate(t3_index):
 				t1 = sta_index_to_name[cl[0]]
 				t2 = sta_index_to_name[cl[1]]
 				t3 = sta_index_to_name[cl[2]]
-				t3_telescopes[idx] = (t1,t2,t3)
+				t3_telescopes[idx] = np.array([t1,t2,t3])
 				t3_labels[idx] 		= t1+t2[-1]+t3[-1]
 			
 			#---------------------------------
