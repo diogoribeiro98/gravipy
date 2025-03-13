@@ -25,6 +25,9 @@ class InterferometricData:
 	sobj_metrology_correction_y : dict
 	north_angle : dict
 	
+	#Polarization
+	pol: str
+
 	#Baselines
 	Bu: np.ndarray
 	Bv: np.ndarray

@@ -329,6 +329,7 @@ class GravData_scivis():
 				sobj_metrology_correction_x = self.sobj_metrology_correction_x,
 				sobj_metrology_correction_y = self.sobj_metrology_correction_y,
 				north_angle = self.north_angle,
+				pol=pol,
 				Bu=Bu, Bv=Bv, 
 				tel_pos=sta_pos,
 				bl_telescopes=bl_telescopes, t3_telescopes=t3_telescopes,
