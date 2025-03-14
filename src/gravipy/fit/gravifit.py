@@ -12,10 +12,10 @@ from ..physical_units import units as units
 #Fitting tools
 from scipy.optimize import curve_fit
 from .models import spectral_visibility
+from .gaussian import gauss
 import lmfit
 import emcee
 import multiprocessing
-
 
 #Python plotting tools
 import matplotlib.pyplot as plt
@@ -36,11 +36,6 @@ logging.getLogger("matplotlib").setLevel(logging.WARNING)
 import os
 import h5py
 
-#Define gaussian function to fit to histogram
-
-def gauss(x, *p):
-	A, mu, sigma = p
-	return A*np.exp(-(x-mu)**2/(2.*sigma**2))
 
 #Alias between beam and telescope
 telescope_to_beam = {
