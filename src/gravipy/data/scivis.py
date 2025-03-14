@@ -272,6 +272,7 @@ class GravData_scivis():
 				data[vis_flag]   = np.nan
 
 			vis2_flag[vis2>1.0] 		= 1
+			vis2_flag[vis2<0.0] 		= 1
 			vis2_flag[np.isnan(vis2)]   = 1
 			vis2_flag[:,flag_channels] 	= 1
 
