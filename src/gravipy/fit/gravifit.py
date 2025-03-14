@@ -1,43 +1,42 @@
 import numpy as np
-import copy
-import pandas as pd
-import os
+from datetime import datetime
 
-#Parent classes
-from ..data import GravData
+#Parent classes and functions
 from ..phasemaps import GravPhaseMaps
 from ..data import GravData_scivis
 from ..data import InterferometricData
+
 #Units
 from ..physical_units import units as units
 
 #Fitting tools
+from scipy.optimize import curve_fit
 from .models import spectral_visibility
 import lmfit
 import emcee
 import multiprocessing
 
-#Plotting tools
-import corner
+
+#Python plotting tools
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+
+#Specific plotting tools
+from ..data.dirty_beam import get_dirty_beam
 from ..data.plot_idata import plot_interferometric_data
-from scipy.stats import norm
+from ..tools.colors import colors_baseline, colors_closure
 
 #Logging tools
 import logging
 from ..logger.log import log_level_mapping
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
 
-from datetime import datetime
-
+#Input output tools
+import os
 import h5py
-from ..tools.colors import colors_baseline, colors_closure
-from ..data.dirty_beam import get_dirty_beam
 
-#Defin gaussian function to fit to histogram
-from scipy.optimize import curve_fit
+#Define gaussian function to fit to histogram
 
 def gauss(x, *p):
 	A, mu, sigma = p
@@ -63,7 +62,6 @@ class GraviFit(GravPhaseMaps):
 		
 		#Super constructor
 		GravPhaseMaps.__init__(self,loglevel=loglevel)
-		GravData_scivis.__init__(self,file)
 		
 		# ---------------------------
 		# Pre-define class quantities
@@ -1584,6 +1582,9 @@ class GraviFit(GravPhaseMaps):
 	#========================================
 	# Visualization tools and fit inspection
 	#========================================
+	
+	def plot_interferometric_data(self):
+		return plot_interferometric_data(self.idata)
 
 	def fit_report_template(
 			self, 
