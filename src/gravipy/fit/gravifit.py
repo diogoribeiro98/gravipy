@@ -954,8 +954,100 @@ class GraviFit(GravPhaseMaps):
 	# mcmc analysis tools
 	#=========================================
 
-	def get_flat_chain(self, step_cut, thin=1, sigma=5, plot=True, plot_save_name=None):
+	def estimate_chain_percentiles(
+		self,
+		chain,
+		percentiles=[5, 50, 95]
+		):
+		"""Estimates the percentiles of a flat chain of samples.
+
+		Args:
+			chain (np.array): Flat samples with dimenson (samples,ndim) 
+			percentiles (list, optional): Percentile list in the form [lower,mid, higher]. Defaults to [5,50,95], approximately corresponding to 2 sigma levels.
+
+		Returns:
+			(q_low, mu,q_high): lower percentile, median and upper percentile
+		"""
 		
+		ndim = chain.shape[1]
+
+		#Storage variables
+		q_low 	= np.empty(ndim)
+		mu 		= np.empty(ndim)
+		q_high 	= np.empty(ndim)
+
+		#Calculate the histogram for each of the variables
+		for idx,var in enumerate(chain.T):
+			hist, bins = np.histogram(var, bins='fd')
+			x = (bins[:-1] + bins[1:])/2
+			l, m, h = np.percentile(x,percentiles, weights=hist, method='inverted_cdf')
+			q_low[idx], mu[idx], q_high[idx] = l,m,h
+
+		return (q_low, mu,q_high)
+
+	def get_gaussian_chain_fit(self,chain):
+		"""
+		Give a chain chain of samples with size (samples,ndim) returns the gaussian fit 
+		to each one of the dimensions.
+
+		Args:
+			chain (np.array): Flat samples with dimenson (samples,ndim) 
+
+		Returns:
+			mu_list, sigma_list: fit result arrays with dimension (ndim).
+		"""
+		
+		#Number of variables
+		ndim = chain.shape[1]
+
+		#Storage variables		
+		mu_list = np.empty(ndim)
+		sigma_list = np.empty(ndim)
+
+		#Initial guess for fit
+		(q_low, mu, q_high) = self.estimate_chain_percentiles(chain)
+		
+		#Evaluate gaussian fit to clean chain
+		for idx in range(ndim):
+			samples = chain[:,idx]
+
+			hist, bins = np.histogram(samples, bins='fd',density=True)
+			
+			#Fit a gaussian to the filtered points
+			x = (bins[:-1] + bins[1:])/2
+
+			p0 = [np.max(hist), mu[idx], q_high[idx]-q_low[idx]]
+			(A, m, s), _ = curve_fit(
+				gauss, 
+				x, hist, 
+				p0=p0, 
+				bounds=([0,-np.inf,0], [np.inf, np.inf, np.inf]))
+			
+			mu_list[idx] = m
+			sigma_list[idx] = s
+
+		return mu_list, sigma_list
+
+	def get_clean_chain(
+			self,
+			chain,
+			lower_limits,
+			upper_limits):
+		"""Given a flat chain of samples of dimension (nsamples,ndim), returns the 
+		filtered out chain according to the user provided lower and upper limits for 
+		each dimension.
+
+		Args:
+			chain (np.array): Flat samples with dimenson (samples,ndim) 
+			lower_limits (array): One dimensonla array with lower limits for variables. Must have size (ndim)
+			upper_limits (array): One dimensonla array with upper limits for variables. Must have size (ndim)
+
+		Returns:
+			flat_chain: Returns the filtered chain
+		"""
+		mask = np.all((chain >= lower_limits) & (chain <= upper_limits), axis=1)
+		return chain[mask]
+
 		if not self.fit_performed:
 			raise ValueError('No fit has been performed.')
 
