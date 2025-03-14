@@ -187,9 +187,7 @@ class GraviFit(GravPhaseMaps,GravData_scivis):
 
 			#Setup class and create list of sources
 			self.field_type = 'star' 
-			self.nsource = nsource
-			self.sources = np.zeros((nsource, 4)) 	# [ra,dec,flux,alpha]
-			self.background = np.zeros(2)			# [flux,alpha]
+			self.nsources = nsource
 			
 			# Parameters for stars 
 			# number of parameters = (3n-1)+1
@@ -241,10 +239,8 @@ class GraviFit(GravPhaseMaps,GravData_scivis):
 
 				#Setup class and create list of sources
 				self.field_type = 'sgra' 
-				self.nsource = 0
-				self.sources = np.zeros((1, 4)) # [ra,dec,flux,alpha]
-				self.background = np.zeros(2)	# [flux,alpha]
-
+				self.nsources = 0
+	
 				#Check fitting area
 				if fit_window_sgr == None:
 					fit_window = 5.0
@@ -277,10 +273,8 @@ class GraviFit(GravPhaseMaps,GravData_scivis):
 
 				#Setup class and create list of sources
 				self.field_type = 'sgra' 
-				self.nsource = nsource
-				self.sources = np.zeros((nsource + 1, 4))  	# [ra,dec,flux,alpha]
-				self.background = np.zeros(2)				# [flux,alpha]
-
+				self.nsources = nsource
+				
 				#Fitting parameters for stars 
 				# number of parameters = (3n-1)+1
 				star_fit_parameters = {
