@@ -1239,7 +1239,7 @@ class GraviFit(GravPhaseMaps):
 		
 		# Create the figure
 		fig = plt.figure(figsize=A4_size,layout='constrained')
-		fig.suptitle(f'{self.filename}', y = 0.99)
+		fig.suptitle(f'{self.idata.filename}', y = 0.99)
 				
 		#Create top and bottom row
 		_ , top_row, bottom_row = fig.subfigures(3, 1, hspace=0.1,height_ratios=[0.02, 1,1.5])
@@ -1297,7 +1297,7 @@ class GraviFit(GravPhaseMaps):
 			ax2.add_artist(circ)
 
 			#Add northangle orientation
-			angle = self.north_angle[beam]
+			angle = self.idata.north_angle[beam]
 			n0 = np.array([np.sin(angle),np.cos(angle)])
 			
 			p1 = (fiber_fov-10)*n0 
@@ -1418,7 +1418,6 @@ class GraviFit(GravPhaseMaps):
 	def fit_report(
 			self, 
 			params,
-			pol,
 			wavelength=2.2, 
 			fiber_fov=70, 
 			*,
@@ -1447,7 +1446,7 @@ class GraviFit(GravPhaseMaps):
 		fig, (pm_axes, cax1, cax2), fov_ax, baselines_ax, data_axes = self.fit_report_template(wavelength=wavelength, fiber_fov=fiber_fov, **plot_limits)
 
 		#Get sources
-		sources, _ = GraviFit.get_sources_and_background(params.valuesdict(), self.field_type, self.nsource )
+		sources, _ = GraviFit.get_sources_and_background(params.valuesdict(), self.field_type, self.nsources )
 
 		#
 		# Plot phasemaps
@@ -1492,11 +1491,11 @@ class GraviFit(GravPhaseMaps):
 				#Plot sources with metrology corrections
 				for x, y, flux, alpha in sources:
 
-					angle = self.north_angle[beam]
+					angle = self.idata.north_angle[beam]
 
 					offset = np.array([
-						self.sobj_metrology_correction_x[beam], 
-						self.sobj_metrology_correction_y[beam]]
+						self.idata.sobj_metrology_correction_x[beam], 
+						self.idata.sobj_metrology_correction_y[beam]]
 						)
 
 					Rm = np.array([	
@@ -1514,15 +1513,17 @@ class GraviFit(GravPhaseMaps):
 		#
 
 		#Get data
-		idata = self.get_interferometric_data(
-			pol=pol,
-			flag_channels=self.flagged_channels)
+		idata = self.idata#
+
+		#Get dirty beam
+		_, _, (x,C) = get_dirty_beam(idata)
 
 		ax = fov_ax
-		ax.set_facecolor('#8f8f8f')
 
-		for x, y, flux, alpha in sources:
-			ax.scatter([x],[y],  edgecolors='black')
+		ax.pcolormesh(x , x, C,cmap='gist_yarg', zorder=0)
+
+		for x, y, _, _ in sources:
+			ax.scatter([x],[y],  s=8.0, edgecolors='black')
 
 		#
 		# Plot baseline configuration
@@ -1533,9 +1534,9 @@ class GraviFit(GravPhaseMaps):
 		uv_coordinates = np.transpose([idata.Bu,idata.Bv])
 
 		for idx,station in enumerate(uv_coordinates):
-			ax1.scatter( station[0], station[1], c=self.colors_baseline[idx], s=14.5)
-			ax1.scatter(-station[0],-station[1], c=self.colors_baseline[idx], s=14.5)
-			ax1.plot([-station[0],station[0]],[-station[1],station[1]], c=self.colors_baseline[idx],lw=1.8,ls='-')
+			ax1.scatter( station[0], station[1], c=colors_baseline[idx], s=14.5)
+			ax1.scatter(-station[0],-station[1], c=colors_baseline[idx], s=14.5)
+			ax1.plot([-station[0],station[0]],[-station[1],station[1]], c=colors_baseline[idx],lw=1.8,ls='-')
 
 		for tel_coord in idata.tel_pos:
 			ax2.scatter(-tel_coord[0],-tel_coord[1],c='black',zorder=10,s=10)
@@ -1556,8 +1557,8 @@ class GraviFit(GravPhaseMaps):
 			x_inner = centroid_x + (x - centroid_x) * scale_factor
 			y_inner = centroid_y + (y - centroid_y) * scale_factor
 			
-			ax2.plot(np.append(x_inner, x_inner[0]), np.append(y_inner, y_inner[0]), color=self.colors_closure[idx], linewidth=1)
-			ax2.fill(x_inner, y_inner, color=self.colors_closure[idx], edgecolor=self.colors_closure[idx], linewidth=0, alpha=0.3)
+			ax2.plot(np.append(x_inner, x_inner[0]), np.append(y_inner, y_inner[0]), color=colors_closure[idx], linewidth=1)
+			ax2.fill(x_inner, y_inner, color=colors_closure[idx], edgecolor=colors_closure[idx], linewidth=0, alpha=0.3)
 
 		ax1.set_aspect(1)
 		ax2.set_aspect(1)
@@ -1593,36 +1594,36 @@ class GraviFit(GravPhaseMaps):
 			y   = idata.visamp[idx] 
 			yerr= idata.visamp_err[idx]
 			
-			ax1.errorbar(x, y, yerr, **plot_config, marker='o', color=self.colors_baseline[idx % 6])
+			ax1.errorbar(x, y, yerr, **plot_config, marker='o', color=colors_baseline[idx % 6])
 
-			ax1.plot(mx,np.abs(my), color=self.colors_baseline[idx % 6])
-			ax1.scatter(mx,np.abs(my),s=2, color=self.colors_baseline[idx % 6])
+			ax1.plot(mx,np.abs(my), color=colors_baseline[idx % 6])
+			ax1.scatter(mx,np.abs(my),s=2, color=colors_baseline[idx % 6])
 	
-			ax1r.errorbar(x, y-np.abs(my), yerr, **plot_config, marker='D', color=self.colors_baseline[idx % 6])
+			ax1r.errorbar(x, y-np.abs(my), yerr, **plot_config, marker='D', color=colors_baseline[idx % 6])
 
 			#Visibility phase
 			x   = idata.spatial_frequency_as[idx] 
 			y   = idata.visphi[idx] 
 			yerr= idata.visphi_err[idx]
 
-			ax2.errorbar(x, y, yerr, **plot_config, marker='o', color=self.colors_baseline[idx % 6])
+			ax2.errorbar(x, y, yerr, **plot_config, marker='o', color=colors_baseline[idx % 6])
 
-			ax2.plot(mx,np.angle(my,deg=True), color=self.colors_baseline[idx % 6])
-			ax2.scatter(mx,np.angle(my,deg=True),s=2, color=self.colors_baseline[idx % 6])
+			ax2.plot(mx,np.angle(my,deg=True), color=colors_baseline[idx % 6])
+			ax2.scatter(mx,np.angle(my,deg=True),s=2, color=colors_baseline[idx % 6])
 	
-			ax2r.errorbar(x, y-np.angle(my,deg=True), yerr, **plot_config, marker='D', color=self.colors_baseline[idx % 6])
+			ax2r.errorbar(x, y-np.angle(my,deg=True), yerr, **plot_config, marker='D', color=colors_baseline[idx % 6])
 
 			#Visibility squared
 			x   = idata.spatial_frequency_as[idx] 
 			y   = idata.vis2[idx] 
 			yerr= idata.vis2_err[idx]
 
-			ax3.errorbar(x, y, yerr, **plot_config, marker='o', color=self.colors_baseline[idx % 6])
+			ax3.errorbar(x, y, yerr, **plot_config, marker='o', color=colors_baseline[idx % 6])
 
-			ax3.plot(mx,np.abs(my)**2, color=self.colors_baseline[idx % 6])
-			ax3.scatter(mx,np.abs(my)**2,s=2, color=self.colors_baseline[idx % 6])
+			ax3.plot(mx,np.abs(my)**2, color=colors_baseline[idx % 6])
+			ax3.scatter(mx,np.abs(my)**2,s=2, color=colors_baseline[idx % 6])
 	
-			ax3r.errorbar(x, y-np.abs(my)**2, yerr, **plot_config, marker='D', color=self.colors_baseline[idx % 6])
+			ax3r.errorbar(x, y-np.abs(my)**2, yerr, **plot_config, marker='D', color=colors_baseline[idx % 6])
 
 		#Closure phases
 		c1 = np.angle(visibility_model['UT43'][1]) + np.angle(visibility_model['UT32'][1]) - np.angle(visibility_model['UT42'][1])
@@ -1638,11 +1639,11 @@ class GraviFit(GravPhaseMaps):
 			y   = idata.t3phi[idx] 
 			yerr= idata.t3phi_err[idx]
 
-			ax4.errorbar(x, y, yerr, **plot_config, marker='o', color=self.colors_closure[idx])
+			ax4.errorbar(x, y, yerr, **plot_config, marker='o', color=colors_closure[idx])
 
-			ax4.plot(x,cp[idx], color=self.colors_closure[idx])
-			ax4.scatter(x,cp[idx], s=2, color=self.colors_closure[idx])
+			ax4.plot(x,cp[idx], color=colors_closure[idx])
+			ax4.scatter(x,cp[idx], s=2, color=colors_closure[idx])
 	
-			ax4r.errorbar(x, y-cp[idx], yerr, **plot_config, marker='D', color=self.colors_closure[idx])
+			ax4r.errorbar(x, y-cp[idx], yerr, **plot_config, marker='D', color=colors_closure[idx])
 
 		return fig, pm_axes, fov_ax, baselines_ax, data_axes
