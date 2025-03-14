@@ -1048,238 +1048,173 @@ class GraviFit(GravPhaseMaps):
 		mask = np.all((chain >= lower_limits) & (chain <= upper_limits), axis=1)
 		return chain[mask]
 
+	def inspect_walkers(
+			self,
+			step_cut, 
+			thin, 
+			sigma = 5
+			):
+
 		if not self.fit_performed:
 			raise ValueError('No fit has been performed.')
 
-		# Part 1: Get the full chain
-		full_chain = self.sampler.get_chain(thin=thin)
-		full_chain_flat = self.sampler.get_chain(thin=thin, flat=True)
-		n_dim = full_chain.shape[-1]
-		n_steps = full_chain.shape[0]
+		if self.class_mode=='fits':
 
-		# Part 2: Get filtered chain according to sigma value
-		discard_chain_flat = self.sampler.get_chain(discard=step_cut, thin=thin, flat=True) 
+			#Get full chain
+			chain 		= self.sampler.get_chain(discard=0,  thin=1, flat=False) 
+			flat_chain  = self.sampler.get_chain(discard=0,  thin=1, flat=True) 
 
-		# Calculate the median and standard deviation for each parameter
-		medians = np.median(discard_chain_flat, axis=0)
-		std_devs = np.std(discard_chain_flat, axis=0)
+			nsteps, nwalkers, ndim = chain.shape
+		
+			#Get filtered chain adn estimate percentiles
+			flat_filt_chain = self.sampler.get_chain(discard=step_cut, thin=thin, flat=True) 
+		
+			#Evaluate gaussian fit to clean chain adn clean chain
+			mu_list, sigma_list = self.get_gaussian_chain_fit(flat_filt_chain)
+			flat_filt_chain = self.get_clean_chain(flat_filt_chain, mu_list-sigma*sigma_list, mu_list+sigma*sigma_list)
 
-		# Define the sigma bounds
-		lower_bound = medians - sigma * std_devs
-		upper_bound = medians + sigma * std_devs
-
-		# Mask out walkers outside the sigma interval for each parameter
-		mask = np.all((discard_chain_flat >= lower_bound) & (discard_chain_flat <= upper_bound), axis=1)
-		filtered_chain_flat = discard_chain_flat[mask]
-
-		if plot:
-
-			# Compute the 16th and 84th percentiles for the filtered chain
-			q_low, q_high = np.percentile(filtered_chain_flat, [16, 84], axis=0)
-
-			fig = plt.figure(figsize=(8, 2*n_dim), dpi=100)
-
-			subfig_left, subfig_right = fig.subfigures(1, 2, wspace=0.1, width_ratios=[3, 1])  
-			axes_left  = subfig_left.subplots(n_dim, 2, width_ratios=[1, 0.4])
-			axes_right = subfig_right.subplots(n_dim, 1) 
-
-			#Define colors for filtered walkers vs unfiltered
-			c1 = '#E4003A'
-			c2 = '#003285'
-
-			# Plot the trace for each parameter
-			for i in range(n_dim):
-
-				#Define plots and setup
-				ax1 = axes_left[i,0] # Step vs Walkers plot
-				ax2 = axes_left[i,1] # Walkers histogram
-				ax3 =  axes_right[i] # Walkers histrogram zoom in
-
-				ax1.set_xlim((0,n_steps))
-				ax1.set_ylabel(self.fit_params[i])
-
-				if i != n_dim-1:
-					ax1.set_xticklabels([])
-					ax1.set_xticks([])
-				else:
-					ax1.set_xlabel('Step')
-
-				ax2.set_xticklabels([])
-				ax2.set_yticklabels([])
-				ax2.set_yticks([])
-				ax2.set_xticks([])
-				
-				ax3.set_xticks([])
-				ax3.set_yticks([])
-				ax3.set_yticklabels([])
-
-				#Plot data and limits for the walker selction
-				ax1.plot(full_chain[:, :, i], alpha=0.5)
-				
-				ax1.vlines(x=step_cut, ymin=ax1.get_ylim()[0], ymax=ax1.get_ylim()[1], ls='-.',lw=0.8, zorder=0, color='k', alpha=0.5)
-				ax1.vlines(x=step_cut, ymin=lower_bound[i], ymax=upper_bound[i], ls='-.',lw=0.8, zorder=0, color='k')
-				ax1.hlines(y=lower_bound[i], xmin=step_cut, xmax=n_steps, ls='-.', zorder=0, lw=0.8, color='k')
-				ax1.hlines(y=upper_bound[i], xmin=step_cut, xmax=n_steps, ls='-.', zorder=0, lw=0.8, color='k')
-				
-				rect = patches.Rectangle(
-					xy = (step_cut, lower_bound[i]), 
-					width=(n_steps-step_cut), 
-					height=(upper_bound[i]-lower_bound[i]), 
-					linewidth=0, 
-					edgecolor=None, 
-					facecolor=c1,
-					alpha=0.2)
-
-				ax1.add_patch(rect)
-
-				#Plot histogram data
-				chain_filt = filtered_chain_flat[:, i]
-				chain_full = full_chain_flat[:, i]
-
-				_, bins_filt = np.histogram(chain_filt, bins='fd')
-				_, bins_full = np.histogram(chain_full, bins='fd')
-				
-				hist_params = {
-					'density': False,
-					'orientation': 'horizontal'
-				}
-
-				for t,a in zip(['step', 'stepfilled'],[1,0.2]):
-					ax2.hist(chain_full, color=c2, bins=bins_full, **hist_params, histtype=t, alpha=a)
-					ax2.hist(chain_filt, color=c1, bins=bins_filt, **hist_params, histtype=t, alpha=a)
-				
-				# Mark zoomed-in range in column 2 and set limits
-				ax2.axhline(lower_bound[i], color='black', linestyle='--', linewidth=1)
-				ax2.axhline(upper_bound[i], color='black', linestyle='--', linewidth=1)
-				
-				ax2.set_ylim(ax1.get_ylim()[0],ax1.get_ylim()[1])
-
-				#Plot zoomed in histograms
-				for t,a in zip(['step', 'stepfilled'],[1,0.2]):
-					ax3.hist(chain_full, color=c2, bins=bins_full, **hist_params, histtype=t, alpha=a)
-					ax3.hist(chain_filt, color=c1, bins=bins_filt, **hist_params, histtype=t, alpha=a)
-				
-				ax3.set_ylim(lower_bound[i], upper_bound[i])
-
-				#Add patches connecting plots	
-				for bound in [lower_bound[i], upper_bound[i]]:
-				
-					line = patches.ConnectionPatch(
-						xyA=(ax2.get_xlim()[1], bound), 
-						xyB=(ax3.get_xlim()[0], bound), 
-						coordsA="data", coordsB="data",
-						axesA=ax2, axesB=ax3, color="black", linestyle="dashed"
-						)
-					
-					fig.add_artist(line)
-				
-			subfig_left.subplots_adjust(hspace=0,wspace=0)
-			subfig_right.subplots_adjust(hspace=0.02,wspace=0)
-			plt.tight_layout()
-
-			if plot_save_name is not None:
-				plt.savefig(plot_save_name, bbox_inches="tight")
+		elif self.class_mode=='hdf':
 			
-			plt.show()
+			chain = self.mcmc_chains
+			nsteps, nwalkers, ndim = chain.shape
+			flat_chain = chain.reshape((nsteps*nwalkers,ndim))
+			
+			flat_filt_chain = self.mcmc_chains[step_cut::thin,:,:]
+			nsteps_filt, nwalkers, ndim = flat_filt_chain.shape
+			flat_filt_chain = flat_filt_chain.reshape((nsteps_filt*nwalkers,ndim))
+			
+			mu_list, sigma_list = self.get_gaussian_chain_fit(flat_filt_chain)
+			
+			flat_filt_chain = self.get_clean_chain(flat_filt_chain, mu_list-sigma*sigma_list, mu_list+sigma*sigma_list)
 
-		return filtered_chain_flat
+		#Create figure and setup plot
+		fig = plt.figure(figsize=(8, 2*ndim), dpi=100)
 
-	def corner_plot(self, step_cut, thin=1, sigma=5):
+		subfig_left, subfig_right = fig.subfigures(1, 2, wspace=0.1, width_ratios=[3, 1])  
+		axes_left  = subfig_left.subplots(ndim, 2, width_ratios=[1, 0.4])
+		axes_right = subfig_right.subplots(ndim, 1) 
+
+		#Define colors for filtered walkers vs unfiltered
+		c_fil  = '#E4003A' #red
+		c_raw  = '#003285' #blue
 		
-		if not self.fit_performed:
-			raise ValueError('No fit has been performed.')
+		# Plot the trace for each parameter
+		for i in range(ndim):
 
-		#Get filtered samples
-		filtered_chain = self.get_flat_chain(
-			step_cut=step_cut, 
-			thin=thin, sigma=sigma, 
-			plot=False)
+			#Define plots and setup
+			ax1 = axes_left[i,0] # Step vs Walkers plot
+			ax2 = axes_left[i,1] # Walkers histogram
+			ax3 =  axes_right[i] # Walkers histrogram zoom in
 
-		fig = plt.figure(figsize=(15, 15))
-		
-		corner.corner(filtered_chain, 
-			  fig=fig, 
-			  labels=self.fit_params, 
-			  quantiles=[0.16, 0.5, 0.84], 
-			  show_titles=True, 
-			  smooth=True, 
-			  title_fmt=None, 
-			  bins=int(1+np.log2(filtered_chain.shape[0]*filtered_chain.shape[1])),
-			  plot_datapoints=True
-			  )
-		
-		return fig
+			ax1.set_xlim((0,nsteps))
+			ax1.set_ylabel(self.mcmc_variables[i])
+			
+			if i != ndim-1:
+				ax1.set_xticklabels([])
+				ax1.set_xticks([])
+			else:
+				ax1.set_xlabel('Step')
 
-	def get_fit_metadata(self,step_cut, thin, sigma):
-		
-		metadata = [
-		f"# MCMC Chain Results",
-		f"# Data",
-		f"# Filename: {self.filename}",
-		f"# Flagged Channels: {self.flagged_channels}",
-		f"# Polarization: {self.fitted_pol}",
-		f"#",
-		f"# Fitting info",
-		f"# Date of fit: {datetime.today().strftime('%Y-%m-%d %H:%M:%S')}",
-		f"# Fit Weights: {self.fit_weights}",
-		f"# Walkers: {self.sampler.nwalkers}",
-		f"# Iterations: {self.sampler.iteration}",
-		f"# Saved samples info",
-		f"# Step Cut: {step_cut}, Thin: {thin}, Sigma: {sigma}",
-		f"# Parameters: {', '.join(self.fit_params)}",
-		f"# --------------------------",
-		]
+			ax2.set_xticklabels([])
+			ax2.set_yticklabels([])
+			ax2.set_yticks([])
+			ax2.set_xticks([])
+			
+			ax3.set_xticks([])
+			ax3.set_yticks([])
+			ax3.set_yticklabels([])
 
-		return metadata
+			#Plot data and limits for the walker selction
+			ax1.plot(chain[:, :, i], alpha=0.5)
+			
+			#Calculate histogram for original and filtered walker
+			ith_walker = flat_chain[:,i]
+			ith_filt_walker = flat_filt_chain[:,i]
 
-	def save_mcmc_chain_csv(self, step_cut, thin=1, sigma=5, appendix=None):
-		"""Save mcmc chain to csv file
+			hist, bins   = np.histogram(ith_walker, bins='fd', density=True)
+			fhist, fbins = np.histogram(ith_filt_walker, bins='fd',density=True)
+			
+			m = mu_list[i]
+			s = sigma_list[i]
 
-		Args:
-			step_cut (_type_): _description_
-			thin (int, optional): _description_. Defaults to 1.
-			sigma (int, optional): _description_. Defaults to 5.
-			appendix (_type_, optional): _description_. Defaults to None.
+			l_lim = m-sigma*s
+			h_lim = m+sigma*s
 
-		Raises:
-			ValueError: _description_
-			ValueError: _description_
-		"""
-		
-		if appendix==None:
-			raise ValueError('Please provide an appendix to save the mcmc chain')
-		
-		results_dir = 'mcmc_results'
-		if not os.path.exists(results_dir):
-			os.makedirs(results_dir)
+			#Plot histograms
+			hist_params = {
+				'density': True,
+				'orientation': 'horizontal'
+			}
 
-		output_name = os.path.join(results_dir, self.filename[:-5] + '_' + appendix + '.csv')
+			for t,a in zip(['step', 'stepfilled'],[1,0.2]):
+				ax2.hist(ith_walker, color=c_raw, bins=bins, **hist_params, histtype=t, alpha=a)
+				ax2.hist(ith_filt_walker, color=c_fil, bins=fbins, **hist_params, histtype=t, alpha=a)
 
-		if os.path.exists(output_name):
-			raise ValueError(f"File '{output_name}' already exists. Choose a different appendix or remove the existing file.")
+				ax3.hist(ith_walker, color=c_raw, bins=bins, **hist_params, histtype=t, alpha=a)
+				ax3.hist(ith_filt_walker, color=c_fil, bins=fbins, **hist_params, histtype=t, alpha=a)
 
-		#Get filtered samples
-		filtered_chain = self.get_flat_chain(
-			step_cut=step_cut, 
-			thin=thin, sigma=sigma, 
-			plot=False)
+			#Plot gaussian
+			x = np.linspace(l_lim,h_lim,100)
+			ax3.plot(gauss(x,np.max(fhist),m,s), x, ls='-.',c='k')
 
-		# Convert to DataFrame with column names
-		df = pd.DataFrame(filtered_chain, columns=self.fit_params)
+			ax1.vlines(x=step_cut, ymin=ax1.get_ylim()[0], ymax=ax1.get_ylim()[1], ls='--',lw=0.9, zorder=0, color='k', alpha=0.5)
+			ax1.hlines(y=l_lim, xmin=step_cut, xmax=nsteps, ls='-.', zorder=0, lw=0.8, color='k')
+			ax1.hlines(y=h_lim, xmin=step_cut, xmax=nsteps, ls='-.', zorder=0, lw=0.8, color='k')
+			
+			rect = patches.Rectangle(
+				xy = (step_cut, l_lim), 
+				width=(nsteps-step_cut), 
+				height=(h_lim-l_lim), 
+				linewidth=0, 
+				edgecolor=None, 
+				facecolor=c_fil,
+				alpha=0.2)
+			
+			ax1.add_patch(rect)
+			
+			# Mark zoomed-in range in column 2 and set limits
+			ax2.axhline(l_lim, color='black', linestyle='--', linewidth=1)
+			ax2.axhline(h_lim, color='black', linestyle='--', linewidth=1)
+			
+			ax2.set_ylim(ax1.get_ylim()[0],ax1.get_ylim()[1])
+			ax3.set_ylim(l_lim,h_lim)
 
-		#Get fit metadata
-		metadata = self.get_fit_metadata(step_cut=step_cut,thin=thin,sigma=sigma)
+			#Add patches connecting plots	
+			for bound in np.sort([l_lim, h_lim]):
+				line = patches.ConnectionPatch(
+					xyA=(ax2.get_xlim()[1], bound), 
+					xyB=(ax3.get_xlim()[0], bound), 
+					coordsA="data", coordsB="data",
+					axesA=ax2, axesB=ax3, color="black", linestyle="dashed"
+					)
 				
-		with open(output_name, "w") as f:
-			for line in metadata:
-				f.write(line + "\n") 
-		
-		df.to_csv(output_name, index=False,  mode='a')
+				fig.add_artist(line)
 
-		return
-	
-	def load_mcmc_csv(self, filename):
-		return pd.read_csv(filename, comment='#')
+		subfig_left.subplots_adjust(hspace=0,wspace=0)
+		subfig_right.subplots_adjust(hspace=0.02,wspace=0)
+		
+		plt.tight_layout()
+
+		#Estimate best fit parameters
+		fit_parameters = self.params.copy()
+
+		best_fit = np.median(flat_filt_chain, axis=0) 
+		uncertainties = np.std(flat_filt_chain, axis=0)
+
+		for idx, elem in enumerate(self.mcmc_variables):
+			fit_parameters[elem].value  = best_fit[idx]
+			fit_parameters[elem].stderr = uncertainties[idx]
+
+		#Store variables
+		self.chain_analysed_by_user = True
+		self.mcmc_chains = chain
+		self.clean_chain = flat_filt_chain
+		self.step_cut = step_cut
+		self.sigma = sigma
+		self.thin = thin
+		self.fit_parameters = fit_parameters
+
+		return fig, (axes_left, axes_right)
 
 	#========================================
 	# Visualization tools and fit inspection
