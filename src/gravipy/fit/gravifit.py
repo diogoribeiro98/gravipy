@@ -356,11 +356,15 @@ class GraviFit(GravPhaseMaps,GravData_scivis):
 			params.add(
 				name, 
 				value = parameter_dictionary[name][0],
-				vary  = parameter_dictionary[name][3],
 				min   = parameter_dictionary[name][1],
 				max   = parameter_dictionary[name][2],
+				vary  = bool(parameter_dictionary[name][3]),
 				)
 
+			#If the list is longer it contains the standard deviation of the parameter
+			if len(parameter_dictionary[name]) == 5:
+				params[name].stderr = parameter_dictionary[name][4]
+		
 		return params
 	
 	#====================
