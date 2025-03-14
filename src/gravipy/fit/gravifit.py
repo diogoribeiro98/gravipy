@@ -69,6 +69,8 @@ class GraviFit(GravPhaseMaps):
 		# Pre-define class quantities
 		# ---------------------------
 		
+		self.class_mode = 'empty' # Can be fits or hdf
+
 		#Status variables
 		self.parameters_setup 	= False
 		self.fit_performed 		= False
@@ -140,6 +142,163 @@ class GraviFit(GravPhaseMaps):
 		self.flagged_channels = self.flagged_channels
 		
 		return
+
+	def load_hdf(self, filename):
+		
+		self.class_mode = 'hdf'
+	
+		with h5py.File(filename, "r") as f:
+
+			#
+			# Load interferometric data
+			#
+
+			#Meta data
+			grp = f['data']
+			filename 	= grp.attrs['filename']
+			date_obs	= grp.attrs['date_obs']
+			obj 		= grp.attrs['object']
+			ra 			= grp.attrs['ra']
+			dec			= grp.attrs['dec']
+			sobj    	= grp.attrs['sobj']
+			sobj_x  	= grp.attrs['sobj_x']
+			sobj_y  	= grp.attrs['sobj_y']
+			sobj_offx  	= grp.attrs['sobj_offx']
+			sobj_offy  	= grp.attrs['sobj_offy']
+
+			#Metrology data
+			beams = ['GV1', 'GV2', 'GV3', 'GV4']
+
+			grp = f['data/metrology']
+
+			sobj_metrology_correction_x = { key : grp[key+'_offx'][()] for key in beams }
+			sobj_metrology_correction_y = { key : grp[key+'_offy'][()] for key in beams }
+			north_angle = {	key : grp[key+'_northangle'][()] for key in beams }
+
+			#Baselines
+			grp = f['data/array']
+			Bu 		= grp['Bu'][()]
+			Bv 		= grp['Bv'][()]
+			telpos 	= grp['telpos'][()]
+
+			bl_telescopes = grp['bl_telescopes'][()].astype('U')
+			t3_telescopes = grp['t3_telescopes'][()].astype('U')
+			
+			bl_labels = grp['bl_labels'][()].astype('U')
+			t3_labels = grp['t3_labels'][()].astype('U')
+
+			grp = f['data/visibility/wave']
+			pol  = str(grp['polarization'][()])
+			wave = grp['wave'][()]
+			band = grp['band'][()]
+
+			#Visibility data
+			grp = f['data/visibility/vis']
+			visamp 		= grp['visamp'][()]
+			visamp_err 	= grp['visamp_err'][()]
+			visphi		= grp['visphi'][()]
+			visphi_err 	= grp['visphi_err'][()]
+			vis_flag 	= grp['vis_flag'][()]
+
+			grp = f['data/visibility/vis2']
+			vis2 		= grp['vis2'][()]
+			vis2_err 	= grp['vis2_err'][()]
+			vis2_flag 	= grp['vis2_flag'][()]
+
+			grp = f['data/visibility/t3']
+			t3amp 		= grp['t3amp'][()]
+			t3amp_err 	= grp['t3amp_err'][()]
+			t3phi 		= grp['t3phi'][()]
+			t3phi_err 	= grp['t3phi_err'][()]
+			t3_flag 	= grp['t3_flag'][()]
+
+			grp = f['data/visibility/sf']
+			spatial_frequency 	 = grp['spatial_frequency'][()]
+			spatial_frequency_t3 = grp['spatial_frequency_t3'][()]
+
+			self.idata = InterferometricData(
+						filename=filename,
+						date_obs=date_obs,
+						object = obj,
+						ra	= ra, 	
+						dec = dec, 
+						sobj   = sobj,
+						sobj_x = sobj_x,
+						sobj_y = sobj_y,
+						sobj_offx = sobj_offx,
+						sobj_offy = sobj_offy,
+						sobj_metrology_correction_x = sobj_metrology_correction_x,
+						sobj_metrology_correction_y = sobj_metrology_correction_y,
+						north_angle = north_angle,
+						pol=pol,
+						Bu=Bu, Bv=Bv, 
+						tel_pos=telpos,
+						bl_telescopes=bl_telescopes, t3_telescopes=t3_telescopes,
+						bl_labels=bl_labels, t3_labels=t3_labels,
+						wave=wave, band=band,
+						visamp=visamp, visamp_err=visamp_err,
+						visphi=visphi, visphi_err=visphi_err,
+						vis_flag=vis_flag,
+						vis2=vis2, vis2_err=vis2_err, 
+						vis2_flag=vis2_flag,
+						t3amp=t3amp, t3amp_err=t3amp_err,
+						t3phi=t3phi, t3phi_err=t3phi_err,
+						t3flag=t3_flag,
+						spatial_frequency_as=spatial_frequency,
+						spatial_frequency_as_T3=spatial_frequency_t3
+					)
+
+			#
+ 			# Read fit results
+			#
+			
+			grp = f["fit"]
+			self.fit_performed = grp.attrs['fit_performed']
+			self.parameters_setup = grp.attrs['parameters_setup']
+			
+			if self.parameters_setup:
+
+				grp_params = f["fit/parameters"]
+				
+				self.field_type = grp_params.attrs['field_type']
+				self.nsources 	= grp_params.attrs['nsources']
+				
+				self.use_phasemaps = grp_params.attrs['use_phasemaps']
+				
+				if self.use_phasemaps:
+					self.phasemap_year 	= grp_params.attrs['phasemap_year']
+					self.phasemap_smoothing_kernel = grp_params.attrs['phasemap_smoothing_kernel']
+				
+				grp_init = f["fit/parameters/initial"]
+				params_dict = {name: grp_init[name][()] for name in grp_init.keys()}
+				self.params = self.assemble_parameter_class(params_dict)
+			
+			if self.fit_performed:
+
+				grp_init = f["fit/parameters/result"]
+				params_dict = {name: grp_init[name][()] for name in grp_init.keys()}
+				self.fit_parameters = self.assemble_parameter_class(params_dict)
+
+			# Read MCMC results
+			grp = f["fit/emcee"]
+			self.mcmc_chains = np.zeros((grp.attrs['nsteps'], grp.attrs['nwalkers'], grp.attrs['ndim']))
+			self.thin = grp.attrs['thin']
+			
+			grp_full_chain = f["fit/emcee/full_chain"]
+			for idx, param in enumerate(grp_full_chain.keys()):
+				self.mcmc_chains[:, :, idx] = grp_full_chain[param][()]
+			
+			grp_clean_chain = f["fit/emcee/clean_chain"]
+			self.step_cut = grp_clean_chain.attrs['step_cut']
+			self.sigma = grp_clean_chain.attrs['sigma_cut']
+			self.clean_chain = np.zeros((grp_clean_chain[param].shape[0], len(grp_clean_chain.keys())))
+			
+			self.mcmc_variables = np.zeros(len(grp_clean_chain.keys()), dtype=object)
+			for idx, param in enumerate(grp_clean_chain.keys()):
+				self.clean_chain[:, idx] = grp_clean_chain[param][()]
+				self.mcmc_variables[idx] = param
+		return
+
 	#========================================
 	# Fitting parameters setup
 	#=========================================
@@ -1261,6 +1420,167 @@ class GraviFit(GravPhaseMaps):
 
 		return fig, (axes_left, axes_right)
 
+	def fit_to_file(
+			self,
+			results_dir='mcmc_results',
+			appendix='fit_result',
+			skip_analysis=False,
+			overwrite=False,
+			):
+		
+		if skip_analysis:
+			pass
+		elif not self.chain_analysed_by_user:
+			raise ValueError(f' Please analyse the walkers by calling `GraviFit.inspect_walkers`')
+
+		if not os.path.exists(results_dir):
+			os.makedirs(results_dir)
+
+		output_name = os.path.join(results_dir, self.idata.filename[:-5] + '_' + appendix + '.h5')
+	
+		if os.path.exists(output_name) and not overwrite:
+			raise ValueError(f"File '{output_name}' already exists. Choose a different appendix, remove the existing file or use the keyword `overwrite`.")
+
+		with h5py.File(output_name, "w") as f:
+
+			#
+			# Data group
+			#
+
+			idata = self.idata
+
+			grp = f.create_group("data")
+
+			#Header information
+			grp.attrs['filename'] 		= idata.filename
+			grp.attrs['date_obs'] 		= idata.date_obs
+			grp.attrs['object'  ] 		= idata.object
+			grp.attrs['ra'  	] 		= idata.ra
+			grp.attrs['dec'  	] 		= idata.dec
+			grp.attrs['sobj'  	] 		= idata.sobj
+
+			grp.attrs['sobj_x'] = idata.sobj_x
+			grp.attrs['sobj_y'] = idata.sobj_y
+			
+			grp.attrs['sobj_offx'] = idata.sobj_offx
+			grp.attrs['sobj_offy'] = idata.sobj_offy
+
+			#Metrology quantities
+			grp = f.create_group("data/metrology")
+			
+			for key in ['GV1', 'GV2', 'GV3', 'GV4']:
+				grp.create_dataset(key+'_offx'		, data=idata.sobj_metrology_correction_x[key])
+				grp.create_dataset(key+'_offy'		, data=idata.sobj_metrology_correction_y[key])
+				grp.create_dataset(key+'_northangle', data=idata.north_angle[key])
+
+			#Baselines
+			grp = f.create_group("data/array")
+			
+			grp.create_dataset('Bu' 	, data=idata.Bu)
+			grp.create_dataset('Bv' 	, data=idata.Bv)
+			grp.create_dataset('telpos' , data=idata.tel_pos)
+			
+			#Note: To save the strings to hdf one needs to convert them to byte strings
+			grp.create_dataset('bl_telescopes' , data= [arr.astype('S') for arr in idata.bl_telescopes])
+			grp.create_dataset('t3_telescopes' , data= [arr.astype('S') for arr in idata.t3_telescopes])
+
+			grp.create_dataset('bl_labels' , data= idata.bl_labels.astype('S'))
+			grp.create_dataset('t3_labels' , data= idata.t3_labels.astype('S'))
+	
+			grp = f.create_group("data/visibility/wave")
+			grp.create_dataset('polarization' 	, data= idata.pol)
+			grp.create_dataset('wave' 			, data= idata.wave)
+			grp.create_dataset('band' 			, data= idata.band)
+			
+			grp = f.create_group("data/visibility/vis")
+			grp.create_dataset('visamp' 	, data= idata.visamp)
+			grp.create_dataset('visamp_err' , data= idata.visamp_err)			
+			grp.create_dataset('visphi' 	, data= idata.visphi)
+			grp.create_dataset('visphi_err' , data= idata.visphi_err)
+			grp.create_dataset('vis_flag' 	, data= idata.vis_flag)
+
+			grp = f.create_group("data/visibility/vis2")
+			grp.create_dataset('vis2' 		, data= idata.vis2)
+			grp.create_dataset('vis2_err' 	, data= idata.vis2_err)			
+			grp.create_dataset('vis2_flag' 	, data= idata.vis2_flag)
+
+			grp = f.create_group("data/visibility/t3")
+			grp.create_dataset('t3amp' 		, data= idata.t3amp)
+			grp.create_dataset('t3amp_err' 	, data= idata.t3amp_err)			
+			grp.create_dataset('t3phi' 		, data= idata.t3phi)
+			grp.create_dataset('t3phi_err' 	, data= idata.t3phi_err)			
+			grp.create_dataset('t3_flag' 	, data= idata.t3flag)
+
+			grp = f.create_group("data/visibility/sf")
+			grp.create_dataset('spatial_frequency', data= idata.spatial_frequency_as)
+			grp.create_dataset('spatial_frequency_t3', data= idata.spatial_frequency_as_T3)
+
+			#
+			# Fit group
+			#
+
+			grp = f.create_group("fit")
+		
+			grp.attrs['fit_performed'] = self.fit_performed
+			grp.attrs['parameters_setup'] = self.parameters_setup
+
+			if self.fit_performed:
+				grp.attrs['Date of fit'] = datetime.today().strftime('%Y-%m-%d %H:%M:%S')
+
+			grp = f.create_group("fit/parameters")
+
+			if self.parameters_setup:
+				
+				grp.attrs['field_type'] = self.field_type
+				grp.attrs['nsources'] = self.nsources
+				grp.attrs['use_phasemaps'] = self.use_phasemaps 
+
+				if self.use_phasemaps:
+					grp.attrs['phasemap_year'] = self.phasemap_year 
+					grp.attrs['phasemap_smoothing_kernel'] = self.phasemap_smoothing_kernel
+		
+			grp = f.create_group("fit/parameters/initial")
+
+			if self.parameters_setup:
+			
+				for name, par in self.params.items():
+					grp.create_dataset(name, data=np.array([
+					par.value, par.min, par.max, int(par.vary), par.stderr
+					]).astype(np.float64))
+
+			grp = f.create_group("fit/parameters/result")
+			
+			if self.chain_analysed_by_user:
+			
+				for name, par in self.fit_parameters.items():
+					grp.create_dataset(name, data=np.array([
+					par.value, par.min, par.max, int(par.vary), par.stderr,
+					]).astype(np.float64))
+			
+			grp = f.create_group("fit/emcee")
+			
+			nsteps, nwalkers, ndim = self.mcmc_chains.shape
+
+			grp.attrs['nsteps'] 	= nsteps
+			grp.attrs['nwalkers'] 	= nwalkers
+			grp.attrs['ndim'] 		= ndim
+			grp.attrs['thin'] 		= self.thin
+
+			grp = f.create_group("fit/emcee/full_chain")
+
+			for idx, param in enumerate(self.mcmc_variables):
+				grp.create_dataset(param, data=self.mcmc_chains[:,:,idx].astype(np.float64))
+
+			grp = f.create_group("fit/emcee/clean_chain")
+
+			grp.attrs['step_cut'] 	= self.step_cut
+			grp.attrs['sigma_cut'] 	= self.sigma
+
+			for idx, param in enumerate(self.mcmc_variables):
+				grp.create_dataset(param, data=self.clean_chain[:,idx].astype(np.float64))
+
+		return
+	
 	#========================================
 	# Visualization tools and fit inspection
 	#========================================
