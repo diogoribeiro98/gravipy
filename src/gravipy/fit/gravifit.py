@@ -22,6 +22,8 @@ import corner
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+from ..data.plot_idata import plot_interferometric_data
+from scipy.stats import norm
 
 #Logging tools
 import logging
@@ -29,6 +31,17 @@ from ..logger.log import log_level_mapping
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
 
 from datetime import datetime
+
+import h5py
+from ..tools.colors import colors_baseline, colors_closure
+from ..data.dirty_beam import get_dirty_beam
+
+#Defin gaussian function to fit to histogram
+from scipy.optimize import curve_fit
+
+def gauss(x, *p):
+	A, mu, sigma = p
+	return A*np.exp(-(x-mu)**2/(2.*sigma**2))
 
 #Alias between beam and telescope
 telescope_to_beam = {
@@ -59,6 +72,7 @@ class GraviFit(GravPhaseMaps):
 		#Status variables
 		self.parameters_setup 	= False
 		self.fit_performed 		= False
+		self.chain_analysed_by_user = False
 
 		#Fitting parameters
 		self.params = None
@@ -74,6 +88,36 @@ class GraviFit(GravPhaseMaps):
 
 		self.idata = None
 		self.flagged_channels	= []
+
+		#
+		# Parameters only accessible after a fit is performed 
+		# or after data is laoded from hdf file
+		#
+		# A few notes:
+		#
+		# - The self.sampler variable is only defined if a fit is performed.
+		#
+		# - The variables in the second block below are only avaliable if a fit
+		#	is performed or if a file is loaded
+		# 
+		# - Those in the third block are only defined after the fit walkers are
+		#	inspected by the user or a file is loaded
+		
+		#Avaliable after a fit is performed 
+		self.sampler = None 
+
+		#Avaliable after a fit is performed or after a file is loaded
+		self.fit_weights = None
+		self.mcmc_variables = None
+		self.max_loglike_parameters = None
+
+		#Avaliable after GraviFit.inspect_walkers is called or a file is loaded
+		self.mcmc_chains = None
+		self.clean_chain = None
+		self.step_cut = None
+		self.thin = None
+		self.sigma = None
+		self.fit_parameters = None
 
 	#========================================
 	# Loading functions
@@ -793,28 +837,28 @@ class GraviFit(GravPhaseMaps):
 		return log_like 
 
 	def run_mcmc_fit(
-			self, 
+			self,
 			nwalkers=50, 
 			steps=100, 
 			nthreads=1, 
 			initial_spread = 0.5, 
-			polarization='P1', 
-			flag_channels=[],
 			fit_weights=[1.0, 1.0, 0.0, 0.0]):
-		"""_summary_
+		"""Run monte carlo fitting
 
 		Args:
 			nwalkers (int, optional): _description_. Defaults to 50.
 			steps (int, optional): _description_. Defaults to 100.
 			nthreads (int, optional): _description_. Defaults to 1.
 			initial_spread (float, optional): _description_. Defaults to 0.5.
-			polarization (str, optional): _description_. Defaults to 'P1'.
-			flag_channels (list, optional): _description_. Defaults to [].
 			fit_weights (list, optional): _description_. Defaults to [1.0, 1.0, 0.0, 0.0].
 
 		Returns:
 			_type_: _description_
 		"""
+
+		#Check that parameters are setup
+		if not self.parameters_setup:
+			raise ValueError('Fitting parameters are not setup. Run the `GraviFit.prep_fit_parameters` function')
 
 		#
 		# Setup walkers for emcee
@@ -927,29 +971,30 @@ class GraviFit(GravPhaseMaps):
 		# Post-process samples
 		#
 
-		#Estimate fit parameters ignoring the first 20 percent of the chain
-		samples = sampler.get_chain(discard=int(0.2*steps), thin=10, flat=True) 
-		best_fit = np.median(samples, axis=0) 
-		uncertainties = np.std(samples, axis=0)
+		#Get the maximum loglikelihood parameters
+		samples = sampler.get_chain(flat=True) 
+		log_probs = sampler.get_log_prob(flat=True)
+		max_likelihood_sample = samples[log_probs.argmax()]
 
 		#Overwrite parameter values
-		result_parameters = self.params.copy()
+		max_loglike_parameters = self.params.copy()
 
 		for idx, elem in enumerate(parameters_to_fit):
-			result_parameters[elem].value  = best_fit[idx]
-			result_parameters[elem].stderr = uncertainties[idx]
+			max_loglike_parameters[elem].value  = max_likelihood_sample[idx]
 
 		#Setup class variables associated with fit
-		self.flagged_channels  	= flag_channels
-		self.sampler 			= sampler
-		self.fit_params 		= parameters_to_fit
-		self.result_params 		= result_parameters
+
 		self.fit_performed 		= True
-		self.fitted_pol 		= polarization
-		self.fit_weights    	= fit_weights
+		self.chain_analysed_by_user = False
 
-		return sampler, parameters_to_fit, result_parameters
+		self.sampler = sampler
 
+		self.fit_weights = fit_weights
+		self.mcmc_variables = parameters_to_fit
+		self.max_loglike_parameters = max_loglike_parameters
+		
+		return 
+	
 	#========================================
 	# mcmc analysis tools
 	#=========================================
