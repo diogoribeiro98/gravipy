@@ -7,7 +7,7 @@ import os
 from ..data import GravData
 from ..phasemaps import GravPhaseMaps
 from ..data import GravData_scivis
-
+from ..data import InterferometricData
 #Units
 from ..physical_units import units as units
 
@@ -38,11 +38,11 @@ telescope_to_beam = {
 	'UT4' : 'GV1',
 }
 
-class GraviFit(GravPhaseMaps,GravData_scivis):
+class GraviFit(GravPhaseMaps):
 	"""GRAVITY single night fit class
 	"""
 
-	def __init__(self, file, loglevel='INFO'):	
+	def __init__(self,loglevel='INFO'):	
 		
 		#Create a logger and set log level according to user
 		self.logger = logging.getLogger(type(self).__name__)
@@ -65,27 +65,37 @@ class GraviFit(GravPhaseMaps,GravData_scivis):
 		
 		#Fitting helper quantities
 		self.field_type = None
-		self.nsource 	= None
-		self.sources 	= None
-		self.background = None
+		self.nsources 	= None
 		
 		#Phasemap helper quantities
 		self.use_phasemaps = None
 		self.phasemap_year = None
 		self.phasemap_smoothing_kernel = None
 
-
-		#
-		# Parameters only accessible after a fit is performed
-		#
-
-		self.sampler 			= None
-		self.fit_params 		= None
-		self.result_params 		= None
-		self.fitted_pol 		= None
-		self.fit_weights 		= None
+		self.idata = None
 		self.flagged_channels	= []
-	
+
+	#========================================
+	# Loading functions
+	#=========================================
+
+	def load_fits(self, 
+			filename , 
+			polarization=None,
+			flag_channels=[]):
+
+		self.class_mode = 'fits'
+		gfit = GravData_scivis(filename)
+
+		self.idata = gfit.get_interferometric_data(
+			pol=polarization,
+			channel='SC',
+			flag_channels=flag_channels
+			)
+		
+		self.flagged_channels = self.flagged_channels
+		
+		return
 	#========================================
 	# Fitting parameters setup
 	#=========================================
@@ -496,15 +506,15 @@ class GraviFit(GravPhaseMaps,GravData_scivis):
 			
 			return sf, visibility/np.sqrt(normalization_i*normalization_j)
 			
-	def get_visibility_model(self, params, pol='P1', use_phasemaps=False):
+	def get_visibility_model(self, params, use_phasemaps=False):
 		
 		#Get baseline info from datafile and create template visibility model
-		idata = self.get_interferometric_data(pol)
+		idata = self.idata
 
 		visibility_model = dict((str(name),None) for name in idata.bl_labels)	
 
 		#Get sources from parameters
-		sources, background = GraviFit.get_sources_and_background(params.valuesdict(), self.field_type, self.nsource )
+		sources, background = GraviFit.get_sources_and_background(params.valuesdict(), self.field_type, self.nsources )
 
 		for idx, (telescopes, label) in enumerate(zip(idata.bl_telescopes, idata.bl_labels)):
 			
@@ -522,14 +532,14 @@ class GraviFit(GravPhaseMaps,GravData_scivis):
 				normalization_maps = [	self.phasemaps_normalization[telescope_to_beam[telescopes[0]]],
 										self.phasemaps_normalization[telescope_to_beam[telescopes[1]]]]
 
-				met_offx = [ self.sobj_metrology_correction_x[telescope_to_beam[telescopes[0]]],
-							 self.sobj_metrology_correction_x[telescope_to_beam[telescopes[1]]]]
+				met_offx = [ idata.sobj_metrology_correction_x[telescope_to_beam[telescopes[0]]],
+							 idata.sobj_metrology_correction_x[telescope_to_beam[telescopes[1]]]]
 
-				met_offy = [ self.sobj_metrology_correction_y[telescope_to_beam[telescopes[0]]],
-							 self.sobj_metrology_correction_y[telescope_to_beam[telescopes[1]]]]
+				met_offy = [ idata.sobj_metrology_correction_y[telescope_to_beam[telescopes[0]]],
+							 idata.sobj_metrology_correction_y[telescope_to_beam[telescopes[1]]]]
 
-				nangle = [	self.north_angle[telescope_to_beam[telescopes[0]]],
-							self.north_angle[telescope_to_beam[telescopes[1]]]]
+				nangle = [	idata.north_angle[telescope_to_beam[telescopes[0]]],
+							idata.north_angle[telescope_to_beam[telescopes[1]]]]
 
 				phasemap_args = {
 					'phase_maps': phase_maps,
@@ -543,7 +553,6 @@ class GraviFit(GravPhaseMaps,GravData_scivis):
 			else:
 				phasemap_args = {}
 
-		
 			model = GraviFit.nsource_visibility(
 			uv_coordinates= [ucoord,vcoord],
 			sources=sources,
@@ -867,14 +876,12 @@ class GraviFit(GravPhaseMaps,GravData_scivis):
 				}
 
 			field_type = self.field_type
-			nsources = self.nsource
+			nsources = self.nsources
 			
 			parameter_value_dictionary = self.params.valuesdict()
 
-			idata = self.get_interferometric_data(
-				pol=polarization,
-				flag_channels=flag_channels)
-
+			idata = self.idata
+	
 			visibility_model = dict((str(name),None) for name in idata.bl_labels)
 
 			use_phasemaps 			= self.use_phasemaps
@@ -882,9 +889,9 @@ class GraviFit(GravPhaseMaps,GravData_scivis):
 			phasemaps_amplitude 	= self.phasemaps_amplitude
 			phasemaps_normalization = self.phasemaps_normalization
 
-			north_angle 	= self.north_angle
-			metrology_offx 	= self.sobj_metrology_correction_x
-			metrology_offy 	= self.sobj_metrology_correction_y
+			north_angle 	= idata.north_angle
+			metrology_offx 	= idata.sobj_metrology_correction_x
+			metrology_offy 	= idata.sobj_metrology_correction_y
 			
 			weights = fit_weights
 
@@ -894,9 +901,8 @@ class GraviFit(GravPhaseMaps,GravData_scivis):
 		# Perform parallel fit
 		#
 
-
 		log_likelihood = GraviFit.log_likelihood
-		#Perform fit		
+		
 		with multiprocessing.Pool(processes=n_cores, initializer=emcee_worker_init) as pool:
 	
 			sampler = emcee.EnsembleSampler(
