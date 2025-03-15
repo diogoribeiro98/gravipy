@@ -1425,11 +1425,14 @@ class GraviFit(GravPhaseMaps):
 	def fit_to_file(
 			self,
 			results_dir='mcmc_results',
-			appendix='fit_result',
+			appendix=None,
 			skip_analysis=False,
 			overwrite=False,
 			):
 		
+		if appendix==None:
+			appendix=f'fitresult_{self.idata.pol}'
+
 		if skip_analysis:
 			pass
 		elif not self.chain_analysed_by_user:
