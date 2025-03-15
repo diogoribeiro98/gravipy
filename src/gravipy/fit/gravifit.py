@@ -1252,6 +1252,7 @@ class GraviFit(GravPhaseMaps):
 			self,
 			step_cut=None, 
 			thin=1, 
+			fit_gaussian=True,
 			sigma = 5
 			):
 
@@ -1276,8 +1277,9 @@ class GraviFit(GravPhaseMaps):
 			flat_filt_chain = self.sampler.get_chain(discard=step_cut, thin=thin, flat=True) 
 		
 			#Evaluate gaussian fit to clean chain adn clean chain
-			mu_list, sigma_list = self.get_gaussian_chain_fit(flat_filt_chain)
-			flat_filt_chain = self.get_clean_chain(flat_filt_chain, mu_list-sigma*sigma_list, mu_list+sigma*sigma_list)
+			if fit_gaussian:
+				mu_list, sigma_list = self.get_gaussian_chain_fit(flat_filt_chain)
+				flat_filt_chain = self.get_clean_chain(flat_filt_chain, mu_list-sigma*sigma_list, mu_list+sigma*sigma_list)
 
 		elif self.class_mode=='hdf':
 			
@@ -1289,9 +1291,9 @@ class GraviFit(GravPhaseMaps):
 			nsteps_filt, nwalkers, ndim = flat_filt_chain.shape
 			flat_filt_chain = flat_filt_chain.reshape((nsteps_filt*nwalkers,ndim))
 			
-			mu_list, sigma_list = self.get_gaussian_chain_fit(flat_filt_chain)
-			
-			flat_filt_chain = self.get_clean_chain(flat_filt_chain, mu_list-sigma*sigma_list, mu_list+sigma*sigma_list)
+			if fit_gaussian:
+				mu_list, sigma_list = self.get_gaussian_chain_fit(flat_filt_chain)
+				flat_filt_chain = self.get_clean_chain(flat_filt_chain, mu_list-sigma*sigma_list, mu_list+sigma*sigma_list)
 
 		#Create figure and setup plot
 		fig = plt.figure(figsize=(8, 2*ndim), dpi=100)
@@ -1340,11 +1342,14 @@ class GraviFit(GravPhaseMaps):
 			hist, bins   = np.histogram(ith_walker, bins='fd', density=True)
 			fhist, fbins = np.histogram(ith_filt_walker, bins='fd',density=True)
 			
-			m = mu_list[i]
-			s = sigma_list[i]
+			if fit_gaussian:
+				m = mu_list[i]
+				s = sigma_list[i]
 
-			l_lim = m-sigma*s
-			h_lim = m+sigma*s
+				l_lim = m-sigma*s
+				h_lim = m+sigma*s
+			else:
+				l_lim, h_lim = ax1.get_ylim()
 
 			#Plot histograms
 			hist_params = {
@@ -1360,8 +1365,9 @@ class GraviFit(GravPhaseMaps):
 				ax3.hist(ith_filt_walker, color=c_fil, bins=fbins, **hist_params, histtype=t, alpha=a)
 
 			#Plot gaussian
-			x = np.linspace(l_lim,h_lim,100)
-			ax3.plot(gauss(x,np.max(fhist),m,s), x, ls='-.',c='k')
+			if fit_gaussian:
+				x = np.linspace(l_lim,h_lim,100)
+				ax3.plot(gauss(x,np.max(fhist),m,s), x, ls='-.',c='k')
 
 			ax1.vlines(x=step_cut, ymin=ax1.get_ylim()[0], ymax=ax1.get_ylim()[1], ls='--',lw=0.9, zorder=0, color='k', alpha=0.5)
 			ax1.hlines(y=l_lim, xmin=step_cut, xmax=nsteps, ls='-.', zorder=0, lw=0.8, color='k')
@@ -1382,7 +1388,7 @@ class GraviFit(GravPhaseMaps):
 			ax2.axhline(l_lim, color='black', linestyle='--', linewidth=1)
 			ax2.axhline(h_lim, color='black', linestyle='--', linewidth=1)
 			
-			ax2.set_ylim(ax1.get_ylim()[0],ax1.get_ylim()[1])
+			#ax2.set_ylim(ax1.get_ylim()[0],ax1.get_ylim()[1])
 			ax3.set_ylim(l_lim,h_lim)
 
 			#Add patches connecting plots	
