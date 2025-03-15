@@ -1250,13 +1250,19 @@ class GraviFit(GravPhaseMaps):
 
 	def inspect_walkers(
 			self,
-			step_cut, 
-			thin, 
+			step_cut=None, 
+			thin=1, 
 			sigma = 5
 			):
 
 		if not self.fit_performed:
 			raise ValueError('No fit has been performed.')
+		elif step_cut==None and self.chain_analysed_by_user:
+			step_cut = self.step_cut
+			thin = self.thin
+		elif step_cut==None:
+			raise ValueError("GraviFit.inspect_walkers() missing arguments: 'step_cut'.")
+
 
 		if self.class_mode=='fits':
 
