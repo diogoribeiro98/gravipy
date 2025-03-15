@@ -272,24 +272,27 @@ class GraviFit(GravPhaseMaps):
 				params_dict = {name: grp_init[name][()] for name in grp_init.keys()}
 				self.fit_parameters = self.assemble_parameter_class(params_dict)
 
-			# Read MCMC results
-			grp = f["fit/emcee"]
-			self.mcmc_chains = np.zeros((grp.attrs['nsteps'], grp.attrs['nwalkers'], grp.attrs['ndim']))
-			self.thin = grp.attrs['thin']
-			
-			grp_full_chain = f["fit/emcee/full_chain"]
-			for idx, param in enumerate(grp_full_chain.keys()):
-				self.mcmc_chains[:, :, idx] = grp_full_chain[param][()]
-			
-			grp_clean_chain = f["fit/emcee/clean_chain"]
-			self.step_cut = grp_clean_chain.attrs['step_cut']
-			self.sigma = grp_clean_chain.attrs['sigma_cut']
-			self.clean_chain = np.zeros((grp_clean_chain[param].shape[0], len(grp_clean_chain.keys())))
-			
-			self.mcmc_variables = np.zeros(len(grp_clean_chain.keys()), dtype=object)
-			for idx, param in enumerate(grp_clean_chain.keys()):
-				self.clean_chain[:, idx] = grp_clean_chain[param][()]
-				self.mcmc_variables[idx] = param
+				# Read MCMC results
+				grp = f["fit/emcee"]
+				self.mcmc_chains = np.zeros((grp.attrs['nsteps'], grp.attrs['nwalkers'], grp.attrs['ndim']))
+				self.thin = grp.attrs['thin']
+				
+				grp_full_chain = f["fit/emcee/full_chain"]
+				for idx, param in enumerate(grp_full_chain.keys()):
+					self.mcmc_chains[:, :, idx] = grp_full_chain[param][()]
+				
+				grp_clean_chain = f["fit/emcee/clean_chain"]
+				self.step_cut = grp_clean_chain.attrs['step_cut']
+				self.sigma = grp_clean_chain.attrs['sigma_cut']
+				self.clean_chain = np.zeros((grp_clean_chain[param].shape[0], len(grp_clean_chain.keys())))
+				
+				self.mcmc_variables = np.zeros(len(grp_clean_chain.keys()), dtype=object)
+				for idx, param in enumerate(grp_clean_chain.keys()):
+					self.clean_chain[:, idx] = grp_clean_chain[param][()]
+					self.mcmc_variables[idx] = param
+		
+				self.chain_analysed_by_user = True
+
 		return
 
 	#========================================
