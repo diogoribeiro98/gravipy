@@ -164,7 +164,21 @@ class GravData_scivis():
 	# Data fetching functions
 	#=========================================
 	
-	def get_interferometric_data(self, pol, channel='SC', flag_channels=[]):
+	def get_interferometric_data(self, 
+							  pol, 
+							  channel='SC', 
+							  flag_channels=[],
+							  flag_channels_bl1 = [],
+							  flag_channels_bl2 = [],
+							  flag_channels_bl3 = [],
+							  flag_channels_bl4 = [],
+							  flag_channels_bl5 = [],
+							  flag_channels_bl6 = [],
+							  flag_channels_cl1 = [],
+							  flag_channels_cl2 = [],
+							  flag_channels_cl3 = [],
+							  flag_channels_cl4 = [],
+							  ):
 		"""Returns an InterferometricData class with the interferometric data
 
 		Args:
@@ -262,30 +276,59 @@ class GravData_scivis():
 
 			t3_flag = oi_t3['FLAG']
 			
+			#
 			# Clean up flagged chanels			
+			#
+
 			vis_flag[visamp>1.0] 		 = 1
 			vis_flag[np.isnan(visamp)] = 1
 			vis_flag[np.isnan(visphi)] = 1
 			vis_flag[:,flag_channels] 	 = 1
-
-			for data in [visamp,visamp_err, visphi, visphi_err]:				
-				data[vis_flag]   = np.nan
 
 			vis2_flag[vis2>1.0] 		= 1
 			vis2_flag[vis2<0.0] 		= 1
 			vis2_flag[np.isnan(vis2)]   = 1
 			vis2_flag[:,flag_channels] 	= 1
 
-			for data in [vis2, vis2_err]:
-				data[vis2_flag] = np.nan
-
 			t3_flag[np.isnan(t3amp)] = 1
 			t3_flag[np.isnan(t3phi)] = 1
 			t3_flag[:,flag_channels] = 1
 
+			#
+			# Check extra flagged channels
+			#
+
+			vis_flag[0,flag_channels_bl1] = 1
+			vis_flag[1,flag_channels_bl2] = 1
+			vis_flag[2,flag_channels_bl3] = 1
+			vis_flag[3,flag_channels_bl4] = 1
+			vis_flag[4,flag_channels_bl5] = 1
+			vis_flag[5,flag_channels_bl6] = 1
+
+			vis2_flag[0,flag_channels_bl1] = 1
+			vis2_flag[1,flag_channels_bl2] = 1
+			vis2_flag[2,flag_channels_bl3] = 1
+			vis2_flag[3,flag_channels_bl4] = 1
+			vis2_flag[4,flag_channels_bl5] = 1
+			vis2_flag[5,flag_channels_bl6] = 1
+
+			t3_flag[0,flag_channels_cl1] = 1
+			t3_flag[1,flag_channels_cl2] = 1
+			t3_flag[2,flag_channels_cl3] = 1
+			t3_flag[3,flag_channels_cl4] = 1
+
+			#
+			# Flag channels
+			#
+
+			for data in [visamp,visamp_err, visphi, visphi_err]:				
+				data[vis_flag]   = np.nan
+
+			for data in [vis2, vis2_err]:
+				data[vis2_flag] = np.nan
+			
 			for data in [t3amp, t3amp_err, t3phi, t3phi_err]:
 				data[t3_flag] = np.nan
-				data[:,flag_channels] = np.nan
 
 			#-------------------------------------------
 			# Fetch baseline and spatial frequency info
@@ -359,7 +402,17 @@ class GravData_scivis():
 			gain=1.0, 
 			threshold=1e-3, 
 			max_iter=None,
-			pixels_per_beam = 2
+			pixels_per_beam = 2,
+			flag_channels_bl1 = [],
+			flag_channels_bl2 = [],
+			flag_channels_bl3 = [],
+			flag_channels_bl4 = [],
+			flag_channels_bl5 = [],
+			flag_channels_bl6 = [],
+			flag_channels_cl1 = [],
+			flag_channels_cl2 = [],
+			flag_channels_cl3 = [],
+			flag_channels_cl4 = [],
 			):
 		"""Returns the Dirty Beam, Dirty Image and Clean Map of interferometric data
 	
@@ -380,7 +433,21 @@ class GravData_scivis():
 		"""
 
 		#Fetch data
-		idata = self.get_interferometric_data(pol,channel,flag_channels)
+		idata = self.get_interferometric_data(
+			pol,
+			channel,
+			flag_channels,
+			flag_channels_bl1,
+			flag_channels_bl2,
+			flag_channels_bl3,
+			flag_channels_bl4,
+			flag_channels_bl5,
+			flag_channels_bl6,
+			flag_channels_cl1,
+			flag_channels_cl2,
+			flag_channels_cl3,
+			flag_channels_cl4,
+			)
 		
 		(xb, B), (x, I), (x,I) =  get_dirty_beam(
 			idata,
@@ -397,9 +464,39 @@ class GravData_scivis():
 	# Plotting functions
 	#=========================================
 	
-	def plot_interferometric_data(self, pol='P1', channel='SC', flag_channels=[]):
+	def plot_interferometric_data(
+			self, 
+			pol='P1', 
+			channel='SC', 
+			flag_channels=[],
+			flag_channels_bl1 = [],
+			flag_channels_bl2 = [],
+			flag_channels_bl3 = [],
+			flag_channels_bl4 = [],
+			flag_channels_bl5 = [],
+			flag_channels_bl6 = [],
+			flag_channels_cl1 = [],
+			flag_channels_cl2 = [],
+			flag_channels_cl3 = [],
+			flag_channels_cl4 = [],
+			):
 
-		idata = self.get_interferometric_data(pol,channel,flag_channels)
+		#Fetch data
+		idata = self.get_interferometric_data(
+			pol,
+			channel,
+			flag_channels,
+			flag_channels_bl1,
+			flag_channels_bl2,
+			flag_channels_bl3,
+			flag_channels_bl4,
+			flag_channels_bl5,
+			flag_channels_bl6,
+			flag_channels_cl1,
+			flag_channels_cl2,
+			flag_channels_cl3,
+			flag_channels_cl4,
+			)
 
 	 	#Define helper plot configurations
 		plot_config = {
@@ -498,13 +595,23 @@ class GravData_scivis():
 			self,
 			pol,
 			channel='SC', 
-			flag_channels=[],
 			window=75,
 			gain=1.0, 
 			threshold=1e-3, 
 			max_iter=None,
 			pixels_per_beam=2,
-			cmap='gist_yarg'
+			cmap='gist_yarg',
+			flag_channels=[],
+			flag_channels_bl1 = [],
+			flag_channels_bl2 = [],
+			flag_channels_bl3 = [],
+			flag_channels_bl4 = [],
+			flag_channels_bl5 = [],
+			flag_channels_bl6 = [],
+			flag_channels_cl1 = [],
+			flag_channels_cl2 = [],
+			flag_channels_cl3 = [],
+			flag_channels_cl4 = [],
 			):
 
 		(bx,B), (x,I), (x,C) = self.get_dirty_beam(
@@ -515,7 +622,17 @@ class GravData_scivis():
 			gain=gain, 
 			threshold=threshold, 
 			max_iter=max_iter,
-			pixels_per_beam=pixels_per_beam
+			pixels_per_beam=pixels_per_beam,
+			flag_channels_bl1 = flag_channels_bl1,
+			flag_channels_bl2 = flag_channels_bl2,
+			flag_channels_bl3 = flag_channels_bl3,
+			flag_channels_bl4 = flag_channels_bl4,
+			flag_channels_bl5 = flag_channels_bl5,
+			flag_channels_bl6 = flag_channels_bl6,
+			flag_channels_cl1 = flag_channels_cl1,
+			flag_channels_cl2 = flag_channels_cl2,
+			flag_channels_cl3 = flag_channels_cl3,
+			flag_channels_cl4 = flag_channels_cl4,
 			)
 		
 
