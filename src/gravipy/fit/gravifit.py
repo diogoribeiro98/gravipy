@@ -82,7 +82,6 @@ class GraviFit(GravPhaseMaps):
 		self.phasemap_smoothing_kernel = None
 
 		self.idata = None
-		self.flagged_channels	= []
 
 		#
 		# Parameters only accessible after a fit is performed 
@@ -121,7 +120,17 @@ class GraviFit(GravPhaseMaps):
 	def load_fits(self, 
 			filename , 
 			polarization=None,
-			flag_channels=[]):
+			flag_channels=[],
+			flag_channels_bl1=[],
+			flag_channels_bl2=[],
+			flag_channels_bl3=[],
+			flag_channels_bl4=[],
+			flag_channels_bl5=[],
+			flag_channels_bl6=[],
+			flag_channels_cl1=[],
+			flag_channels_cl2=[],
+			flag_channels_cl3=[],
+			flag_channels_cl4=[]):
 
 		self.class_mode = 'fits'
 		gfit = GravData_scivis(filename)
@@ -129,11 +138,19 @@ class GraviFit(GravPhaseMaps):
 		self.idata = gfit.get_interferometric_data(
 			pol=polarization,
 			channel='SC',
-			flag_channels=flag_channels
+			flag_channels=flag_channels,
+			flag_channels_bl1=flag_channels_bl1,
+			flag_channels_bl2=flag_channels_bl2,
+			flag_channels_bl3=flag_channels_bl3,
+			flag_channels_bl4=flag_channels_bl4,
+			flag_channels_bl5=flag_channels_bl5,
+			flag_channels_bl6=flag_channels_bl6,
+			flag_channels_cl1=flag_channels_cl1,
+			flag_channels_cl2=flag_channels_cl2,
+			flag_channels_cl3=flag_channels_cl3,
+			flag_channels_cl4=flag_channels_cl4
 			)
-		
-		self.flagged_channels = self.flagged_channels
-		
+				
 		return
 
 	def load_hdf(self, filename):
