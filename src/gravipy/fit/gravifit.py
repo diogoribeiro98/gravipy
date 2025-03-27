@@ -523,7 +523,7 @@ class GraviFit(GravPhaseMaps):
 					'sgra_ra' 	 : [sgr_ra	 			, -fit_window	 , fit_window	 , fit_sgr_pos  ],
 					'sgra_dec' 	 : [sgr_de	 			, -fit_window	 , fit_window	 , fit_sgr_pos  ],
 					'sgra_dmag'  : [-2.5*np.log10(sgr_fr/fr_list[0]), -6.0, 6.0			 , fit_sgr_fr   ],
-					'sgra_alpha' : [sgr_alpha			, -10.0	 		 , 10.0			 , fit_sgr_alpha],
+					'sgra_alpha' : [sgr_alpha			, -20.0	 		 , 20.0			 , fit_sgr_alpha],
 				}
 
 				#Fitting parameters for background
