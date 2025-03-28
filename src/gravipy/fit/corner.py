@@ -3,6 +3,11 @@ import matplotlib.pyplot as plt
 from scipy.ndimage import gaussian_filter
 import numpy as np
 
+def highlight_plot(ax,lw=2):
+	for s in ['top', 'right','bottom', 'left']:
+		ax.spines[s].set_linewidth(lw)
+
+
 def plot_corner_results(
 		file_list,
 		radec_window = 0.5,
@@ -82,6 +87,10 @@ def plot_corner_results(
 	for row in range(ndim):
 		for col in range(ndim):
 
+			#
+			# Setup plot
+			#
+
 			ax = axes[row, col]
 
 			#Remove upper triangle of plots
@@ -109,6 +118,14 @@ def plot_corner_results(
 			if col==0 and row != 0:
 				ax.set_ylabel(labels[row])
 	
+			#Highlight astrometric plots
+			label_row = labels[row]
+			label_col = labels[col]
+			
+			if label_row.endswith('_dec') and label_col.endswith('_ra'):
+				if label_row[:-4]==label_col[:-3]:
+					highlight_plot(ax)
+				
 			if row==col:
 
 				for idx in range(nfiles):
@@ -141,5 +158,5 @@ def plot_corner_results(
 			
 					if labels[ii] == 'background_flux' :
 						ax.set_xlim(central_values[ii]-bkg_window,central_values[ii]+bkg_window)
-
+			
 	return fig, ax
