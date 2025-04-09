@@ -24,12 +24,12 @@ class GravData_raw():
 		# Pre-define class quantities
 		# ---------------------------
 
-		self.filepath : str | None
-		self.filename : str | None
+		self.filepath : str | None  #: Absolute file path
+		self.filename : str | None  #: Loaded file name
 
-		self.header : fits.Header | None
+		self.header : fits.Header | None #: FITS Header
 
-		self.datacatg   : str | None
+		self.datacatg   : str | None #: Data Category (see :ref:`gravipy`)
 		self.datatype   : str | None
 
 		self.date_obs   : str | None
@@ -40,10 +40,18 @@ class GravData_raw():
 		self.resolution : str 	| None
 		self.dit        : float | None
 		self.ndit       : int 	| None
+		self.tel		: str   | None
 
 		self.object : str   | None
 		self.ra 	: float | None
 		self.dec 	: float | None
+
+		self.sobj   : float | None
+		self.sobj_x : float | None
+		self.sobj_y : float | None
+
+		self.sobj_offx: float | None
+		self.sobj_offy: float | None
 
 		# ---------------------------
 		# Check input file is ok
@@ -107,6 +115,7 @@ class GravData_raw():
 		self.dec 	= self.header['DEC']
 
 		#Field and pointing parameters
+		self.sobj   = self.header['ESO INS SOBJ NAME']
 		self.sobj_x = self.header['ESO INS SOBJ X'] # Distance from fringe tracker to field center in RA
 		self.sobj_y = self.header['ESO INS SOBJ Y'] # Distance from fringe tracker to field center in DEC
 
@@ -118,6 +127,11 @@ class GravData_raw():
 	#=========================================
 	
 	def get_acq_data(self):
+		"""Get aquisition camera data
+
+		Returns:
+			_type_: _description_
+		"""
 		with fits.open(self.filepath) as f:
 			aqc_data = f['IMAGING_DATA_ACQ'].data
 		return aqc_data
