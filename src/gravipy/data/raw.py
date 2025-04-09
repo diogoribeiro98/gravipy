@@ -14,7 +14,7 @@ raw_types = [
 'SKY,SINGLE'
 ]
 
-class GravData_raw():
+class GraviData_raw():
 	"""Wrapper class to deal with raw files
 	"""
 

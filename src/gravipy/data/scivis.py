@@ -105,7 +105,7 @@ class GravData_scivis():
 				raise ValueError(f'Filetype {self.datacatg} is not supported')
 		
 		else:
-			raise ValueError(f'ESO PRO CATG not found. Perhaps you are loading a RAW file. Use the GravData_raw for these files')
+			raise ValueError(f'ESO PRO CATG not found. Perhaps you are loading a RAW file. Use the GraviData_raw for these files')
 
 		# ---------------------------
 		# Load Header data
@@ -165,9 +165,10 @@ class GravData_scivis():
 	#=========================================
 	
 	def get_interferometric_data(self, 
-							  pol, 
-							  channel='SC', 
-							  flag_channels=[],
+							  pol : str , 
+							  channel : str ='SC', 
+							  flag_channels : list = [],
+							  *,
 							  flag_channels_bl1 = [],
 							  flag_channels_bl2 = [],
 							  flag_channels_bl3 = [],
@@ -179,14 +180,30 @@ class GravData_scivis():
 							  flag_channels_cl3 = [],
 							  flag_channels_cl4 = [],
 							  ):
-		"""Returns an InterferometricData class with the interferometric data
+		"""
+		get_interferometric_data(pol, channel='SC', flag_channels=[], **kwargs)
+
+		Returns instance of :class:`InterferometricData`.
 
 		Args:
-			pol (str): polarization to retrieve. Must be 'P1' or 'P2'.
-			channel (str): channel to retrieve. Must be 'SC'(science) or 'FT'(fringe tracker) Defaults to 'SC'.
+			pol (str): Polarization to retrieve. Must be 'P1' or 'P2'.
+			channel (str, optional): Channel to retrieve. Must be 'SC'(science) or 'FT'(fringe tracker). Defaults to 'SC'.
 			flag_channels (list, optional): Wavelenght channels to flag. Defaults to [].
+		
+		Keyword Args:
+			flag_channels_bl1 (list): Channels to flag on baseline 1.
+			flag_channels_bl2 (list): Channels to flag on baseline 2.
+			flag_channels_bl3 (list): Channels to flag on baseline 3.
+			flag_channels_bl4 (list): Channels to flag on baseline 4.
+			flag_channels_bl5 (list): Channels to flag on baseline 5.
+			flag_channels_bl6 (list): Channels to flag on baseline 6.
+			flag_channels_cl1 (list): Channels to flag on closure triangle 1.
+			flag_channels_cl2 (list): Channels to flag on closure triangle 2.
+			flag_channels_cl3 (list): Channels to flag on closure triangle 3.
+			flag_channels_cl4 (list): Channels to flag on closure triangle 4.
+
 		Returns:
-			InterferometricData: interferometric data
+			InterferometricData: interferometric data class
 		"""
 
 		if self.polmode=='COMBINED':
