@@ -3,7 +3,7 @@ from datetime import datetime
 
 #Parent classes and functions
 from ..phasemaps import GravPhaseMaps
-from ..data import GravData_scivis
+from ..data import GraviData_scivis
 from ..data import InterferometricData
 
 #Units
@@ -133,7 +133,7 @@ class GraviFit(GravPhaseMaps):
 			flag_channels_cl4=[]):
 
 		self.class_mode = 'fits'
-		gfit = GravData_scivis(filename)
+		gfit = GraviData_scivis(filename)
 
 		self.idata = gfit.get_interferometric_data(
 			pol=polarization,

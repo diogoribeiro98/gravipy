@@ -1,3 +1,3 @@
 from .interferometric_data_class import InterferometricData
-from .scivis import GravData_scivis
+from .scivis import GraviData_scivis
 from .raw import GraviData_raw

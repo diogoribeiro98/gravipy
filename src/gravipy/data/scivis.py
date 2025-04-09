@@ -23,7 +23,7 @@ dualscivis_types = [
 	]
 
 
-class GravData_scivis():
+class GraviData_scivis():
 	"""Wrapper class to deal with science visibility files
 	"""
 
