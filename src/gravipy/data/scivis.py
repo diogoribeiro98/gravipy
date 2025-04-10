@@ -153,12 +153,20 @@ class GraviData_scivis():
 			'GV4': self.header['ESO QC MET SOBJ DDEC4'],
 		}
 
-		self.north_angle = {
+		try:
+			self.north_angle = {
 			'GV1': self.header['ESO QC ACQ FIELD1 NORTH_ANGLE']*np.pi/180., 
 			'GV2': self.header['ESO QC ACQ FIELD2 NORTH_ANGLE']*np.pi/180.,
 			'GV3': self.header['ESO QC ACQ FIELD3 NORTH_ANGLE']*np.pi/180.,
 			'GV4': self.header['ESO QC ACQ FIELD4 NORTH_ANGLE']*np.pi/180.,
-		}
+			}
+		except:
+			self.north_angle = {
+			'GV1': 0.0, 
+			'GV2': 0.0,
+			'GV3': 0.0,
+			'GV4': 0.0,
+			}
 
 	#========================================
 	# Data fetching functions
