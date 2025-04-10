@@ -67,3 +67,7 @@ class InterferometricData:
 	#Spacial frequencies
 	spatial_frequency_as: np.ndarray
 	spatial_frequency_as_T3: np.ndarray
+
+	#Flux
+	flux: np.ndarray
+	flux_err: np.ndarray

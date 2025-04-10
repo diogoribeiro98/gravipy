@@ -237,7 +237,8 @@ class GraviData_scivis():
 			oi_vis 			= f['OI_VIS'	   , fits_index].data
 			oi_vis2  		= f['OI_VIS2'	   , fits_index].data
 			oi_t3  			= f['OI_T3'	  	   , fits_index].data
-
+			oi_flux			= f['OI_FLUX' 	   , fits_index].data
+			
 			#---------------------------------
 			# Fetch telescope array quantities
 			#---------------------------------
@@ -274,13 +275,16 @@ class GraviData_scivis():
 				t3_telescopes[idx] = np.array([t1,t2,t3])
 				t3_labels[idx] 		= t1+t2[-1]+t3[-1]
 			
-			#---------------------------------
-			# Fetch wavelength quantities
-			#---------------------------------
+			#--------------------------------------
+			# Fetch wavelength quantities and flux
+			#--------------------------------------
 
 			#Fetch wavelength quantities
 			wave =  oi_wavelenght['EFF_WAVE']/units.micrometer
 			band = (oi_wavelenght['EFF_BAND']/units.micrometer)/2
+			
+			#Fetch flux quantities
+			flux, flux_err = oi_flux['FLUX'], oi_flux['FLUXERR']
 
 			#---------------------------------
 			# Fetch interferometric data
@@ -413,7 +417,8 @@ class GraviData_scivis():
 				t3phi=t3phi, t3phi_err=t3phi_err,
 				t3flag=t3_flag,
 				spatial_frequency_as=spatial_frequency_as,
-				spatial_frequency_as_T3=spatial_frequency_as_T3
+				spatial_frequency_as_T3=spatial_frequency_as_T3,
+				flux=flux, flux_err=flux_err
 			)
 
 			return data
