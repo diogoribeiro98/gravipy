@@ -157,21 +157,22 @@ class GraviData_raw():
 	#=========================================
 	
 	def get_acq_data(self):
-		"""Get aquisition camera data
-
-		Returns:
-			_type_: _description_
+		"""Returns aquisition camera data
 		"""
 		with fits.open(self.filepath) as f:
 			aqc_data = f['IMAGING_DATA_ACQ'].data
 		return aqc_data
 	
 	def get_sc_data(self):
+		""" Returns science camera data for SCience channel
+		"""
 		with fits.open(self.filepath) as f:
 			sc_data = f['IMAGING_DATA_SC'].data
 		return sc_data
 	
 	def get_ft_data(self):
+		""" Returns science camera data for Fringe Tracker channel
+		"""
 		with fits.open(self.filepath) as f:
 			ft_data = f['IMAGING_DATA_FT'].data
 		return ft_data
@@ -241,7 +242,7 @@ class GraviData_raw():
 		return fig, ax
 	
 	def plot_acq_camera(self, percentile=99.6):
-		"""	Plot the frame average of the acquisition camera
+		"""	Plot the frame average of the (whole) acquisition camera
 		"""
 
 		acq_data = self.get_acq_data()
@@ -275,7 +276,7 @@ class GraviData_raw():
 	#=========================================
 
 	def plot_sc_data(self, vmin =0, vmax = 250):
-		"""Plot the frame average of the laser beacons
+		"""Plot the frame average of the science camera for the SCience channel
 		"""
 		
 		#Get beacon data
