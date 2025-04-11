@@ -25,6 +25,7 @@ class InterferometricData:
 		pol (str): The polarization type of the observation (e.g., 'linear', 'circular').
 		Bu (np.ndarray): Baseline vector components in the u-direction.
 		Bv (np.ndarray): Baseline vector components in the v-direction.
+		telescopes (np.ndarray): Telescopes' names.
 		tel_pos (np.ndarray): The position of the telescope(s) during the observation.
 		bl_telescopes (np.ndarray): List of telescopes used for baseline measurements.
 		t3_telescopes (np.ndarray): List of telescopes used for closure phase measurements.
@@ -80,7 +81,8 @@ class InterferometricData:
 	Bv: np.ndarray
 
 	#Telescope position
-	tel_pos: np.ndarray
+	telescopes: np.ndarray
+	tel_pos: 	np.ndarray
 
 	#Baseline and closure telescopes
 	bl_telescopes: np.ndarray

@@ -191,6 +191,7 @@ class GraviFit(GravPhaseMaps):
 			Bu 		= grp['Bu'][()]
 			Bv 		= grp['Bv'][()]
 			telpos 	= grp['telpos'][()]
+			telescopes = grp['telpos'][()]
 
 			bl_telescopes = grp['bl_telescopes'][()].astype('U')
 			t3_telescopes = grp['t3_telescopes'][()].astype('U')
@@ -248,7 +249,8 @@ class GraviFit(GravPhaseMaps):
 						sobj_metrology_correction_y = sobj_metrology_correction_y,
 						north_angle = north_angle,
 						pol=pol,
-						Bu=Bu, Bv=Bv, 
+						Bu=Bu, Bv=Bv,
+						telescopes=telescopes, 
 						tel_pos=telpos,
 						bl_telescopes=bl_telescopes, t3_telescopes=t3_telescopes,
 						bl_labels=bl_labels, t3_labels=t3_labels,
@@ -1516,6 +1518,7 @@ class GraviFit(GravPhaseMaps):
 			
 			grp.create_dataset('Bu' 	, data=idata.Bu)
 			grp.create_dataset('Bv' 	, data=idata.Bv)
+			grp.create_dataset('telescopes', data=idata.telescopes)
 			grp.create_dataset('telpos' , data=idata.tel_pos)
 			
 			#Note: To save the strings to hdf one needs to convert them to byte strings

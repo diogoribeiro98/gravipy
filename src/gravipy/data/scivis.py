@@ -404,6 +404,7 @@ class GraviData_scivis():
 				north_angle = self.north_angle,
 				pol=pol,
 				Bu=Bu, Bv=Bv, 
+				telescopes=sta_names,
 				tel_pos=sta_pos,
 				bl_telescopes=bl_telescopes, t3_telescopes=t3_telescopes,
 				bl_labels=bl_labels, t3_labels=t3_labels,
