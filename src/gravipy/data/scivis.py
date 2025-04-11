@@ -27,7 +27,7 @@ class GraviData_scivis():
 	"""Wrapper class to deal with science visibility files
 	"""
 
-	def __init__(self, file):
+	def __init__(self, file, *, ignore_north_angle=False):
 
 		# ---------------------------
 		# Pre-define class quantities
@@ -161,12 +161,20 @@ class GraviData_scivis():
 			'GV4': self.header['ESO QC ACQ FIELD4 NORTH_ANGLE']*np.pi/180.,
 			}
 		except:
-			self.north_angle = {
-			'GV1': 0.0, 
-			'GV2': 0.0,
-			'GV3': 0.0,
-			'GV4': 0.0,
-			}
+			if ignore_north_angle:
+				self.north_angle = {
+					'GV1': 0.0, 
+					'GV2': 0.0,
+					'GV3': 0.0,
+					'GV4': 0.0,
+				}
+			else:
+				raise ValueError(''\
+				'NORTH ANGLE parameters not found in header. ' \
+				'Make sure your SCIVIS file was reduced using the -reduce-acq-cam=TRUE' \
+				' or initialize the constructor with "ignore_north_angle=True"'
+				)
+			
 
 	#========================================
 	# Data fetching functions
