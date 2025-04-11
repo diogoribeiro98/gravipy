@@ -15,7 +15,31 @@ raw_types = [
 ]
 
 class GraviData_raw():
-	"""Wrapper class to deal with raw files
+	"""Wrapper class for RAW files
+	
+	Class Variables:
+		filepath (str): Absolute file path
+		filename (str): Loaded filename
+		header (fits.Header): FITS Header from file
+		datacatg (str): Data Category (see section on :ref:`gravity_data`)
+		datatype (str): Data Type (see section on :ref:`gravity_data`)
+		date_obs (str)  : Date of observation as a string
+		date (float): Date of observation in years
+		mjd (float): Date of observation in MJD format
+		polmode (str): Polarization mode 
+		resolution (str): Observation resolution
+		dit (int): Duration of each DIT
+		ndit (int): Number of DITS
+		tel (str): Array of telescopes used ('UT' or 'AT')
+		object (str) : Name of observed object 
+		ra (float) : Pointing RA 
+		dec (float) : Pointing DEC
+		sobj (str): Science object name
+		sobj_x (float): RA offset from fringe tracker
+		sobj_y (float): DEC offset from fringe tracker
+		sobj_offx (float): RA offset in mas (from sobj_x)
+		sobj_offy (float): DEC offset in mas (from sobj_y)
+
 	"""
 
 	def __init__(self, file):
@@ -24,17 +48,17 @@ class GraviData_raw():
 		# Pre-define class quantities
 		# ---------------------------
 
-		self.filepath : str | None  #: Absolute file path
-		self.filename : str | None  #: Loaded file name
+		self.filepath : str | None  
+		self.filename : str | None  
 
-		self.header : fits.Header | None #: FITS Header
+		self.header : fits.Header | None 
 
-		self.datacatg   : str | None #: Data Category (see :ref:`gravipy`)
+		self.datacatg   : str | None 
 		self.datatype   : str | None
 
 		self.date_obs   : str | None
-		self.date       : str | None
-		self.mjd        : str | None
+		self.date       : float | None
+		self.mjd        : float | None
 
 		self.polmode    : str 	| None 
 		self.resolution : str 	| None
@@ -46,7 +70,7 @@ class GraviData_raw():
 		self.ra 	: float | None
 		self.dec 	: float | None
 
-		self.sobj   : float | None
+		self.sobj   : str   | None
 		self.sobj_x : float | None
 		self.sobj_y : float | None
 
