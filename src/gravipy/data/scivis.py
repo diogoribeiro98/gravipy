@@ -24,7 +24,50 @@ dualscivis_types = [
 
 
 class GraviData_scivis():
-	"""Wrapper class to deal with science visibility files
+	"""Wrapper class for SCIVIS files. The class is called with a FITS file path as an argument:
+	
+	.. code-block:: python
+		
+		sci_data = GraviData_scivis("path/to/filename.FITS")
+
+	All class variables can be acessed by ``sci_data.class_variable_name``.
+
+	.. important::
+		A valid ``north_angle`` variable requires the loaded file to have been reduced with
+		the ``-reduce-acq-cam=TRUE`` as an argument for the `gravi_vis` pipeline recipe. If this
+		is not the case, the class will raise an error. This behaviour can be overwritten by
+		calling the constructor as
+
+		.. code-block:: python
+		
+			sci_data = GraviData_scivis("path/to/filename.FITS", ignore_north_angle=True)
+
+	
+	Class Variables:
+		filepath (str): Absolute file path
+		filename (str): Loaded filename
+		header (fits.Header): FITS Header from file
+		datacatg (str): Data Category (see section on :ref:`gravity_data`)
+		datatype (str): Data Type (see section on :ref:`gravity_data`)
+		date_obs (str)  : Date of observation as a string
+		date (float): Date of observation in years
+		mjd (float): Date of observation in MJD format
+		polmode (str): Polarization mode 
+		resolution (str): Observation resolution
+		dit (int): Duration of each DIT
+		ndit (int): Number of DITS
+		tel (str): Array of telescopes used ('UT' or 'AT')
+		object (str) : Name of observed object 
+		ra (float) : Pointing RA 
+		dec (float) : Pointing DEC
+		sobj (str): Science object name
+		sobj_x (float): RA offset from fringe tracker
+		sobj_y (float): DEC offset from fringe tracker
+		sobj_offx (float): RA offset in mas (from sobj_x)
+		sobj_offy (float): DEC offset in mas (from sobj_y)
+		sobj_metrology_correction_x (dict): RA offset metrology correction
+		sobj_metrology_correction_y (dict): DEC offset metrology correction 
+		north_angle (dict): Dictionary with north angle position of each GRAVITY beam. 
 	"""
 
 	def __init__(self, file, *, ignore_north_angle=False):
@@ -199,7 +242,7 @@ class GraviData_scivis():
 		"""
 		get_interferometric_data(pol, channel='SC', flag_channels=[], **kwargs)
 
-		Returns instance of :class:`InterferometricData`.
+		Returns instance of InterferometricData.
 
 		Args:
 			pol (str): Polarization to retrieve. Must be 'P1' or 'P2'.
