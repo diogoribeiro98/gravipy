@@ -15,8 +15,14 @@ raw_types = [
 ]
 
 class GraviData_raw():
-	"""Wrapper class for RAW files
-	
+	"""Wrapper class for RAW files. The class is called with a FITS file path as an argument:
+
+	.. code-block:: python
+		
+		raw_data = GraviData_raw("path/to/filename.FITS")
+
+	All class variables can be acessed by ``raw_data.class_variable_name``.
+		
 	Class Variables:
 		filepath (str): Absolute file path
 		filename (str): Loaded filename
