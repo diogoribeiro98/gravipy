@@ -198,10 +198,16 @@ class GraviFit(GravPhaseMaps):
 			bl_labels = grp['bl_labels'][()].astype('U')
 			t3_labels = grp['t3_labels'][()].astype('U')
 
+			#Wavelenght
 			grp = f['data/visibility/wave']
 			pol  = str(grp['polarization'][()])
 			wave = grp['wave'][()]
 			band = grp['band'][()]
+
+			#Flux
+			grp = f['data/visibility/flux']
+			flux = grp['flux'][()]
+			flux_err = grp['flux_err'][()]
 
 			#Visibility data
 			grp = f['data/visibility/vis']
@@ -256,7 +262,9 @@ class GraviFit(GravPhaseMaps):
 						t3phi=t3phi, t3phi_err=t3phi_err,
 						t3flag=t3_flag,
 						spatial_frequency_as=spatial_frequency,
-						spatial_frequency_as_T3=spatial_frequency_t3
+						spatial_frequency_as_T3=spatial_frequency_t3,
+						flux=flux,
+						flux_err=flux_err
 					)
 
 			#
@@ -1521,6 +1529,10 @@ class GraviFit(GravPhaseMaps):
 			grp.create_dataset('polarization' 	, data= idata.pol)
 			grp.create_dataset('wave' 			, data= idata.wave)
 			grp.create_dataset('band' 			, data= idata.band)
+			
+			grp = f.create_group("data/visibility/flux")
+			grp.create_dataset('flux'			, data= idata.flux)
+			grp.create_dataset('flux_err'		, data= idata.flux_err)
 			
 			grp = f.create_group("data/visibility/vis")
 			grp.create_dataset('visamp' 	, data= idata.visamp)
