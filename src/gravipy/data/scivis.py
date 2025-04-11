@@ -34,7 +34,7 @@ class GraviData_scivis():
 
 	.. important::
 		A valid ``north_angle`` variable requires the loaded file to have been reduced with
-		the ``-reduce-acq-cam=TRUE`` as an argument for the `gravi_vis` pipeline recipe. If this
+		the ``-reduce-acq-cam=TRUE`` as an argument for the ``gravi_vis`` pipeline recipe. If this
 		is not the case, the class will raise an error. This behaviour can be overwritten by
 		calling the constructor as
 
@@ -497,23 +497,42 @@ class GraviData_scivis():
 			flag_channels_cl3 = [],
 			flag_channels_cl4 = [],
 			):
-		"""Returns the Dirty Beam, Dirty Image and Clean Map of interferometric data
-	
-			Args:
+		"""		
+		get_dirty_beam(pol, channel='SC', flag_channels=[], **kwargs)
+
+		Returns the Dirty Beam, Dirty Image and Clean Map of interferometric data
+
+		Args:
 			pol (str): polarization to retrieve. Must be 'P1' or 'P2'.
 			channel (str): channel to retrieve. Must be 'SC'(science) or 'FT'(fringe tracker) Defaults to 'SC'.
 			flag_channels (list, optional): Wavelenght channels to flag. Defaults to [].
+		Keyword Args:
 			window (int, optional): Size of reconstructed image in miliarcseconds. Defaults to 80.
-			npoints (int, optional): Number of sample points. Total image will be (2*npoints+1) in both directions. Defaults to 500.
 			gain (float, optional): CLEAN loop gain. Defaults to 1.0.
 			threshold (float, optional): CLEAN loop threshold. Defaults to 0.05.
 			max_iter (int, optional): Maxium CLEAN iterations. If None is give, uses the number of UV sampled points. Defaults to None.
+			pixels_per_beam (int, optional): Size of central beam in pixels. Defaults to 2.
+			flag_channels_bl1 (list): Channels to flag on baseline 1.
+			flag_channels_bl2 (list): Channels to flag on baseline 2.
+			flag_channels_bl3 (list): Channels to flag on baseline 3.
+			flag_channels_bl4 (list): Channels to flag on baseline 4.
+			flag_channels_bl5 (list): Channels to flag on baseline 5.
+			flag_channels_bl6 (list): Channels to flag on baseline 6.
+			flag_channels_cl1 (list): Channels to flag on closure triangle 1.
+			flag_channels_cl2 (list): Channels to flag on closure triangle 2.
+			flag_channels_cl3 (list): Channels to flag on closure triangle 3.
+			flag_channels_cl4 (list): Channels to flag on closure triangle 4.
 
 		Returns:
+			Dirty Beam, Dirty Image and Clean map in the format (x, 2D Array)		
+			
 			(bx, B.real) : Dirty Beam 
+			
 			(x, I.real)  : Dirty Image 
+			
 			(x,clean_map.real): Clean Map
-		"""
+		
+		"""		
 
 		#Fetch data
 		idata = self.get_interferometric_data(
@@ -551,8 +570,8 @@ class GraviData_scivis():
 			self, 
 			pol='P1', 
 			channel='SC', 
-			*,
 			flag_channels=[],
+			*,
 			flag_channels_bl1 = [],
 			flag_channels_bl2 = [],
 			flag_channels_bl3 = [],
@@ -564,6 +583,31 @@ class GraviData_scivis():
 			flag_channels_cl3 = [],
 			flag_channels_cl4 = [],
 			):
+		"""
+		plot_interferometric_data(pol, channel='SC', flag_channels=[], **kwargs)
+
+		Plot all interferometric quantities
+
+		Args:
+			pol (str): polarization to retrieve. Must be 'P1' or 'P2'.
+			channel (str): channel to retrieve. Must be 'SC'(science) or 'FT'(fringe tracker) Defaults to 'SC'.
+			flag_channels (list, optional): Wavelenght channels to flag. Defaults to [].
+
+		Keyword Args:
+			flag_channels_bl1 (list): Channels to flag on baseline 1.
+			flag_channels_bl2 (list): Channels to flag on baseline 2.
+			flag_channels_bl3 (list): Channels to flag on baseline 3.
+			flag_channels_bl4 (list): Channels to flag on baseline 4.
+			flag_channels_bl5 (list): Channels to flag on baseline 5.
+			flag_channels_bl6 (list): Channels to flag on baseline 6.
+			flag_channels_cl1 (list): Channels to flag on closure triangle 1.
+			flag_channels_cl2 (list): Channels to flag on closure triangle 2.
+			flag_channels_cl3 (list): Channels to flag on closure triangle 3.
+			flag_channels_cl4 (list): Channels to flag on closure triangle 4.
+
+		Returns:
+			(fig, ax) : Figure and axes
+		"""
 
 		#Fetch data
 		idata = self.get_interferometric_data(
@@ -679,13 +723,13 @@ class GraviData_scivis():
 			self,
 			pol,
 			channel='SC', 
+			flag_channels=[],
+			*,
 			window=75,
 			gain=1.0, 
 			threshold=1e-3, 
 			max_iter=None,
 			pixels_per_beam=2,
-			cmap='gist_yarg',
-			flag_channels=[],
 			flag_channels_bl1 = [],
 			flag_channels_bl2 = [],
 			flag_channels_bl3 = [],
@@ -696,7 +740,40 @@ class GraviData_scivis():
 			flag_channels_cl2 = [],
 			flag_channels_cl3 = [],
 			flag_channels_cl4 = [],
+			cmap='gist_yarg',
 			):
+		"""		
+		plot_dirty_beam(pol, channel='SC', flag_channels=[], **kwargs)
+
+		PLots the Dirty Beam, Dirty Image and Clean Map of interferometric data
+
+		Args:
+			pol (str): polarization to retrieve. Must be 'P1' or 'P2'.
+			channel (str): channel to retrieve. Must be 'SC'(science) or 'FT'(fringe tracker) Defaults to 'SC'.
+			flag_channels (list, optional): Wavelenght channels to flag. Defaults to [].
+		Keyword Args:
+			window (int, optional): Size of reconstructed image in miliarcseconds. Defaults to 80.
+			gain (float, optional): CLEAN loop gain. Defaults to 1.0.
+			threshold (float, optional): CLEAN loop threshold. Defaults to 0.05.
+			max_iter (int, optional): Maxium CLEAN iterations. If None is give, uses the number of UV sampled points. Defaults to None.
+			pixels_per_beam (int, optional): Size of central beam in pixels. Defaults to 2.
+			flag_channels_bl1 (list): Channels to flag on baseline 1.
+			flag_channels_bl2 (list): Channels to flag on baseline 2.
+			flag_channels_bl3 (list): Channels to flag on baseline 3.
+			flag_channels_bl4 (list): Channels to flag on baseline 4.
+			flag_channels_bl5 (list): Channels to flag on baseline 5.
+			flag_channels_bl6 (list): Channels to flag on baseline 6.
+			flag_channels_cl1 (list): Channels to flag on closure triangle 1.
+			flag_channels_cl2 (list): Channels to flag on closure triangle 2.
+			flag_channels_cl3 (list): Channels to flag on closure triangle 3.
+			flag_channels_cl4 (list): Channels to flag on closure triangle 4.
+
+		Plot Arguments:
+			cmap (str): Matplotlib colormap
+		
+		Returns:
+			(fig, ax) : Figure and axes
+		"""
 
 		(bx,B), (x,I), (x,C) = self.get_dirty_beam(
 			pol=pol,
