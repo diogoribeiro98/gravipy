@@ -1,8 +1,7 @@
 import numpy as np
-from astropy.io import fits
 import h5py
 import os
-
+from astropy.io import fits
 from dataclasses import dataclass
 
 @dataclass
@@ -193,22 +192,29 @@ class InterferometricData:
 		"""
 		
 		#Check mode
-		valid_modes = ('write', 'append')
+		valid_modes = ('write', 'append', 'overwrite')
 
 		if mode=='write':
+			if os.path.exists(filepath):
+				raise FileExistsError(f"File {filepath} already exists. Consider a different name or use `mode='overwrite'.")
+			
 			hdf5_mode = 'w-' # Create file, fail if exists
 		elif mode=='append':
 			hdf5_mode = 'r+' # Read/write, file must exist
+		elif mode=='overwrite':
+			if os.path.exists(filepath):
+				os.remove(filepath)
+			hdf5_mode = 'w-' # Read/write, file must exist
 		else:
 			raise ValueError(f"mode must be one of {valid_modes}")
 
-		with h5py.File(filepath, "w") as f:
+		with h5py.File(filepath, hdf5_mode) as f:
 
 			grp = f.create_group("data")
 
 			#Header information
-			grp.attrs['filename'] 		= self.filename
-			grp.attrs['fits_header'] = self.header.tostring(sep='`n').encode('utf-8')
+			grp.attrs['filename'] 	 = self.filename
+			grp.attrs['fits_header'] = self.header.tostring(sep='\n').encode('utf-8')
 			
 			#Obsevation information
 			grp.attrs['date_obs'] 		= self.date_obs
@@ -275,50 +281,120 @@ class InterferometricData:
 			grp.create_dataset('spatial_frequency_t3', data= self.spatial_frequency_as_T3)
 
 		return
-'''
-	def to_hdf5(self, filepath,*, mode='write'):
-
-		
-		valid_modes = ('write', 'append', 'overwrite')
-		if mode not in valid_modes:
-			raise ValueError(f"mode must be one of {valid_modes}")
-		
-		#Save behaviour depends on file existence
-		file_exists = os.path.exists(filepath)
-
-		if mode == 'write':
-			if file_exists:
-				raise FileExistsError(f"File '{filepath}' already exists. Use 'overwrite_file' if you want to replace it.")
-			else:
-				file_mode = 'w'
-
-		elif mode == 'append':
-			if not file_exists:
-				raise FileNotFoundError(f"File '{filepath}' does not exist. Use 'write_file' to create it.")
-			else:
-				file_mode = 'a'
-
-		elif mode =='overwrite':
-
-
-
-		if mode not in ('write_file', 'append_to_file'):
-			raise ValueError("mode must be 'write_file' or 'append_to_file'")
 	
-		file_mode = 'w' if mode == 'write_file' else 'a'
-		group_name = 'idata'
+	@staticmethod
+	def from_hdf5(filepath):
+		"""
+		Load InterferometricData from an HDF5 file.
 
-		if os.path.exists(filepath) and not overwrite:
-			raise ValueError(f"File '{filepath}' already exists. Choose a different appendix, remove the existing file or use the keyword `overwrite`.")
-
-
-
-		with h5py.File(filepath, file_mode) as f:
+		Args:
+			filepath (str): Path to the HDF5 file.
+		Returns:
+			InterferometricData: Reconstructed data class.
+		"""
+		with h5py.File(filepath, 'r') as f:
+			# --- General info from attributes ---
+			grp = f['data']
+			filename = grp.attrs['filename']
 			
-			if group_name in f:
-                raise ValueError(f"Group '{group_name}' already exists in file.")
+			header = fits.Header.fromstring(grp.attrs['fits_header'], sep='\n')
 
+			date_obs = grp.attrs['date_obs']
+			polmode = grp.attrs['polmode']
+			resolution = grp.attrs['resolution']
+			object_ = grp.attrs['object']
+			ra = grp.attrs['ra']
+			dec = grp.attrs['dec']
+			sobj = grp.attrs['sobj']
+			sobj_x = grp.attrs['sobj_x']
+			sobj_y = grp.attrs['sobj_y']
+			sobj_offx = grp.attrs['sobj_offx']
+			sobj_offy = grp.attrs['sobj_offy']
 
+			# --- Array data ---
+			arr = f['data/array']
+			Bu = arr['Bu'][()]
+			Bv = arr['Bv'][()]
+			telescopes = arr['telescopes'][()].astype(str)
+			tel_pos = arr['telpos'][()]
+			bl_telescopes = np.array([a.astype(str) for a in arr['bl_telescopes'][()]])
+			t3_telescopes = np.array([a.astype(str) for a in arr['t3_telescopes'][()]])
+			bl_labels = arr['bl_labels'][()].astype(str)
+			t3_labels = arr['t3_labels'][()].astype(str)
 
-		return
-'''
+			# --- Visibility data ---
+			vis_wave = f['data/visibility/wave']			
+			pol  = vis_wave['polarization'][()].decode()
+			wave = vis_wave['wave'][()]
+			band = vis_wave['band'][()]
+
+			vis_flux = f['data/visibility/flux']
+			flux = vis_flux['flux'][()]
+			flux_err = vis_flux['flux_err'][()]
+
+			vis = f['data/visibility/vis']
+			visamp = vis['visamp'][()]
+			visamp_err = vis['visamp_err'][()]
+			visphi = vis['visphi'][()]
+			visphi_err = vis['visphi_err'][()]
+			vis_flag = vis['vis_flag'][()]
+
+			vis2 = f['data/visibility/vis2']
+			vis2_data = vis2['vis2'][()]
+			vis2_err = vis2['vis2_err'][()]
+			vis2_flag = vis2['vis2_flag'][()]
+
+			t3 = f['data/visibility/t3']
+			t3amp = t3['t3amp'][()]
+			t3amp_err = t3['t3amp_err'][()]
+			t3phi = t3['t3phi'][()]
+			t3phi_err = t3['t3phi_err'][()]
+			t3flag = t3['t3_flag'][()]
+
+			sf = f['data/visibility/sf']
+			spatial_frequency_as = sf['spatial_frequency'][()]
+			spatial_frequency_as_T3 = sf['spatial_frequency_t3'][()]
+
+		return InterferometricData(
+			filename=filename,
+			header=header,
+			date_obs=date_obs,
+			polmode=polmode,
+			resolution=resolution,
+			object=object_,
+			ra=ra,
+			dec=dec,
+			sobj=sobj,
+			sobj_x=sobj_x,
+			sobj_y=sobj_y,
+			sobj_offx=sobj_offx,
+			sobj_offy=sobj_offy,
+			pol=pol,
+			Bu=Bu,
+			Bv=Bv,
+			telescopes=telescopes,
+			tel_pos=tel_pos,
+			bl_telescopes=bl_telescopes,
+			t3_telescopes=t3_telescopes,
+			bl_labels=bl_labels,
+			t3_labels=t3_labels,
+			wave=wave,
+			band=band,
+			flux=flux,
+			flux_err=flux_err,
+			visamp=visamp,
+			visamp_err=visamp_err,
+			visphi=visphi,
+			visphi_err=visphi_err,
+			vis_flag=vis_flag,
+			vis2=vis2_data,
+			vis2_err=vis2_err,
+			vis2_flag=vis2_flag,
+			t3amp=t3amp,
+			t3amp_err=t3amp_err,
+			t3phi=t3phi,
+			t3phi_err=t3phi_err,
+			t3flag=t3flag,
+			spatial_frequency_as=spatial_frequency_as,
+			spatial_frequency_as_T3=spatial_frequency_as_T3
+		)
