@@ -181,6 +181,16 @@ class InterferometricData:
 		return north_angle
 
 	def save_to_hdf5(self, filepath, mode='write'):
+		"""
+		Save InterferometridData class data to hdf5 file. 
+		
+		If ``mode=write``, tries to create a new file. If ``mode=append``, tries to append the data to an existing file.
+
+		Args:
+			filepath (str): Output file path. Should end with '.hdf5'
+			mode (str, optional): Writting mode. Defaults to 'write'.
+
+		"""
 		
 		#Check mode
 		valid_modes = ('write', 'append')
