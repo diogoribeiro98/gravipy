@@ -70,7 +70,7 @@ class GraviData_scivis():
 		north_angle (dict): Dictionary with north angle position of each GRAVITY beam. 
 	"""
 
-	def __init__(self, file, *, ignore_north_angle=False):
+	def __init__(self, file):
 
 		# ---------------------------
 		# Pre-define class quantities
@@ -104,11 +104,6 @@ class GraviData_scivis():
 
 		self.sobj_offx: float | None
 		self.sobj_offy: float | None
-
-		self.sobj_metrology_correction_x : None
-		self.sobj_metrology_correction_y : None
-
-		self.north_angle : None
 
 		# ---------------------------
 		# Check input file is ok
@@ -179,46 +174,6 @@ class GraviData_scivis():
 		self.sobj_offx = self.header['ESO INS SOBJ OFFX'] #Distance between source field and current field in RA
 		self.sobj_offy = self.header['ESO INS SOBJ OFFY'] #Distance between source field and current field in DEC
 		
-		#Note:  the following keywords are specific of dualsivis files
-		# 		not entirerly sure if only dualscivis or all the processed files
-
-		self.sobj_metrology_correction_x ={
-			'GV1': self.header['ESO QC MET SOBJ DRA1'], 
-			'GV2': self.header['ESO QC MET SOBJ DRA2'],
-			'GV3': self.header['ESO QC MET SOBJ DRA3'],
-			'GV4': self.header['ESO QC MET SOBJ DRA4'],
-		}
-
-		self.sobj_metrology_correction_y ={
-			'GV1': self.header['ESO QC MET SOBJ DDEC1'], 
-			'GV2': self.header['ESO QC MET SOBJ DDEC2'],
-			'GV3': self.header['ESO QC MET SOBJ DDEC3'],
-			'GV4': self.header['ESO QC MET SOBJ DDEC4'],
-		}
-
-		try:
-			self.north_angle = {
-			'GV1': self.header['ESO QC ACQ FIELD1 NORTH_ANGLE']*np.pi/180., 
-			'GV2': self.header['ESO QC ACQ FIELD2 NORTH_ANGLE']*np.pi/180.,
-			'GV3': self.header['ESO QC ACQ FIELD3 NORTH_ANGLE']*np.pi/180.,
-			'GV4': self.header['ESO QC ACQ FIELD4 NORTH_ANGLE']*np.pi/180.,
-			}
-		except:
-			if ignore_north_angle:
-				self.north_angle = {
-					'GV1': 0.0, 
-					'GV2': 0.0,
-					'GV3': 0.0,
-					'GV4': 0.0,
-				}
-			else:
-				raise ValueError(''\
-				'NORTH ANGLE parameters not found in header. ' \
-				'Make sure your SCIVIS file was reduced using the -reduce-acq-cam=TRUE' \
-				' or initialize the constructor with "ignore_north_angle=True"'
-				)
-			
-
 	#========================================
 	# Data fetching functions
 	#=========================================
@@ -360,10 +315,10 @@ class GraviData_scivis():
 			# Clean up flagged chanels			
 			#
 
-			vis_flag[visamp>1.0] 		 = 1
-			vis_flag[np.isnan(visamp)] = 1
-			vis_flag[np.isnan(visphi)] = 1
-			vis_flag[:,flag_channels] 	 = 1
+			vis_flag[visamp>1.0] 		= 1
+			vis_flag[np.isnan(visamp)]	= 1
+			vis_flag[np.isnan(visphi)] 	= 1
+			vis_flag[:,flag_channels] 	= 1
 
 			vis2_flag[vis2>1.0] 		= 1
 			vis2_flag[vis2<0.0] 		= 1
@@ -441,7 +396,10 @@ class GraviData_scivis():
 
 			data = InterferometricData(
 				filename=self.filename,
+				header = self.header,
 				date_obs=self.date_obs,
+				polmode = self.polmode,
+				resolution = self.resolution,
 				object = self.object,
 				ra	= self.ra, 	
 				dec = self.dec, 
@@ -450,9 +408,6 @@ class GraviData_scivis():
 				sobj_y = self.sobj_y,
 				sobj_offx = self.sobj_offx,
 				sobj_offy = self.sobj_offy,
-				sobj_metrology_correction_x = self.sobj_metrology_correction_x,
-				sobj_metrology_correction_y = self.sobj_metrology_correction_y,
-				north_angle = self.north_angle,
 				pol=pol,
 				Bu=Bu, Bv=Bv, 
 				telescopes=sta_names,

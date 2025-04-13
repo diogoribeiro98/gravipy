@@ -1,4 +1,8 @@
 import numpy as np
+from astropy.io import fits
+import h5py
+import os
+
 from dataclasses import dataclass
 
 @dataclass
@@ -10,7 +14,10 @@ class InterferometricData:
 
 	Parameters:
 		filename (str): The name of the data file.
+		header (fits.Header): Main header of file
 		date_obs (str): The date and time of observation.
+		polmode (str): Observation polarization mode
+		resolution(str):
 		object (str): The astronomical object being observed.
 		ra (float): The right ascension of the observed object in degrees.
 		dec (float): The declination of the observed object in degrees.
@@ -19,9 +26,6 @@ class InterferometricData:
 		sobj_y (float): The source object flux density in the y-direction.
 		sobj_offx (float): The source object offset in the x-direction.
 		sobj_offy (float): The source object offset in the y-direction.
-		sobj_metrology_correction_x (dict): Metrology correction for the x-direction for the source object.
-		sobj_metrology_correction_y (dict): Metrology correction for the y-direction for the source object.
-		north_angle (dict): The angle of the north direction for the observation, in degrees.
 		pol (str): The polarization type of the observation (e.g., 'linear', 'circular').
 		Bu (np.ndarray): Baseline vector components in the u-direction.
 		Bv (np.ndarray): Baseline vector components in the v-direction.
@@ -33,6 +37,8 @@ class InterferometricData:
 		t3_labels (np.ndarray): Labels for the closure phase baselines.
 		wave (np.ndarray): The wavelength(s) of observation.
 		band (np.ndarray): The bandwidth(s) of the observation.
+		flux (np.ndarray): Flux per wavelength
+		flux_err (np.ndarray): Flux error
 		visamp (np.ndarray): Visibility amplitude data.
 		visamp_err (np.ndarray): Visibility amplitude error.
 		visphi (np.ndarray): Visibility phase data.
@@ -48,14 +54,21 @@ class InterferometricData:
 		t3flag (np.ndarray): Flag for closure phase data.
 		spatial_frequency_as (np.ndarray): Spatial frequency in arcseconds for baseline data.
 		spatial_frequency_as_T3 (np.ndarray): Spatial frequency in arcseconds for closure phase data.
-		flux (np.ndarray): Flux per wavelength
-		flux_err (np.ndarray): Flux error
 	"""
 
-	#Header information
-	filename: str
-	date_obs: str
+	#--------------------------
+	# General file information
+	#--------------------------
 
+	#File and Header information
+	filename: str
+	header : fits.Header
+	
+	#Obsevation information
+	date_obs: str
+	polmode    : str 
+	resolution : str
+		
 	#Observation pointing
 	object 	: str
 	ra 		: float
@@ -68,11 +81,10 @@ class InterferometricData:
 	sobj_offx: float 
 	sobj_offy: float 
 
-	#Metrology corrections
-	sobj_metrology_correction_x : dict
-	sobj_metrology_correction_y : dict
-	north_angle : dict
-	
+	#--------------------------
+	# Interferometric data
+	#--------------------------
+
 	#Polarization
 	pol: str
 
@@ -93,7 +105,11 @@ class InterferometricData:
 	#Wavelength
 	wave: np.ndarray
 	band: np.ndarray
-	
+
+	#Flux
+	flux: np.ndarray
+	flux_err: np.ndarray
+
 	#Visibility amplitude and phase
 	visamp: np.ndarray
 	visamp_err: np.ndarray
@@ -117,6 +133,85 @@ class InterferometricData:
 	spatial_frequency_as: np.ndarray
 	spatial_frequency_as_T3: np.ndarray
 
-	#Flux
-	flux: np.ndarray
-	flux_err: np.ndarray
+	def get_metrology_offset_correction(self):
+		
+		sobj_metrology_correction_x ={
+			'GV1': self.header['ESO QC MET SOBJ DRA1'], 
+			'GV2': self.header['ESO QC MET SOBJ DRA2'],
+			'GV3': self.header['ESO QC MET SOBJ DRA3'],
+			'GV4': self.header['ESO QC MET SOBJ DRA4'],
+		}
+
+		sobj_metrology_correction_y ={
+			'GV1': self.header['ESO QC MET SOBJ DDEC1'], 
+			'GV2': self.header['ESO QC MET SOBJ DDEC2'],
+			'GV3': self.header['ESO QC MET SOBJ DDEC3'],
+			'GV4': self.header['ESO QC MET SOBJ DDEC4'],
+		}
+
+		return sobj_metrology_correction_x, sobj_metrology_correction_y
+
+	def get_acq_north_angle(self):
+		
+		try:
+			north_angle = {
+				'GV1': self.header['ESO QC ACQ FIELD1 NORTH_ANGLE']*np.pi/180., 
+				'GV2': self.header['ESO QC ACQ FIELD2 NORTH_ANGLE']*np.pi/180.,
+				'GV3': self.header['ESO QC ACQ FIELD3 NORTH_ANGLE']*np.pi/180.,
+				'GV4': self.header['ESO QC ACQ FIELD4 NORTH_ANGLE']*np.pi/180.,
+				}
+		except:
+			raise ValueError(''\
+			'NORTH ANGLE parameters not found in header. ' \
+			'Make sure your SCIVIS file was reduced using the -reduce-acq-cam=TRUE'
+			)
+
+		return north_angle
+
+'''
+	def to_hdf5(self, filepath,*, mode='write'):
+
+		
+		valid_modes = ('write', 'append', 'overwrite')
+		if mode not in valid_modes:
+			raise ValueError(f"mode must be one of {valid_modes}")
+		
+		#Save behaviour depends on file existence
+		file_exists = os.path.exists(filepath)
+
+		if mode == 'write':
+			if file_exists:
+				raise FileExistsError(f"File '{filepath}' already exists. Use 'overwrite_file' if you want to replace it.")
+			else:
+				file_mode = 'w'
+
+		elif mode == 'append':
+			if not file_exists:
+				raise FileNotFoundError(f"File '{filepath}' does not exist. Use 'write_file' to create it.")
+			else:
+				file_mode = 'a'
+
+		elif mode =='overwrite':
+
+
+
+		if mode not in ('write_file', 'append_to_file'):
+			raise ValueError("mode must be 'write_file' or 'append_to_file'")
+	
+		file_mode = 'w' if mode == 'write_file' else 'a'
+		group_name = 'idata'
+
+		if os.path.exists(filepath) and not overwrite:
+			raise ValueError(f"File '{filepath}' already exists. Choose a different appendix, remove the existing file or use the keyword `overwrite`.")
+
+
+
+		with h5py.File(filepath, file_mode) as f:
+			
+			if group_name in f:
+                raise ValueError(f"Group '{group_name}' already exists in file.")
+
+
+
+		return
+'''
