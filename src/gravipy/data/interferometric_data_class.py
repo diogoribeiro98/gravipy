@@ -12,12 +12,16 @@ class InterferometricData:
 	header information, observation details, polarization, metrology corrections, 
 	baseline data, telescope positions, visibility data (amplitude, phase), and more.
 
+	Besides the explicit class members, several fetching methods are implemented to quickly access important header variables.
+
+	Further more, the interferometric data can be saved or loaded from an hdf file.
+
 	Parameters:
 		filename (str): The name of the data file.
 		header (fits.Header): Main header of file
 		date_obs (str): The date and time of observation.
 		polmode (str): Observation polarization mode
-		resolution(str):
+		resolution(str): Observation resolution
 		object (str): The astronomical object being observed.
 		ra (float): The right ascension of the observed object in degrees.
 		dec (float): The declination of the observed object in degrees.
@@ -134,6 +138,8 @@ class InterferometricData:
 	spatial_frequency_as_T3: np.ndarray
 
 	def get_metrology_offset_correction(self):
+		""" Returns metrology offset correction
+		"""
 		
 		sobj_metrology_correction_x ={
 			'GV1': self.header['ESO QC MET SOBJ DRA1'], 
@@ -152,7 +158,13 @@ class InterferometricData:
 		return sobj_metrology_correction_x, sobj_metrology_correction_y
 
 	def get_acq_north_angle(self):
-		
+		""" Return estimated north angle values estimated from aquisition camera
+
+		.. important::
+			
+			If the loaded data was not reduced reduced with the ``-reduce-acq-cam=TRUE`` as an argument for the ``gravi_vis`` pipeline recipe, the function will raise an error.
+
+		"""
 		try:
 			north_angle = {
 				'GV1': self.header['ESO QC ACQ FIELD1 NORTH_ANGLE']*np.pi/180., 
