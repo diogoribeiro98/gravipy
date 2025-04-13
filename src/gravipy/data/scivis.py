@@ -65,9 +65,6 @@ class GraviData_scivis():
 		sobj_y (float): DEC offset from fringe tracker
 		sobj_offx (float): RA offset in mas (from sobj_x)
 		sobj_offy (float): DEC offset in mas (from sobj_y)
-		sobj_metrology_correction_x (dict): RA offset metrology correction
-		sobj_metrology_correction_y (dict): DEC offset metrology correction 
-		north_angle (dict): Dictionary with north angle position of each GRAVITY beam. 
 	"""
 
 	def __init__(self, file):
