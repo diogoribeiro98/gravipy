@@ -180,6 +180,91 @@ class InterferometricData:
 
 		return north_angle
 
+	def save_to_hdf5(self, filepath, mode='write'):
+		
+		#Check mode
+		valid_modes = ('write', 'append')
+
+		if mode=='write':
+			hdf5_mode = 'w-' # Create file, fail if exists
+		elif mode=='append':
+			hdf5_mode = 'r+' # Read/write, file must exist
+		else:
+			raise ValueError(f"mode must be one of {valid_modes}")
+
+		with h5py.File(filepath, "w") as f:
+
+			grp = f.create_group("data")
+
+			#Header information
+			grp.attrs['filename'] 		= self.filename
+			grp.attrs['fits_header'] = self.header.tostring(sep='`n').encode('utf-8')
+			
+			#Obsevation information
+			grp.attrs['date_obs'] 		= self.date_obs
+			grp.attrs['polmode'] 		= self.polmode
+			grp.attrs['resolution'] 	= self.resolution
+
+			#Observation pointing
+			grp.attrs['object'  ] 		= self.object
+			grp.attrs['ra'  	] 		= self.ra
+			grp.attrs['dec'  	] 		= self.dec
+			
+			grp.attrs['sobj'  ] 		= self.sobj
+			grp.attrs['sobj_x'] 		= self.sobj_x
+			grp.attrs['sobj_y'] 		= self.sobj_y
+			
+			grp.attrs['sobj_offx'] = self.sobj_offx
+			grp.attrs['sobj_offy'] = self.sobj_offy
+
+			#Interferometric data
+			grp = f.create_group("data/array")
+			grp.create_dataset('Bu' 	, data=self.Bu)
+			grp.create_dataset('Bv' 	, data=self.Bv)
+			
+			grp.create_dataset('telescopes' , data= self.telescopes.astype('S'))
+			grp.create_dataset('telpos' 	, data=self.tel_pos)
+			
+			#Note: To save the strings to hdf one needs to convert them to byte strings
+			grp.create_dataset('bl_telescopes' , data= [arr.astype('S') for arr in self.bl_telescopes])
+			grp.create_dataset('t3_telescopes' , data= [arr.astype('S') for arr in self.t3_telescopes])
+
+			grp.create_dataset('bl_labels' , data= self.bl_labels.astype('S'))
+			grp.create_dataset('t3_labels' , data= self.t3_labels.astype('S'))
+	
+			grp = f.create_group("data/visibility/wave")
+			grp.create_dataset('polarization' 	, data= self.pol)
+			grp.create_dataset('wave' 			, data= self.wave)
+			grp.create_dataset('band' 			, data= self.band)
+			
+			grp = f.create_group("data/visibility/flux")
+			grp.create_dataset('flux'			, data= self.flux)
+			grp.create_dataset('flux_err'		, data= self.flux_err)
+			
+			grp = f.create_group("data/visibility/vis")
+			grp.create_dataset('visamp' 	, data= self.visamp)
+			grp.create_dataset('visamp_err' , data= self.visamp_err)			
+			grp.create_dataset('visphi' 	, data= self.visphi)
+			grp.create_dataset('visphi_err' , data= self.visphi_err)
+			grp.create_dataset('vis_flag' 	, data= self.vis_flag)
+			
+			grp = f.create_group("data/visibility/vis2")
+			grp.create_dataset('vis2' 		, data= self.vis2)
+			grp.create_dataset('vis2_err' 	, data= self.vis2_err)			
+			grp.create_dataset('vis2_flag' 	, data= self.vis2_flag)
+			
+			grp = f.create_group("data/visibility/t3")
+			grp.create_dataset('t3amp' 		, data= self.t3amp)
+			grp.create_dataset('t3amp_err' 	, data= self.t3amp_err)			
+			grp.create_dataset('t3phi' 		, data= self.t3phi)
+			grp.create_dataset('t3phi_err' 	, data= self.t3phi_err)			
+			grp.create_dataset('t3_flag' 	, data= self.t3flag)
+			
+			grp = f.create_group("data/visibility/sf")
+			grp.create_dataset('spatial_frequency', data= self.spatial_frequency_as)
+			grp.create_dataset('spatial_frequency_t3', data= self.spatial_frequency_as_T3)
+
+		return
 '''
 	def to_hdf5(self, filepath,*, mode='write'):
 
