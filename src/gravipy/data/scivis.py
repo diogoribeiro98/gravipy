@@ -32,17 +32,6 @@ class GraviData_scivis():
 
 	All class variables can be acessed by ``sci_data.class_variable_name``.
 
-	.. important::
-		A valid ``north_angle`` variable requires the loaded file to have been reduced with
-		the ``-reduce-acq-cam=TRUE`` as an argument for the ``gravi_vis`` pipeline recipe. If this
-		is not the case, the class will raise an error. This behaviour can be overwritten by
-		calling the constructor as
-
-		.. code-block:: python
-		
-			sci_data = GraviData_scivis("path/to/filename.FITS", ignore_north_angle=True)
-
-	
 	Class Variables:
 		filepath (str): Absolute file path
 		filename (str): Loaded filename
