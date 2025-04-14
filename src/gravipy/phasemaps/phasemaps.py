@@ -145,6 +145,13 @@ class GravPhaseMaps():
 			'GV4' : np.zeros((self.spectral_channels, self.phasemap_size, self.phasemap_size), dtype=np.float64),
 		}
 
+		self.telescope_to_beam = {
+			'UT1' : 'GV4',
+			'UT2' : 'GV3',
+			'UT3' : 'GV2',
+			'UT4' : 'GV1',
+		}
+
 	#=========================
 	# Phasemap creation tools
 	#=========================
