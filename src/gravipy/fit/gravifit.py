@@ -1117,9 +1117,9 @@ class GraviFit(GravPhaseMaps):
 			phasemaps_amplitude 	= self.phasemaps_amplitude
 			phasemaps_normalization = self.phasemaps_normalization
 
-			north_angle 	= idata.north_angle
-			metrology_offx 	= idata.sobj_metrology_correction_x
-			metrology_offy 	= idata.sobj_metrology_correction_y
+			north_angle 	= idata.get_acq_north_angle()
+			metrology_offx, metrology_offy 	= idata.get_metrology_offset_correction()
+			 	
 			
 			weights = fit_weights
 
