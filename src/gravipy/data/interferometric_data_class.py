@@ -179,7 +179,7 @@ class InterferometricData:
 
 		return north_angle
 
-	def save_to_hdf5(self, filepath, mode='write'):
+	def to_hdf5(self, filepath, mode='write'):
 		"""
 		Save InterferometridData class data to hdf5 file. 
 		
