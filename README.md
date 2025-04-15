@@ -7,4 +7,4 @@
 
 ## About the logo
 
-The package logo was designed by Diogo Ribeiro. Some elements were adapted from vector resources originally sourced from [Vecteezy](https://www.vecteezy.com/).
+The package logo was designed by Diogo Ribeiro. <a href="https://www.vecteezy.com/free-vector/snake-icon">Some elements</a> were adapted from vector resources originally sourced from [Vecteezy](https://www.vecteezy.com/).
