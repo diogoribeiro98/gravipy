@@ -761,3 +761,33 @@ class GraviData_scivis():
 			ax.set_aspect(1)
 
 		return fig, axes
+	
+	def plot_spectral_flux(
+			self,
+			pol,
+			channel='SC', 
+			flag_channels=[]):
+		
+		#Fetch data
+		idata = self.get_interferometric_data(
+			pol,
+			channel,
+			flag_channels = flag_channels,
+			)
+		
+		x 	 = idata.wave
+		y 	 = idata.flux
+		yerr = idata.flux_err
+		
+		fig, ax = plt.subplots(figsize=(5,2.2))
+		ax.set_xlabel('Wavelength [micrometer]')
+		ax.set_ylabel(fr'Flux [a.u.]')
+		ax.set_xlim(1.98,2.5)
+		ax.axvline(2.0, ls='-.', lw=0.8,c='k')
+		ax.axvline(2.4, ls='-.', lw=0.8,c='k')
+		#ax.set_ylim(-2,2)
+
+		for idx, tel in enumerate(idata.telescopes):
+			ax.errorbar(x,y[idx],yerr=yerr[idx])
+
+		return fig, ax
