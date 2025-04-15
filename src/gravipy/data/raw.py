@@ -181,7 +181,7 @@ class GraviData_raw():
 	# Aquisition camera display functions
 	#=========================================
 
-	def plot_acq_beacons(self, vmin =-500, vmax = 2500):
+	def plot_acq_beacons(self, vmin=-500, vmax=2500, *, dpi=300):
 		"""Plot the frame average of the laser beacons
 		"""
 		
@@ -190,8 +190,8 @@ class GraviData_raw():
 		frame_data = np.average(acq_data[:,750:1000,:], axis=0)
 
 		#Setup figure
-		fig, ax = plt.subplots( figsize=(4,2.5))	
-		ax.set_title(self.filename, fontsize=6)	
+		fig, ax = plt.subplots( figsize=(4,2.5), dpi=dpi)	
+		ax.set_title(self.filename, fontsize=5)	
 		ax.set_xticks([])
 		ax.set_yticks([])
 		ax.set_xticklabels([])
@@ -210,7 +210,7 @@ class GraviData_raw():
 		
 		return fig, ax
 	
-	def plot_acq_fields(self, percentile=99.6):
+	def plot_acq_fields(self, percentile=99.6, dpi=300):
 		"""Plot the frame average of the acquisition fields
 		"""
 		
@@ -219,8 +219,8 @@ class GraviData_raw():
 		frame_data = np.average(acq_data[:,0:250,:], axis=0)
 
 		#Setup figure
-		fig, ax = plt.subplots( figsize=(4,2.5))	
-		ax.set_title(self.filename, fontsize=6)	
+		fig, ax = plt.subplots(figsize=(4,2.5), dpi=dpi)	
+		ax.set_title(self.filename, fontsize=5)	
 		ax.set_xticks([])
 		ax.set_yticks([])
 		ax.set_xticklabels([])
@@ -241,15 +241,15 @@ class GraviData_raw():
 	
 		return fig, ax
 	
-	def plot_acq_camera(self, percentile=99.6):
+	def plot_acq_camera(self, percentile=99.6,*, dpi=300):
 		"""	Plot the frame average of the (whole) acquisition camera
 		"""
 
 		acq_data = self.get_acq_data()
 		frame_data = np.average(acq_data, axis=0)
 
-		fig, ax = plt.subplots(figsize=(5,5))
-		ax.set_title(self.filename, fontsize=6)	
+		fig, ax = plt.subplots(figsize=(4,4), dpi=dpi)
+		ax.set_title(self.filename, fontsize=5)	
 
 		ax.set_xticks([])
 		ax.set_yticks([])
@@ -275,7 +275,7 @@ class GraviData_raw():
 	# Science camera display functions
 	#=========================================
 
-	def plot_sc_data(self, vmin =0, vmax = 250):
+	def plot_sc_data(self, vmin=0, vmax=250):
 		"""Plot the frame average of the science camera for the SCience channel
 		"""
 		
