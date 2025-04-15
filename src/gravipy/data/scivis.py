@@ -766,6 +766,14 @@ class GraviData_scivis():
 			self,
 			pol,
 			channel='SC'):
+		"""		
+		
+		Plots the spectral flux associated with a specific polarization and channel
+		
+		Args:
+			pol (str): polarization to retrieve. Must be 'P1' or 'P2'.
+			channel (str): channel to retrieve. Must be 'SC'(science) or 'FT'(fringe tracker) Defaults to 'SC'.
+		"""
 		
 		#Fetch data
 		idata = self.get_interferometric_data(pol, channel)
