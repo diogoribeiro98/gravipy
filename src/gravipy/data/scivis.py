@@ -782,15 +782,29 @@ class GraviData_scivis():
 		y 	 = idata.flux
 		yerr = idata.flux_err
 		
+		#Calculate average and standard deviation of spectrum
+		yavg = np.median(y)
+		ystd = np.std(y)
+
 		fig, ax = plt.subplots(figsize=(5,2.2))
 		ax.set_xlabel('Wavelength [micrometer]')
 		ax.set_ylabel(fr'Flux [a.u.]')
 		ax.set_xlim(1.98,2.5)
 		ax.axvline(2.0, ls='-.', lw=0.8,c='k')
 		ax.axvline(2.4, ls='-.', lw=0.8,c='k')
-		#ax.set_ylim(-2,2)
+		ax.set_ylim(yavg-ystd, yavg+ystd)
+		
+		plot_config = {
+			'alpha':    0.8,
+			'ms':       0.0,
+			'lw':       1.2,
+			'capsize':  2.0,
+			'ls':       '-'    
+		}
 
 		for idx, tel in enumerate(idata.telescopes):
-			ax.errorbar(x,y[idx],yerr=yerr[idx])
+			ax.errorbar(x,y[idx],yerr=yerr[idx], **plot_config, label=tel)
+		
+		ax.legend(ncol=len(idata.telescopes))
 
 		return fig, ax
