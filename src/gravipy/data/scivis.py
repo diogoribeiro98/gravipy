@@ -765,15 +765,10 @@ class GraviData_scivis():
 	def plot_spectral_flux(
 			self,
 			pol,
-			channel='SC', 
-			flag_channels=[]):
+			channel='SC'):
 		
 		#Fetch data
-		idata = self.get_interferometric_data(
-			pol,
-			channel,
-			flag_channels = flag_channels,
-			)
+		idata = self.get_interferometric_data(pol, channel)
 		
 		x 	 = idata.wave
 		y 	 = idata.flux
