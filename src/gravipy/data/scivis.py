@@ -570,9 +570,9 @@ class GraviData_scivis():
 	 	#Define helper plot configurations
 		plot_config = {
 			'alpha':    0.8,
-			'ms':       3.0,
-			'lw':       0.8,
-			'capsize':  1.0,
+			'ms':       3.0 if idata.resolution=='LOW' else 0.0,
+			'lw':       0.8 if idata.resolution=='LOW' else 0.1,
+			'capsize':  1.0 if idata.resolution=='LOW' else 0.1,
 			'ls':       ''    
 		}
 		
