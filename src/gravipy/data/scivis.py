@@ -765,7 +765,9 @@ class GraviData_scivis():
 	def plot_spectral_flux(
 			self,
 			pol,
-			channel='SC'):
+			channel='SC',
+			*,
+			std=None):
 		"""		
 		
 		Plots the spectral flux associated with a specific polarization and channel
@@ -773,6 +775,7 @@ class GraviData_scivis():
 		Args:
 			pol (str): polarization to retrieve. Must be 'P1' or 'P2'.
 			channel (str): channel to retrieve. Must be 'SC'(science) or 'FT'(fringe tracker) Defaults to 'SC'.
+			std (float): number of standard deviations from averate to use as plot range. Defaults to None.
 		"""
 		
 		#Fetch data
@@ -782,23 +785,25 @@ class GraviData_scivis():
 		y 	 = idata.flux
 		yerr = idata.flux_err
 		
-		#Calculate average and standard deviation of spectrum
-		yavg = np.median(y)
-		ystd = np.std(y)
 
 		fig, ax = plt.subplots(figsize=(5,2.2))
 		ax.set_xlabel('Wavelength [micrometer]')
 		ax.set_ylabel(fr'Flux [a.u.]')
-		ax.set_xlim(1.98,2.5)
+		ax.set_xlim(1.9,2.5)
 		ax.axvline(2.0, ls='-.', lw=0.8,c='k')
 		ax.axvline(2.4, ls='-.', lw=0.8,c='k')
-		ax.set_ylim(yavg-ystd, yavg+ystd)
 		
+		if std is not None:
+			#Calculate average and standard deviation of spectrum
+			yavg = np.median(y)
+			ystd = np.std(y)
+
+			ax.set_ylim(yavg-std*ystd, yavg+std*ystd)
+				
 		plot_config = {
-			'alpha':    0.8,
 			'ms':       0.0,
-			'lw':       1.2,
-			'capsize':  2.0,
+			'lw':       0.8,
+			'capsize':  0.1 if idata.resolution =='HIGH' else 2.0,
 			'ls':       '-'    
 		}
 
