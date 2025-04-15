@@ -492,7 +492,7 @@ class GraviData_scivis():
 			flag_channels_cl4 = flag_channels_cl4,
 			)
 		
-		(xb, B), (x, I), (x,I) =  get_dirty_beam(
+		(xb, B), (x, I), (x,C) =  get_dirty_beam(
 			idata,
 			window=window,
 			gain=gain, 
@@ -501,7 +501,7 @@ class GraviData_scivis():
 			pixels_per_beam = pixels_per_beam
 		)
 
-		return (xb, B), (x, I), (x,I)
+		return (xb, B), (x, I), (x,C)
 
 	#========================================
 	# Plotting functions
